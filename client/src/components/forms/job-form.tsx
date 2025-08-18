@@ -9,15 +9,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Plus, X, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertJobSchema } from "@shared/schema";
 import { SERVICE_TYPES, JOB_PRIORITIES, RECURRING_PATTERNS } from "@/lib/constants";
-import type { Job, Client, Worker, Division } from "@shared/schema";
+import type { Job, Client, Worker, Division, InventoryItem, InsertJobInventoryItem } from "@shared/schema";
 import { z } from "zod";
+import { useState } from "react";
 
 const jobFormSchema = insertJobSchema.extend({
   scheduledDate: z.date({
@@ -26,6 +28,15 @@ const jobFormSchema = insertJobSchema.extend({
 });
 
 type JobFormData = z.infer<typeof jobFormSchema>;
+
+interface SelectedInventoryItem {
+  inventoryItem: InventoryItem;
+  quantity: number;
+  isRental: boolean;
+  rentalStartDate?: Date;
+  rentalEndDate?: Date;
+  notes?: string;
+}
 
 interface JobFormProps {
   job?: Job | null;
@@ -36,6 +47,8 @@ interface JobFormProps {
 export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedItems, setSelectedItems] = useState<SelectedInventoryItem[]>([]);
+  const [showItemSelector, setShowItemSelector] = useState(false);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
@@ -47,6 +60,10 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
 
   const { data: divisions = [] } = useQuery<Division[]>({
     queryKey: ['/api/divisions'],
+  });
+
+  const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
+    queryKey: ['/api/inventory'],
   });
 
   const form = useForm<JobFormData>({
@@ -70,12 +87,35 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: JobFormData) => apiRequest('POST', '/api/jobs', data),
+    mutationFn: async (data: JobFormData) => {
+      // First create the job
+      const createdJob = await apiRequest('POST', '/api/jobs', data);
+      
+      // Then create job inventory items if any are selected
+      if (selectedItems.length > 0) {
+        for (const selectedItem of selectedItems) {
+          const jobInventoryItem: InsertJobInventoryItem = {
+            jobId: createdJob.id,
+            inventoryItemId: selectedItem.inventoryItem.id,
+            quantity: selectedItem.quantity.toString(),
+            unitPrice: selectedItem.inventoryItem.unitPrice || "0",
+            notes: selectedItem.notes,
+            isRental: selectedItem.isRental,
+            rentalStartDate: selectedItem.rentalStartDate,
+            rentalEndDate: selectedItem.rentalEndDate
+          };
+          await apiRequest('POST', '/api/job-inventory', jobInventoryItem);
+        }
+      }
+      
+      return createdJob;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-inventory'] });
       toast({
         title: "Success",
-        description: "Job created successfully",
+        description: "Job created successfully with selected equipment",
       });
       onSuccess();
     },
@@ -121,6 +161,46 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   );
 
   const isRecurring = form.watch("isRecurring");
+
+  // Helper functions for inventory selection
+  const addInventoryItem = (item: InventoryItem) => {
+    const exists = selectedItems.find(selected => selected.inventoryItem.id === item.id);
+    if (exists) {
+      toast({
+        title: "Item already added",
+        description: "This item is already selected for this job",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newItem: SelectedInventoryItem = {
+      inventoryItem: item,
+      quantity: 1,
+      isRental: item.type === 'rental_equipment',
+      rentalStartDate: item.type === 'rental_equipment' ? new Date() : undefined,
+      rentalEndDate: item.type === 'rental_equipment' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : undefined, // 30 days default
+      notes: ""
+    };
+
+    setSelectedItems([...selectedItems, newItem]);
+    setShowItemSelector(false);
+  };
+
+  const removeInventoryItem = (itemId: string) => {
+    setSelectedItems(selectedItems.filter(item => item.inventoryItem.id !== itemId));
+  };
+
+  const updateInventoryItem = (itemId: string, updates: Partial<SelectedInventoryItem>) => {
+    setSelectedItems(selectedItems.map(item => 
+      item.inventoryItem.id === itemId ? { ...item, ...updates } : item
+    ));
+  };
+
+  // Filter inventory items by division
+  const availableInventory = selectedDivision 
+    ? inventoryItems.filter(item => !item.divisionId || item.divisionId === selectedDivision)
+    : inventoryItems;
 
   return (
     <Form {...form}>
@@ -389,6 +469,168 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               </FormItem>
             )}
           />
+
+          {/* Inventory Selection Section */}
+          <div className="space-y-4 border-t pt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-md font-medium">Equipment & Consumables</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowItemSelector(true)}
+                data-testid="button-add-inventory"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Items
+              </Button>
+            </div>
+
+            {selectedItems.length > 0 && (
+              <div className="space-y-3">
+                {selectedItems.map((selectedItem) => (
+                  <div key={selectedItem.inventoryItem.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Package className="h-5 w-5 text-blue-500" />
+                        <div>
+                          <p className="font-medium">{selectedItem.inventoryItem.name}</p>
+                          <p className="text-sm text-muted-foreground">{selectedItem.inventoryItem.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={selectedItem.isRental ? "default" : "secondary"}>
+                          {selectedItem.isRental ? "Rental" : "Consumable"}
+                        </Badge>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeInventoryItem(selectedItem.inventoryItem.id)}
+                          data-testid={`button-remove-${selectedItem.inventoryItem.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-sm font-medium">Quantity</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={selectedItem.quantity}
+                          onChange={(e) => updateInventoryItem(selectedItem.inventoryItem.id, { 
+                            quantity: parseInt(e.target.value) || 1 
+                          })}
+                          data-testid={`input-quantity-${selectedItem.inventoryItem.id}`}
+                        />
+                      </div>
+                      
+                      {selectedItem.isRental && (
+                        <>
+                          <div>
+                            <label className="text-sm font-medium">Rental Start Date</label>
+                            <Input
+                              type="date"
+                              value={selectedItem.rentalStartDate?.toISOString().split('T')[0] || ""}
+                              onChange={(e) => updateInventoryItem(selectedItem.inventoryItem.id, {
+                                rentalStartDate: e.target.value ? new Date(e.target.value) : undefined
+                              })}
+                              data-testid={`input-start-date-${selectedItem.inventoryItem.id}`}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium">Rental End Date</label>
+                            <Input
+                              type="date"
+                              value={selectedItem.rentalEndDate?.toISOString().split('T')[0] || ""}
+                              onChange={(e) => updateInventoryItem(selectedItem.inventoryItem.id, {
+                                rentalEndDate: e.target.value ? new Date(e.target.value) : undefined
+                              })}
+                              data-testid={`input-end-date-${selectedItem.inventoryItem.id}`}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Notes</label>
+                      <Textarea
+                        placeholder="Additional notes for this item..."
+                        value={selectedItem.notes || ""}
+                        onChange={(e) => updateInventoryItem(selectedItem.inventoryItem.id, { 
+                          notes: e.target.value 
+                        })}
+                        data-testid={`textarea-notes-${selectedItem.inventoryItem.id}`}
+                        className="resize-none"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Inventory Item Selector Dialog */}
+            {showItemSelector && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Select Inventory Items</h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowItemSelector(false)}
+                      data-testid="button-close-selector"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {availableInventory.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-4">
+                        No inventory items available for the selected division.
+                      </p>
+                    ) : (
+                      availableInventory.map((item) => (
+                        <div
+                          key={item.id}
+                          className="border rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                          onClick={() => addInventoryItem(item)}
+                          data-testid={`inventory-item-${item.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <Package className="h-4 w-4 text-blue-500" />
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                                <p className="text-sm text-muted-foreground">Stock: {item.quantity} | SKU: {item.sku}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge variant={item.type === 'rental_equipment' ? "default" : "secondary"}>
+                                {item.type === 'rental_equipment' ? 'Rental' : 'Consumable'}
+                              </Badge>
+                              {item.unitPrice && (
+                                <p className="text-sm font-medium mt-1">R {item.unitPrice}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <FormField
             control={form.control}

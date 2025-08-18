@@ -5,7 +5,8 @@ import {
   insertDivisionSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
   insertInvoiceSchema, insertInvoiceItemSchema,
-  insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema
+  insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
+  insertJobInventoryItemSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -644,6 +645,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: "Failed to send email" });
     }
+  });
+
+  // Job Inventory Items
+  app.get("/api/job-inventory", async (req, res) => {
+    const { jobId } = req.query;
+    if (jobId) {
+      const items = await storage.getJobInventoryItemsByJob(jobId as string);
+      res.json(items);
+    } else {
+      const items = await storage.getJobInventoryItems();
+      res.json(items);
+    }
+  });
+
+  app.post("/api/job-inventory", async (req, res) => {
+    try {
+      const item = insertJobInventoryItemSchema.parse(req.body);
+      const created = await storage.createJobInventoryItem(item);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid job inventory item data" });
+    }
+  });
+
+  app.put("/api/job-inventory/:id", async (req, res) => {
+    try {
+      const updateData = insertJobInventoryItemSchema.partial().parse(req.body);
+      const updated = await storage.updateJobInventoryItem(req.params.id, updateData);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid job inventory item data" });
+    }
+  });
+
+  app.delete("/api/job-inventory/:id", async (req, res) => {
+    const deleted = await storage.deleteJobInventoryItem(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Job inventory item not found" });
+    }
+    res.status(204).send();
   });
 
   const httpServer = createServer(app);

@@ -115,6 +115,19 @@ export const invoiceItems = pgTable("invoice_items", {
   inventoryItemId: varchar("inventory_item_id"), // link to inventory item
 });
 
+export const jobInventoryItems = pgTable("job_inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull(),
+  inventoryItemId: varchar("inventory_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  isRental: boolean("is_rental").notNull().default(false),
+  rentalStartDate: timestamp("rental_start_date"),
+  rentalEndDate: timestamp("rental_end_date"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
@@ -213,6 +226,11 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+export const insertJobInventoryItemSchema = createInsertSchema(jobInventoryItems).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -249,3 +267,6 @@ export type EmailTemplate = typeof emailTemplates.$inferSelect;
 
 export type InsertEmailLog = z.infer<typeof insertEmailLogSchema>;
 export type EmailLog = typeof emailLogs.$inferSelect;
+
+export type InsertJobInventoryItem = z.infer<typeof insertJobInventoryItemSchema>;
+export type JobInventoryItem = typeof jobInventoryItems.$inferSelect;

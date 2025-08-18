@@ -10,7 +10,8 @@ import {
   type InvoiceItem, type InsertInvoiceItem,
   type Notification, type InsertNotification,
   type EmailTemplate, type InsertEmailTemplate,
-  type EmailLog, type InsertEmailLog
+  type EmailLog, type InsertEmailLog,
+  type JobInventoryItem, type InsertJobInventoryItem
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -109,6 +110,14 @@ export interface IStorage {
   getEmailLogsByStatus(status: string): Promise<EmailLog[]>;
   createEmailLog(log: InsertEmailLog): Promise<EmailLog>;
   updateEmailLog(id: string, log: Partial<InsertEmailLog>): Promise<EmailLog>;
+
+  // Job Inventory Items
+  getJobInventoryItems(): Promise<JobInventoryItem[]>;
+  getJobInventoryItem(id: string): Promise<JobInventoryItem | undefined>;
+  getJobInventoryItemsByJob(jobId: string): Promise<JobInventoryItem[]>;
+  createJobInventoryItem(item: InsertJobInventoryItem): Promise<JobInventoryItem>;
+  updateJobInventoryItem(id: string, item: Partial<InsertJobInventoryItem>): Promise<JobInventoryItem>;
+  deleteJobInventoryItem(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -124,6 +133,7 @@ export class MemStorage implements IStorage {
   private notifications: Map<string, Notification> = new Map();
   private emailTemplates: Map<string, EmailTemplate> = new Map();
   private emailLogs: Map<string, EmailLog> = new Map();
+  private jobInventoryItems: Map<string, JobInventoryItem> = new Map();
   private invoiceCounter: number = 1;
 
   constructor() {
@@ -186,6 +196,73 @@ export class MemStorage implements IStorage {
         createdAt: new Date()
       };
       this.clients.set(c.id, c);
+    });
+
+    // Create sample inventory items
+    const inventoryItems = [
+      {
+        name: "Paper Towel Dispenser - Wall Mount",
+        type: "rental_equipment",
+        sku: "PTD-WM-001",
+        quantity: 50,
+        unitPrice: "149.99",
+        description: "Professional wall-mounted paper towel dispenser, lockable design",
+        divisionId: "div-2"
+      },
+      {
+        name: "Paper Roll Refill - Premium",
+        type: "product",
+        sku: "PRR-PREM-001", 
+        quantity: 200,
+        unitPrice: "12.50",
+        description: "High-quality paper towel rolls for dispensers, 200m per roll",
+        divisionId: "div-2"
+      },
+      {
+        name: "Hand Sanitizer Dispenser - Automatic",
+        type: "rental_equipment",
+        sku: "HSD-AUTO-001",
+        quantity: 30,
+        unitPrice: "199.99",
+        description: "Touchless automatic hand sanitizer dispenser with sensor",
+        divisionId: "div-2"
+      },
+      {
+        name: "Hand Sanitizer Refill - 1L",
+        type: "product",
+        sku: "HSR-1L-001",
+        quantity: 150,
+        unitPrice: "35.00",
+        description: "Premium hand sanitizer refill, alcohol-based formula",
+        divisionId: "div-2"
+      },
+      {
+        name: "Pest Control Bait Station",
+        type: "rental_equipment", 
+        sku: "PCB-STAT-001",
+        quantity: 25,
+        unitPrice: "89.99",
+        description: "Tamper-resistant bait station for rodent control",
+        divisionId: "div-1"
+      },
+      {
+        name: "Pest Control Bait - Rodenticide",
+        type: "product",
+        sku: "PCB-ROD-001",
+        quantity: 100,
+        unitPrice: "25.00",
+        description: "Professional rodenticide bait blocks",
+        divisionId: "div-1"
+      }
+    ];
+
+    inventoryItems.forEach((item, index) => {
+      const inv: InventoryItem = {
+        id: `inv-${index + 1}`,
+        ...item,
+        createdAt: new Date()
+      };
+      this.inventoryItems.set(inv.id, inv);
     });
 
     // Create sample invoices
@@ -719,6 +796,41 @@ export class MemStorage implements IStorage {
     const updatedLog = { ...log, ...updateData };
     this.emailLogs.set(id, updatedLog);
     return updatedLog;
+  }
+
+  // Job Inventory Items
+  async getJobInventoryItems(): Promise<JobInventoryItem[]> {
+    return Array.from(this.jobInventoryItems.values());
+  }
+
+  async getJobInventoryItem(id: string): Promise<JobInventoryItem | undefined> {
+    return this.jobInventoryItems.get(id);
+  }
+
+  async getJobInventoryItemsByJob(jobId: string): Promise<JobInventoryItem[]> {
+    return Array.from(this.jobInventoryItems.values()).filter(item => item.jobId === jobId);
+  }
+
+  async createJobInventoryItem(insertItem: InsertJobInventoryItem): Promise<JobInventoryItem> {
+    const id = randomUUID();
+    const item: JobInventoryItem = { ...insertItem, id, createdAt: new Date() };
+    this.jobInventoryItems.set(id, item);
+    return item;
+  }
+
+  async updateJobInventoryItem(id: string, updateData: Partial<InsertJobInventoryItem>): Promise<JobInventoryItem> {
+    const item = this.jobInventoryItems.get(id);
+    if (!item) {
+      throw new Error(`Job inventory item with id ${id} not found`);
+    }
+    
+    const updatedItem = { ...item, ...updateData };
+    this.jobInventoryItems.set(id, updatedItem);
+    return updatedItem;
+  }
+
+  async deleteJobInventoryItem(id: string): Promise<boolean> {
+    return this.jobInventoryItems.delete(id);
   }
 }
 
