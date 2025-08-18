@@ -85,6 +85,36 @@ export const jobs = pgTable("jobs", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  clientId: varchar("client_id").notNull(),
+  status: text("status").notNull().default('draft'), // draft, sent, paid, overdue, cancelled
+  issueDate: timestamp("issue_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  paymentDate: timestamp("payment_date"),
+  notes: text("notes"),
+  terms: text("terms"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const invoiceItems = pgTable("invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(),
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  jobId: varchar("job_id"), // link to job if invoice item is for a job
+  contractId: varchar("contract_id"), // link to contract if invoice item is for rental
+  inventoryItemId: varchar("inventory_item_id"), // link to inventory item
+});
+
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
@@ -93,7 +123,7 @@ export const notifications = pgTable("notifications", {
   priority: text("priority").notNull().default('medium'), // low, medium, high, urgent
   isRead: boolean("is_read").notNull().default(false),
   userId: varchar("user_id"),
-  relatedEntityType: text("related_entity_type"), // job, contract, worker, inventory
+  relatedEntityType: text("related_entity_type"), // job, contract, worker, inventory, invoice
   relatedEntityId: varchar("related_entity_id"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -134,6 +164,16 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   updatedAt: true,
 });
 
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
+  id: true,
+});
+
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
@@ -160,6 +200,12 @@ export type RentalContract = typeof rentalContracts.$inferSelect;
 
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;

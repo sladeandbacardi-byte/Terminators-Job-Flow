@@ -6,6 +6,8 @@ import {
   type InventoryItem, type InsertInventoryItem,
   type RentalContract, type InsertRentalContract,
   type Job, type InsertJob,
+  type Invoice, type InsertInvoice,
+  type InvoiceItem, type InsertInvoiceItem,
   type Notification, type InsertNotification
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -66,6 +68,23 @@ export interface IStorage {
   updateJob(id: string, job: Partial<InsertJob>): Promise<Job>;
   deleteJob(id: string): Promise<boolean>;
 
+  // Invoices
+  getInvoices(): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoicesByClient(clientId: string): Promise<Invoice[]>;
+  getInvoicesByStatus(status: string): Promise<Invoice[]>;
+  getOverdueInvoices(): Promise<Invoice[]>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice>;
+  deleteInvoice(id: string): Promise<boolean>;
+  generateInvoiceNumber(): Promise<string>;
+
+  // Invoice Items
+  getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
+  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
+  updateInvoiceItem(id: string, item: Partial<InsertInvoiceItem>): Promise<InvoiceItem>;
+  deleteInvoiceItem(id: string): Promise<boolean>;
+
   // Notifications
   getNotifications(): Promise<Notification[]>;
   getNotification(id: string): Promise<Notification | undefined>;
@@ -83,7 +102,10 @@ export class MemStorage implements IStorage {
   private inventoryItems: Map<string, InventoryItem> = new Map();
   private rentalContracts: Map<string, RentalContract> = new Map();
   private jobs: Map<string, Job> = new Map();
+  private invoices: Map<string, Invoice> = new Map();
+  private invoiceItems: Map<string, InvoiceItem> = new Map();
   private notifications: Map<string, Notification> = new Map();
+  private invoiceCounter: number = 1;
 
   constructor() {
     this.initializeData();
@@ -146,6 +168,110 @@ export class MemStorage implements IStorage {
       };
       this.clients.set(c.id, c);
     });
+
+    // Create sample invoices
+    const invoices = [
+      {
+        clientId: "client-1",
+        status: "sent",
+        issueDate: new Date('2025-08-01'),
+        dueDate: new Date('2025-08-31'),
+        subtotal: "850.00",
+        taxAmount: "127.50",
+        total: "977.50",
+        paidAmount: "0.00",
+        notes: "Monthly pest control service for August 2025",
+        terms: "Payment due within 30 days"
+      },
+      {
+        clientId: "client-2",
+        status: "paid",
+        issueDate: new Date('2025-07-01'),
+        dueDate: new Date('2025-07-31'),
+        paymentDate: new Date('2025-07-28'),
+        subtotal: "1200.00",
+        taxAmount: "180.00",
+        total: "1380.00",
+        paidAmount: "1380.00",
+        notes: "Monthly hygiene service for July 2025",
+        terms: "Payment due within 30 days"
+      },
+      {
+        clientId: "client-3",
+        status: "overdue",
+        issueDate: new Date('2025-06-01'),
+        dueDate: new Date('2025-06-30'),
+        subtotal: "2500.00",
+        taxAmount: "375.00",
+        total: "2875.00",
+        paidAmount: "0.00",
+        notes: "Quarterly sanitization service",
+        terms: "Payment due within 30 days"
+      }
+    ];
+
+    for (let i = 0; i < invoices.length; i++) {
+      const invoice = invoices[i];
+      const invoiceId = `invoice-${i + 1}`;
+      const invoiceNumber = `INV-2025-${String(i + 1).padStart(4, '0')}`;
+      
+      const inv: Invoice = {
+        id: invoiceId,
+        invoiceNumber,
+        ...invoice,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.invoices.set(invoiceId, inv);
+
+      // Add invoice items
+      if (i === 0) {
+        // Pest control invoice items
+        const items = [
+          { description: "Monthly Pest Control - Interior", quantity: "1", unitPrice: "450.00", total: "450.00" },
+          { description: "Monthly Pest Control - Exterior", quantity: "1", unitPrice: "400.00", total: "400.00" }
+        ];
+        items.forEach((item, itemIndex) => {
+          const itemId = `item-${invoiceId}-${itemIndex + 1}`;
+          const invoiceItem: InvoiceItem = {
+            id: itemId,
+            invoiceId,
+            ...item
+          };
+          this.invoiceItems.set(itemId, invoiceItem);
+        });
+      } else if (i === 1) {
+        // Hygiene service invoice items
+        const items = [
+          { description: "Sanitizer Refill - Entrances", quantity: "8", unitPrice: "75.00", total: "600.00" },
+          { description: "Sanitizer Refill - Washrooms", quantity: "12", unitPrice: "50.00", total: "600.00" }
+        ];
+        items.forEach((item, itemIndex) => {
+          const itemId = `item-${invoiceId}-${itemIndex + 1}`;
+          const invoiceItem: InvoiceItem = {
+            id: itemId,
+            invoiceId,
+            ...item
+          };
+          this.invoiceItems.set(itemId, invoiceItem);
+        });
+      } else if (i === 2) {
+        // Mall sanitization invoice items
+        const items = [
+          { description: "Deep Sanitization - Food Court", quantity: "1", unitPrice: "1500.00", total: "1500.00" },
+          { description: "Deep Sanitization - Common Areas", quantity: "1", unitPrice: "1000.00", total: "1000.00" }
+        ];
+        items.forEach((item, itemIndex) => {
+          const itemId = `item-${invoiceId}-${itemIndex + 1}`;
+          const invoiceItem: InvoiceItem = {
+            id: itemId,
+            invoiceId,
+            ...item
+          };
+          this.invoiceItems.set(itemId, invoiceItem);
+        });
+      }
+    }
   }
 
   // Users
@@ -384,6 +510,97 @@ export class MemStorage implements IStorage {
 
   async deleteJob(id: string): Promise<boolean> {
     return this.jobs.delete(id);
+  }
+
+  // Invoices
+  async getInvoices(): Promise<Invoice[]> {
+    return Array.from(this.invoices.values());
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    return this.invoices.get(id);
+  }
+
+  async getInvoicesByClient(clientId: string): Promise<Invoice[]> {
+    return Array.from(this.invoices.values()).filter(invoice => invoice.clientId === clientId);
+  }
+
+  async getInvoicesByStatus(status: string): Promise<Invoice[]> {
+    return Array.from(this.invoices.values()).filter(invoice => invoice.status === status);
+  }
+
+  async getOverdueInvoices(): Promise<Invoice[]> {
+    const now = new Date();
+    return Array.from(this.invoices.values()).filter(invoice => 
+      invoice.status !== 'paid' && 
+      invoice.status !== 'cancelled' && 
+      new Date(invoice.dueDate) < now
+    );
+  }
+
+  async generateInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const number = String(this.invoiceCounter).padStart(4, '0');
+    this.invoiceCounter++;
+    return `INV-${year}-${number}`;
+  }
+
+  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
+    const id = randomUUID();
+    const now = new Date();
+    const invoiceNumber = await this.generateInvoiceNumber();
+    
+    const invoice: Invoice = { 
+      ...insertInvoice, 
+      id,
+      invoiceNumber,
+      createdAt: now, 
+      updatedAt: now 
+    };
+    this.invoices.set(id, invoice);
+    return invoice;
+  }
+
+  async updateInvoice(id: string, updateData: Partial<InsertInvoice>): Promise<Invoice> {
+    const invoice = this.invoices.get(id);
+    if (!invoice) throw new Error("Invoice not found");
+    
+    const updatedInvoice = { ...invoice, ...updateData, updatedAt: new Date() };
+    this.invoices.set(id, updatedInvoice);
+    return updatedInvoice;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    // Also delete associated invoice items
+    const items = await this.getInvoiceItems(id);
+    items.forEach(item => this.invoiceItems.delete(item.id));
+    
+    return this.invoices.delete(id);
+  }
+
+  // Invoice Items
+  async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
+    return Array.from(this.invoiceItems.values()).filter(item => item.invoiceId === invoiceId);
+  }
+
+  async createInvoiceItem(insertItem: InsertInvoiceItem): Promise<InvoiceItem> {
+    const id = randomUUID();
+    const item: InvoiceItem = { ...insertItem, id };
+    this.invoiceItems.set(id, item);
+    return item;
+  }
+
+  async updateInvoiceItem(id: string, updateData: Partial<InsertInvoiceItem>): Promise<InvoiceItem> {
+    const item = this.invoiceItems.get(id);
+    if (!item) throw new Error("Invoice item not found");
+    
+    const updatedItem = { ...item, ...updateData };
+    this.invoiceItems.set(id, updatedItem);
+    return updatedItem;
+  }
+
+  async deleteInvoiceItem(id: string): Promise<boolean> {
+    return this.invoiceItems.delete(id);
   }
 
   // Notifications

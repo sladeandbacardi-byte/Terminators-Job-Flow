@@ -1,13 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { BarChart3, Calendar, Users, Box, BarChart } from "lucide-react";
+import { BarChart3, Calendar, Users, Box, BarChart, Receipt } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Jobs", href: "/jobs", icon: Calendar },
   { name: "Workers", href: "/workers", icon: Users },
   { name: "Inventory", href: "/inventory", icon: Box },
-  { name: "Reports", href: "/reports", icon: BarChart },
+  { name: "Invoices", href: "/invoices", icon: Receipt },
 ];
 
 export default function MobileNavigation() {

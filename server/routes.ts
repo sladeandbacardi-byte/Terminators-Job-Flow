@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { 
   insertDivisionSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
+  insertInvoiceSchema, insertInvoiceItemSchema,
   insertNotificationSchema
 } from "@shared/schema";
 import { z } from "zod";
@@ -278,6 +279,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteJob(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Job not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Invoices
+  app.get("/api/invoices", async (req, res) => {
+    const { clientId, status, overdue } = req.query;
+    let invoices;
+    
+    if (overdue === "true") {
+      invoices = await storage.getOverdueInvoices();
+    } else if (clientId) {
+      invoices = await storage.getInvoicesByClient(clientId as string);
+    } else if (status) {
+      invoices = await storage.getInvoicesByStatus(status as string);
+    } else {
+      invoices = await storage.getInvoices();
+    }
+    
+    res.json(invoices);
+  });
+
+  app.get("/api/invoices/:id", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.json(invoice);
+  });
+
+  app.get("/api/invoices/:id/items", async (req, res) => {
+    const items = await storage.getInvoiceItems(req.params.id);
+    res.json(items);
+  });
+
+  app.post("/api/invoices", async (req, res) => {
+    try {
+      const invoice = insertInvoiceSchema.parse(req.body);
+      const created = await storage.createInvoice(invoice);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid invoice data" });
+    }
+  });
+
+  app.put("/api/invoices/:id", async (req, res) => {
+    try {
+      const updateData = insertInvoiceSchema.partial().parse(req.body);
+      const updated = await storage.updateInvoice(req.params.id, updateData);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid invoice data" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", async (req, res) => {
+    const deleted = await storage.deleteInvoice(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.status(204).send();
+  });
+
+  app.post("/api/invoices/:id/items", async (req, res) => {
+    try {
+      const item = insertInvoiceItemSchema.parse({
+        ...req.body,
+        invoiceId: req.params.id
+      });
+      const created = await storage.createInvoiceItem(item);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid invoice item data" });
+    }
+  });
+
+  app.put("/api/invoice-items/:id", async (req, res) => {
+    try {
+      const updateData = insertInvoiceItemSchema.partial().parse(req.body);
+      const updated = await storage.updateInvoiceItem(req.params.id, updateData);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid invoice item data" });
+    }
+  });
+
+  app.delete("/api/invoice-items/:id", async (req, res) => {
+    const deleted = await storage.deleteInvoiceItem(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Invoice item not found" });
     }
     res.status(204).send();
   });

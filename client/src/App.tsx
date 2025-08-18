@@ -9,6 +9,7 @@ import Jobs from "@/pages/jobs";
 import Workers from "@/pages/workers";
 import Inventory from "@/pages/inventory";
 import Contracts from "@/pages/contracts";
+import Invoices from "@/pages/invoices";
 import Reports from "@/pages/reports";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/workers" component={Workers} />
       <Route path="/inventory" component={Inventory} />
       <Route path="/contracts" component={Contracts} />
+      <Route path="/invoices" component={Invoices} />
       <Route path="/reports" component={Reports} />
       <Route component={NotFound} />
     </Switch>
