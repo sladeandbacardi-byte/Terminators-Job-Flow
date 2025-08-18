@@ -6,9 +6,11 @@ import {
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
   insertInvoiceSchema, insertInvoiceItemSchema,
   insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
-  insertJobInventoryItemSchema, insertSupplierSchema
+  insertJobInventoryItemSchema, insertSupplierSchema,
+  insertPurchaseOrderSchema, insertPurchaseOrderItemSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -790,6 +792,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteSupplier(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Supplier not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Purchase Orders
+  app.get("/api/purchase-orders", async (req, res) => {
+    const { status } = req.query;
+    let purchaseOrders;
+    
+    if (status) {
+      purchaseOrders = await storage.getPurchaseOrdersByStatus(status as string);
+    } else {
+      purchaseOrders = await storage.getPurchaseOrders();
+    }
+    
+    res.json(purchaseOrders);
+  });
+
+  app.get("/api/purchase-orders/pending", async (req, res) => {
+    const pendingOrders = await storage.getPendingPurchaseOrders();
+    res.json(pendingOrders);
+  });
+
+  app.get("/api/purchase-orders/:id", async (req, res) => {
+    const purchaseOrder = await storage.getPurchaseOrder(req.params.id);
+    if (!purchaseOrder) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+    res.json(purchaseOrder);
+  });
+
+  app.get("/api/purchase-orders/:id/items", async (req, res) => {
+    const items = await storage.getPurchaseOrderItems(req.params.id);
+    res.json(items);
+  });
+
+  app.post("/api/purchase-orders", async (req, res) => {
+    try {
+      const purchaseOrder = insertPurchaseOrderSchema.parse(req.body);
+      const created = await storage.createPurchaseOrder(purchaseOrder);
+      
+      // Send approval notification email to management
+      const supplier = await storage.getSupplier(created.supplierId);
+      if (supplier) {
+        const approvalEmail = generateApprovalNotificationEmail(
+          created,
+          supplier,
+          "management@terminators.co.za"
+        );
+        await sendEmail(approvalEmail);
+      }
+      
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid purchase order data" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/items", async (req, res) => {
+    try {
+      const item = insertPurchaseOrderItemSchema.parse({
+        ...req.body,
+        purchaseOrderId: req.params.id
+      });
+      const created = await storage.createPurchaseOrderItem(item);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid purchase order item data" });
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const purchaseOrder = insertPurchaseOrderSchema.partial().parse(req.body);
+      const updated = await storage.updatePurchaseOrder(req.params.id, purchaseOrder);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid purchase order data" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/approve", async (req, res) => {
+    try {
+      const { approvedById } = req.body;
+      if (!approvedById) {
+        return res.status(400).json({ error: "Approved by ID is required" });
+      }
+      const approved = await storage.approvePurchaseOrder(req.params.id, approvedById);
+      res.json(approved);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to approve purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/reject", async (req, res) => {
+    try {
+      const { rejectionReason } = req.body;
+      if (!rejectionReason) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+      }
+      const rejected = await storage.rejectPurchaseOrder(req.params.id, rejectionReason);
+      res.json(rejected);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to reject purchase order" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id", async (req, res) => {
+    const deleted = await storage.deletePurchaseOrder(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+    res.status(204).send();
+  });
+
+  app.post("/api/purchase-orders/:id/send", async (req, res) => {
+    try {
+      const po = await storage.getPurchaseOrder(req.params.id);
+      if (!po) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+
+      if (po.status !== "approved") {
+        return res.status(400).json({ error: "Purchase order must be approved before sending" });
+      }
+
+      // Get related data
+      const supplier = await storage.getSupplier(po.supplierId);
+      const items = await storage.getPurchaseOrderItems(po.id);
+      const inventoryItems = await storage.getInventoryItems();
+
+      if (!supplier) {
+        return res.status(400).json({ error: "Supplier not found" });
+      }
+
+      // Generate and send email
+      const emailData = generatePurchaseOrderEmail(po, supplier, items, inventoryItems);
+      const emailSent = await sendEmail(emailData);
+
+      if (emailSent) {
+        // Update PO status to sent
+        const updated = await storage.updatePurchaseOrder(po.id, {
+          status: "sent",
+          sentDate: new Date(),
+        });
+        res.json(updated);
+      } else {
+        res.status(500).json({ error: "Failed to send email to supplier" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send purchase order" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id/items/:itemId", async (req, res) => {
+    const deleted = await storage.deletePurchaseOrderItem(req.params.itemId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Purchase order item not found" });
     }
     res.status(204).send();
   });

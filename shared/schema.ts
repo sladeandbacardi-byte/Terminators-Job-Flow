@@ -300,3 +300,51 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
 
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;
+
+// Purchase Orders table
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poNumber: text("po_number").notNull().unique(), // PO-2024-001, etc.
+  supplierId: varchar("supplier_id").notNull(),
+  requestedById: varchar("requested_by_id").notNull(), // User who created the PO
+  approvedById: varchar("approved_by_id"), // User who approved the PO
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, sent, received, cancelled
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  requestDate: timestamp("request_date").notNull().default(sql`now()`),
+  approvalDate: timestamp("approval_date"),
+  sentDate: timestamp("sent_date"),
+  expectedDeliveryDate: timestamp("expected_delivery_date"),
+  actualDeliveryDate: timestamp("actual_delivery_date"),
+  notes: text("notes"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Purchase Order Items table
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id").notNull(),
+  inventoryItemId: varchar("inventory_item_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;

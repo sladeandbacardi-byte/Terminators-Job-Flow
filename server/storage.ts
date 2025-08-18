@@ -13,7 +13,9 @@ import {
   type EmailTemplate, type InsertEmailTemplate,
   type EmailLog, type InsertEmailLog,
   type JobInventoryItem, type InsertJobInventoryItem,
-  type Supplier, type InsertSupplier
+  type Supplier, type InsertSupplier,
+  type PurchaseOrder, type InsertPurchaseOrder,
+  type PurchaseOrderItem, type InsertPurchaseOrderItem
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -129,6 +131,23 @@ export interface IStorage {
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier>;
   deleteSupplier(id: string): Promise<boolean>;
+
+  // Purchase Orders
+  getPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
+  getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrder[]>;
+  getPendingPurchaseOrders(): Promise<PurchaseOrder[]>;
+  createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: string, po: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
+  approvePurchaseOrder(id: string, approvedById: string): Promise<PurchaseOrder>;
+  rejectPurchaseOrder(id: string, rejectionReason: string): Promise<PurchaseOrder>;
+  deletePurchaseOrder(id: string): Promise<boolean>;
+  
+  // Purchase Order Items
+  getPurchaseOrderItems(purchaseOrderId: string): Promise<PurchaseOrderItem[]>;
+  createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
+  updatePurchaseOrderItem(id: string, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem>;
+  deletePurchaseOrderItem(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -146,7 +165,10 @@ export class MemStorage implements IStorage {
   private emailLogs: Map<string, EmailLog> = new Map();
   private jobInventoryItems: Map<string, JobInventoryItem> = new Map();
   private suppliers: Map<string, Supplier> = new Map();
+  private purchaseOrders: Map<string, PurchaseOrder> = new Map();
+  private purchaseOrderItems: Map<string, PurchaseOrderItem> = new Map();
   private invoiceCounter: number = 1;
+  private poCounter: number = 1;
 
   constructor() {
     this.initializeData();
@@ -576,6 +598,42 @@ export class MemStorage implements IStorage {
     ];
 
     suppliers.forEach(supplier => this.suppliers.set(supplier.id, supplier));
+
+    // Create example purchase orders
+    await this.createPurchaseOrder({
+      poNumber: "PO-2024-001",
+      supplierId: "supplier-1",
+      requestedById: "user-1",
+      status: "pending",
+      totalAmount: "450.00",
+      requestDate: new Date("2024-08-15"),
+      expectedDeliveryDate: new Date("2024-08-25"),
+      notes: "Urgent order for Pick n Pay refill requirements"
+    });
+
+    await this.createPurchaseOrder({
+      poNumber: "PO-2024-002", 
+      supplierId: "supplier-3",
+      requestedById: "user-1",
+      approvedById: "user-2",
+      status: "approved",
+      totalAmount: "1250.00",
+      requestDate: new Date("2024-08-16"),
+      approvalDate: new Date("2024-08-17"),
+      expectedDeliveryDate: new Date("2024-08-30"),
+      notes: "Monthly pest control supplies order"
+    });
+
+    await this.createPurchaseOrder({
+      poNumber: "PO-2024-003",
+      supplierId: "supplier-2", 
+      requestedById: "user-1",
+      status: "rejected",
+      totalAmount: "320.00",
+      requestDate: new Date("2024-08-14"),
+      rejectionReason: "Budget constraints for this quarter",
+      notes: "Paper towel stock replenishment"
+    });
   }
 
   private initializeData() {
@@ -1555,6 +1613,108 @@ export class MemStorage implements IStorage {
 
   async deleteSupplier(id: string): Promise<boolean> {
     return this.suppliers.delete(id);
+  }
+
+  // Purchase Orders
+  async getPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return Array.from(this.purchaseOrders.values());
+  }
+
+  async getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
+    return this.purchaseOrders.get(id);
+  }
+
+  async getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrder[]> {
+    return Array.from(this.purchaseOrders.values()).filter(po => po.status === status);
+  }
+
+  async getPendingPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return Array.from(this.purchaseOrders.values()).filter(po => po.status === "pending");
+  }
+
+  async createPurchaseOrder(insertPO: InsertPurchaseOrder): Promise<PurchaseOrder> {
+    const id = randomUUID();
+    const poNumber = insertPO.poNumber || `PO-2024-${String(this.poCounter++).padStart(3, '0')}`;
+    const po: PurchaseOrder = { 
+      ...insertPO, 
+      id, 
+      poNumber,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.purchaseOrders.set(id, po);
+    return po;
+  }
+
+  async updatePurchaseOrder(id: string, updateData: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder> {
+    const po = this.purchaseOrders.get(id);
+    if (!po) throw new Error("Purchase order not found");
+    
+    const updatedPO = { ...po, ...updateData, updatedAt: new Date() };
+    this.purchaseOrders.set(id, updatedPO);
+    return updatedPO;
+  }
+
+  async approvePurchaseOrder(id: string, approvedById: string): Promise<PurchaseOrder> {
+    const po = this.purchaseOrders.get(id);
+    if (!po) throw new Error("Purchase order not found");
+    
+    const updatedPO = { 
+      ...po, 
+      status: "approved", 
+      approvedById, 
+      approvalDate: new Date(),
+      updatedAt: new Date()
+    };
+    this.purchaseOrders.set(id, updatedPO);
+    return updatedPO;
+  }
+
+  async rejectPurchaseOrder(id: string, rejectionReason: string): Promise<PurchaseOrder> {
+    const po = this.purchaseOrders.get(id);
+    if (!po) throw new Error("Purchase order not found");
+    
+    const updatedPO = { 
+      ...po, 
+      status: "rejected", 
+      rejectionReason,
+      updatedAt: new Date()
+    };
+    this.purchaseOrders.set(id, updatedPO);
+    return updatedPO;
+  }
+
+  async deletePurchaseOrder(id: string): Promise<boolean> {
+    // Delete associated items first
+    const items = Array.from(this.purchaseOrderItems.values()).filter(item => item.purchaseOrderId === id);
+    items.forEach(item => this.purchaseOrderItems.delete(item.id));
+    
+    return this.purchaseOrders.delete(id);
+  }
+
+  // Purchase Order Items
+  async getPurchaseOrderItems(purchaseOrderId: string): Promise<PurchaseOrderItem[]> {
+    return Array.from(this.purchaseOrderItems.values()).filter(item => item.purchaseOrderId === purchaseOrderId);
+  }
+
+  async createPurchaseOrderItem(insertItem: InsertPurchaseOrderItem): Promise<PurchaseOrderItem> {
+    const id = randomUUID();
+    const item: PurchaseOrderItem = { ...insertItem, id, createdAt: new Date() };
+    this.purchaseOrderItems.set(id, item);
+    return item;
+  }
+
+  async updatePurchaseOrderItem(id: string, updateData: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem> {
+    const item = this.purchaseOrderItems.get(id);
+    if (!item) throw new Error("Purchase order item not found");
+    
+    const updatedItem = { ...item, ...updateData };
+    this.purchaseOrderItems.set(id, updatedItem);
+    return updatedItem;
+  }
+
+  async deletePurchaseOrderItem(id: string): Promise<boolean> {
+    return this.purchaseOrderItems.delete(id);
   }
 }
 

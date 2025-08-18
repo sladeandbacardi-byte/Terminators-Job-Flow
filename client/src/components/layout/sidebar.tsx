@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Shield, BarChart3, Calendar, Users, Box, FileText, BarChart, Receipt, Mail, Building2 } from "lucide-react";
+import { Shield, BarChart3, Calendar, Users, Box, FileText, BarChart, Receipt, Mail, Building2, ShoppingCart } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -11,6 +11,7 @@ const navigation = [
   { name: "Invoices", href: "/invoices", icon: Receipt },
   { name: "Email Center", href: "/emails", icon: Mail },
   { name: "Suppliers", href: "/suppliers", icon: Building2 },
+  { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart },
   { name: "Reports", href: "/reports", icon: BarChart },
 ];
 
