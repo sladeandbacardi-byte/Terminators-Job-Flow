@@ -7,7 +7,7 @@ import ContractForm from "@/components/forms/contract-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Search, Plus, FileText, AlertTriangle, Edit, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -150,6 +150,14 @@ export default function Contracts() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingContract ? "Edit Contract" : "Create New Contract"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingContract ? "Update the rental contract details below." : "Fill in the details to create a new rental contract."}
+                    </DialogDescription>
+                  </DialogHeader>
                   <ContractForm
                     contract={editingContract}
                     onSuccess={handleFormSuccess}

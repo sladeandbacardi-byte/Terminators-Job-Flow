@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InvoiceForm from "@/components/forms/invoice-form";
 import type { Invoice, Client } from "@shared/schema";
@@ -266,6 +266,9 @@ export default function Invoices() {
             <DialogTitle>
               {selectedInvoice ? "Edit Invoice" : "Create New Invoice"}
             </DialogTitle>
+            <DialogDescription>
+              {selectedInvoice ? "Update the invoice details below." : "Fill in the details to create a new invoice."}
+            </DialogDescription>
           </DialogHeader>
           <InvoiceForm
             invoice={selectedInvoice}

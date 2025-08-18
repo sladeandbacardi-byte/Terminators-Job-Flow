@@ -7,7 +7,7 @@ import InventoryForm from "@/components/forms/inventory-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Search, Plus, Package, Settings, Edit, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -139,6 +139,14 @@ export default function Inventory() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingItem ? "Edit Item" : "Add New Item"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingItem ? "Update the inventory item details below." : "Fill in the details to add a new inventory item."}
+                    </DialogDescription>
+                  </DialogHeader>
                   <InventoryForm
                     item={editingItem}
                     onSuccess={handleFormSuccess}
