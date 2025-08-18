@@ -14,12 +14,20 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { InventoryItem, Division } from "@shared/schema";
 
+interface StockAlerts {
+  lowStock: InventoryItem[];
+  reorderRequired: InventoryItem[];
+  overstocked: InventoryItem[];
+}
+
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [divisionFilter, setDivisionFilter] = useState("all");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [alertsFilter, setAlertsFilter] = useState("all");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -30,6 +38,11 @@ export default function Inventory() {
 
   const { data: divisions = [] } = useQuery<Division[]>({
     queryKey: ['/api/divisions'],
+  });
+
+  const { data: stockAlerts } = useQuery<StockAlerts>({
+    queryKey: ['/api/inventory/alerts/stock'],
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const deleteMutation = useMutation({
@@ -58,7 +71,19 @@ export default function Inventory() {
     const matchesType = typeFilter === "all" || item.type === typeFilter;
     const matchesDivision = divisionFilter === "all" || item.divisionId === divisionFilter;
     
-    return matchesSearch && matchesType && matchesDivision;
+    // Stock alerts filter
+    let matchesAlerts = true;
+    if (alertsFilter === "critical") {
+      matchesAlerts = item.quantity <= item.minStockLevel;
+    } else if (alertsFilter === "low") {
+      matchesAlerts = item.quantity <= item.reorderPoint && item.quantity > item.minStockLevel;
+    } else if (alertsFilter === "reorder") {
+      matchesAlerts = item.quantity <= item.reorderPoint;
+    } else if (alertsFilter === "overstocked") {
+      matchesAlerts = item.quantity >= item.maxStockLevel;
+    }
+    
+    return matchesSearch && matchesType && matchesDivision && matchesAlerts;
   });
 
   const getDivisionName = (divisionId: string | null) => {
@@ -72,6 +97,37 @@ export default function Inventory() {
       ? 'bg-blue-100 text-blue-800' 
       : 'bg-green-100 text-green-800';
   };
+
+  const getStockStatus = (item: InventoryItem) => {
+    if (item.quantity <= item.minStockLevel) {
+      return { status: 'critical', color: 'bg-red-100 text-red-800', label: 'Critical' };
+    } else if (item.quantity <= item.reorderPoint) {
+      return { status: 'low', color: 'bg-yellow-100 text-yellow-800', label: 'Low Stock' };
+    } else if (item.quantity >= item.maxStockLevel) {
+      return { status: 'overstocked', color: 'bg-purple-100 text-purple-800', label: 'Overstocked' };
+    }
+    return { status: 'normal', color: 'bg-green-100 text-green-800', label: 'Normal' };
+  };
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: ({ id, quantity }: { id: string; quantity: number }) => 
+      apiRequest('PUT', `/api/inventory/${id}/quantity`, { quantity }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/alerts/stock'] });
+      toast({
+        title: "Success",
+        description: "Inventory quantity updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update inventory quantity",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item);
@@ -93,10 +149,62 @@ export default function Inventory() {
     <div className="min-h-screen flex bg-gray-50" data-testid="inventory-page">
       <Sidebar />
       
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="relative bg-white w-64 shadow-lg">
+            <Sidebar />
+          </div>
+        </div>
+      )}
+      
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Inventory Management" />
+        <Header 
+          title="Inventory Management" 
+          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
+        />
         
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+          {/* Stock Alerts Summary */}
+          {stockAlerts && (stockAlerts.lowStock.length > 0 || stockAlerts.reorderRequired.length > 0 || stockAlerts.overstocked.length > 0) && (
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {stockAlerts.lowStock.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                    <div>
+                      <h3 className="font-semibold text-red-800">Critical Stock</h3>
+                      <p className="text-sm text-red-600">{stockAlerts.lowStock.length} items below minimum</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {stockAlerts.reorderRequired.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                    <div>
+                      <h3 className="font-semibold text-yellow-800">Reorder Required</h3>
+                      <p className="text-sm text-yellow-600">{stockAlerts.reorderRequired.length} items need restocking</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {stockAlerts.overstocked.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                    <div>
+                      <h3 className="font-semibold text-purple-800">Overstocked</h3>
+                      <p className="text-sm text-purple-600">{stockAlerts.overstocked.length} items above maximum</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Header Actions */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1 relative">
@@ -130,6 +238,18 @@ export default function Inventory() {
                 {divisions.map(division => (
                   <option key={division.id} value={division.id}>{division.name}</option>
                 ))}
+              </select>
+              <select
+                value={alertsFilter}
+                onChange={(e) => setAlertsFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                data-testid="filter-alerts"
+              >
+                <option value="all">All Stock Levels</option>
+                <option value="critical">Critical Stock</option>
+                <option value="low">Low Stock</option>
+                <option value="reorder">Need Reorder</option>
+                <option value="overstocked">Overstocked</option>
               </select>
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogTrigger asChild>
@@ -228,25 +348,74 @@ export default function Inventory() {
                         </Badge>
                       </div>
                       
+                      {/* Stock Status Badge */}
+                      <div className="mb-4">
+                        <Badge className={getStockStatus(item).color} data-testid={`stock-status-${item.id}`}>
+                          {getStockStatus(item).label}
+                        </Badge>
+                      </div>
+
                       <div className="space-y-3 text-sm text-gray-600 mb-4">
                         <div className="flex justify-between">
                           <span className="font-medium">SKU:</span>
                           <span data-testid={`item-sku-${item.id}`}>{item.sku}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">Quantity:</span>
-                          <span data-testid={`item-quantity-${item.id}`}>{item.quantity}</span>
+                        
+                        {/* Current Stock with Visual Indicator */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium">Current Stock:</span>
+                            <span className="font-semibold" data-testid={`item-quantity-${item.id}`}>{item.quantity}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${
+                                item.quantity <= item.minStockLevel ? 'bg-red-500' :
+                                item.quantity <= item.reorderPoint ? 'bg-yellow-500' :
+                                item.quantity >= item.maxStockLevel ? 'bg-purple-500' : 'bg-green-500'
+                              }`}
+                              style={{ 
+                                width: `${Math.min((item.quantity / item.maxStockLevel) * 100, 100)}%` 
+                              }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span>Min: {item.minStockLevel}</span>
+                            <span>Reorder: {item.reorderPoint}</span>
+                            <span>Max: {item.maxStockLevel}</span>
+                          </div>
                         </div>
+
                         {item.unitPrice && (
                           <div className="flex justify-between">
                             <span className="font-medium">Unit Price:</span>
                             <span data-testid={`item-price-${item.id}`}>{formatCurrency(Number(item.unitPrice))}</span>
                           </div>
                         )}
+                        
+                        <div className="flex justify-between">
+                          <span className="font-medium">Location:</span>
+                          <span data-testid={`item-location-${item.id}`}>{item.location || 'Not specified'}</span>
+                        </div>
+                        
+                        <div className="flex justify-between">
+                          <span className="font-medium">Supplier:</span>
+                          <span data-testid={`item-supplier-${item.id}`}>{item.supplier || 'Not specified'}</span>
+                        </div>
+                        
                         <div className="flex justify-between">
                           <span className="font-medium">Division:</span>
                           <span data-testid={`item-division-${item.id}`}>{getDivisionName(item.divisionId)}</span>
                         </div>
+                        
+                        {item.lastRestocked && (
+                          <div className="flex justify-between">
+                            <span className="font-medium">Last Restocked:</span>
+                            <span data-testid={`item-restocked-${item.id}`}>
+                              {new Date(item.lastRestocked).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {item.description && (
@@ -255,26 +424,65 @@ export default function Inventory() {
                         </p>
                       )}
                       
-                      <div className="flex justify-between pt-4 border-t border-gray-200">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(item)}
-                          data-testid={`button-edit-${item.id}`}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(item)}
-                          className="text-red-600 hover:text-red-700"
-                          data-testid={`button-delete-${item.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
+                      <div className="flex flex-col gap-2 pt-4 border-t border-gray-200">
+                        {/* Quick quantity update */}
+                        {item.quantity <= item.reorderPoint && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="New quantity"
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const newQuantity = parseInt((e.target as HTMLInputElement).value);
+                                  if (newQuantity >= 0) {
+                                    updateQuantityMutation.mutate({ id: item.id, quantity: newQuantity });
+                                    (e.target as HTMLInputElement).value = '';
+                                  }
+                                }
+                              }}
+                              data-testid={`input-quantity-${item.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                const input = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement;
+                                const newQuantity = parseInt(input.value);
+                                if (newQuantity >= 0) {
+                                  updateQuantityMutation.mutate({ id: item.id, quantity: newQuantity });
+                                  input.value = '';
+                                }
+                              }}
+                              data-testid={`button-update-quantity-${item.id}`}
+                            >
+                              Update
+                            </Button>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(item)}
+                            data-testid={`button-edit-${item.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(item)}
+                            className="text-red-600 hover:text-red-700"
+                            data-testid={`button-delete-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}

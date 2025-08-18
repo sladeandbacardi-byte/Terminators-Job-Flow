@@ -41,9 +41,15 @@ export const inventoryItems = pgTable("inventory_items", {
   type: text("type").notNull(), // 'product' or 'rental_equipment'
   sku: text("sku").notNull().unique(),
   quantity: integer("quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(10),
+  maxStockLevel: integer("max_stock_level").notNull().default(100),
+  reorderPoint: integer("reorder_point").notNull().default(20),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   description: text("description"),
   divisionId: varchar("division_id"),
+  location: text("location"), // Storage location/warehouse
+  supplier: text("supplier"), // Supplier information
+  lastRestocked: timestamp("last_restocked"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 

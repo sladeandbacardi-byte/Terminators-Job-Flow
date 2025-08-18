@@ -170,6 +170,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Stock alerts and management
+  app.get("/api/inventory/alerts/stock", async (req, res) => {
+    const alerts = await storage.getStockAlerts();
+    res.json(alerts);
+  });
+
+  app.get("/api/inventory/alerts/low-stock", async (req, res) => {
+    const lowStockItems = await storage.getLowStockItems();
+    res.json(lowStockItems);
+  });
+
+  app.get("/api/inventory/alerts/reorder", async (req, res) => {
+    const reorderItems = await storage.getReorderRequiredItems();
+    res.json(reorderItems);
+  });
+
+  app.put("/api/inventory/:id/quantity", async (req, res) => {
+    try {
+      const { quantity, note } = req.body;
+      if (typeof quantity !== 'number' || quantity < 0) {
+        return res.status(400).json({ error: "Invalid quantity" });
+      }
+      const updated = await storage.updateInventoryQuantity(req.params.id, quantity, note);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update inventory quantity" });
+    }
+  });
+
   // Rental Contracts
   app.get("/api/contracts", async (req, res) => {
     const { active, expiring } = req.query;

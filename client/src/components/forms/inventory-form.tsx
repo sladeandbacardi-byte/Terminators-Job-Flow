@@ -40,9 +40,14 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
       type: item?.type || "product",
       sku: item?.sku || "",
       quantity: item?.quantity || 0,
+      minStockLevel: item?.minStockLevel || 10,
+      maxStockLevel: item?.maxStockLevel || 100,
+      reorderPoint: item?.reorderPoint || 20,
       unitPrice: item?.unitPrice || undefined,
       description: item?.description || "",
       divisionId: item?.divisionId || undefined,
+      location: item?.location || "",
+      supplier: item?.supplier || "",
     },
   });
 
@@ -220,6 +225,116 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
                 </FormItem>
               )}
             />
+          </div>
+
+          {/* Stock Level Management */}
+          <div className="space-y-4">
+            <h3 className="text-md font-semibold text-gray-900 border-b pb-2">Stock Level Management</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="minStockLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Minimum Stock Level</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="10" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 10)}
+                        data-testid="input-min-stock"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="reorderPoint"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reorder Point</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="20" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 20)}
+                        data-testid="input-reorder-point"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxStockLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Maximum Stock Level</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="100" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 100)}
+                        data-testid="input-max-stock"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Location and Supplier Information */}
+          <div className="space-y-4">
+            <h3 className="text-md font-semibold text-gray-900 border-b pb-2">Storage & Supplier Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Storage Location</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., Main Warehouse - Shelf A3" 
+                        {...field} 
+                        data-testid="input-location"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., HygieneTech Solutions" 
+                        {...field} 
+                        data-testid="input-supplier"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
 
           <FormField

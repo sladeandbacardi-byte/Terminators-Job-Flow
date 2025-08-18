@@ -198,61 +198,97 @@ export class MemStorage implements IStorage {
       this.clients.set(c.id, c);
     });
 
-    // Create sample inventory items
+    // Create sample inventory items with stock level settings
     const inventoryItems = [
       {
         name: "Paper Towel Dispenser - Wall Mount",
         type: "rental_equipment",
         sku: "PTD-WM-001",
-        quantity: 50,
+        quantity: 15,
+        minStockLevel: 10,
+        maxStockLevel: 100,
+        reorderPoint: 20,
         unitPrice: "149.99",
         description: "Professional wall-mounted paper towel dispenser, lockable design",
-        divisionId: "div-2"
+        divisionId: "div-2",
+        location: "Main Warehouse - Shelf A3",
+        supplier: "HygieneTech Solutions",
+        lastRestocked: new Date('2025-08-10')
       },
       {
         name: "Paper Roll Refill - Premium",
         type: "product",
         sku: "PRR-PREM-001", 
-        quantity: 200,
+        quantity: 8,
+        minStockLevel: 15,
+        maxStockLevel: 500,
+        reorderPoint: 25,
         unitPrice: "12.50",
         description: "High-quality paper towel rolls for dispensers, 200m per roll",
-        divisionId: "div-2"
+        divisionId: "div-2",
+        location: "Main Warehouse - Shelf B2",
+        supplier: "PaperCorp Industries",
+        lastRestocked: new Date('2025-08-05')
       },
       {
         name: "Hand Sanitizer Dispenser - Automatic",
         type: "rental_equipment",
         sku: "HSD-AUTO-001",
         quantity: 30,
+        minStockLevel: 5,
+        maxStockLevel: 50,
+        reorderPoint: 10,
         unitPrice: "199.99",
         description: "Touchless automatic hand sanitizer dispenser with sensor",
-        divisionId: "div-2"
+        divisionId: "div-2",
+        location: "Main Warehouse - Shelf A1",
+        supplier: "HygieneTech Solutions",
+        lastRestocked: new Date('2025-08-12')
       },
       {
         name: "Hand Sanitizer Refill - 1L",
         type: "product",
         sku: "HSR-1L-001",
-        quantity: 150,
+        quantity: 3,
+        minStockLevel: 20,
+        maxStockLevel: 200,
+        reorderPoint: 30,
         unitPrice: "35.00",
         description: "Premium hand sanitizer refill, alcohol-based formula",
-        divisionId: "div-2"
+        divisionId: "div-2",
+        location: "Storage Room B - Shelf 1",
+        supplier: "ChemiClean Supplies",
+        lastRestocked: new Date('2025-07-28')
       },
       {
         name: "Pest Control Bait Station",
         type: "rental_equipment", 
         sku: "PCB-STAT-001",
         quantity: 25,
+        minStockLevel: 8,
+        maxStockLevel: 80,
+        reorderPoint: 15,
         unitPrice: "89.99",
         description: "Tamper-resistant bait station for rodent control",
-        divisionId: "div-1"
+        divisionId: "div-1",
+        location: "Pest Control Storage - Rack C",
+        supplier: "PestTech Professional",
+        lastRestocked: new Date('2025-08-14')
       },
       {
         name: "Pest Control Bait - Rodenticide",
         type: "product",
         sku: "PCB-ROD-001",
-        quantity: 100,
+        quantity: 5,
+        minStockLevel: 12,
+        maxStockLevel: 150,
+        reorderPoint: 20,
         unitPrice: "25.00",
         description: "Professional rodenticide bait blocks",
-        divisionId: "div-1"
+        divisionId: "div-1",
+        location: "Secure Storage - Locked Cabinet A",
+        supplier: "ToxiGuard Solutions",
+        lastRestocked: new Date('2025-08-01')
       }
     ];
 
@@ -499,6 +535,63 @@ export class MemStorage implements IStorage {
 
   async deleteInventoryItem(id: string): Promise<boolean> {
     return this.inventoryItems.delete(id);
+  }
+
+  // Stock level management methods
+  async getLowStockItems(): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter(item => 
+      item.quantity <= item.minStockLevel
+    );
+  }
+
+  async getReorderRequiredItems(): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter(item => 
+      item.quantity <= item.reorderPoint
+    );
+  }
+
+  async getOverstockedItems(): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter(item => 
+      item.quantity >= item.maxStockLevel
+    );
+  }
+
+  async getStockAlerts(): Promise<{
+    lowStock: InventoryItem[];
+    reorderRequired: InventoryItem[];
+    overstocked: InventoryItem[];
+  }> {
+    return {
+      lowStock: await this.getLowStockItems(),
+      reorderRequired: await this.getReorderRequiredItems(),
+      overstocked: await this.getOverstockedItems()
+    };
+  }
+
+  async updateInventoryQuantity(id: string, newQuantity: number, note?: string): Promise<InventoryItem> {
+    const item = this.inventoryItems.get(id);
+    if (!item) throw new Error("Inventory item not found");
+    
+    const updatedItem = { 
+      ...item, 
+      quantity: newQuantity,
+      lastRestocked: newQuantity > item.quantity ? new Date() : item.lastRestocked
+    };
+    this.inventoryItems.set(id, updatedItem);
+
+    // Create notification if stock is low after update
+    if (newQuantity <= item.minStockLevel) {
+      await this.createNotification({
+        title: "Low Stock Alert",
+        message: `${item.name} (${item.sku}) is now at ${newQuantity} units - below minimum stock level of ${item.minStockLevel}`,
+        type: "warning",
+        priority: "high",
+        relatedEntityType: "inventory",
+        relatedEntityId: id
+      });
+    }
+
+    return updatedItem;
   }
 
   // Rental Contracts
