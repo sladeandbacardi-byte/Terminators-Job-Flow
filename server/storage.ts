@@ -138,6 +138,342 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.initializeData();
+    this.createExampleData();
+  }
+
+  private async createExampleData() {
+    // Create example clients
+    const clients = [
+      {
+        id: "client-1",
+        name: "Pick n Pay - Fourways",
+        email: "facilities@picknpay.co.za",
+        phone: "+27 11 465 2000",
+        address: "Fourways Mall, Cnr Witkoppen & Fourways Blvd, Fourways, Sandton, 2055",
+        type: "retail",
+        createdAt: new Date("2024-01-15"),
+      },
+      {
+        id: "client-2", 
+        name: "Woolworths - Sandton City",
+        email: "operations@woolworths.co.za",
+        phone: "+27 11 217 4000",
+        address: "Sandton City Shopping Centre, 83 Rivonia Rd, Sandhurst, Sandton, 2196",
+        type: "retail",
+        createdAt: new Date("2024-02-10"),
+      },
+      {
+        id: "client-3",
+        name: "McDonald's - Menlyn Park",
+        email: "manager@mcdonalds.co.za",
+        phone: "+27 12 348 1500",
+        address: "Menlyn Park Shopping Centre, Cnr Atterbury & Lois Ave, Menlyn, Pretoria, 0181",
+        type: "restaurant",
+        createdAt: new Date("2024-02-20"),
+      },
+      {
+        id: "client-4",
+        name: "Discovery Health Head Office",
+        email: "facilities@discovery.co.za", 
+        phone: "+27 11 529 2888",
+        address: "1 Discovery Place, Sandton, Johannesburg, 2196",
+        type: "corporate",
+        createdAt: new Date("2024-01-05"),
+      },
+      {
+        id: "client-5",
+        name: "Steers - Mall of Africa",
+        email: "operations@steers.co.za",
+        phone: "+27 11 549 8000", 
+        address: "Mall of Africa, Lone Creek Crescent, Waterfall City, Midrand, 1686",
+        type: "restaurant",
+        createdAt: new Date("2024-08-10"),
+      }
+    ];
+
+    // Create example rental contracts
+    const contracts = [
+      {
+        id: "contract-1",
+        clientId: "client-1",
+        equipmentType: "Paper Towel Dispensers",
+        quantity: 15,
+        monthlyRate: "2500.00",
+        startDate: "2024-01-15",
+        endDate: "2025-01-15",
+        isActive: true,
+        description: "Monthly rental of paper towel dispensers for all restrooms and kitchen areas",
+        createdAt: new Date("2024-01-15"),
+      },
+      {
+        id: "contract-2",
+        clientId: "client-2", 
+        equipmentType: "Hand Sanitizer Stations",
+        quantity: 8,
+        monthlyRate: "1800.00",
+        startDate: "2024-02-10",
+        endDate: "2025-02-10", 
+        isActive: true,
+        description: "Hand sanitizer stations for entrance and checkout areas",
+        createdAt: new Date("2024-02-10"),
+      },
+      {
+        id: "contract-3",
+        clientId: "client-3",
+        equipmentType: "Soap Dispensers", 
+        quantity: 6,
+        monthlyRate: "1200.00",
+        startDate: "2024-02-20",
+        endDate: "2024-12-20", // Expiring soon
+        isActive: true,
+        description: "Soap dispensers for customer and staff restrooms",
+        createdAt: new Date("2024-02-20"),
+      },
+      {
+        id: "contract-4",
+        clientId: "client-4",
+        equipmentType: "Pest Control Stations",
+        quantity: 25,
+        monthlyRate: "4500.00", 
+        startDate: "2024-01-05",
+        endDate: "2025-01-05",
+        isActive: true,
+        description: "Comprehensive pest monitoring stations for office building",
+        createdAt: new Date("2024-01-05"),
+      }
+    ];
+
+    // Create example jobs
+    const jobs = [
+      {
+        id: "job-1",
+        clientId: "client-1",
+        workerId: "worker-1", 
+        divisionId: "div-2", // Hygiene Services
+        title: "Monthly Paper Towel Refill - Pick n Pay Fourways",
+        description: "Refill all paper towel dispensers and check dispenser functionality",
+        status: "completed",
+        priority: "medium",
+        scheduledDate: new Date(),
+        completedDate: new Date(),
+        estimatedDuration: 120,
+        actualDuration: 105,
+        totalAmount: "850.00",
+        notes: "All dispensers refilled successfully. Replaced faulty dispenser in main restroom.",
+        createdAt: new Date(),
+      },
+      {
+        id: "job-2", 
+        clientId: "client-4",
+        workerId: "worker-5", // Pest control worker
+        divisionId: "div-1", // Pest Control
+        title: "Monthly Pest Inspection - Discovery Head Office",
+        description: "Check all pest monitoring stations and bait levels",
+        status: "in_progress",
+        priority: "high",
+        scheduledDate: new Date(),
+        estimatedDuration: 180,
+        totalAmount: "1200.00",
+        notes: "Started inspection on floors 1-5. Found increased activity on floor 3.",
+        createdAt: new Date(),
+      },
+      {
+        id: "job-3",
+        clientId: "client-2",
+        workerId: "worker-3",
+        divisionId: "div-2", // Hygiene Services  
+        title: "Sanitizer Refill - Woolworths Sandton",
+        description: "Refill hand sanitizer stations and clean dispensers",
+        status: "pending",
+        priority: "medium",
+        scheduledDate: new Date(Date.now() + 86400000), // Tomorrow
+        estimatedDuration: 90,
+        totalAmount: "650.00",
+        notes: "Scheduled for tomorrow morning. Check sanitizer levels.",
+        createdAt: new Date(),
+      },
+      {
+        id: "job-4",
+        clientId: "client-3",
+        workerId: "worker-2",
+        divisionId: "div-2",
+        title: "Soap Dispenser Maintenance - McDonald's Menlyn",
+        description: "Clean and refill soap dispensers, check functionality",
+        status: "pending", 
+        priority: "low",
+        scheduledDate: new Date(Date.now() + 172800000), // Day after tomorrow
+        estimatedDuration: 60,
+        totalAmount: "400.00",
+        notes: "Regular monthly maintenance visit",
+        createdAt: new Date(),
+      },
+      {
+        id: "job-5",
+        clientId: "client-5",
+        workerId: "worker-6", 
+        divisionId: "div-1", // Pest Control
+        title: "Initial Pest Assessment - Steers Mall of Africa",
+        description: "Comprehensive pest assessment for new client setup",
+        status: "completed",
+        priority: "high",
+        scheduledDate: new Date(Date.now() - 604800000), // Last week
+        completedDate: new Date(Date.now() - 604800000 + 7200000), // Completed 2 hours later
+        estimatedDuration: 240,
+        actualDuration: 195,
+        totalAmount: "1500.00",
+        notes: "Completed full assessment. Recommended 12 monitoring stations. Client approved.",
+        createdAt: new Date(Date.now() - 604800000),
+      }
+    ];
+
+    // Create example invoices
+    const invoices = [
+      {
+        id: "invoice-1",
+        invoiceNumber: "INV-2024-001",
+        clientId: "client-1",
+        issueDate: new Date(),
+        dueDate: new Date(Date.now() + 2592000000), // 30 days from now
+        status: "sent",
+        totalAmount: "2850.00",
+        taxAmount: "427.50",
+        subtotalAmount: "2422.50",
+        notes: "Monthly rental fee and service charges for August 2024",
+        createdAt: new Date(),
+      },
+      {
+        id: "invoice-2", 
+        invoiceNumber: "INV-2024-002",
+        clientId: "client-4",
+        issueDate: new Date(Date.now() - 86400000), // Yesterday
+        dueDate: new Date(Date.now() + 2505600000), // 29 days from now
+        status: "paid",
+        totalAmount: "5700.00",
+        taxAmount: "855.00", 
+        subtotalAmount: "4845.00",
+        paidDate: new Date(),
+        notes: "Monthly pest control services and equipment rental - August 2024",
+        createdAt: new Date(Date.now() - 86400000),
+      },
+      {
+        id: "invoice-3",
+        invoiceNumber: "INV-2024-003",
+        clientId: "client-2",
+        issueDate: new Date(Date.now() - 172800000), // 2 days ago
+        dueDate: new Date(Date.now() + 2419200000), // 28 days from now
+        status: "overdue",
+        totalAmount: "2070.00",
+        taxAmount: "310.50",
+        subtotalAmount: "1759.50", 
+        notes: "Hand sanitizer rental and refill services - August 2024",
+        createdAt: new Date(Date.now() - 172800000),
+      }
+    ];
+
+    // Create invoice items
+    const invoiceItems = [
+      {
+        id: "item-1",
+        invoiceId: "invoice-1",
+        description: "Paper Towel Dispenser Rental (15 units)",
+        quantity: 15,
+        unitPrice: "120.00",
+        totalPrice: "1800.00",
+      },
+      {
+        id: "item-2", 
+        invoiceId: "invoice-1",
+        description: "Paper Towel Refills",
+        quantity: 45,
+        unitPrice: "13.83",
+        totalPrice: "622.50",
+      },
+      {
+        id: "item-3",
+        invoiceId: "invoice-2",
+        description: "Pest Control Station Rental (25 units)",
+        quantity: 25,
+        unitPrice: "150.00", 
+        totalPrice: "3750.00",
+      },
+      {
+        id: "item-4",
+        invoiceId: "invoice-2",
+        description: "Monthly Pest Inspection Service",
+        quantity: 1,
+        unitPrice: "1095.00",
+        totalPrice: "1095.00",
+      },
+      {
+        id: "item-5",
+        invoiceId: "invoice-3",
+        description: "Hand Sanitizer Station Rental (8 units)",
+        quantity: 8,
+        unitPrice: "180.00",
+        totalPrice: "1440.00",
+      },
+      {
+        id: "item-6",
+        invoiceId: "invoice-3", 
+        description: "Hand Sanitizer Refills",
+        quantity: 16,
+        unitPrice: "19.97",
+        totalPrice: "319.50",
+      }
+    ];
+
+    // Store all example data
+    clients.forEach(client => this.clients.set(client.id, client));
+    contracts.forEach(contract => this.rentalContracts.set(contract.id, contract));
+    jobs.forEach(job => this.jobs.set(job.id, job));
+    invoices.forEach(invoice => this.invoices.set(invoice.id, invoice));
+    invoiceItems.forEach(item => this.invoiceItems.set(item.id, item));
+
+    // Create some notifications based on the example data
+    await this.createNotification({
+      title: "Low Stock Alert",
+      message: "Paper Roll Refill (SKU: PR-001) is at 8 units - below minimum stock level of 15",
+      type: "warning",
+      priority: "high",
+      relatedEntityType: "inventory",
+      relatedEntityId: "inv-2"
+    });
+
+    await this.createNotification({
+      title: "Contract Expiring Soon",
+      message: "McDonald's Menlyn Park soap dispenser contract expires in 4 months",
+      type: "info", 
+      priority: "medium",
+      relatedEntityType: "contract",
+      relatedEntityId: "contract-3"
+    });
+
+    await this.createNotification({
+      title: "Job Completed",
+      message: "Initial pest assessment for Steers Mall of Africa completed successfully",
+      type: "success",
+      priority: "low",
+      relatedEntityType: "job",
+      relatedEntityId: "job-5"
+    });
+
+    await this.createNotification({
+      title: "Payment Received", 
+      message: "Discovery Health payment of R5,700 received for invoice INV-2024-002",
+      type: "success",
+      priority: "low",
+      relatedEntityType: "invoice", 
+      relatedEntityId: "invoice-2"
+    });
+
+    await this.createNotification({
+      title: "Critical Stock Alert",
+      message: "Hand Sanitizer Refill (SKU: HS-002) is critically low at 3 units",
+      type: "error",
+      priority: "high",
+      relatedEntityType: "inventory",
+      relatedEntityId: "inv-3"
+    });
   }
 
   private initializeData() {
