@@ -594,6 +594,162 @@ export class MemStorage implements IStorage {
     return updatedItem;
   }
 
+  // Analytics and Dashboard Metrics
+  async getDashboardAnalytics(period: 'today' | 'week' | 'month' = 'today'): Promise<{
+    customers: { count: number; new: number };
+    jobs: { total: number; completed: number; inProgress: number; pending: number };
+    revenue: { total: number; invoiced: number; paid: number };
+    contracts: { active: number; expiring: number };
+    inventory: { totalItems: number; lowStock: number; criticalStock: number };
+  }> {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (period) {
+      case 'today':
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'week':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate = new Date(now);
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+    }
+
+    // Customer metrics
+    const allCustomers = Array.from(this.clients.values());
+    const newCustomers = allCustomers.filter(client => 
+      client.createdAt && new Date(client.createdAt) >= startDate
+    );
+
+    // Job metrics
+    const allJobs = Array.from(this.jobs.values());
+    const periodJobs = allJobs.filter(job => 
+      new Date(job.scheduledDate) >= startDate
+    );
+    
+    const completedJobs = periodJobs.filter(job => job.status === 'completed');
+    const inProgressJobs = periodJobs.filter(job => job.status === 'in_progress');
+    const pendingJobs = periodJobs.filter(job => job.status === 'pending');
+
+    // Revenue calculation from completed jobs
+    const revenue = completedJobs.reduce((total, job) => {
+      return total + (job.totalAmount ? parseFloat(job.totalAmount) : 0);
+    }, 0);
+
+    // Invoice metrics
+    const allInvoices = Array.from(this.invoices.values());
+    const periodInvoices = allInvoices.filter(invoice => 
+      invoice.issueDate && new Date(invoice.issueDate) >= startDate
+    );
+    
+    const invoicedAmount = periodInvoices.reduce((total, invoice) => 
+      total + parseFloat(invoice.totalAmount), 0
+    );
+    
+    const paidInvoices = periodInvoices.filter(invoice => invoice.status === 'paid');
+    const paidAmount = paidInvoices.reduce((total, invoice) => 
+      total + parseFloat(invoice.totalAmount), 0
+    );
+
+    // Contract metrics
+    const activeContracts = Array.from(this.rentalContracts.values())
+      .filter(contract => contract.isActive);
+    const expiringContracts = await this.getExpiringContracts(30);
+
+    // Inventory metrics
+    const allInventory = Array.from(this.inventoryItems.values());
+    const lowStockItems = allInventory.filter(item => 
+      item.quantity <= item.reorderPoint
+    );
+    const criticalStockItems = allInventory.filter(item => 
+      item.quantity <= item.minStockLevel
+    );
+
+    return {
+      customers: {
+        count: allCustomers.length,
+        new: newCustomers.length
+      },
+      jobs: {
+        total: periodJobs.length,
+        completed: completedJobs.length,
+        inProgress: inProgressJobs.length,
+        pending: pendingJobs.length
+      },
+      revenue: {
+        total: revenue,
+        invoiced: invoicedAmount,
+        paid: paidAmount
+      },
+      contracts: {
+        active: activeContracts.length,
+        expiring: expiringContracts.length
+      },
+      inventory: {
+        totalItems: allInventory.length,
+        lowStock: lowStockItems.length,
+        criticalStock: criticalStockItems.length
+      }
+    };
+  }
+
+  async getRevenueByPeriod(period: 'daily' | 'weekly' | 'monthly', days: number = 30): Promise<Array<{
+    date: string;
+    revenue: number;
+    jobs: number;
+  }>> {
+    const result = [];
+    const now = new Date();
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      
+      let startDate: Date, endDate: Date;
+      
+      if (period === 'daily') {
+        startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (period === 'weekly') {
+        const dayOfWeek = date.getDay();
+        startDate = new Date(date);
+        startDate.setDate(date.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      const periodJobs = Array.from(this.jobs.values()).filter(job => {
+        const jobDate = new Date(job.scheduledDate);
+        return jobDate >= startDate && jobDate <= endDate && job.status === 'completed';
+      });
+
+      const revenue = periodJobs.reduce((total, job) => {
+        return total + (job.totalAmount ? parseFloat(job.totalAmount) : 0);
+      }, 0);
+
+      result.push({
+        date: startDate.toISOString().split('T')[0],
+        revenue,
+        jobs: periodJobs.length
+      });
+    }
+
+    return result;
+  }
+
   // Rental Contracts
   async getRentalContracts(): Promise<RentalContract[]> {
     return Array.from(this.rentalContracts.values());

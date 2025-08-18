@@ -501,6 +501,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced dashboard analytics
+  app.get("/api/dashboard/analytics", async (req, res) => {
+    try {
+      const { period = 'today' } = req.query;
+      const analytics = await storage.getDashboardAnalytics(period as 'today' | 'week' | 'month');
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching dashboard analytics:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard analytics" });
+    }
+  });
+
+  app.get("/api/dashboard/revenue-chart", async (req, res) => {
+    try {
+      const { period = 'daily', days = '30' } = req.query;
+      const revenueData = await storage.getRevenueByPeriod(
+        period as 'daily' | 'weekly' | 'monthly', 
+        parseInt(days as string)
+      );
+      res.json(revenueData);
+    } catch (error) {
+      console.error("Error fetching revenue chart data:", error);
+      res.status(500).json({ error: "Failed to fetch revenue chart data" });
+    }
+  });
+
   // Email Templates
   app.get("/api/email-templates", async (req, res) => {
     const { type } = req.query;
