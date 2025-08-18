@@ -7,13 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Search, Plus, Phone, Mail } from "lucide-react";
 import { getInitials, getDivisionColor } from "@/lib/utils";
+import WorkerForm from "@/components/forms/worker-form";
 import type { Worker, Division } from "@shared/schema";
 
 export default function Workers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [divisionFilter, setDivisionFilter] = useState("all");
+  const [showWorkerForm, setShowWorkerForm] = useState(false);
+  const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
 
   const { data: workers = [], isLoading } = useQuery<Worker[]>({
     queryKey: ['/api/workers'],
@@ -51,6 +55,26 @@ export default function Workers() {
     return 'bg-primary-100 text-primary-800';
   };
 
+  const handleAddWorker = () => {
+    setSelectedWorker(null);
+    setShowWorkerForm(true);
+  };
+
+  const handleEditWorker = (worker: Worker) => {
+    setSelectedWorker(worker);
+    setShowWorkerForm(true);
+  };
+
+  const handleFormSuccess = () => {
+    setShowWorkerForm(false);
+    setSelectedWorker(null);
+  };
+
+  const handleFormCancel = () => {
+    setShowWorkerForm(false);
+    setSelectedWorker(null);
+  };
+
   return (
     <div className="min-h-screen flex bg-gray-50" data-testid="workers-page">
       <Sidebar />
@@ -83,7 +107,7 @@ export default function Workers() {
                   <option key={division.id} value={division.id}>{division.name}</option>
                 ))}
               </select>
-              <Button data-testid="button-add-worker">
+              <Button onClick={handleAddWorker} data-testid="button-add-worker">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Worker
               </Button>
@@ -132,7 +156,7 @@ export default function Workers() {
                   }
                 </p>
                 {(!searchTerm && divisionFilter === "all") && (
-                  <Button className="mt-4" data-testid="button-add-first-worker">
+                  <Button onClick={handleAddWorker} className="mt-4" data-testid="button-add-first-worker">
                     <Plus className="h-4 w-4 mr-2" />
                     Add First Worker
                   </Button>
@@ -182,7 +206,12 @@ export default function Workers() {
                           }`} data-testid={`worker-status-${worker.id}`}>
                             {worker.isActive ? 'Active' : 'Inactive'}
                           </span>
-                          <Button variant="outline" size="sm" data-testid={`button-edit-worker-${worker.id}`}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleEditWorker(worker)}
+                            data-testid={`button-edit-worker-${worker.id}`}
+                          >
                             Edit
                           </Button>
                         </div>
@@ -197,6 +226,27 @@ export default function Workers() {
       </div>
       
       <MobileNavigation />
+
+      {/* Worker Form Dialog */}
+      <Dialog open={showWorkerForm} onOpenChange={setShowWorkerForm}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedWorker ? "Edit Worker" : "Add New Worker"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedWorker 
+                ? "Update the worker's information below." 
+                : "Enter the details for the new field worker."}
+            </DialogDescription>
+          </DialogHeader>
+          <WorkerForm
+            worker={selectedWorker}
+            onSuccess={handleFormSuccess}
+            onCancel={handleFormCancel}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
