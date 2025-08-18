@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, FileText, Eye, Edit, Trash2, DollarSign, AlertCircle, CheckCircle } from "lucide-react";
+import { Plus, FileText, Eye, Edit, Trash2, DollarSign, AlertCircle, CheckCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InvoiceForm from "@/components/forms/invoice-form";
+import EmailInvoiceForm from "@/components/forms/email-invoice-form";
 import type { Invoice, Client } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -99,6 +101,21 @@ export default function Invoices() {
 
   const handleFormCancel = () => {
     setShowInvoiceForm(false);
+    setSelectedInvoice(null);
+  };
+
+  const handleEmailInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowEmailForm(true);
+  };
+
+  const handleEmailSuccess = () => {
+    setShowEmailForm(false);
+    setSelectedInvoice(null);
+  };
+
+  const handleEmailCancel = () => {
+    setShowEmailForm(false);
     setSelectedInvoice(null);
   };
 
@@ -242,6 +259,16 @@ export default function Invoices() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => handleEmailInvoice(invoice)}
+                              data-testid={`email-invoice-${invoice.id}`}
+                              disabled={!client?.email}
+                              title={client?.email ? `Email invoice to ${client.email}` : "Client has no email address"}
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleEditInvoice(invoice)}
                               data-testid={`edit-invoice-${invoice.id}`}
                             >
@@ -275,6 +302,26 @@ export default function Invoices() {
             onSuccess={handleFormSuccess}
             onCancel={handleFormCancel}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Invoice Dialog */}
+      <Dialog open={showEmailForm} onOpenChange={setShowEmailForm}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Email Invoice</DialogTitle>
+            <DialogDescription>
+              Send this invoice via email to your customer.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedInvoice && (
+            <EmailInvoiceForm
+              invoice={selectedInvoice}
+              client={clientMap.get(selectedInvoice.clientId)!}
+              onSuccess={handleEmailSuccess}
+              onCancel={handleEmailCancel}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

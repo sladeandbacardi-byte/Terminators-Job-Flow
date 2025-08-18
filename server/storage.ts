@@ -8,7 +8,9 @@ import {
   type Job, type InsertJob,
   type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem,
-  type Notification, type InsertNotification
+  type Notification, type InsertNotification,
+  type EmailTemplate, type InsertEmailTemplate,
+  type EmailLog, type InsertEmailLog
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -92,6 +94,21 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: string): Promise<boolean>;
   deleteNotification(id: string): Promise<boolean>;
+
+  // Email Templates
+  getEmailTemplates(): Promise<EmailTemplate[]>;
+  getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
+  getEmailTemplatesByType(type: string): Promise<EmailTemplate[]>;
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, template: Partial<InsertEmailTemplate>): Promise<EmailTemplate>;
+  deleteEmailTemplate(id: string): Promise<boolean>;
+
+  // Email Logs
+  getEmailLogs(): Promise<EmailLog[]>;
+  getEmailLog(id: string): Promise<EmailLog | undefined>;
+  getEmailLogsByStatus(status: string): Promise<EmailLog[]>;
+  createEmailLog(log: InsertEmailLog): Promise<EmailLog>;
+  updateEmailLog(id: string, log: Partial<InsertEmailLog>): Promise<EmailLog>;
 }
 
 export class MemStorage implements IStorage {
@@ -105,6 +122,8 @@ export class MemStorage implements IStorage {
   private invoices: Map<string, Invoice> = new Map();
   private invoiceItems: Map<string, InvoiceItem> = new Map();
   private notifications: Map<string, Notification> = new Map();
+  private emailTemplates: Map<string, EmailTemplate> = new Map();
+  private emailLogs: Map<string, EmailLog> = new Map();
   private invoiceCounter: number = 1;
 
   constructor() {
@@ -634,6 +653,72 @@ export class MemStorage implements IStorage {
 
   async deleteNotification(id: string): Promise<boolean> {
     return this.notifications.delete(id);
+  }
+
+  // Email Templates
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return Array.from(this.emailTemplates.values());
+  }
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    return this.emailTemplates.get(id);
+  }
+
+  async getEmailTemplatesByType(type: string): Promise<EmailTemplate[]> {
+    return Array.from(this.emailTemplates.values()).filter(template => template.type === type);
+  }
+
+  async createEmailTemplate(insertTemplate: InsertEmailTemplate): Promise<EmailTemplate> {
+    const id = randomUUID();
+    const template: EmailTemplate = { ...insertTemplate, id, createdAt: new Date() };
+    this.emailTemplates.set(id, template);
+    return template;
+  }
+
+  async updateEmailTemplate(id: string, updateData: Partial<InsertEmailTemplate>): Promise<EmailTemplate> {
+    const template = this.emailTemplates.get(id);
+    if (!template) {
+      throw new Error(`Email template with id ${id} not found`);
+    }
+    
+    const updatedTemplate = { ...template, ...updateData };
+    this.emailTemplates.set(id, updatedTemplate);
+    return updatedTemplate;
+  }
+
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    return this.emailTemplates.delete(id);
+  }
+
+  // Email Logs
+  async getEmailLogs(): Promise<EmailLog[]> {
+    return Array.from(this.emailLogs.values());
+  }
+
+  async getEmailLog(id: string): Promise<EmailLog | undefined> {
+    return this.emailLogs.get(id);
+  }
+
+  async getEmailLogsByStatus(status: string): Promise<EmailLog[]> {
+    return Array.from(this.emailLogs.values()).filter(log => log.status === status);
+  }
+
+  async createEmailLog(insertLog: InsertEmailLog): Promise<EmailLog> {
+    const id = randomUUID();
+    const log: EmailLog = { ...insertLog, id, createdAt: new Date() };
+    this.emailLogs.set(id, log);
+    return log;
+  }
+
+  async updateEmailLog(id: string, updateData: Partial<InsertEmailLog>): Promise<EmailLog> {
+    const log = this.emailLogs.get(id);
+    if (!log) {
+      throw new Error(`Email log with id ${id} not found`);
+    }
+    
+    const updatedLog = { ...log, ...updateData };
+    this.emailLogs.set(id, updatedLog);
+    return updatedLog;
   }
 }
 

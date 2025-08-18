@@ -5,7 +5,7 @@ import {
   insertDivisionSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
   insertInvoiceSchema, insertInvoiceItemSchema,
-  insertNotificationSchema
+  insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -468,6 +468,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(metrics);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch dashboard metrics" });
+    }
+  });
+
+  // Email Templates
+  app.get("/api/email-templates", async (req, res) => {
+    const { type } = req.query;
+    let templates;
+    
+    if (type) {
+      templates = await storage.getEmailTemplatesByType(type as string);
+    } else {
+      templates = await storage.getEmailTemplates();
+    }
+    
+    res.json(templates);
+  });
+
+  app.post("/api/email-templates", async (req, res) => {
+    try {
+      const template = insertEmailTemplateSchema.parse(req.body);
+      const created = await storage.createEmailTemplate(template);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid email template data" });
+    }
+  });
+
+  app.put("/api/email-templates/:id", async (req, res) => {
+    try {
+      const template = insertEmailTemplateSchema.parse(req.body);
+      const updated = await storage.updateEmailTemplate(req.params.id, template);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid email template data or template not found" });
+    }
+  });
+
+  app.delete("/api/email-templates/:id", async (req, res) => {
+    const deleted = await storage.deleteEmailTemplate(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Email template not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Email Logs
+  app.get("/api/email-logs", async (req, res) => {
+    const { status } = req.query;
+    let logs;
+    
+    if (status) {
+      logs = await storage.getEmailLogsByStatus(status as string);
+    } else {
+      logs = await storage.getEmailLogs();
+    }
+    
+    res.json(logs);
+  });
+
+  // Send Invoice Email
+  app.post("/api/invoices/:id/send-email", async (req, res) => {
+    try {
+      const invoiceId = req.params.id;
+      const { email, username, password } = req.body;
+
+      // Get invoice and client data
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const client = await storage.getClient(invoice.clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const recipientEmail = email || client.email;
+      if (!recipientEmail) {
+        return res.status(400).json({ error: "No email address provided" });
+      }
+
+      // Create email service instance
+      const OutlookEmailService = (await import("./email-service")).default;
+      const emailService = new OutlookEmailService({
+        clientId: process.env.MICROSOFT_CLIENT_ID || "your-client-id",
+        authority: "https://login.microsoftonline.com/common",
+        redirectUri: "http://localhost:5000"
+      });
+
+      // Authenticate and send email
+      const authenticated = await emailService.authenticate(username, password);
+      if (!authenticated) {
+        return res.status(401).json({ error: "Email authentication failed" });
+      }
+
+      const emailTemplate = emailService.generateInvoiceEmailTemplate(invoice, client);
+      const emailSent = await emailService.sendEmail({
+        to: recipientEmail,
+        subject: emailTemplate.subject,
+        htmlContent: emailTemplate.htmlContent,
+        textContent: emailTemplate.textContent
+      });
+
+      // Log the email attempt
+      await storage.createEmailLog({
+        toEmail: recipientEmail,
+        subject: emailTemplate.subject,
+        status: emailSent ? 'sent' : 'failed',
+        errorMessage: emailSent ? undefined : 'Failed to send email',
+        sentAt: emailSent ? new Date() : undefined,
+        relatedEntityId: invoiceId,
+        relatedEntityType: 'invoice'
+      });
+
+      if (emailSent) {
+        res.json({ message: "Invoice email sent successfully", recipient: recipientEmail });
+      } else {
+        res.status(500).json({ error: "Failed to send invoice email" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send invoice email" });
+    }
+  });
+
+  // Send Custom Email to Customer
+  app.post("/api/send-customer-email", async (req, res) => {
+    try {
+      const { clientId, subject, message, username, password } = req.body;
+
+      // Get client data
+      const client = await storage.getClient(clientId);
+      if (!client || !client.email) {
+        return res.status(400).json({ error: "Client not found or has no email address" });
+      }
+
+      // Create email service instance
+      const OutlookEmailService = (await import("./email-service")).default;
+      const emailService = new OutlookEmailService({
+        clientId: process.env.MICROSOFT_CLIENT_ID || "your-client-id",
+        authority: "https://login.microsoftonline.com/common",
+        redirectUri: "http://localhost:5000"
+      });
+
+      // Authenticate and send email
+      const authenticated = await emailService.authenticate(username, password);
+      if (!authenticated) {
+        return res.status(401).json({ error: "Email authentication failed" });
+      }
+
+      const emailTemplate = emailService.generateCustomerEmailTemplate(subject, message, client.name);
+      const emailSent = await emailService.sendEmail({
+        to: client.email,
+        subject: emailTemplate.subject,
+        htmlContent: emailTemplate.htmlContent,
+        textContent: emailTemplate.textContent
+      });
+
+      // Log the email attempt
+      await storage.createEmailLog({
+        toEmail: client.email,
+        subject: emailTemplate.subject,
+        status: emailSent ? 'sent' : 'failed',
+        errorMessage: emailSent ? undefined : 'Failed to send email',
+        sentAt: emailSent ? new Date() : undefined,
+        relatedEntityId: clientId,
+        relatedEntityType: 'client'
+      });
+
+      if (emailSent) {
+        res.json({ message: "Email sent successfully", recipient: client.email });
+      } else {
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send email" });
     }
   });
 
