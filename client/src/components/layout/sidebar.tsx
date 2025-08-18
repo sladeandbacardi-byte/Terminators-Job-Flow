@@ -34,16 +34,14 @@ export default function Sidebar() {
           const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
           
           return (
-            <Link key={item.name} href={item.href}>
-              <a className={cn(
-                "flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors",
-                isActive 
-                  ? "bg-primary-50 text-primary-700" 
-                  : "text-gray-700 hover:bg-gray-100"
-              )} data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                <Icon className="h-5 w-5" />
-                <span>{item.name}</span>
-              </a>
+            <Link key={item.name} href={item.href} className={cn(
+              "flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors",
+              isActive 
+                ? "bg-primary-50 text-primary-700" 
+                : "text-gray-700 hover:bg-gray-100"
+            )} data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}>
+              <Icon className="h-5 w-5" />
+              <span>{item.name}</span>
             </Link>
           );
         })}
