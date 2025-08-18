@@ -276,3 +276,27 @@ export type EmailLog = typeof emailLogs.$inferSelect;
 
 export type InsertJobInventoryItem = z.infer<typeof insertJobInventoryItemSchema>;
 export type JobInventoryItem = typeof jobInventoryItems.$inferSelect;
+
+// Suppliers table
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  website: text("website"),
+  category: text("category").notNull(), // e.g., "hygiene", "pest_control", "equipment"
+  paymentTerms: text("payment_terms"), // e.g., "30 days", "Net 15"
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;

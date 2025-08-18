@@ -6,7 +6,7 @@ import {
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
   insertInvoiceSchema, insertInvoiceItemSchema,
   insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
-  insertJobInventoryItemSchema
+  insertJobInventoryItemSchema, insertSupplierSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -738,6 +738,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteJobInventoryItem(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Job inventory item not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Suppliers
+  app.get("/api/suppliers", async (req, res) => {
+    const { category, activeOnly } = req.query;
+    let suppliers;
+    
+    if (category) {
+      suppliers = await storage.getSuppliersByCategory(category as string);
+    } else if (activeOnly === 'true') {
+      suppliers = await storage.getActiveSuppliers();
+    } else {
+      suppliers = await storage.getSuppliers();
+    }
+    
+    res.json(suppliers);
+  });
+
+  app.get("/api/suppliers/:id", async (req, res) => {
+    const supplier = await storage.getSupplier(req.params.id);
+    if (!supplier) {
+      return res.status(404).json({ error: "Supplier not found" });
+    }
+    res.json(supplier);
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const supplier = insertSupplierSchema.parse(req.body);
+      const created = await storage.createSupplier(supplier);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid supplier data" });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", async (req, res) => {
+    try {
+      const supplier = insertSupplierSchema.partial().parse(req.body);
+      const updated = await storage.updateSupplier(req.params.id, supplier);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid supplier data" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", async (req, res) => {
+    const deleted = await storage.deleteSupplier(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Supplier not found" });
     }
     res.status(204).send();
   });

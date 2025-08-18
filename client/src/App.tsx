@@ -12,6 +12,7 @@ import Contracts from "@/pages/contracts";
 import Invoices from "@/pages/invoices";
 import Emails from "@/pages/emails";
 import Reports from "@/pages/reports";
+import Suppliers from "@/pages/suppliers";
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/invoices" component={Invoices} />
       <Route path="/emails" component={Emails} />
       <Route path="/reports" component={Reports} />
+      <Route path="/suppliers" component={Suppliers} />
       <Route component={NotFound} />
     </Switch>
   );

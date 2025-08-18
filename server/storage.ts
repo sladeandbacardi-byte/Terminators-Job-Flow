@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { 
   type User, type InsertUser,
   type Division, type InsertDivision,
@@ -11,7 +12,8 @@ import {
   type Notification, type InsertNotification,
   type EmailTemplate, type InsertEmailTemplate,
   type EmailLog, type InsertEmailLog,
-  type JobInventoryItem, type InsertJobInventoryItem
+  type JobInventoryItem, type InsertJobInventoryItem,
+  type Supplier, type InsertSupplier
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -118,6 +120,15 @@ export interface IStorage {
   createJobInventoryItem(item: InsertJobInventoryItem): Promise<JobInventoryItem>;
   updateJobInventoryItem(id: string, item: Partial<InsertJobInventoryItem>): Promise<JobInventoryItem>;
   deleteJobInventoryItem(id: string): Promise<boolean>;
+
+  // Suppliers
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  getSuppliersByCategory(category: string): Promise<Supplier[]>;
+  getActiveSuppliers(): Promise<Supplier[]>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier>;
+  deleteSupplier(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -134,6 +145,7 @@ export class MemStorage implements IStorage {
   private emailTemplates: Map<string, EmailTemplate> = new Map();
   private emailLogs: Map<string, EmailLog> = new Map();
   private jobInventoryItems: Map<string, JobInventoryItem> = new Map();
+  private suppliers: Map<string, Supplier> = new Map();
   private invoiceCounter: number = 1;
 
   constructor() {
@@ -474,6 +486,96 @@ export class MemStorage implements IStorage {
       relatedEntityType: "inventory",
       relatedEntityId: "inv-3"
     });
+
+    // Create example suppliers
+    const suppliers = [
+      {
+        id: "supplier-1",
+        name: "HygieneTech Solutions",
+        contactPerson: "Sarah Johnson",
+        email: "sarah@hygienetech.co.za",
+        phone: "+27 11 234 5678",
+        address: "123 Industrial Road, Johannesburg, 2001",
+        website: "https://hygienetech.co.za",
+        category: "hygiene",
+        paymentTerms: "30 days",
+        isActive: true,
+        notes: "Primary supplier for paper towel dispensers and hygiene equipment",
+        createdAt: new Date("2024-01-10"),
+      },
+      {
+        id: "supplier-2",
+        name: "Paper Products SA",
+        contactPerson: "Michael Chen",
+        email: "michael@paperproducts.co.za",
+        phone: "+27 21 987 6543",
+        address: "456 Commerce Street, Cape Town, 8001",
+        website: "https://paperproducts.co.za",
+        category: "hygiene",
+        paymentTerms: "15 days",
+        isActive: true,
+        notes: "Reliable supplier for paper towel refills and tissue products",
+        createdAt: new Date("2024-01-12"),
+      },
+      {
+        id: "supplier-3",
+        name: "PestPro Solutions",
+        contactPerson: "David Smith",
+        email: "david@pestpro.co.za",
+        phone: "+27 12 555 7890",
+        address: "789 Security Avenue, Pretoria, 0001",
+        website: "https://pestpro.co.za",
+        category: "pest_control",
+        paymentTerms: "45 days",
+        isActive: true,
+        notes: "Specialized pest control supplies and baits",
+        createdAt: new Date("2024-01-15"),
+      },
+      {
+        id: "supplier-4",
+        name: "SafeClean Distributors",
+        contactPerson: "Emma Wilson",
+        email: "emma@safeclean.co.za",
+        phone: "+27 11 444 3333",
+        address: "321 Cleaning Way, Sandton, 2196",
+        website: "https://safeclean.co.za",
+        category: "hygiene",
+        paymentTerms: "30 days",
+        isActive: true,
+        notes: "Hand sanitizers and antibacterial products",
+        createdAt: new Date("2024-02-01"),
+      },
+      {
+        id: "supplier-5",
+        name: "TrapTech Industries",
+        contactPerson: "James Brown",
+        email: "james@traptech.co.za",
+        phone: "+27 31 222 1111",
+        address: "654 Industrial Park, Durban, 4001",
+        website: "https://traptech.co.za",
+        category: "pest_control",
+        paymentTerms: "60 days",
+        isActive: true,
+        notes: "Monitoring stations and pest control equipment",
+        createdAt: new Date("2024-02-05"),
+      },
+      {
+        id: "supplier-6",
+        name: "AutoClean Systems",
+        contactPerson: "Lisa Green",
+        email: "lisa@autoclean.co.za",
+        phone: "+27 11 888 9999",
+        address: "987 Tech Boulevard, Midrand, 1686",
+        website: "https://autoclean.co.za",
+        category: "equipment",
+        paymentTerms: "30 days",
+        isActive: false, // Inactive supplier example
+        notes: "Automatic dispensers and smart hygiene solutions. Currently on hold due to quality issues.",
+        createdAt: new Date("2024-03-01"),
+      }
+    ];
+
+    suppliers.forEach(supplier => this.suppliers.set(supplier.id, supplier));
   }
 
   private initializeData() {
@@ -1416,6 +1518,43 @@ export class MemStorage implements IStorage {
 
   async deleteJobInventoryItem(id: string): Promise<boolean> {
     return this.jobInventoryItems.delete(id);
+  }
+
+  // Suppliers
+  async getSuppliers(): Promise<Supplier[]> {
+    return Array.from(this.suppliers.values());
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    return this.suppliers.get(id);
+  }
+
+  async getSuppliersByCategory(category: string): Promise<Supplier[]> {
+    return Array.from(this.suppliers.values()).filter(supplier => supplier.category === category);
+  }
+
+  async getActiveSuppliers(): Promise<Supplier[]> {
+    return Array.from(this.suppliers.values()).filter(supplier => supplier.isActive);
+  }
+
+  async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
+    const id = randomUUID();
+    const supplier: Supplier = { ...insertSupplier, id, createdAt: new Date() };
+    this.suppliers.set(id, supplier);
+    return supplier;
+  }
+
+  async updateSupplier(id: string, updateData: Partial<InsertSupplier>): Promise<Supplier> {
+    const supplier = this.suppliers.get(id);
+    if (!supplier) throw new Error("Supplier not found");
+    
+    const updatedSupplier = { ...supplier, ...updateData };
+    this.suppliers.set(id, updatedSupplier);
+    return updatedSupplier;
+  }
+
+  async deleteSupplier(id: string): Promise<boolean> {
+    return this.suppliers.delete(id);
   }
 }
 
