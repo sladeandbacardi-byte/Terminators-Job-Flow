@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -31,6 +32,7 @@ interface DashboardMetrics {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['/api/dashboard/metrics'],
@@ -69,8 +71,21 @@ export default function Dashboard() {
     <div className="min-h-screen flex bg-gray-50" data-testid="dashboard-page">
       <Sidebar />
       
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="relative bg-white w-64 shadow-lg">
+            <Sidebar />
+          </div>
+        </div>
+      )}
+      
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Dashboard" />
+        <Header 
+          title="Dashboard" 
+          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
+        />
         
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <MetricsCards 

@@ -3,9 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
+import JobForm from "@/components/forms/job-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar, Search, Plus, Filter } from "lucide-react";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import type { Job } from "@shared/schema";
@@ -13,6 +15,9 @@ import type { Job } from "@shared/schema";
 export default function Jobs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isJobFormOpen, setIsJobFormOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { data: jobs = [], isLoading } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
@@ -37,8 +42,21 @@ export default function Jobs() {
     <div className="min-h-screen flex bg-gray-50" data-testid="jobs-page">
       <Sidebar />
       
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="relative bg-white w-64 shadow-lg">
+            <Sidebar />
+          </div>
+        </div>
+      )}
+      
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Job Scheduling" />
+        <Header 
+          title="Job Scheduling" 
+          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
+        />
         
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           {/* Header Actions */}
@@ -66,10 +84,27 @@ export default function Jobs() {
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <Button data-testid="button-create-job">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Job
-              </Button>
+              <Dialog open={isJobFormOpen} onOpenChange={setIsJobFormOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-create-job">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Job
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <JobForm
+                    job={editingJob}
+                    onSuccess={() => {
+                      setIsJobFormOpen(false);
+                      setEditingJob(null);
+                    }}
+                    onCancel={() => {
+                      setIsJobFormOpen(false);
+                      setEditingJob(null);
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 

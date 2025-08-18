@@ -1,13 +1,16 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { BarChart3, Calendar, Users, Box, BarChart, Receipt, Mail } from "lucide-react";
+import { BarChart3, Calendar, Users, Box, BarChart, Receipt, Mail, FileText } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Jobs", href: "/jobs", icon: Calendar },
   { name: "Workers", href: "/workers", icon: Users },
-  { name: "Emails", href: "/emails", icon: Mail },
+  { name: "Inventory", href: "/inventory", icon: Box },
+  { name: "Contracts", href: "/contracts", icon: FileText },
   { name: "Invoices", href: "/invoices", icon: Receipt },
+  { name: "Emails", href: "/emails", icon: Mail },
+  { name: "Reports", href: "/reports", icon: BarChart },
 ];
 
 export default function MobileNavigation() {
@@ -15,7 +18,8 @@ export default function MobileNavigation() {
 
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50" data-testid="mobile-navigation">
-      <div className="grid grid-cols-5 gap-1">
+      <div className="grid grid-cols-4 gap-1 overflow-x-auto"
+           style={{ gridTemplateColumns: `repeat(${navigation.length}, minmax(60px, 1fr))` }}>
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
