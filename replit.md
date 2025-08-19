@@ -57,4 +57,7 @@ Preferred communication style: Simple, everyday language.
 ### Division-Specific Features
 - **Pest Control Division**: Green branding, pest-specific job types, inspection scheduling
 - **Hygiene Services Division**: Orange branding, sanitizer services, equipment maintenance
-- **Multi-tenant Support**: Division-based filtering and assignment of workers, jobs, and inventory
+- **Washroom Division**: Blue branding, washroom maintenance and hygiene services with specialized cleaning equipment
+- **Sanitary Bin Division**: Purple branding, sanitary waste collection and disposal services with pedal-operated bins
+- **Deep Cleaning Division**: Cyan branding, professional deep cleaning and disinfection services with industrial equipment
+- **Multi-tenant Support**: Division-based filtering and assignment of workers, jobs, and inventory across all five divisions

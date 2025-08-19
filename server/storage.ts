@@ -652,8 +652,32 @@ export class MemStorage implements IStorage {
       description: "Commercial hygiene and sanitization services"
     };
 
+    const washroomDivision: Division = {
+      id: "div-3",
+      name: "Washroom",
+      colorCode: "#3b82f6",
+      description: "Washroom maintenance and hygiene services"
+    };
+
+    const sanitaryBinDivision: Division = {
+      id: "div-4",
+      name: "Sanitary Bin",
+      colorCode: "#8b5cf6",
+      description: "Sanitary waste collection and disposal services"
+    };
+
+    const deepCleaningDivision: Division = {
+      id: "div-5",
+      name: "Deep Cleaning",
+      colorCode: "#06b6d4",
+      description: "Professional deep cleaning and disinfection services"
+    };
+
     this.divisions.set(pestControlDivision.id, pestControlDivision);
     this.divisions.set(hygieneDivision.id, hygieneDivision);
+    this.divisions.set(washroomDivision.id, washroomDivision);
+    this.divisions.set(sanitaryBinDivision.id, sanitaryBinDivision);
+    this.divisions.set(deepCleaningDivision.id, deepCleaningDivision);
 
     // Create sample workers
     const workers = [
@@ -664,7 +688,13 @@ export class MemStorage implements IStorage {
       { name: "Mike Johnson", email: "mike@terminators.co.za", phone: "+27 41 123 4571", divisionId: "div-1" },
       { name: "Emma Davis", email: "emma@terminators.co.za", phone: "+27 41 123 4572", divisionId: "div-2" },
       { name: "James Wilson", email: "james@terminators.co.za", phone: "+27 41 123 4573", divisionId: "div-1" },
-      { name: "Rachel Green", email: "rachel@terminators.co.za", phone: "+27 41 123 4574", divisionId: "div-2" }
+      { name: "Rachel Green", email: "rachel@terminators.co.za", phone: "+27 41 123 4574", divisionId: "div-2" },
+      { name: "Mark Thompson", email: "mark@terminators.co.za", phone: "+27 41 123 4575", divisionId: "div-3" },
+      { name: "Jessica Adams", email: "jessica@terminators.co.za", phone: "+27 41 123 4576", divisionId: "div-3" },
+      { name: "Robert Miller", email: "robert@terminators.co.za", phone: "+27 41 123 4577", divisionId: "div-4" },
+      { name: "Amanda Clark", email: "amanda@terminators.co.za", phone: "+27 41 123 4578", divisionId: "div-4" },
+      { name: "Kevin Lee", email: "kevin@terminators.co.za", phone: "+27 41 123 4579", divisionId: "div-5" },
+      { name: "Natalie Scott", email: "natalie@terminators.co.za", phone: "+27 41 123 4580", divisionId: "div-5" }
     ];
 
     workers.forEach((worker, index) => {
@@ -784,6 +814,96 @@ export class MemStorage implements IStorage {
         divisionId: "div-1",
         location: "Secure Storage - Locked Cabinet A",
         supplier: "ToxiGuard Solutions",
+        lastRestocked: new Date('2025-08-01')
+      },
+      {
+        name: "Washroom Cleaning Kit - Professional",
+        type: "product",
+        sku: "WCK-PROF-001",
+        quantity: 12,
+        minStockLevel: 5,
+        maxStockLevel: 30,
+        reorderPoint: 8,
+        unitPrice: "85.00",
+        description: "Complete washroom cleaning kit with disinfectants and tools",
+        divisionId: "div-3",
+        location: "Cleaning Supplies - Shelf D1",
+        supplier: "CleanTech Professional",
+        lastRestocked: new Date('2025-08-10')
+      },
+      {
+        name: "Toilet Paper Dispenser - Commercial",
+        type: "rental_equipment",
+        sku: "TPD-COM-001",
+        quantity: 18,
+        minStockLevel: 8,
+        maxStockLevel: 40,
+        reorderPoint: 12,
+        unitPrice: "120.00",
+        description: "Heavy-duty commercial toilet paper dispenser",
+        divisionId: "div-3",
+        location: "Washroom Equipment - Rack A",
+        supplier: "RestroomPro Systems",
+        lastRestocked: new Date('2025-08-12')
+      },
+      {
+        name: "Sanitary Bin - Pedal Operated",
+        type: "rental_equipment",
+        sku: "SB-PED-001",
+        quantity: 15,
+        minStockLevel: 10,
+        maxStockLevel: 50,
+        reorderPoint: 15,
+        unitPrice: "75.00",
+        description: "Hygienic pedal-operated sanitary waste bin with liner",
+        divisionId: "div-4",
+        location: "Sanitary Equipment - Shelf B",
+        supplier: "HygieneTech Solutions",
+        lastRestocked: new Date('2025-08-08')
+      },
+      {
+        name: "Sanitary Bin Liners - Biodegradable",
+        type: "product",
+        sku: "SBL-BIO-001",
+        quantity: 25,
+        minStockLevel: 50,
+        maxStockLevel: 500,
+        reorderPoint: 75,
+        unitPrice: "18.50",
+        description: "Eco-friendly biodegradable sanitary waste bin liners, pack of 50",
+        divisionId: "div-4",
+        location: "Consumables Storage - Bin C",
+        supplier: "EcoWaste Solutions",
+        lastRestocked: new Date('2025-08-15')
+      },
+      {
+        name: "Deep Clean Disinfectant - Industrial",
+        type: "product",
+        sku: "DCD-IND-001",
+        quantity: 8,
+        minStockLevel: 10,
+        maxStockLevel: 60,
+        reorderPoint: 15,
+        unitPrice: "45.00",
+        description: "Industrial-strength disinfectant for deep cleaning services, 5L container",
+        divisionId: "div-5",
+        location: "Chemical Storage - Locked Section",
+        supplier: "ChemiClean Industrial",
+        lastRestocked: new Date('2025-08-05')
+      },
+      {
+        name: "Steam Cleaner - Professional",
+        type: "rental_equipment",
+        sku: "SC-PROF-001",
+        quantity: 4,
+        minStockLevel: 2,
+        maxStockLevel: 10,
+        reorderPoint: 3,
+        unitPrice: "850.00",
+        description: "High-pressure steam cleaner for deep sanitization",
+        divisionId: "div-5",
+        location: "Equipment Bay - Section E",
+        supplier: "SteamTech Professional",
         lastRestocked: new Date('2025-08-01')
       }
     ];
