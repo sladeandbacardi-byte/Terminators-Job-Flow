@@ -13,7 +13,9 @@ import {
   AlertCircle,
   Navigation,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  Menu,
+  X
 } from "lucide-react";
 import type { Job, Client, Worker } from '@shared/schema';
 
@@ -26,6 +28,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
   const [jobs, setJobs] = useState<(Job & { client: Client })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showMenu, setShowMenu] = useState(false);
 
   const fetchWorkOrders = async () => {
     try {
@@ -124,11 +127,22 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-green-600 text-white p-4 sticky top-0 z-10">
+      <div className="bg-green-600 text-white p-4 sticky top-0 z-20">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">My Work Orders</h1>
-            <p className="text-green-100 text-sm">{worker.name}</p>
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMenu(true)}
+              className="text-white hover:bg-green-700 p-2"
+              data-testid="button-menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-lg font-semibold">My Work Orders</h1>
+              <p className="text-green-100 text-sm">{worker.name}</p>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -136,20 +150,81 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
               size="sm"
               onClick={fetchWorkOrders}
               className="text-white hover:bg-green-700"
+              data-testid="button-refresh"
             >
               <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onLogout}
-              className="text-white hover:bg-green-700"
-            >
-              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Side Menu Overlay */}
+      {showMenu && (
+        <div className="fixed inset-0 z-30">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black bg-opacity-50"
+            onClick={() => setShowMenu(false)}
+          />
+          
+          {/* Menu Content */}
+          <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-xl">
+            {/* Menu Header */}
+            <div className="bg-green-600 text-white p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Menu</h2>
+                  <p className="text-green-100 text-sm">{worker.name}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMenu(false)}
+                  className="text-white hover:bg-green-700"
+                  data-testid="button-close-menu"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Menu Items */}
+            <div className="p-4 space-y-4">
+              <div className="border-b pb-4">
+                <h3 className="font-medium text-gray-900 mb-2">Worker Information</h3>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p><strong>ID:</strong> {worker.employeeId}</p>
+                  <p><strong>Role:</strong> {worker.role}</p>
+                  <p><strong>Email:</strong> {worker.email}</p>
+                  <p><strong>Phone:</strong> {worker.phone}</p>
+                </div>
+              </div>
+
+              <div className="border-b pb-4">
+                <h3 className="font-medium text-gray-900 mb-2">Quick Stats</h3>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p><strong>Today's Jobs:</strong> {jobs.length}</p>
+                  <p><strong>Completed:</strong> {jobs.filter(j => j.status === 'completed').length}</p>
+                  <p><strong>In Progress:</strong> {jobs.filter(j => j.status === 'in_progress').length}</p>
+                  <p><strong>Scheduled:</strong> {jobs.filter(j => j.status === 'scheduled').length}</p>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <Button
+                  onClick={onLogout}
+                  variant="outline"
+                  className="w-full flex items-center space-x-2 text-red-600 border-red-200 hover:bg-red-50"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign Out</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="p-4 space-y-4">
