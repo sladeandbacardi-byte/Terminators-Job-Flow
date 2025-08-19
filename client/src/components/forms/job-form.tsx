@@ -78,7 +78,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
       status: job?.status || "pending",
       scheduledDate: job ? new Date(job.scheduledDate) : new Date(),
       priority: job?.priority || "medium",
-      estimatedDuration: job?.estimatedDuration || undefined,
+      estimatedDuration: job?.estimatedDuration || 0,
       location: job?.location || "",
       notes: job?.notes || "",
       isRecurring: job?.isRecurring || false,
@@ -89,7 +89,8 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   const createMutation = useMutation({
     mutationFn: async (data: JobFormData) => {
       // First create the job
-      const createdJob = await apiRequest('POST', '/api/jobs', data);
+      const response = await apiRequest('/api/jobs', 'POST', data);
+      const createdJob = response as any;
       
       // Then create job inventory items if any are selected
       if (selectedItems.length > 0) {
@@ -99,12 +100,12 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
             inventoryItemId: selectedItem.inventoryItem.id,
             quantity: selectedItem.quantity.toString(),
             unitPrice: selectedItem.inventoryItem.unitPrice || "0",
-            notes: selectedItem.notes,
+            notes: selectedItem.notes || "",
             isRental: selectedItem.isRental,
             rentalStartDate: selectedItem.rentalStartDate,
             rentalEndDate: selectedItem.rentalEndDate
           };
-          await apiRequest('POST', '/api/job-inventory', jobInventoryItem);
+          await apiRequest('/api/job-inventory', 'POST', jobInventoryItem);
         }
       }
       
@@ -129,7 +130,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: JobFormData) => apiRequest('PUT', `/api/jobs/${job!.id}`, data),
+    mutationFn: (data: JobFormData) => apiRequest(`/api/jobs/${job!.id}`, 'PATCH', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({
@@ -283,7 +284,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assigned Worker</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-worker">
                         <SelectValue placeholder="Select a worker" />
@@ -408,8 +409,9 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                     <Input 
                       type="number" 
                       placeholder="120" 
-                      {...field} 
-                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      {...field}
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
                       data-testid="input-duration"
                     />
                   </FormControl>
@@ -426,7 +428,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               <FormItem>
                 <FormLabel>Location</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter job location" {...field} data-testid="input-location" />
+                  <Input placeholder="Enter job location" {...field} value={field.value || ""} data-testid="input-location" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -444,6 +446,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                     placeholder="Enter job description" 
                     className="min-h-[100px]" 
                     {...field} 
+                    value={field.value || ""}
                     data-testid="input-description"
                   />
                 </FormControl>
@@ -462,6 +465,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                   <Textarea 
                     placeholder="Additional notes or instructions" 
                     {...field} 
+                    value={field.value || ""}
                     data-testid="input-notes"
                   />
                 </FormControl>
@@ -662,7 +666,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Recurring Pattern</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-recurring-pattern">
                         <SelectValue placeholder="Select recurring pattern" />
