@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Plus, X, Package } from "lucide-react";
+import { CalendarIcon, Plus, X, Package, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -49,6 +49,8 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   const queryClient = useQueryClient();
   const [selectedItems, setSelectedItems] = useState<SelectedInventoryItem[]>([]);
   const [showItemSelector, setShowItemSelector] = useState(false);
+  const [itemSearchTerm, setItemSearchTerm] = useState("");
+  const [itemDivisionFilter, setItemDivisionFilter] = useState("all");
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
@@ -198,10 +200,21 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
     ));
   };
 
-  // Filter inventory items by division
-  const availableInventory = selectedDivision 
-    ? inventoryItems.filter(item => !item.divisionId || item.divisionId === selectedDivision)
-    : inventoryItems;
+  // Enhanced filtering for inventory items with search and division filter
+  const availableInventory = inventoryItems.filter(item => {
+    // Search filter - matches name, description, or SKU
+    const matchesSearch = itemSearchTerm === "" || 
+      item.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+      item.description?.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+      item.sku.toLowerCase().includes(itemSearchTerm.toLowerCase());
+    
+    // Division filter
+    const matchesDivision = itemDivisionFilter === "all" || 
+      item.divisionId === itemDivisionFilter ||
+      !item.divisionId; // Include unassigned items
+    
+    return matchesSearch && matchesDivision;
+  });
 
   return (
     <Form {...form}>
@@ -584,22 +597,75 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Select Inventory Items</h3>
+                    <h3 className="text-lg font-semibold">Select Products & Services</h3>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowItemSelector(false)}
+                      onClick={() => {
+                        setShowItemSelector(false);
+                        setItemSearchTerm("");
+                        setItemDivisionFilter("all");
+                      }}
                       data-testid="button-close-selector"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                   
-                  <div className="space-y-2">
+                  {/* Search and Filter Controls */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search products/services by name, description, or SKU..."
+                        value={itemSearchTerm}
+                        onChange={(e) => setItemSearchTerm(e.target.value)}
+                        className="pl-10"
+                        data-testid="input-search-items"
+                      />
+                    </div>
+                    <Select value={itemDivisionFilter} onValueChange={setItemDivisionFilter}>
+                      <SelectTrigger data-testid="select-division-filter">
+                        <SelectValue placeholder="Filter by division" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Divisions</SelectItem>
+                        {divisions.map(division => (
+                          <SelectItem key={division.id} value={division.id}>
+                            {division.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Results counter */}
+                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                    <span>
+                      {availableInventory.length} product{availableInventory.length !== 1 ? 's' : ''} 
+                      {itemSearchTerm && ` matching "${itemSearchTerm}"`}
+                    </span>
+                    {itemSearchTerm && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setItemSearchTerm("")}
+                        className="h-6 px-2 text-xs"
+                      >
+                        Clear search
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {availableInventory.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-4">
-                        No inventory items available for the selected division.
+                      <p className="text-muted-foreground text-center py-8">
+                        {itemSearchTerm ? 
+                          `No products or services found matching "${itemSearchTerm}"` : 
+                          "No products or services available for the selected division."
+                        }
                       </p>
                     ) : (
                       availableInventory.map((item) => (
@@ -615,7 +681,19 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                               <div>
                                 <p className="font-medium">{item.name}</p>
                                 <p className="text-sm text-muted-foreground">{item.description}</p>
-                                <p className="text-sm text-muted-foreground">Stock: {item.quantity} | SKU: {item.sku}</p>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <span>Stock: {item.quantity}</span>
+                                  <span>•</span>
+                                  <span>SKU: {item.sku}</span>
+                                  {item.divisionId && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-blue-600 font-medium">
+                                        {divisions.find(d => d.id === item.divisionId)?.name || 'Unknown Division'}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="text-right">
