@@ -10,6 +10,8 @@ import { Calendar, DateRange } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, TrendingUp, FileText, Download, Calendar as CalendarIcon, DollarSign } from "lucide-react";
+import { ExportButton } from "@/components/export-button";
+import { exportAllData } from "@/lib/data-export";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Job, RentalContract, Worker, Division } from "@shared/schema";
@@ -153,10 +155,20 @@ export default function Reports() {
                   />
                 </PopoverContent>
               </Popover>
-              <Button onClick={handleExportReport} data-testid="button-export-report">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
+              <ExportButton 
+                onExportCSV={() => {
+                  // Export comprehensive business data
+                  exportAllData({
+                    jobs: filteredJobs,
+                    contracts,
+                    workers,
+                    divisions,
+                    dateRange
+                  });
+                }}
+                entityName="All Business Data"
+                variant="default"
+              />
             </div>
           </div>
 

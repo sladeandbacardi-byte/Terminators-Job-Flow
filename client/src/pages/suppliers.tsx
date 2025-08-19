@@ -65,6 +65,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { SupplierForm } from "@/components/forms/supplier-form";
+import { ExportButton } from "@/components/export-button";
+import { exportSuppliers } from "@/lib/data-export";
 import { apiRequest } from "@/lib/queryClient";
 import type { Supplier } from "@shared/schema";
 
@@ -189,26 +191,33 @@ export default function SuppliersPage() {
             Manage your supplier relationships and vendor information
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-supplier">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Supplier
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Supplier</DialogTitle>
-              <DialogDescription>
-                Add a new supplier to your vendor database.
-              </DialogDescription>
-            </DialogHeader>
-            <SupplierForm
-              onSubmit={(data) => createMutation.mutate(data)}
-              onCancel={() => setIsCreateDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <ExportButton 
+            onExportCSV={() => exportSuppliers(suppliers)}
+            entityName="Suppliers"
+            variant="outline"
+          />
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-supplier">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Supplier
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Supplier</DialogTitle>
+                <DialogDescription>
+                  Add a new supplier to your vendor database.
+                </DialogDescription>
+              </DialogHeader>
+              <SupplierForm
+                onSubmit={(data) => createMutation.mutate(data)}
+                onCancel={() => setIsCreateDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Statistics Cards */}

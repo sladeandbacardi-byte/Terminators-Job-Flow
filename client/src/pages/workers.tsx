@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Search, Plus, Phone, Mail } from "lucide-react";
 import { getInitials, getDivisionColor } from "@/lib/utils";
 import WorkerForm from "@/components/forms/worker-form";
+import { ExportButton } from "@/components/export-button";
+import { exportWorkers } from "@/lib/data-export";
 import type { Worker, Division } from "@shared/schema";
 
 export default function Workers() {
@@ -107,6 +109,12 @@ export default function Workers() {
                   <option key={division.id} value={division.id}>{division.name}</option>
                 ))}
               </select>
+              <ExportButton 
+                onExportCSV={() => exportWorkers(workers)}
+                entityName="Workers"
+                variant="outline"
+                size="sm"
+              />
               <Button onClick={handleAddWorker} data-testid="button-add-worker">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Worker

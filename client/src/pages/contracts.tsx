@@ -12,6 +12,8 @@ import { Search, Plus, FileText, AlertTriangle, Edit, Trash2 } from "lucide-reac
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ExportButton } from "@/components/export-button";
+import { exportContracts } from "@/lib/data-export";
 import type { RentalContract, Client, InventoryItem } from "@shared/schema";
 
 export default function Contracts() {
@@ -142,6 +144,12 @@ export default function Contracts() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+              <ExportButton 
+                onExportCSV={() => exportContracts(contracts)}
+                entityName="Contracts"
+                variant="outline"
+                size="sm"
+              />
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogTrigger asChild>
                   <Button data-testid="button-create-contract">

@@ -3,9 +3,10 @@ import { cn } from "@/lib/utils";
 import { BarChart3, Calendar, Users, Box, BarChart, Receipt, Mail, FileText, Building2, ShoppingCart } from "lucide-react";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+  { name: "Dashboard", href: "/", icon: BarChart3 },
   { name: "Jobs", href: "/jobs", icon: Calendar },
   { name: "Workers", href: "/workers", icon: Users },
+  { name: "Clients", href: "/clients", icon: Building2 },
   { name: "Inventory", href: "/inventory", icon: Box },
   { name: "Contracts", href: "/contracts", icon: FileText },
   { name: "Invoices", href: "/invoices", icon: Receipt },

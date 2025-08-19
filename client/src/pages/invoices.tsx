@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InvoiceForm from "@/components/forms/invoice-form";
 import EmailInvoiceForm from "@/components/forms/email-invoice-form";
-import type { Invoice, Client } from "@shared/schema";
+import { ExportButton } from "@/components/export-button";
+import { exportInvoices } from "@/lib/data-export";
+import type { Invoice, Client, InvoiceItem } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 
 export default function Invoices() {
@@ -134,10 +136,17 @@ export default function Invoices() {
           <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">Invoice Management</h1>
           <p className="text-gray-600 mt-2">Create and manage customer invoices</p>
         </div>
-        <Button onClick={handleCreateInvoice} className="bg-primary-600 hover:bg-primary-700" data-testid="create-invoice-button">
-          <Plus className="h-4 w-4 mr-2" />
-          New Invoice
-        </Button>
+        <div className="flex gap-2">
+          <ExportButton 
+            onExportCSV={() => exportInvoices(invoices, [])}
+            entityName="Invoices"
+            variant="outline"
+          />
+          <Button onClick={handleCreateInvoice} className="bg-primary-600 hover:bg-primary-700" data-testid="create-invoice-button">
+            <Plus className="h-4 w-4 mr-2" />
+            New Invoice
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

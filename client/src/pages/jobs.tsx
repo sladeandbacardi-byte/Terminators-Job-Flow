@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Search, Plus, Filter } from "lucide-react";
+import { Calendar, Search, Plus, Filter, Download } from "lucide-react";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
+import { ExportButton } from "@/components/export-button";
+import { exportJobs } from "@/lib/data-export";
 import type { Job } from "@shared/schema";
 
 export default function Jobs() {
@@ -84,6 +86,12 @@ export default function Jobs() {
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
+              <ExportButton 
+                onExportCSV={() => exportJobs(jobs)}
+                entityName="Jobs"
+                variant="outline"
+                size="sm"
+              />
               <Dialog open={isJobFormOpen} onOpenChange={setIsJobFormOpen}>
                 <DialogTrigger asChild>
                   <Button data-testid="button-create-job">

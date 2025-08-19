@@ -12,6 +12,8 @@ import { Search, Plus, Package, Settings, Edit, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ExportButton } from "@/components/export-button";
+import { exportInventory } from "@/lib/data-export";
 import type { InventoryItem, Division } from "@shared/schema";
 
 interface StockAlerts {
@@ -251,6 +253,12 @@ export default function Inventory() {
                 <option value="reorder">Need Reorder</option>
                 <option value="overstocked">Overstocked</option>
               </select>
+              <ExportButton 
+                onExportCSV={() => exportInventory(items)}
+                entityName="Inventory"
+                variant="outline"
+                size="sm"
+              />
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogTrigger asChild>
                   <Button data-testid="button-add-item">

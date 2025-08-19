@@ -69,6 +69,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { PurchaseOrderForm } from "@/components/forms/purchase-order-form";
+import { ExportButton } from "@/components/export-button";
+import { exportPurchaseOrders } from "@/lib/data-export";
 import { apiRequest } from "@/lib/queryClient";
 import type { PurchaseOrder, Supplier, InventoryItem, PurchaseOrderItem } from "@shared/schema";
 
@@ -271,26 +273,33 @@ export default function PurchaseOrdersPage() {
             Create and manage purchase orders with approval workflow
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-purchase-order">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Purchase Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Purchase Order</DialogTitle>
-              <DialogDescription>
-                Create a new purchase order for inventory items from suppliers.
-              </DialogDescription>
-            </DialogHeader>
-            <PurchaseOrderForm
-              onSubmit={(data) => createMutation.mutate(data)}
-              onCancel={() => setIsCreateDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <ExportButton 
+            onExportCSV={() => exportPurchaseOrders(purchaseOrders, poItems)}
+            entityName="Purchase Orders"
+            variant="outline"
+          />
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-purchase-order">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Purchase Order
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Purchase Order</DialogTitle>
+                <DialogDescription>
+                  Create a new purchase order for inventory items from suppliers.
+                </DialogDescription>
+              </DialogHeader>
+              <PurchaseOrderForm
+                onSubmit={(data) => createMutation.mutate(data)}
+                onCancel={() => setIsCreateDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Statistics Cards */}

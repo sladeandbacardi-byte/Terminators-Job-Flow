@@ -29,10 +29,19 @@ export const workers = pgTable("workers", {
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  address: text("address").notNull(),
-  phone: text("phone"),
   email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  contactPerson: text("contact_person"),
+  businessType: text("business_type"),
+  status: text("status").notNull().default('active'), // active, inactive, suspended
+  divisionId: varchar("division_id").notNull(),
+  taxNumber: text("tax_number"),
+  paymentTerms: text("payment_terms"),
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
+  notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
 export const inventoryItems = pgTable("inventory_items", {

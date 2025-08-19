@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import Workers from "@/pages/workers";
+import Clients from "@/pages/clients";
 import Inventory from "@/pages/inventory";
 import Contracts from "@/pages/contracts";
 import Invoices from "@/pages/invoices";
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/workers" component={Workers} />
+      <Route path="/clients" component={Clients} />
       <Route path="/inventory" component={Inventory} />
       <Route path="/contracts" component={Contracts} />
       <Route path="/invoices" component={Invoices} />
