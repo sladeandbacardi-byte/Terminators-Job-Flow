@@ -17,7 +17,6 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder,
   type PurchaseOrderItem, type InsertPurchaseOrderItem
 } from "@shared/schema";
-import { randomUUID } from "crypto";
 
 export interface IStorage {
   // Users
@@ -457,11 +456,104 @@ export class MemStorage implements IStorage {
     ];
 
     // Store all example data
-    clients.forEach(client => this.clients.set(client.id, client));
-    contracts.forEach(contract => this.rentalContracts.set(contract.id, contract));
-    jobs.forEach(job => this.jobs.set(job.id, job));
-    invoices.forEach(invoice => this.invoices.set(invoice.id, invoice));
-    invoiceItems.forEach(item => this.invoiceItems.set(item.id, item));
+    // Map data to proper types with required properties
+    clients.forEach(client => {
+      const clientData: Client = {
+        id: client.id,
+        name: client.name,
+        contactPerson: client.contactPerson || null,
+        email: client.email || null,
+        phone: client.phone || null,
+        address: client.address || null,
+        divisionId: client.divisionId,
+        paymentTerms: client.paymentTerms || null,
+        notes: client.notes || null,
+        isActive: client.isActive,
+        website: client.website || null,
+        category: client.category,
+        createdAt: client.createdAt,
+        updatedAt: new Date()
+      };
+      this.clients.set(client.id, clientData);
+    });
+    
+    contracts.forEach(contract => {
+      const contractData: RentalContract = {
+        id: contract.id,
+        clientId: contract.clientId,
+        inventoryItemId: contract.inventoryItemId,
+        monthlyPrice: contract.monthlyRate,
+        startDate: new Date(contract.startDate),
+        endDate: contract.endDate ? new Date(contract.endDate) : null,
+        isActive: contract.isActive,
+        notes: contract.description || null,
+        createdAt: contract.createdAt,
+        lastPriceIncrease: null
+      };
+      this.rentalContracts.set(contract.id, contractData);
+    });
+    
+    jobs.forEach(job => {
+      const jobData: Job = {
+        id: job.id,
+        clientId: job.clientId,
+        workerId: job.workerId,
+        divisionId: job.divisionId,
+        title: job.title,
+        description: job.description || null,
+        status: job.status,
+        priority: job.priority,
+        scheduledDate: job.scheduledDate,
+        completedDate: job.completedDate || null,
+        estimatedDuration: job.estimatedDuration || null,
+        actualDuration: job.actualDuration || null,
+        serviceType: job.serviceType || null,
+        location: job.location || null,
+        startTime: job.startTime || null,
+        endTime: job.endTime || null,
+        notes: job.notes || null,
+        createdAt: job.createdAt,
+        updatedAt: new Date(),
+        parentJobId: null
+      };
+      this.jobs.set(job.id, jobData);
+    });
+    
+    invoices.forEach(invoice => {
+      const invoiceData: Invoice = {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        clientId: invoice.clientId,
+        issueDate: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        status: invoice.status,
+        subtotal: invoice.subtotalAmount,
+        taxAmount: invoice.taxAmount,
+        total: invoice.totalAmount,
+        paidAmount: invoice.paidAmount || "0.00",
+        paymentDate: invoice.paidDate || null,
+        notes: invoice.notes || null,
+        createdAt: invoice.createdAt,
+        updatedAt: new Date(),
+        terms: null
+      };
+      this.invoices.set(invoice.id, invoiceData);
+    });
+    
+    invoiceItems.forEach(item => {
+      const itemData: InvoiceItem = {
+        id: item.id,
+        invoiceId: item.invoiceId,
+        description: item.description,
+        quantity: item.quantity.toString(),
+        unitPrice: item.unitPrice,
+        total: item.totalPrice,
+        inventoryItemId: null,
+        jobId: null,
+        contractId: null
+      };
+      this.invoiceItems.set(item.id, itemData);
+    });
 
     // Create some notifications based on the example data
     await this.createNotification({
@@ -1058,7 +1150,11 @@ export class MemStorage implements IStorage {
 
   async createDivision(insertDivision: InsertDivision): Promise<Division> {
     const id = randomUUID();
-    const division: Division = { ...insertDivision, id };
+    const division: Division = { 
+      ...insertDivision, 
+      id,
+      description: insertDivision.description || null
+    };
     this.divisions.set(id, division);
     return division;
   }
@@ -1078,7 +1174,13 @@ export class MemStorage implements IStorage {
 
   async createWorker(insertWorker: InsertWorker): Promise<Worker> {
     const id = randomUUID();
-    const worker: Worker = { ...insertWorker, id, createdAt: new Date() };
+    const worker: Worker = { 
+      ...insertWorker, 
+      id, 
+      createdAt: new Date(),
+      isActive: insertWorker.isActive ?? true,
+      role: insertWorker.role || null
+    };
     this.workers.set(id, worker);
     return worker;
   }
@@ -1107,7 +1209,19 @@ export class MemStorage implements IStorage {
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     const id = randomUUID();
-    const client: Client = { ...insertClient, id, createdAt: new Date() };
+    const client: Client = { 
+      ...insertClient, 
+      id, 
+      createdAt: new Date(),
+      contactPerson: insertClient.contactPerson || null,
+      email: insertClient.email || null,
+      phone: insertClient.phone || null,
+      address: insertClient.address || null,
+      paymentTerms: insertClient.paymentTerms || null,
+      notes: insertClient.notes || null,
+      website: insertClient.website || null,
+      updatedAt: new Date()
+    };
     this.clients.set(id, client);
     return client;
   }
@@ -1144,7 +1258,17 @@ export class MemStorage implements IStorage {
 
   async createInventoryItem(insertItem: InsertInventoryItem): Promise<InventoryItem> {
     const id = randomUUID();
-    const item: InventoryItem = { ...insertItem, id, createdAt: new Date() };
+    const item: InventoryItem = { 
+      ...insertItem, 
+      id, 
+      createdAt: new Date(),
+      divisionId: insertItem.divisionId || null,
+      description: insertItem.description || null,
+      supplier: insertItem.supplier || null,
+      location: insertItem.location || null,
+      unitPrice: insertItem.unitPrice || null,
+      lastRestocked: insertItem.lastRestocked || null
+    };
     this.inventoryItems.set(id, item);
     return item;
   }
@@ -1261,9 +1385,13 @@ export class MemStorage implements IStorage {
     const inProgressJobs = periodJobs.filter(job => job.status === 'in_progress');
     const pendingJobs = periodJobs.filter(job => job.status === 'pending');
 
-    // Revenue calculation from completed jobs
-    const revenue = completedJobs.reduce((total, job) => {
-      return total + (job.totalAmount ? parseFloat(job.totalAmount) : 0);
+    // Revenue calculation from completed jobs (using related invoices)
+    const completedJobIds = new Set(completedJobs.map(job => job.id));
+    const relatedInvoices = Array.from(this.invoices.values()).filter(invoice => 
+      invoice.status === 'paid'
+    );
+    const revenue = relatedInvoices.reduce((total, invoice) => {
+      return total + parseFloat(invoice.total);
     }, 0);
 
     // Invoice metrics
@@ -1273,12 +1401,12 @@ export class MemStorage implements IStorage {
     );
     
     const invoicedAmount = periodInvoices.reduce((total, invoice) => 
-      total + parseFloat(invoice.totalAmount), 0
+      total + parseFloat(invoice.total), 0
     );
     
     const paidInvoices = periodInvoices.filter(invoice => invoice.status === 'paid');
     const paidAmount = paidInvoices.reduce((total, invoice) => 
-      total + parseFloat(invoice.totalAmount), 0
+      total + parseFloat(invoice.total), 0
     );
 
     // Contract metrics
@@ -1361,8 +1489,14 @@ export class MemStorage implements IStorage {
         return jobDate >= startDate && jobDate <= endDate && job.status === 'completed';
       });
 
-      const revenue = periodJobs.reduce((total, job) => {
-        return total + (job.totalAmount ? parseFloat(job.totalAmount) : 0);
+      // Calculate revenue from invoices for this period instead of jobs
+      const periodInvoices = Array.from(this.invoices.values()).filter(invoice => {
+        const invoiceDate = new Date(invoice.issueDate);
+        return invoiceDate >= startDate && invoiceDate <= endDate && invoice.status === 'paid';
+      });
+      
+      const revenue = periodInvoices.reduce((total, invoice) => {
+        return total + parseFloat(invoice.total);
       }, 0);
 
       result.push({
@@ -1401,7 +1535,15 @@ export class MemStorage implements IStorage {
 
   async createRentalContract(insertContract: InsertRentalContract): Promise<RentalContract> {
     const id = randomUUID();
-    const contract: RentalContract = { ...insertContract, id, createdAt: new Date() };
+    const contract: RentalContract = { 
+      ...insertContract, 
+      id, 
+      createdAt: new Date(),
+      isActive: insertContract.isActive ?? true,
+      notes: insertContract.notes || null,
+      endDate: insertContract.endDate || null,
+      lastPriceIncrease: insertContract.lastPriceIncrease || null
+    };
     this.rentalContracts.set(id, contract);
     return contract;
   }
@@ -1463,7 +1605,17 @@ export class MemStorage implements IStorage {
       ...insertJob, 
       id, 
       createdAt: now, 
-      updatedAt: now 
+      updatedAt: now,
+      notes: insertJob.notes || null,
+      description: insertJob.description || null,
+      location: insertJob.location || null,
+      serviceType: insertJob.serviceType || null,
+      estimatedDuration: insertJob.estimatedDuration || null,
+      actualDuration: insertJob.actualDuration || null,
+      startTime: insertJob.startTime || null,
+      endTime: insertJob.endTime || null,
+      completedDate: insertJob.completedDate || null,
+      parentJobId: insertJob.parentJobId || null
     };
     this.jobs.set(id, job);
     return job;
@@ -1525,7 +1677,10 @@ export class MemStorage implements IStorage {
       id,
       invoiceNumber,
       createdAt: now, 
-      updatedAt: now 
+      updatedAt: now,
+      notes: insertInvoice.notes || null,
+      paymentDate: insertInvoice.paymentDate || null,
+      terms: insertInvoice.terms || null
     };
     this.invoices.set(id, invoice);
     return invoice;
@@ -1555,7 +1710,13 @@ export class MemStorage implements IStorage {
 
   async createInvoiceItem(insertItem: InsertInvoiceItem): Promise<InvoiceItem> {
     const id = randomUUID();
-    const item: InvoiceItem = { ...insertItem, id };
+    const item: InvoiceItem = { 
+      ...insertItem, 
+      id,
+      inventoryItemId: insertItem.inventoryItemId || null,
+      jobId: insertItem.jobId || null,
+      contractId: insertItem.contractId || null
+    };
     this.invoiceItems.set(id, item);
     return item;
   }
@@ -1726,7 +1887,19 @@ export class MemStorage implements IStorage {
 
   async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
     const id = randomUUID();
-    const supplier: Supplier = { ...insertSupplier, id, createdAt: new Date() };
+    const supplier: Supplier = { 
+      ...insertSupplier, 
+      id, 
+      createdAt: new Date(),
+      contactPerson: insertSupplier.contactPerson || null,
+      email: insertSupplier.email || null,
+      phone: insertSupplier.phone || null,
+      address: insertSupplier.address || null,
+      website: insertSupplier.website || null,
+      divisionId: insertSupplier.divisionId || null,
+      paymentTerms: insertSupplier.paymentTerms || null,
+      notes: insertSupplier.notes || null
+    };
     this.suppliers.set(id, supplier);
     return supplier;
   }
