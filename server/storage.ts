@@ -637,55 +637,31 @@ export class MemStorage implements IStorage {
   }
 
   private initializeData() {
-    // Create divisions
+    // Create divisions - Updated to match actual business services from terminators.co.za
     const pestControlDivision: Division = {
       id: "div-1",
       name: "Pest Control Services",
       colorCode: "#22c55e",
-      description: "Professional pest control services"
-    };
-
-    const hygieneDivision: Division = {
-      id: "div-2", 
-      name: "Hygiene Services",
-      colorCode: "#f97316",
-      description: "Commercial hygiene and sanitization services"
+      description: "Professional pest control and extermination services for residential and commercial clients"
     };
 
     const sanitaryBinDivision: Division = {
-      id: "div-3",
-      name: "Sanitary Bin Service",
+      id: "div-2",
+      name: "Sanitary Bin Services",
       colorCode: "#8b5cf6",
-      description: "Sanitary waste collection and disposal services"
+      description: "Sanitary waste collection, disposal and feminine hygiene services"
     };
 
     const washroomDivision: Division = {
-      id: "div-4",
+      id: "div-3",
       name: "Washroom Services",
       colorCode: "#3b82f6",
-      description: "Washroom maintenance and hygiene services"
-    };
-
-    const deepCleaningDivision: Division = {
-      id: "div-5",
-      name: "Ablution Deep Cleaning",
-      colorCode: "#06b6d4",
-      description: "Professional deep cleaning and disinfection services"
-    };
-
-    const dailyCleaningDivision: Division = {
-      id: "div-6",
-      name: "Daily Cleaning Services",
-      colorCode: "#10b981",
-      description: "Regular daily cleaning and maintenance services"
+      description: "Complete washroom maintenance, hygiene and supply services"
     };
 
     this.divisions.set(pestControlDivision.id, pestControlDivision);
-    this.divisions.set(hygieneDivision.id, hygieneDivision);
     this.divisions.set(sanitaryBinDivision.id, sanitaryBinDivision);
     this.divisions.set(washroomDivision.id, washroomDivision);
-    this.divisions.set(deepCleaningDivision.id, deepCleaningDivision);
-    this.divisions.set(dailyCleaningDivision.id, dailyCleaningDivision);
 
     // Create workers based on actual organogram
     const workers = [
@@ -703,28 +679,24 @@ export class MemStorage implements IStorage {
       { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", divisionId: "div-1", role: "PCO" },
       
       // Sanitary Bin Service A Team
-      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", divisionId: "div-3", role: "Supervisor" },
-      { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", divisionId: "div-3", role: "Sanitary Bin Technician" },
-      { name: "Maryldene", email: "maryldene@terminators.co.za", phone: "+27 41 123 4578", divisionId: "div-3", role: "Sanitary Bin Technician" },
+      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", divisionId: "div-2", role: "Supervisor" },
+      { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", divisionId: "div-2", role: "Sanitary Bin Technician" },
+      { name: "Maryldene", email: "maryldene@terminators.co.za", phone: "+27 41 123 4578", divisionId: "div-2", role: "Sanitary Bin Technician" },
       
       // Sanitary Bin Service B Team
-      { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", divisionId: "div-3", role: "Supervisor" },
-      { name: "Nandipha", email: "nandipha@terminators.co.za", phone: "+27 41 123 4580", divisionId: "div-3", role: "Sanitary Bin Technician" },
-      { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", divisionId: "div-3", role: "Sanitary Bin Technician" },
+      { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", divisionId: "div-2", role: "Supervisor" },
+      { name: "Nandipha", email: "nandipha@terminators.co.za", phone: "+27 41 123 4580", divisionId: "div-2", role: "Sanitary Bin Technician" },
+      { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", divisionId: "div-2", role: "Sanitary Bin Technician" },
       
-      // Washroom Services
-      { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", divisionId: "div-4", role: "Supervisor" },
-      { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", divisionId: "div-4", role: "Washroom Technician" },
-      
-      // Ablution Deep Cleaning
-      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", divisionId: "div-5", role: "Supervisor" },
-      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", divisionId: "div-5", role: "Deep Cleaning Technician" },
-      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", divisionId: "div-5", role: "Deep Cleaning Technician" },
-      
-      // Daily Cleaning Services
-      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", divisionId: "div-6", role: "Daily Cleaning Technician" },
-      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", divisionId: "div-6", role: "Daily Cleaning Technician" },
-      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", divisionId: "div-6", role: "Daily Cleaning Technician" }
+      // Washroom Services Team
+      { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", divisionId: "div-3", role: "Supervisor" },
+      { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", divisionId: "div-3", role: "Washroom Technician" }
     ];
 
     workers.forEach((worker, index) => {
@@ -766,7 +738,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 20,
         unitPrice: "149.99",
         description: "Professional wall-mounted paper towel dispenser, lockable design",
-        divisionId: "div-2",
+        divisionId: "div-3",
         location: "Main Warehouse - Shelf A3",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-10')
@@ -781,7 +753,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 25,
         unitPrice: "12.50",
         description: "High-quality paper towel rolls for dispensers, 200m per roll",
-        divisionId: "div-2",
+        divisionId: "div-3",
         location: "Main Warehouse - Shelf B2",
         supplier: "PaperCorp Industries",
         lastRestocked: new Date('2025-08-05')
@@ -796,7 +768,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 10,
         unitPrice: "199.99",
         description: "Touchless automatic hand sanitizer dispenser with sensor",
-        divisionId: "div-2",
+        divisionId: "div-3",
         location: "Main Warehouse - Shelf A1",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-12')
@@ -811,7 +783,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 30,
         unitPrice: "35.00",
         description: "Premium hand sanitizer refill, alcohol-based formula",
-        divisionId: "div-2",
+        divisionId: "div-3",
         location: "Storage Room B - Shelf 1",
         supplier: "ChemiClean Supplies",
         lastRestocked: new Date('2025-07-28')
@@ -886,7 +858,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 15,
         unitPrice: "75.00",
         description: "Hygienic pedal-operated sanitary waste bin with liner",
-        divisionId: "div-4",
+        divisionId: "div-2",
         location: "Sanitary Equipment - Shelf B",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-08')
@@ -901,7 +873,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 75,
         unitPrice: "18.50",
         description: "Eco-friendly biodegradable sanitary waste bin liners, pack of 50",
-        divisionId: "div-4",
+        divisionId: "div-2",
         location: "Consumables Storage - Bin C",
         supplier: "EcoWaste Solutions",
         lastRestocked: new Date('2025-08-15')
@@ -916,7 +888,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 15,
         unitPrice: "45.00",
         description: "Industrial-strength disinfectant for deep cleaning services, 5L container",
-        divisionId: "div-5",
+        divisionId: "div-3",
         location: "Chemical Storage - Locked Section",
         supplier: "ChemiClean Industrial",
         lastRestocked: new Date('2025-08-05')
@@ -931,7 +903,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 3,
         unitPrice: "850.00",
         description: "High-pressure steam cleaner for deep sanitization",
-        divisionId: "div-5",
+        divisionId: "div-3",
         location: "Equipment Bay - Section E",
         supplier: "SteamTech Professional",
         lastRestocked: new Date('2025-08-01')

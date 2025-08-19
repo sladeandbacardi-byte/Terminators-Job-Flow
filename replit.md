@@ -54,14 +54,19 @@ Preferred communication style: Simple, everyday language.
 - **Responsive Design**: Mobile-first approach with progressive enhancement for larger screens
 - **Real-time Updates**: Polling-based data refresh for dashboard metrics and notifications
 
-### Division-Specific Features
-- **Pest Control Services**: Green branding, pest control inspections and treatments
-- **Hygiene Services**: Orange branding, sanitizer services, equipment maintenance  
-- **Sanitary Bin Service**: Purple branding, sanitary waste collection and disposal services with A/B teams
-- **Washroom Services**: Blue branding, washroom maintenance and hygiene services
-- **Ablution Deep Cleaning**: Cyan branding, professional deep cleaning and disinfection services
-- **Daily Cleaning Services**: Emerald branding, regular daily cleaning and maintenance services
-- **Multi-tenant Support**: Division-based filtering and assignment of workers, jobs, and inventory across all six divisions
+### Division-Specific Features - Updated to Match Business Website
+Based on terminators.co.za, the system now accurately reflects the actual business services:
+
+- **Pest Control Services** (div-1): Green branding (#22c55e), professional pest control and extermination services for residential and commercial clients
+- **Sanitary Bin Services** (div-2): Purple branding (#8b5cf6), sanitary waste collection, disposal and feminine hygiene services with A/B teams
+- **Washroom Services** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
+
+**Recent Changes (August 19, 2025)**:
+- Removed non-core divisions (Hygiene Services, Ablution Deep Cleaning, Daily Cleaning Services)
+- Consolidated all washroom-related services under single Washroom Services division
+- Redistributed 23 staff members across the three core service divisions
+- Updated all inventory items to reflect correct division assignments
+- Multi-tenant Support: Division-based filtering and assignment of workers, jobs, and inventory across the three core divisions
 
 ### Real Staff Integration
 - Actual organizational structure from The Terminators organogram integrated
