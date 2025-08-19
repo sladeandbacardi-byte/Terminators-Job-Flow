@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Shield, BarChart3, Calendar, Users, Box, FileText, BarChart, Receipt, Mail, Building2, ShoppingCart } from "lucide-react";
+import { TerminatorsLogo } from "@/components/terminators-logo";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
@@ -22,15 +23,7 @@ export default function Sidebar() {
   return (
     <div className="bg-white shadow-lg w-64 hidden lg:block" data-testid="sidebar">
       <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-            <Shield className="h-6 w-6 text-white" data-testid="logo-icon" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900" data-testid="company-name">The Terminators</h1>
-            <p className="text-sm text-gray-500" data-testid="company-subtitle">Field Service Management</p>
-          </div>
-        </div>
+        <TerminatorsLogo size="sm" data-testid="sidebar-logo" />
       </div>
       
       <nav className="p-4 space-y-2" data-testid="navigation">

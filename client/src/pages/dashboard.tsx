@@ -9,6 +9,7 @@ import NotificationsPanel from "@/components/dashboard/notifications";
 import RecentJobs from "@/components/dashboard/recent-jobs";
 import TodaysSchedule from "@/components/dashboard/schedule";
 import QuickActions from "@/components/dashboard/quick-actions";
+import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardMetrics {
@@ -114,6 +115,14 @@ export default function Dashboard() {
         
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
+            {/* Company Logo Header */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <TerminatorsLogo size="lg" className="mx-auto" data-testid="company-logo" />
+              <div className="mt-4 text-center">
+                <p className="text-gray-600 text-sm">Port Elizabeth's Premier Pest Control & Hygiene Services</p>
+              </div>
+            </div>
+
             {/* Period Selection and Overview */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
