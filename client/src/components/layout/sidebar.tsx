@@ -21,7 +21,7 @@ export default function Sidebar() {
   const [location] = useLocation();
 
   return (
-    <div className="bg-white shadow-lg w-64 hidden lg:block" data-testid="sidebar">
+    <div className="bg-white shadow-lg w-64 hidden md:block" data-testid="sidebar">
       <div className="p-6 border-b border-gray-200">
         <TerminatorsLogo size="sm" data-testid="sidebar-logo" />
       </div>
