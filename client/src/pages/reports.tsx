@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, DateRange } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, TrendingUp, FileText, Download, Calendar as CalendarIcon, DollarSign } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BarChart3, TrendingUp, FileText, Download, Calendar as CalendarIcon, DollarSign, User, Target } from "lucide-react";
 import { ExportButton } from "@/components/export-button";
 import { exportAllData } from "@/lib/data-export";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -18,6 +19,11 @@ import type { Job, RentalContract, Worker, Division } from "@shared/schema";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date(),
+  });
+  const [selectedStaffMember, setSelectedStaffMember] = useState<string>("");
+  const [staffDateRange, setStaffDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
@@ -36,6 +42,24 @@ export default function Reports() {
 
   const { data: divisions = [] } = useQuery<Division[]>({
     queryKey: ['/api/divisions'],
+  });
+
+  // Staff performance data
+  const { data: staffPerformance, isLoading: isLoadingStaffPerformance } = useQuery({
+    queryKey: ['/api/reports/staff-performance', selectedStaffMember, staffDateRange?.from, staffDateRange?.to],
+    queryFn: async () => {
+      if (!selectedStaffMember || !staffDateRange?.from || !staffDateRange?.to) return null;
+      
+      const params = new URLSearchParams({
+        startDate: staffDateRange.from.toISOString(),
+        endDate: staffDateRange.to.toISOString(),
+      });
+      
+      const response = await fetch(`/api/reports/staff-performance/${selectedStaffMember}?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch staff performance');
+      return response.json();
+    },
+    enabled: !!selectedStaffMember && !!staffDateRange?.from && !!staffDateRange?.to,
   });
 
   // Filter jobs by date range
@@ -173,10 +197,11 @@ export default function Reports() {
           </div>
 
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
               <TabsTrigger value="jobs" data-testid="tab-jobs">Job Analytics</TabsTrigger>
               <TabsTrigger value="workers" data-testid="tab-workers">Worker Performance</TabsTrigger>
+              <TabsTrigger value="staff" data-testid="tab-staff">Staff Analysis</TabsTrigger>
               <TabsTrigger value="contracts" data-testid="tab-contracts">Contract Reports</TabsTrigger>
             </TabsList>
 
@@ -337,6 +362,244 @@ export default function Reports() {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="staff" className="space-y-6">
+              {/* Staff Performance Analysis */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Individual Staff Performance Analysis
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Select a staff member and date range to view detailed performance metrics and sales figures
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Staff and Date Selection */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Select Staff Member</label>
+                      <Select value={selectedStaffMember} onValueChange={setSelectedStaffMember}>
+                        <SelectTrigger data-testid="select-staff-member">
+                          <SelectValue placeholder="Choose a staff member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workers
+                            .filter(w => w.isActive)
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((worker) => {
+                              const division = divisions.find(d => d.id === worker.divisionId);
+                              return (
+                                <SelectItem key={worker.id} value={worker.id}>
+                                  {worker.name} {division && `(${division.name})`}
+                                </SelectItem>
+                              );
+                            })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Date Range</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !staffDateRange && "text-muted-foreground"
+                            )}
+                            data-testid="staff-date-range-picker"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {staffDateRange?.from ? (
+                              staffDateRange.to ? (
+                                <>
+                                  {formatDate(staffDateRange.from)} - {formatDate(staffDateRange.to)}
+                                </>
+                              ) : (
+                                formatDate(staffDateRange.from)
+                              )
+                            ) : (
+                              <span>Pick date range</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={staffDateRange?.from}
+                            selected={staffDateRange}
+                            onSelect={setStaffDateRange}
+                            numberOfMonths={2}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  {/* Performance Metrics */}
+                  {isLoadingStaffPerformance && selectedStaffMember && (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">Loading performance data...</p>
+                    </div>
+                  )}
+
+                  {staffPerformance && (
+                    <div className="space-y-6">
+                      {/* Key Performance Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
+                            <Target className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold" data-testid="staff-total-jobs">
+                              {staffPerformance.totalJobs}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {staffPerformance.completedJobs} completed
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold" data-testid="staff-total-sales">
+                              R {parseFloat(staffPerformance.totalSales).toLocaleString()}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              From products & services
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Average Sales</CardTitle>
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold" data-testid="staff-avg-sales">
+                              R {parseFloat(staffPerformance.averageSalesPerJob).toLocaleString()}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Per job
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold" data-testid="staff-completion-rate">
+                              {staffPerformance.completionRate}%
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Job completion
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Job Status Breakdown */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Job Status Breakdown</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                                {staffPerformance.completedJobs}
+                              </div>
+                              <div className="text-sm text-green-600 dark:text-green-400">Completed</div>
+                            </div>
+                            <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                                {staffPerformance.inProgressJobs}
+                              </div>
+                              <div className="text-sm text-blue-600 dark:text-blue-400">In Progress</div>
+                            </div>
+                            <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
+                                {staffPerformance.pendingJobs}
+                              </div>
+                              <div className="text-sm text-yellow-600 dark:text-yellow-400">Pending</div>
+                            </div>
+                            <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-red-700 dark:text-red-400">
+                                {staffPerformance.cancelledJobs}
+                              </div>
+                              <div className="text-sm text-red-600 dark:text-red-400">Cancelled</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Recent Jobs */}
+                      {staffPerformance.jobs && staffPerformance.jobs.length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Recent Jobs in Date Range</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              Showing {Math.min(10, staffPerformance.jobs.length)} of {staffPerformance.jobs.length} jobs
+                            </p>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              {staffPerformance.jobs.slice(0, 10).map((job: any) => (
+                                <div key={job.id} className="flex justify-between items-center p-3 border rounded" data-testid={`staff-job-${job.id}`}>
+                                  <div>
+                                    <p className="font-medium">{job.title}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {formatDate(job.scheduledDate)} • {job.serviceType}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <Badge
+                                      variant={
+                                        job.status === 'completed' ? 'default' :
+                                        job.status === 'in_progress' ? 'secondary' :
+                                        job.status === 'cancelled' ? 'destructive' : 'outline'
+                                      }
+                                    >
+                                      {job.status.replace('_', ' ')}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedStaffMember && staffDateRange?.from && staffDateRange?.to && !isLoadingStaffPerformance && !staffPerformance && (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No performance data found for the selected period.</p>
+                    </div>
+                  )}
+
+                  {!selectedStaffMember && (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">Select a staff member to view their performance metrics.</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

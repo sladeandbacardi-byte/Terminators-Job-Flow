@@ -744,6 +744,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Staff Performance Analytics
+  app.get("/api/reports/staff-performance/:workerId", async (req, res) => {
+    const { workerId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    try {
+      // Get worker jobs within date range
+      const jobs = await storage.getJobs();
+      const jobInventoryItems = await storage.getJobInventoryItems();
+      
+      const filteredJobs = jobs.filter(job => {
+        const jobDate = new Date(job.scheduledDate);
+        const matchesWorker = job.workerId === workerId;
+        let matchesDateRange = true;
+        
+        if (startDate && endDate) {
+          const start = new Date(startDate as string);
+          const end = new Date(endDate as string);
+          matchesDateRange = jobDate >= start && jobDate <= end;
+        }
+        
+        return matchesWorker && matchesDateRange;
+      });
+
+      // Calculate sales figures from job inventory items
+      let totalSales = 0;
+      const jobIds = filteredJobs.map(job => job.id);
+      
+      const relatedInventoryItems = jobInventoryItems.filter(item => 
+        jobIds.includes(item.jobId)
+      );
+
+      for (const item of relatedInventoryItems) {
+        const quantity = parseFloat(item.quantity);
+        const unitPrice = parseFloat(item.unitPrice || "0");
+        totalSales += quantity * unitPrice;
+      }
+
+      const performance = {
+        workerId,
+        dateRange: { startDate, endDate },
+        totalJobs: filteredJobs.length,
+        completedJobs: filteredJobs.filter(j => j.status === 'completed').length,
+        pendingJobs: filteredJobs.filter(j => j.status === 'pending').length,
+        inProgressJobs: filteredJobs.filter(j => j.status === 'in_progress').length,
+        cancelledJobs: filteredJobs.filter(j => j.status === 'cancelled').length,
+        totalSales: totalSales.toFixed(2),
+        averageSalesPerJob: filteredJobs.length > 0 ? (totalSales / filteredJobs.length).toFixed(2) : "0.00",
+        completionRate: filteredJobs.length > 0 ? 
+          Math.round((filteredJobs.filter(j => j.status === 'completed').length / filteredJobs.length) * 100) : 0,
+        jobs: filteredJobs,
+        inventoryItems: relatedInventoryItems
+      };
+
+      res.json(performance);
+    } catch (error) {
+      console.error("Staff performance error:", error);
+      res.status(500).json({ error: "Failed to fetch staff performance data" });
+    }
+  });
+
   // Suppliers
   app.get("/api/suppliers", async (req, res) => {
     const { category, activeOnly } = req.query;
