@@ -53,7 +53,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
     fetchWorkOrders();
   }, [worker.id]);
 
-  const updateJobStatus = async (jobId: number, status: string) => {
+  const updateJobStatus = async (jobId: string, status: string) => {
     try {
       const token = localStorage.getItem('mobile_session_token');
       const response = await fetch(`/api/mobile/jobs/${jobId}/status`, {
@@ -66,12 +66,15 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update job status');
+        const errorText = await response.text();
+        throw new Error(`Failed to update job status: ${errorText}`);
       }
 
       // Refresh the list
-      fetchWorkOrders();
+      await fetchWorkOrders();
+      setError(''); // Clear any previous errors
     } catch (err) {
+      console.error('Job status update error:', err);
       setError(err instanceof Error ? err.message : 'Failed to update job status');
     }
   };
@@ -87,14 +90,24 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
   };
 
   const openMaps = (address: string) => {
-    const encodedAddress = encodeURIComponent(address);
-    // Try Google Maps first, fallback to default maps
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-    window.open(googleMapsUrl, '_blank');
+    try {
+      const encodedAddress = encodeURIComponent(address);
+      // Try Google Maps first, fallback to default maps
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+      window.open(googleMapsUrl, '_blank');
+    } catch (err) {
+      console.error('Error opening maps:', err);
+      setError('Unable to open maps application');
+    }
   };
 
   const callClient = (phone: string) => {
-    window.open(`tel:${phone}`, '_self');
+    try {
+      window.open(`tel:${phone}`, '_self');
+    } catch (err) {
+      console.error('Error making call:', err);
+      setError('Unable to make phone call');
+    }
   };
 
   if (isLoading) {
@@ -171,8 +184,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                         {job.status.replace('_', ' ').toUpperCase()}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
-                        {job.division === 'div-1' ? 'Pest Control' : 
-                         job.division === 'div-2' ? 'Sanitary Bins' : 'Washroom Services'}
+                        {job.serviceType || 'Service'}
                       </Badge>
                     </div>
                   </div>
@@ -192,7 +204,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                   </div>
                   <div className="flex items-start space-x-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4 mt-0.5" />
-                    <span className="flex-1">{job.client.address}</span>
+                    <span className="flex-1">{job.location || job.client.address}</span>
                   </div>
                   {job.client.phone && (
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -216,7 +228,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => openMaps(job.client.address)}
+                    onClick={() => openMaps(job.location || job.client.address || '')}
                     className="flex items-center space-x-1"
                     data-testid={`button-navigate-${job.id}`}
                   >

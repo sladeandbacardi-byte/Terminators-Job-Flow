@@ -105,9 +105,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/mobile/work-orders/:workerId", async (req, res) => {
     try {
       const { workerId } = req.params;
+      console.log("Fetching work orders for worker:", workerId);
       
       // Get today's and upcoming jobs for the worker
       const jobs = await storage.getJobsForWorker(workerId);
+      console.log("Found jobs:", jobs.length);
       
       res.json(jobs);
     } catch (error) {
@@ -120,8 +122,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { jobId } = req.params;
       const { status } = req.body;
+      console.log("Updating job status:", jobId, "to", status);
+      
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
       
       const updatedJob = await storage.updateJobStatus(jobId, status);
+      console.log("Job status updated successfully");
       
       res.json(updatedJob);
     } catch (error) {
