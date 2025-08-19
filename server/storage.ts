@@ -147,6 +147,9 @@ export interface IStorage {
   createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
   updatePurchaseOrderItem(id: string, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem>;
   deletePurchaseOrderItem(id: string): Promise<boolean>;
+
+  // Activity Logs (for admin audit trail)
+  getActivityLogs(): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -166,6 +169,7 @@ export class MemStorage implements IStorage {
   private suppliers: Map<string, Supplier> = new Map();
   private purchaseOrders: Map<string, PurchaseOrder> = new Map();
   private purchaseOrderItems: Map<string, PurchaseOrderItem> = new Map();
+  private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 1;
 
@@ -2017,6 +2021,11 @@ export class MemStorage implements IStorage {
 
   async deletePurchaseOrderItem(id: string): Promise<boolean> {
     return this.purchaseOrderItems.delete(id);
+  }
+
+  // Activity Logs
+  async getActivityLogs(): Promise<any[]> {
+    return this.activityLogs;
   }
 }
 

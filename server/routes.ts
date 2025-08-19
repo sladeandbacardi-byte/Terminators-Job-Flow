@@ -12,8 +12,110 @@ import {
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
 import { createSageService } from "./sage-integration";
+import { AuthService, requireAuth, logActivity, type AuthenticatedRequest } from "./auth-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const authResult = await AuthService.authenticateUser(username, password);
+      
+      if (!authResult) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      // Log successful login
+      await AuthService.logActivity({
+        userId: authResult.user.id,
+        action: "login",
+        details: "User logged in successfully",
+        ipAddress: req.ip || req.connection.remoteAddress || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      res.json({
+        token: authResult.token,
+        user: {
+          id: authResult.user.id,
+          username: authResult.user.username,
+          email: authResult.user.email,
+          firstName: authResult.user.firstName,
+          lastName: authResult.user.lastName,
+          role: authResult.user.role,
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/logout", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      
+      if (token) {
+        await AuthService.logoutUser(token);
+        
+        // Log logout activity
+        if (req.user) {
+          await AuthService.logActivity({
+            userId: req.user.id,
+            action: "logout",
+            details: "User logged out",
+            ipAddress: req.ip || req.connection.remoteAddress || null,
+            userAgent: req.headers['user-agent'] || null,
+          });
+        }
+      }
+      
+      res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/auth/me", requireAuth, async (req: AuthenticatedRequest, res) => {
+    res.json({
+      id: req.user!.id,
+      username: req.user!.username,
+      email: req.user!.email,
+      firstName: req.user!.firstName,
+      lastName: req.user!.lastName,
+      role: req.user!.role,
+    });
+  });
+
+  // Activity logs - admin only access
+  app.get("/api/auth/activity-logs", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const logs = await storage.getActivityLogs();
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching activity logs:", error);
+      res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+  
+  // Clean expired sessions (can be called by a scheduled job)
+  app.post("/api/auth/cleanup-sessions", async (req, res) => {
+    try {
+      await AuthService.cleanExpiredSessions();
+      res.json({ message: "Session cleanup completed" });
+    } catch (error) {
+      console.error("Session cleanup error:", error);
+      res.status(500).json({ message: "Session cleanup failed" });
+    }
+  });
   
   // Divisions
   app.get("/api/divisions", async (req, res) => {
