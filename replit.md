@@ -64,12 +64,15 @@ Based on terminators.co.za, the system now accurately reflects the actual busine
 **Recent Changes (August 19, 2025)**:
 - Removed non-core divisions (Hygiene Services, Ablution Deep Cleaning, Daily Cleaning Services)
 - Consolidated all washroom-related services under single Washroom Services division
-- Redistributed 23 staff members across the three core service divisions
+- Redistributed 24 staff members across the three core service divisions
 - Updated all inventory items to reflect correct division assignments
 - Multi-tenant Support: Division-based filtering and assignment of workers, jobs, and inventory across the three core divisions
+- Staff role updates: Sheryl-Lyn Lee promoted to Sales Administrator, Chane du Toit added as Sales Representative
+- Enhanced reports with individual staff performance tracking including job counts and sales figures
 
 ### Real Staff Integration
 - Actual organizational structure from The Terminators organogram integrated
 - Real staff names, roles, and division assignments
 - Team supervisors and management hierarchy properly structured
-- 23 staff members across all divisions with authentic contact details
+- 24 staff members across all divisions with authentic contact details
+- Individual staff performance reporting with date range filtering and sales calculations

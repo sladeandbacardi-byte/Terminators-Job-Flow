@@ -667,8 +667,9 @@ export class MemStorage implements IStorage {
     const workers = [
       // Management Team
       { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", divisionId: "div-1", role: "Managing Member/Operations" },
-      { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", divisionId: "div-2", role: "Sales Consultant" },
+      { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", divisionId: "div-2", role: "Sales Administrator" },
       { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", divisionId: "div-2", role: "Finance/HR Manager" },
+      { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", divisionId: "div-2", role: "Sales Representative" },
       { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", divisionId: "div-2", role: "Hygiene Services Manager" },
       { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", divisionId: "div-1", role: "Pest Control Services Manager" },
       
