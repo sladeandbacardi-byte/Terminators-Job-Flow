@@ -520,6 +520,7 @@ export class MemStorage implements IStorage {
         address: "123 Industrial Road, Johannesburg, 2001",
         website: "https://hygienetech.co.za",
         category: "hygiene",
+        divisionId: "div-2", // Sanitary Bin Services
         paymentTerms: "30 days",
         isActive: true,
         notes: "Primary supplier for paper towel dispensers and hygiene equipment",
@@ -534,6 +535,7 @@ export class MemStorage implements IStorage {
         address: "456 Commerce Street, Cape Town, 8001",
         website: "https://paperproducts.co.za",
         category: "hygiene",
+        divisionId: "div-3", // Washroom Services
         paymentTerms: "15 days",
         isActive: true,
         notes: "Reliable supplier for paper towel refills and tissue products",
@@ -548,6 +550,7 @@ export class MemStorage implements IStorage {
         address: "789 Security Avenue, Pretoria, 0001",
         website: "https://pestpro.co.za",
         category: "pest_control",
+        divisionId: "div-1", // Pest Control Services
         paymentTerms: "45 days",
         isActive: true,
         notes: "Specialized pest control supplies and baits",
@@ -562,6 +565,7 @@ export class MemStorage implements IStorage {
         address: "321 Cleaning Way, Sandton, 2196",
         website: "https://safeclean.co.za",
         category: "hygiene",
+        divisionId: "div-3", // Washroom Services
         paymentTerms: "30 days",
         isActive: true,
         notes: "Hand sanitizers and antibacterial products",
@@ -576,6 +580,7 @@ export class MemStorage implements IStorage {
         address: "654 Industrial Park, Durban, 4001",
         website: "https://traptech.co.za",
         category: "pest_control",
+        divisionId: "div-1", // Pest Control Services
         paymentTerms: "60 days",
         isActive: true,
         notes: "Monitoring stations and pest control equipment",
@@ -590,6 +595,7 @@ export class MemStorage implements IStorage {
         address: "987 Tech Boulevard, Midrand, 1686",
         website: "https://autoclean.co.za",
         category: "equipment",
+        divisionId: "div-2", // Sanitary Bin Services
         paymentTerms: "30 days",
         isActive: false, // Inactive supplier example
         notes: "Automatic dispensers and smart hygiene solutions. Currently on hold due to quality issues.",

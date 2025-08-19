@@ -297,6 +297,7 @@ export const suppliers = pgTable("suppliers", {
   address: text("address"),
   website: text("website"),
   category: text("category").notNull(), // e.g., "hygiene", "pest_control", "equipment"
+  divisionId: varchar("division_id"), // link to division for department-specific suppliers
   paymentTerms: text("payment_terms"), // e.g., "30 days", "Net 15"
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
