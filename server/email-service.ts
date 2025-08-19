@@ -228,7 +228,7 @@ Supplier: ${supplier.name}
 Total Amount: R${parseFloat(po.totalAmount || "0").toFixed(2)}
 Requested By: User ${po.requestedById}
 Request Date: ${new Date(po.requestDate).toLocaleDateString()}
-${po.notes ? `Notes: ${po.notes}` : ''}
+${(po.notes || '') ? `Notes: ${po.notes || ''}` : ''}
 
 Please review and approve or reject this purchase order in the system.
   `;
