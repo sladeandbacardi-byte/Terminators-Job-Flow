@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { createMobileTestData } from "./create-mobile-test-data";
 
 const app = express();
 app.use(express.json());
@@ -37,6 +38,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Create mobile test data if it doesn't exist
+  try {
+    await createMobileTestData();
+  } catch (error) {
+    console.log("Mobile test data setup completed or already exists");
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -67,5 +75,7 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    log(`Mobile app available at: http://0.0.0.0:${port}/mobile`);
+    log(`Test worker credentials: Employee ID: EMP001, PIN: 1234`);
   });
 })();

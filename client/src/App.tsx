@@ -17,6 +17,7 @@ import Emails from "@/pages/emails";
 import Reports from "@/pages/reports";
 import Suppliers from "@/pages/suppliers";
 import PurchaseOrders from "@/pages/purchase-orders";
+import Mobile from "@/pages/mobile";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -38,6 +39,7 @@ function AuthenticatedApp() {
 
   return (
     <Switch>
+      <Route path="/mobile" component={Mobile} />
       <Route path="/" component={Dashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/jobs" component={Jobs} />

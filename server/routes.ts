@@ -57,6 +57,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mobile authentication routes
+  app.post("/api/auth/mobile-login", async (req, res) => {
+    try {
+      const { employeeId, pin } = req.body;
+      
+      if (!employeeId || !pin) {
+        return res.status(400).json({ message: "Employee ID and PIN are required" });
+      }
+
+      const worker = await storage.getWorkerByEmployeeId(employeeId.trim());
+      
+      if (!worker || !worker.pin) {
+        return res.status(401).json({ message: "Invalid employee ID or PIN" });
+      }
+
+      // For demo purposes, check PIN directly (in production, should be hashed)
+      if (worker.pin !== pin.trim()) {
+        return res.status(401).json({ message: "Invalid employee ID or PIN" });
+      }
+
+      if (!worker.isActive) {
+        return res.status(401).json({ message: "Account is inactive" });
+      }
+
+      // Generate simple token for mobile session
+      const token = `mobile_${worker.id}_${Date.now()}`;
+
+      res.json({
+        token,
+        worker: {
+          id: worker.id,
+          name: worker.name,
+          email: worker.email,
+          phone: worker.phone,
+          divisionId: worker.divisionId,
+          role: worker.role,
+          employeeId: worker.employeeId,
+        }
+      });
+    } catch (error) {
+      console.error("Mobile login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/mobile/work-orders/:workerId", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      
+      // Get today's and upcoming jobs for the worker
+      const jobs = await storage.getJobsForWorker(workerId);
+      
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching work orders:", error);
+      res.status(500).json({ message: "Failed to fetch work orders" });
+    }
+  });
+
+  app.patch("/api/mobile/jobs/:jobId/status", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { status } = req.body;
+      
+      const updatedJob = await storage.updateJobStatus(jobId, status);
+      
+      res.json(updatedJob);
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      res.status(500).json({ message: "Failed to update job status" });
+    }
+  });
+
   app.post("/api/auth/logout", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const authHeader = req.headers.authorization;

@@ -23,6 +23,8 @@ export const workers = pgTable("workers", {
   phone: text("phone").notNull(),
   divisionId: varchar("division_id").notNull(),
   role: text("role"),
+  employeeId: text("employee_id").unique(), // For mobile login
+  pin: text("pin"), // 4-digit PIN for mobile login (hashed)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -84,8 +86,9 @@ export const jobs = pgTable("jobs", {
   workerId: varchar("worker_id"),
   divisionId: varchar("division_id").notNull(),
   serviceType: text("service_type").notNull(),
-  status: text("status").notNull().default('pending'), // pending, in_progress, completed, cancelled
+  status: text("status").notNull().default('scheduled'), // scheduled, in_progress, completed, cancelled
   scheduledDate: timestamp("scheduled_date").notNull(),
+  scheduledTime: text("scheduled_time"), // Time as string for mobile display
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
   priority: text("priority").notNull().default('medium'), // low, medium, high, urgent

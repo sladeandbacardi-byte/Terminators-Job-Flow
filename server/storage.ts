@@ -32,6 +32,7 @@ export interface IStorage {
   // Workers
   getWorkers(): Promise<Worker[]>;
   getWorker(id: string): Promise<Worker | undefined>;
+  getWorkerByEmployeeId(employeeId: string): Promise<Worker | undefined>;
   getWorkersByDivision(divisionId: string): Promise<Worker[]>;
   createWorker(worker: InsertWorker): Promise<Worker>;
   updateWorker(id: string, worker: Partial<InsertWorker>): Promise<Worker>;
@@ -66,10 +67,12 @@ export interface IStorage {
   getJobs(): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
   getJobsByWorker(workerId: string): Promise<Job[]>;
+  getJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]>;
   getJobsByDivision(divisionId: string): Promise<Job[]>;
   getJobsByStatus(status: string): Promise<Job[]>;
   getJobsByDateRange(startDate: Date, endDate: Date): Promise<Job[]>;
   getTodaysJobs(): Promise<Job[]>;
+  updateJobStatus(jobId: string, status: string): Promise<Job>;
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: string, job: Partial<InsertJob>): Promise<Job>;
   deleteJob(id: string): Promise<boolean>;
@@ -1172,6 +1175,10 @@ export class MemStorage implements IStorage {
     return this.workers.get(id);
   }
 
+  async getWorkerByEmployeeId(employeeId: string): Promise<Worker | undefined> {
+    return Array.from(this.workers.values()).find(w => w.employeeId === employeeId);
+  }
+
   async getWorkersByDivision(divisionId: string): Promise<Worker[]> {
     return Array.from(this.workers.values()).filter(worker => worker.divisionId === divisionId);
   }
@@ -1636,6 +1643,29 @@ export class MemStorage implements IStorage {
 
   async deleteJob(id: string): Promise<boolean> {
     return this.jobs.delete(id);
+  }
+
+  async getJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]> {
+    const workerJobs = Array.from(this.jobs.values()).filter(job => job.workerId === workerId);
+    const result: (Job & { client: Client })[] = [];
+    
+    for (const job of workerJobs) {
+      const client = this.clients.get(job.clientId);
+      if (client) {
+        result.push({ ...job, client });
+      }
+    }
+    
+    return result;
+  }
+
+  async updateJobStatus(jobId: string, status: string): Promise<Job> {
+    const job = this.jobs.get(jobId);
+    if (!job) throw new Error("Job not found");
+    
+    const updatedJob = { ...job, status };
+    this.jobs.set(jobId, updatedJob);
+    return updatedJob;
   }
 
   // Invoices
