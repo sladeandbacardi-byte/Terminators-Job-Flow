@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Sidebar from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
+import MobileNavigation from "@/components/layout/mobile-nav";
 import {
   Plus,
   Search,
@@ -77,6 +80,7 @@ export default function SuppliersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -183,7 +187,27 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen flex bg-gray-50" data-testid="suppliers-page">
+      <Sidebar />
+      
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="relative bg-white w-64 shadow-lg">
+            <Sidebar />
+          </div>
+        </div>
+      )}
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header 
+          title="Supplier Management" 
+          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
+        />
+        
+        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+          <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="page-title">Suppliers</h1>
@@ -459,6 +483,11 @@ export default function SuppliersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+          </div>
+        </main>
+        
+        <MobileNavigation />
+      </div>
     </div>
   );
 }
