@@ -118,9 +118,6 @@ export default function Dashboard() {
             {/* Company Logo Header */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <TerminatorsLogo size="lg" className="mx-auto" data-testid="company-logo" />
-              <div className="mt-4 text-center">
-                <p className="text-gray-600 text-sm">Port Elizabeth's Premier Pest Control & Hygiene Services</p>
-              </div>
             </div>
 
             {/* Period Selection and Overview */}
