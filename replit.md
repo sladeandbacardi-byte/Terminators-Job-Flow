@@ -55,9 +55,16 @@ Preferred communication style: Simple, everyday language.
 - **Real-time Updates**: Polling-based data refresh for dashboard metrics and notifications
 
 ### Division-Specific Features
-- **Pest Control Division**: Green branding, pest-specific job types, inspection scheduling
-- **Hygiene Services Division**: Orange branding, sanitizer services, equipment maintenance
-- **Washroom Division**: Blue branding, washroom maintenance and hygiene services with specialized cleaning equipment
-- **Sanitary Bin Division**: Purple branding, sanitary waste collection and disposal services with pedal-operated bins
-- **Deep Cleaning Division**: Cyan branding, professional deep cleaning and disinfection services with industrial equipment
-- **Multi-tenant Support**: Division-based filtering and assignment of workers, jobs, and inventory across all five divisions
+- **Pest Control Services**: Green branding, pest control inspections and treatments
+- **Hygiene Services**: Orange branding, sanitizer services, equipment maintenance  
+- **Sanitary Bin Service**: Purple branding, sanitary waste collection and disposal services with A/B teams
+- **Washroom Services**: Blue branding, washroom maintenance and hygiene services
+- **Ablution Deep Cleaning**: Cyan branding, professional deep cleaning and disinfection services
+- **Daily Cleaning Services**: Emerald branding, regular daily cleaning and maintenance services
+- **Multi-tenant Support**: Division-based filtering and assignment of workers, jobs, and inventory across all six divisions
+
+### Real Staff Integration
+- Actual organizational structure from The Terminators organogram integrated
+- Real staff names, roles, and division assignments
+- Team supervisors and management hierarchy properly structured
+- 23 staff members across all divisions with authentic contact details

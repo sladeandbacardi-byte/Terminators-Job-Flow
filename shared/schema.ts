@@ -22,6 +22,7 @@ export const workers = pgTable("workers", {
   email: text("email").notNull().unique(),
   phone: text("phone").notNull(),
   divisionId: varchar("division_id").notNull(),
+  role: text("role"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });

@@ -640,7 +640,7 @@ export class MemStorage implements IStorage {
     // Create divisions
     const pestControlDivision: Division = {
       id: "div-1",
-      name: "Pest Control",
+      name: "Pest Control Services",
       colorCode: "#22c55e",
       description: "Professional pest control services"
     };
@@ -652,49 +652,79 @@ export class MemStorage implements IStorage {
       description: "Commercial hygiene and sanitization services"
     };
 
-    const washroomDivision: Division = {
-      id: "div-3",
-      name: "Washroom",
-      colorCode: "#3b82f6",
-      description: "Washroom maintenance and hygiene services"
-    };
-
     const sanitaryBinDivision: Division = {
-      id: "div-4",
-      name: "Sanitary Bin",
+      id: "div-3",
+      name: "Sanitary Bin Service",
       colorCode: "#8b5cf6",
       description: "Sanitary waste collection and disposal services"
     };
 
+    const washroomDivision: Division = {
+      id: "div-4",
+      name: "Washroom Services",
+      colorCode: "#3b82f6",
+      description: "Washroom maintenance and hygiene services"
+    };
+
     const deepCleaningDivision: Division = {
       id: "div-5",
-      name: "Deep Cleaning",
+      name: "Ablution Deep Cleaning",
       colorCode: "#06b6d4",
       description: "Professional deep cleaning and disinfection services"
     };
 
+    const dailyCleaningDivision: Division = {
+      id: "div-6",
+      name: "Daily Cleaning Services",
+      colorCode: "#10b981",
+      description: "Regular daily cleaning and maintenance services"
+    };
+
     this.divisions.set(pestControlDivision.id, pestControlDivision);
     this.divisions.set(hygieneDivision.id, hygieneDivision);
-    this.divisions.set(washroomDivision.id, washroomDivision);
     this.divisions.set(sanitaryBinDivision.id, sanitaryBinDivision);
+    this.divisions.set(washroomDivision.id, washroomDivision);
     this.divisions.set(deepCleaningDivision.id, deepCleaningDivision);
+    this.divisions.set(dailyCleaningDivision.id, dailyCleaningDivision);
 
-    // Create sample workers
+    // Create workers based on actual organogram
     const workers = [
-      { name: "John Smith", email: "john@terminators.co.za", phone: "+27 41 123 4567", divisionId: "div-1" },
-      { name: "Sarah Williams", email: "sarah@terminators.co.za", phone: "+27 41 123 4568", divisionId: "div-2" },
-      { name: "David Brown", email: "david@terminators.co.za", phone: "+27 41 123 4569", divisionId: "div-1" },
-      { name: "Lisa Johnson", email: "lisa@terminators.co.za", phone: "+27 41 123 4570", divisionId: "div-2" },
-      { name: "Mike Johnson", email: "mike@terminators.co.za", phone: "+27 41 123 4571", divisionId: "div-1" },
-      { name: "Emma Davis", email: "emma@terminators.co.za", phone: "+27 41 123 4572", divisionId: "div-2" },
-      { name: "James Wilson", email: "james@terminators.co.za", phone: "+27 41 123 4573", divisionId: "div-1" },
-      { name: "Rachel Green", email: "rachel@terminators.co.za", phone: "+27 41 123 4574", divisionId: "div-2" },
-      { name: "Mark Thompson", email: "mark@terminators.co.za", phone: "+27 41 123 4575", divisionId: "div-3" },
-      { name: "Jessica Adams", email: "jessica@terminators.co.za", phone: "+27 41 123 4576", divisionId: "div-3" },
-      { name: "Robert Miller", email: "robert@terminators.co.za", phone: "+27 41 123 4577", divisionId: "div-4" },
-      { name: "Amanda Clark", email: "amanda@terminators.co.za", phone: "+27 41 123 4578", divisionId: "div-4" },
-      { name: "Kevin Lee", email: "kevin@terminators.co.za", phone: "+27 41 123 4579", divisionId: "div-5" },
-      { name: "Natalie Scott", email: "natalie@terminators.co.za", phone: "+27 41 123 4580", divisionId: "div-5" }
+      // Management Team
+      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", divisionId: "div-1", role: "Managing Member/Operations" },
+      { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", divisionId: "div-2", role: "Sales Consultant" },
+      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", divisionId: "div-2", role: "Finance/HR Manager" },
+      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", divisionId: "div-2", role: "Hygiene Services Manager" },
+      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", divisionId: "div-1", role: "Pest Control Services Manager" },
+      
+      // Pest Control Team
+      { name: "Reece Ebrahim", email: "reece@terminators.co.za", phone: "+27 41 123 4572", divisionId: "div-1", role: "PCO" },
+      { name: "Garth du Preez", email: "garth@terminators.co.za", phone: "+27 41 123 4573", divisionId: "div-1", role: "PCO" },
+      { name: "Michael Meyer", email: "michael@terminators.co.za", phone: "+27 41 123 4574", divisionId: "div-1", role: "PCO" },
+      { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", divisionId: "div-1", role: "PCO" },
+      
+      // Sanitary Bin Service A Team
+      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", divisionId: "div-3", role: "Supervisor" },
+      { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", divisionId: "div-3", role: "Sanitary Bin Technician" },
+      { name: "Maryldene", email: "maryldene@terminators.co.za", phone: "+27 41 123 4578", divisionId: "div-3", role: "Sanitary Bin Technician" },
+      
+      // Sanitary Bin Service B Team
+      { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", divisionId: "div-3", role: "Supervisor" },
+      { name: "Nandipha", email: "nandipha@terminators.co.za", phone: "+27 41 123 4580", divisionId: "div-3", role: "Sanitary Bin Technician" },
+      { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", divisionId: "div-3", role: "Sanitary Bin Technician" },
+      
+      // Washroom Services
+      { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", divisionId: "div-4", role: "Supervisor" },
+      { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", divisionId: "div-4", role: "Washroom Technician" },
+      
+      // Ablution Deep Cleaning
+      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", divisionId: "div-5", role: "Supervisor" },
+      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", divisionId: "div-5", role: "Deep Cleaning Technician" },
+      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", divisionId: "div-5", role: "Deep Cleaning Technician" },
+      
+      // Daily Cleaning Services
+      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", divisionId: "div-6", role: "Daily Cleaning Technician" },
+      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", divisionId: "div-6", role: "Daily Cleaning Technician" },
+      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", divisionId: "div-6", role: "Daily Cleaning Technician" }
     ];
 
     workers.forEach((worker, index) => {
