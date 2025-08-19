@@ -11,6 +11,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
+import { createSageService } from "./sage-integration";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -607,27 +608,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No email address provided" });
       }
 
-      // Create email service instance
-      const OutlookEmailService = (await import("./email-service")).default;
-      const emailService = new OutlookEmailService({
-        clientId: process.env.MICROSOFT_CLIENT_ID || "your-client-id",
-        authority: "https://login.microsoftonline.com/common",
-        redirectUri: "http://localhost:5000"
-      });
-
-      // Authenticate and send email
-      const authenticated = await emailService.authenticate(username, password);
-      if (!authenticated) {
-        return res.status(401).json({ error: "Email authentication failed" });
-      }
-
-      const emailTemplate = emailService.generateInvoiceEmailTemplate(invoice, client);
-      const emailSent = await emailService.sendEmail({
+      // Use simple SendGrid email service
+      const emailSent = await sendEmail({
         to: recipientEmail,
-        subject: emailTemplate.subject,
-        htmlContent: emailTemplate.htmlContent,
-        textContent: emailTemplate.textContent
+        from: "noreply@terminators.co.za",
+        subject: `Invoice ${invoice.invoiceNumber} from The Terminators`,
+        html: `
+          <h2>Invoice ${invoice.invoiceNumber}</h2>
+          <p>Dear ${client.name},</p>
+          <p>Please find your invoice details below:</p>
+          <p><strong>Total Amount:</strong> R ${parseFloat(invoice.total).toFixed(2)}</p>
+          <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+          <p>Thank you for your business!</p>
+          <br>
+          <p>Best regards,<br>The Terminators Team</p>
+        `
       });
+
+
 
       // Log the email attempt
       await storage.createEmailLog({
@@ -1013,6 +1011,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Purchase order item not found" });
     }
     res.status(204).send();
+  });
+
+  // Sage Accounting Integration
+  app.post("/api/sage/test-connection", async (req, res) => {
+    try {
+      const sageService = createSageService();
+      const result = await sageService.testConnection();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Failed to test Sage connection' 
+      });
+    }
+  });
+
+  app.post("/api/sage/send-invoice/:id", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const invoiceItems = await storage.getInvoiceItems(invoice.id);
+      const client = await storage.getClient(invoice.clientId);
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const sageService = createSageService();
+      const sageInvoice = await sageService.sendInvoice(invoice, invoiceItems, client);
+      
+      res.json({
+        success: true,
+        message: `Invoice ${invoice.invoiceNumber} sent to Sage successfully`,
+        sageInvoiceId: sageInvoice.id,
+        sageInvoiceNumber: sageInvoice.invoice_number
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Failed to send invoice to Sage' 
+      });
+    }
+  });
+
+  app.post("/api/sage/send-invoices-bulk", async (req, res) => {
+    try {
+      const { invoiceIds } = req.body;
+      
+      if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+        return res.status(400).json({ error: "Invoice IDs array is required" });
+      }
+
+      const invoiceData = [];
+      
+      for (const invoiceId of invoiceIds) {
+        const invoice = await storage.getInvoice(invoiceId);
+        if (!invoice) continue;
+        
+        const invoiceItems = await storage.getInvoiceItems(invoice.id);
+        const client = await storage.getClient(invoice.clientId);
+        
+        if (client) {
+          invoiceData.push({ invoice, invoiceItems, client });
+        }
+      }
+
+      const sageService = createSageService();
+      const results = await sageService.sendMultipleInvoices(invoiceData);
+      
+      res.json({
+        success: true,
+        message: `Processed ${results.length} invoices`,
+        results
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Failed to send invoices to Sage' 
+      });
+    }
+  });
+
+  app.get("/api/sage/invoice-status/:sageInvoiceId", async (req, res) => {
+    try {
+      const sageService = createSageService();
+      const status = await sageService.getInvoiceStatus(req.params.sageInvoiceId);
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Failed to get invoice status from Sage' 
+      });
+    }
   });
 
   const httpServer = createServer(app);

@@ -16,6 +16,7 @@ import { ExportButton } from "@/components/export-button";
 import { exportInvoices } from "@/lib/data-export";
 import type { Invoice, Client, InvoiceItem } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
+import { SageIntegration } from "@/components/sage-integration";
 
 export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -340,20 +341,41 @@ export default function Invoices() {
 
       {/* Email Invoice Dialog */}
       <Dialog open={showEmailForm} onOpenChange={setShowEmailForm}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Email Invoice</DialogTitle>
+            <DialogTitle>Email & Send Invoice</DialogTitle>
             <DialogDescription>
-              Send this invoice via email to your customer.
+              Send this invoice via email to your customer or sync with Sage Accounting.
             </DialogDescription>
           </DialogHeader>
           {selectedInvoice && (
-            <EmailInvoiceForm
-              invoice={selectedInvoice}
-              client={clientMap.get(selectedInvoice.clientId)!}
-              onSuccess={handleEmailSuccess}
-              onCancel={handleEmailCancel}
-            />
+            <div className="space-y-6">
+              <Tabs defaultValue="email" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="email">Email Invoice</TabsTrigger>
+                  <TabsTrigger value="sage">Sage Accounting</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="email" className="space-y-4">
+                  <EmailInvoiceForm
+                    invoice={selectedInvoice}
+                    client={clientMap.get(selectedInvoice.clientId)!}
+                    onSuccess={handleEmailSuccess}
+                    onCancel={handleEmailCancel}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="sage" className="space-y-4">
+                  <SageIntegration
+                    invoice={selectedInvoice}
+                    onSuccess={() => {
+                      setShowEmailForm(false);
+                      setSelectedInvoice(null);
+                    }}
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
           )}
         </DialogContent>
       </Dialog>

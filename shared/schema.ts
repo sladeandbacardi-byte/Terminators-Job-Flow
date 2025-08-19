@@ -117,6 +117,8 @@ export const invoices = pgTable("invoices", {
   terms: text("terms"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+  sageInvoiceId: varchar("sage_invoice_id"), // Store Sage invoice ID for integration
+  sageStatus: varchar("sage_status"), // Store Sage invoice status
 });
 
 export const invoiceItems = pgTable("invoice_items", {
