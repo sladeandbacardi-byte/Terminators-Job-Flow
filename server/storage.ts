@@ -754,28 +754,36 @@ export class MemStorage implements IStorage {
     // Create divisions - Updated to match actual business services from terminators.co.za
     const pestControlDivision: Division = {
       id: "div-1",
-      name: "Pest Control Services",
+      name: "Pest Control",
       colorCode: "#22c55e",
       description: "Professional pest control and extermination services for residential and commercial clients"
     };
 
     const sanitaryBinDivision: Division = {
       id: "div-2",
-      name: "Sanitary Bin Services",
+      name: "Sanitary Bins",
       colorCode: "#8b5cf6",
       description: "Sanitary waste collection, disposal and feminine hygiene services"
     };
 
     const washroomDivision: Division = {
       id: "div-3",
-      name: "Washroom Services",
+      name: "Washroom",
       colorCode: "#3b82f6",
       description: "Complete washroom maintenance, hygiene and supply services"
+    };
+
+    const deepCleaningDivision: Division = {
+      id: "div-4",
+      name: "Deep Cleaning",
+      colorCode: "#f59e0b",
+      description: "Professional deep cleaning and specialized cleaning services"
     };
 
     this.divisions.set(pestControlDivision.id, pestControlDivision);
     this.divisions.set(sanitaryBinDivision.id, sanitaryBinDivision);
     this.divisions.set(washroomDivision.id, washroomDivision);
+    this.divisions.set(deepCleaningDivision.id, deepCleaningDivision);
 
     // Create workers based on actual organogram
     const workers = [

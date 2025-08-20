@@ -55,12 +55,13 @@ Preferred communication style: Simple, everyday language.
 - **Responsive Design**: Mobile-first approach with progressive enhancement for larger screens
 - **Real-time Updates**: Polling-based data refresh for dashboard metrics and notifications
 
-### Division-Specific Features - Updated to Match Business Website
-Based on terminators.co.za, the system now accurately reflects the actual business services:
+### Division-Specific Features - Updated to Match Actual Departments
+Based on current business operations, the system now accurately reflects the four main service departments:
 
-- **Pest Control Services** (div-1): Green branding (#22c55e), professional pest control and extermination services for residential and commercial clients
-- **Sanitary Bin Services** (div-2): Purple branding (#8b5cf6), sanitary waste collection, disposal and feminine hygiene services with A/B teams
-- **Washroom Services** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
+- **Pest Control** (div-1): Green branding (#22c55e), professional pest control and extermination services for residential and commercial clients
+- **Sanitary Bins** (div-2): Purple branding (#8b5cf6), sanitary waste collection, disposal and feminine hygiene services with A/B teams
+- **Washroom** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
+- **Deep Cleaning** (div-4): Orange branding (#f59e0b), professional deep cleaning and specialized cleaning services
 
 **Recent Changes (August 20, 2025)**:
 - **Navigation Reorganization**: Complete restructuring of application navigation into four business categories
