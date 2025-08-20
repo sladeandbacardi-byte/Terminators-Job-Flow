@@ -13,11 +13,12 @@ import { getInitials, getDivisionColor } from "@/lib/utils";
 import WorkerForm from "@/components/forms/worker-form";
 import { ExportButton } from "@/components/export-button";
 import { exportWorkers } from "@/lib/data-export";
+import { DepartmentFilter } from "@/components/filters/department-filter";
+import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import type { Worker, Division } from "@shared/schema";
 
 export default function Workers() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [divisionFilter, setDivisionFilter] = useState("all");
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
 
@@ -29,15 +30,17 @@ export default function Workers() {
     queryKey: ['/api/divisions'],
   });
 
-  const filteredWorkers = workers.filter(worker => {
-    const matchesSearch = searchTerm === "" || 
-      worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      worker.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesDivision = divisionFilter === "all" || worker.divisionId === divisionFilter;
-    
-    return matchesSearch && matchesDivision;
-  });
+  const departmentFilter = useDepartmentFilter();
+
+  const filteredWorkers = departmentFilter.filteredData(
+    workers.filter(worker => {
+      const matchesSearch = searchTerm === "" || 
+        worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        worker.email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return matchesSearch;
+    })
+  );
 
   const getDivisionName = (divisionId: string) => {
     const division = divisions.find(d => d.id === divisionId);
@@ -98,17 +101,12 @@ export default function Workers() {
               />
             </div>
             <div className="flex gap-2">
-              <select
-                value={divisionFilter}
-                onChange={(e) => setDivisionFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                data-testid="filter-division"
-              >
-                <option value="all">All Divisions</option>
-                {divisions.map(division => (
-                  <option key={division.id} value={division.id}>{division.name}</option>
-                ))}
-              </select>
+              <div className="min-w-64">
+                <DepartmentFilter
+                  selectedDepartments={departmentFilter.selectedDepartments}
+                  onSelectionChange={departmentFilter.setSelectedDepartments}
+                />
+              </div>
               <ExportButton 
                 onExportCSV={() => exportWorkers(workers)}
                 entityName="Workers"
@@ -158,12 +156,12 @@ export default function Workers() {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No workers found</h3>
                 <p className="text-gray-600">
-                  {searchTerm || divisionFilter !== "all" 
+                  {searchTerm || !departmentFilter.isAllSelected
                     ? "Try adjusting your search or filter criteria."
                     : "Get started by adding your first field worker."
                   }
                 </p>
-                {(!searchTerm && divisionFilter === "all") && (
+                {(!searchTerm && departmentFilter.isAllSelected) && (
                   <Button onClick={handleAddWorker} className="mt-4" data-testid="button-add-first-worker">
                     <Plus className="h-4 w-4 mr-2" />
                     Add First Worker

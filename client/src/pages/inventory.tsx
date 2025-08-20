@@ -14,6 +14,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ExportButton } from "@/components/export-button";
 import { exportInventory } from "@/lib/data-export";
+import { DepartmentFilter } from "@/components/filters/department-filter";
+import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import type { InventoryItem, Division } from "@shared/schema";
 
 interface StockAlerts {
@@ -25,11 +27,12 @@ interface StockAlerts {
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [divisionFilter, setDivisionFilter] = useState("all");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [alertsFilter, setAlertsFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const departmentFilter = useDepartmentFilter();
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,28 +68,29 @@ export default function Inventory() {
     },
   });
 
-  const filteredItems = items.filter(item => {
-    const matchesSearch = searchTerm === "" || 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = typeFilter === "all" || item.type === typeFilter;
-    const matchesDivision = divisionFilter === "all" || item.divisionId === divisionFilter;
-    
-    // Stock alerts filter
-    let matchesAlerts = true;
-    if (alertsFilter === "critical") {
-      matchesAlerts = item.quantity <= item.minStockLevel;
-    } else if (alertsFilter === "low") {
-      matchesAlerts = item.quantity <= item.reorderPoint && item.quantity > item.minStockLevel;
-    } else if (alertsFilter === "reorder") {
-      matchesAlerts = item.quantity <= item.reorderPoint;
-    } else if (alertsFilter === "overstocked") {
-      matchesAlerts = item.quantity >= item.maxStockLevel;
-    }
-    
-    return matchesSearch && matchesType && matchesDivision && matchesAlerts;
-  });
+  const filteredItems = departmentFilter.filteredData(
+    items.filter(item => {
+      const matchesSearch = searchTerm === "" || 
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesType = typeFilter === "all" || item.type === typeFilter;
+      
+      // Stock alerts filter
+      let matchesAlerts = true;
+      if (alertsFilter === "critical") {
+        matchesAlerts = item.quantity <= item.minStockLevel;
+      } else if (alertsFilter === "low") {
+        matchesAlerts = item.quantity <= item.reorderPoint && item.quantity > item.minStockLevel;
+      } else if (alertsFilter === "reorder") {
+        matchesAlerts = item.quantity <= item.reorderPoint;
+      } else if (alertsFilter === "overstocked") {
+        matchesAlerts = item.quantity >= item.maxStockLevel;
+      }
+      
+      return matchesSearch && matchesType && matchesAlerts;
+    })
+  );
 
   const getDivisionName = (divisionId: string | null) => {
     if (!divisionId) return "General";
@@ -230,17 +234,12 @@ export default function Inventory() {
                 <option value="product">Products</option>
                 <option value="rental_equipment">Rental Equipment</option>
               </select>
-              <select
-                value={divisionFilter}
-                onChange={(e) => setDivisionFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                data-testid="filter-division"
-              >
-                <option value="all">All Divisions</option>
-                {divisions.map(division => (
-                  <option key={division.id} value={division.id}>{division.name}</option>
-                ))}
-              </select>
+              <div className="min-w-64">
+                <DepartmentFilter
+                  selectedDepartments={departmentFilter.selectedDepartments}
+                  onSelectionChange={departmentFilter.setSelectedDepartments}
+                />
+              </div>
               <select
                 value={alertsFilter}
                 onChange={(e) => setAlertsFilter(e.target.value)}
@@ -317,12 +316,12 @@ export default function Inventory() {
                 <Package className="h-12 w-12 mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory items found</h3>
                 <p className="text-gray-600">
-                  {searchTerm || typeFilter !== "all" || divisionFilter !== "all"
+                  {searchTerm || typeFilter !== "all" || !departmentFilter.isAllSelected
                     ? "Try adjusting your search or filter criteria."
                     : "Get started by adding your first inventory item."
                   }
                 </p>
-                {(!searchTerm && typeFilter === "all" && divisionFilter === "all") && (
+                {(!searchTerm && typeFilter === "all" && departmentFilter.isAllSelected) && (
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button className="mt-4" data-testid="button-add-first-item">
