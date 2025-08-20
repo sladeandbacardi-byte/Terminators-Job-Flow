@@ -171,7 +171,7 @@ export class AuthService {
     try {
       await db
         .delete(userSessions)
-        .where(gt(new Date(), userSessions.expiresAt));
+        .where(gt(userSessions.expiresAt, new Date()));
     } catch (error) {
       console.error('Session cleanup error:', error);
     }

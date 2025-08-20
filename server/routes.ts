@@ -647,12 +647,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventData = req.body;
       const event = await storage.createCalendarEvent(eventData);
       
-      await logActivity({
+      await AuthService.logActivity({
         userId: req.user!.id,
         action: "create_calendar_event",
         details: `Created calendar event: ${eventData.title}`,
-        ipAddress: req.ip || req.connection.remoteAddress || null,
-        userAgent: req.headers['user-agent'] || null,
       });
 
       res.json(event);
@@ -668,12 +666,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = req.body;
       const event = await storage.updateCalendarEvent(id, updateData);
       
-      await logActivity({
+      await AuthService.logActivity({
         userId: req.user!.id,
         action: "update_calendar_event",
         details: `Updated calendar event: ${id}`,
-        ipAddress: req.ip || req.connection.remoteAddress || null,
-        userAgent: req.headers['user-agent'] || null,
       });
 
       res.json(event);
