@@ -159,7 +159,7 @@ export default function Calendar() {
         estimatedDuration: data.duration,
         type: 'appointment' as const,
       };
-      return apiRequest('/api/calendar/events', { method: 'POST', body: appointmentData });
+      return apiRequest('POST', '/api/calendar/events', appointmentData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
@@ -178,7 +178,7 @@ export default function Calendar() {
         ...data,
         scheduledDate: `${data.scheduledDate}T${data.scheduledTime}:00.000Z`,
       };
-      return apiRequest(`/api/jobs/${id}`, { method: 'PATCH', body: jobData });
+      return apiRequest('PATCH', `/api/jobs/${id}`, jobData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
@@ -201,15 +201,9 @@ export default function Calendar() {
         const job = jobs.find(j => j.id === eventId);
         if (!job) throw new Error('Job not found');
         
-        return apiRequest(`/api/jobs/${eventId}`, {
-          method: 'PATCH',
-          body: { scheduledDate: newDate }
-        });
+        return apiRequest('PATCH', `/api/jobs/${eventId}`, { scheduledDate: newDate });
       } else {
-        return apiRequest(`/api/calendar/events/${eventId}`, {
-          method: 'PATCH',
-          body: { scheduledDate: newDate }
-        });
+        return apiRequest('PATCH', `/api/calendar/events/${eventId}`, { scheduledDate: newDate });
       }
     },
     onSuccess: () => {
@@ -1153,7 +1147,7 @@ export default function Calendar() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Unassigned</SelectItem>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
                               {workers.map(worker => (
                                 <SelectItem key={worker.id} value={worker.id}>
                                   {worker.name}
