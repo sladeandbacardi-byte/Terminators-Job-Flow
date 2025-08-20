@@ -629,6 +629,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Calendar Events Routes
+  app.get("/api/calendar/events/:month?", async (req, res) => {
+    try {
+      // Return empty array for now - calendar events will be derived from jobs
+      // In a real implementation, you might have a separate events table
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+      res.status(500).json({ message: "Failed to fetch calendar events" });
+    }
+  });
+
   // Dashboard Analytics
   app.get("/api/dashboard/metrics", async (req, res) => {
     try {

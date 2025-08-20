@@ -18,6 +18,7 @@ import Reports from "@/pages/reports";
 import Suppliers from "@/pages/suppliers";
 import PurchaseOrders from "@/pages/purchase-orders";
 import Mobile from "@/pages/mobile";
+import Calendar from "@/pages/calendar";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -52,6 +53,7 @@ function AuthenticatedApp() {
       <Route path="/reports" component={Reports} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/purchase-orders" component={PurchaseOrders} />
+      <Route path="/calendar" component={Calendar} />
       <Route component={NotFound} />
     </Switch>
   );

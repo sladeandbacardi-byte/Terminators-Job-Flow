@@ -35,6 +35,7 @@ const navigationCategories = [
     name: "Service",
     icon: Wrench,
     items: [
+      { name: "Calendar", href: "/calendar", icon: Calendar },
       { name: "Job Scheduling", href: "/jobs", icon: Calendar },
       { name: "Field Workers", href: "/workers", icon: Users },
       { name: "Stock Management", href: "/inventory", icon: Box },

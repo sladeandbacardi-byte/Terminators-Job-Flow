@@ -62,7 +62,20 @@ Based on terminators.co.za, the system now accurately reflects the actual busine
 - **Sanitary Bin Services** (div-2): Purple branding (#8b5cf6), sanitary waste collection, disposal and feminine hygiene services with A/B teams
 - **Washroom Services** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
 
-**Recent Changes (August 19, 2025)**:
+**Recent Changes (August 20, 2025)**:
+- **Navigation Reorganization**: Complete restructuring of application navigation into four business categories
+  - 📊 **Sales**: Clients, Rental Contracts, Email Center
+  - 🔧 **Service**: Calendar, Job Scheduling, Field Workers, Stock Management, Suppliers, Purchase Orders
+  - 💰 **Finance**: Invoices
+  - ⚙️ **Admin**: Reports
+- **Calendar Implementation**: Full Microsoft Outlook-style calendar with multiple view types
+  - Month, Week, Day, and Agenda views
+  - Job integration with automatic event generation from scheduled jobs
+  - Event filtering by division, status, and search
+  - Event details popup with job information
+  - Mobile-responsive calendar interface
+- **Terminology Updates**: Changed "Inventory" to "Stock Management" throughout application
+- **Mobile Navigation**: Updated mobile menu to reflect new categorization structure
 - Removed non-core divisions (Hygiene Services, Ablution Deep Cleaning, Daily Cleaning Services)
 - Consolidated all washroom-related services under single Washroom Services division
 - Redistributed 24 staff members across the three core service divisions
