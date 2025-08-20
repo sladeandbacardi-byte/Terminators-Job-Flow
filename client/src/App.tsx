@@ -15,6 +15,7 @@ import Contracts from "@/pages/contracts";
 import Invoices from "@/pages/invoices";
 import Emails from "@/pages/emails";
 import Reports from "@/pages/reports";
+import CustomReports from "@/pages/custom-reports";
 import Suppliers from "@/pages/suppliers";
 import PurchaseOrders from "@/pages/purchase-orders";
 import Mobile from "@/pages/mobile";
@@ -51,6 +52,7 @@ function AuthenticatedApp() {
       <Route path="/invoices" component={Invoices} />
       <Route path="/emails" component={Emails} />
       <Route path="/reports" component={Reports} />
+      <Route path="/custom-reports" component={CustomReports} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/purchase-orders" component={PurchaseOrders} />
       <Route path="/calendar" component={Calendar} />

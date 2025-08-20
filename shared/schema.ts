@@ -186,6 +186,23 @@ export const emailLogs = pgTable("email_logs", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const customReports = pgTable("custom_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  reportType: text("report_type").notNull(), // 'sales', 'expenses', 'financial', 'operational', 'custom'
+  template: text("template"), // 'sales_summary', 'expense_breakdown', 'financial_overview', 'department_performance', 'custom'
+  configuration: text("configuration").notNull(), // JSON string with report configuration
+  filters: text("filters"), // JSON string with filter settings (departments, date ranges, etc.)
+  createdBy: varchar("created_by").notNull(),
+  isTemplate: boolean("is_template").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  lastRun: timestamp("last_run"),
+  runCount: integer("run_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -252,6 +269,14 @@ export const insertJobInventoryItemSchema = createInsertSchema(jobInventoryItems
   createdAt: true,
 });
 
+export const insertCustomReportSchema = createInsertSchema(customReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastRun: true,
+  runCount: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -291,6 +316,9 @@ export type EmailLog = typeof emailLogs.$inferSelect;
 
 export type InsertJobInventoryItem = z.infer<typeof insertJobInventoryItemSchema>;
 export type JobInventoryItem = typeof jobInventoryItems.$inferSelect;
+
+export type InsertCustomReport = z.infer<typeof insertCustomReportSchema>;
+export type CustomReport = typeof customReports.$inferSelect;
 
 // Suppliers table
 export const suppliers = pgTable("suppliers", {

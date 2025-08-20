@@ -8,7 +8,7 @@ import {
   insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
   insertJobInventoryItemSchema, insertSupplierSchema,
   insertPurchaseOrderSchema, insertPurchaseOrderItemSchema,
-  insertCalendarEventSchema
+  insertCalendarEventSchema, insertCustomReportSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -1376,6 +1376,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         message: error instanceof Error ? error.message : 'Failed to get invoice status from Sage' 
       });
+    }
+  });
+
+  // Custom Reports Routes
+  app.get("/api/custom-reports", async (req, res) => {
+    try {
+      const { type } = req.query;
+      let reports;
+      
+      if (type) {
+        reports = await storage.getCustomReportsByType(type as string);
+      } else {
+        reports = await storage.getCustomReports();
+      }
+      
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch custom reports" });
+    }
+  });
+
+  app.get("/api/custom-reports/:id", async (req, res) => {
+    try {
+      const report = await storage.getCustomReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Custom report not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch custom report" });
+    }
+  });
+
+  app.post("/api/custom-reports", async (req, res) => {
+    try {
+      const reportData = insertCustomReportSchema.parse(req.body);
+      const report = await storage.createCustomReport(reportData);
+      res.status(201).json(report);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid report data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create custom report" });
+    }
+  });
+
+  app.put("/api/custom-reports/:id", async (req, res) => {
+    try {
+      const reportData = insertCustomReportSchema.partial().parse(req.body);
+      const report = await storage.updateCustomReport(req.params.id, reportData);
+      res.json(report);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid report data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update custom report" });
+    }
+  });
+
+  app.delete("/api/custom-reports/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCustomReport(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Custom report not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete custom report" });
+    }
+  });
+
+  app.post("/api/custom-reports/:id/run", async (req, res) => {
+    try {
+      const reportData = await storage.runCustomReport(req.params.id);
+      res.json(reportData);
+    } catch (error) {
+      if (error.message === "Custom report not found") {
+        return res.status(404).json({ error: "Custom report not found" });
+      }
+      res.status(500).json({ error: "Failed to run custom report" });
     }
   });
 

@@ -16,7 +16,8 @@ import {
   type Supplier, type InsertSupplier,
   type PurchaseOrder, type InsertPurchaseOrder,
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
-  type CalendarEvent, type InsertCalendarEvent
+  type CalendarEvent, type InsertCalendarEvent,
+  type CustomReport, type InsertCustomReport
 } from "@shared/schema";
 
 export interface IStorage {
@@ -161,6 +162,15 @@ export interface IStorage {
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
   updateCalendarEvent(id: string, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: string): Promise<boolean>;
+
+  // Custom Reports
+  getCustomReports(): Promise<CustomReport[]>;
+  getCustomReport(id: string): Promise<CustomReport | undefined>;
+  getCustomReportsByType(type: string): Promise<CustomReport[]>;
+  createCustomReport(report: InsertCustomReport): Promise<CustomReport>;
+  updateCustomReport(id: string, report: Partial<InsertCustomReport>): Promise<CustomReport>;
+  deleteCustomReport(id: string): Promise<boolean>;
+  runCustomReport(id: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -181,6 +191,7 @@ export class MemStorage implements IStorage {
   private purchaseOrders: Map<string, PurchaseOrder> = new Map();
   private purchaseOrderItems: Map<string, PurchaseOrderItem> = new Map();
   private calendarEvents: Map<string, CalendarEvent> = new Map();
+  private customReports: Map<string, CustomReport> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 1;
@@ -2480,6 +2491,285 @@ export class MemStorage implements IStorage {
 
   async deleteCalendarEvent(id: string): Promise<boolean> {
     return this.calendarEvents.delete(id);
+  }
+
+  // Custom Reports
+  async getCustomReports(): Promise<CustomReport[]> {
+    return Array.from(this.customReports.values());
+  }
+
+  async getCustomReport(id: string): Promise<CustomReport | undefined> {
+    return this.customReports.get(id);
+  }
+
+  async getCustomReportsByType(type: string): Promise<CustomReport[]> {
+    return Array.from(this.customReports.values()).filter(report => report.reportType === type);
+  }
+
+  async createCustomReport(insertReport: InsertCustomReport): Promise<CustomReport> {
+    const id = randomUUID();
+    const report: CustomReport = { 
+      ...insertReport, 
+      id, 
+      lastRun: null,
+      runCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.customReports.set(id, report);
+    return report;
+  }
+
+  async updateCustomReport(id: string, updateData: Partial<InsertCustomReport>): Promise<CustomReport> {
+    const report = this.customReports.get(id);
+    if (!report) throw new Error("Custom report not found");
+    
+    const updatedReport = { ...report, ...updateData, updatedAt: new Date() };
+    this.customReports.set(id, updatedReport);
+    return updatedReport;
+  }
+
+  async deleteCustomReport(id: string): Promise<boolean> {
+    return this.customReports.delete(id);
+  }
+
+  async runCustomReport(id: string): Promise<any> {
+    const report = this.customReports.get(id);
+    if (!report) throw new Error("Custom report not found");
+
+    // Update run statistics
+    const updatedReport = { 
+      ...report, 
+      lastRun: new Date(), 
+      runCount: (report.runCount || 0) + 1 
+    };
+    this.customReports.set(id, updatedReport);
+
+    // Parse configuration and filters
+    const config = report.configuration ? JSON.parse(report.configuration) : {};
+    const filters = report.filters ? JSON.parse(report.filters) : {};
+
+    // Generate report data based on type and template
+    let reportData: any = {};
+
+    switch (report.template) {
+      case "sales_summary":
+        reportData = await this.generateSalesSummaryReport(filters);
+        break;
+      case "expense_breakdown":
+        reportData = await this.generateExpenseBreakdownReport(filters);
+        break;
+      case "financial_overview":
+        reportData = await this.generateFinancialOverviewReport(filters);
+        break;
+      default:
+        reportData = { message: "Custom report template not implemented yet" };
+    }
+
+    return {
+      reportId: id,
+      reportName: report.name,
+      generatedAt: new Date(),
+      data: reportData,
+      filters: filters,
+      runCount: updatedReport.runCount
+    };
+  }
+
+  private async generateSalesSummaryReport(filters: any): Promise<any> {
+    const invoices = Array.from(this.invoices.values());
+    const clients = Array.from(this.clients.values());
+    const divisions = Array.from(this.divisions.values());
+    
+    // Filter by date range
+    let filteredInvoices = invoices;
+    if (filters.dateRange) {
+      const dateFilter = this.getDateRangeFilter(filters.dateRange);
+      filteredInvoices = invoices.filter(invoice => 
+        invoice.createdAt >= dateFilter.start && invoice.createdAt <= dateFilter.end
+      );
+    }
+
+    // Filter by departments
+    if (filters.departments && filters.departments.length > 0) {
+      const relevantClientIds = clients
+        .filter(client => filters.departments.includes(client.divisionId))
+        .map(client => client.id);
+      filteredInvoices = filteredInvoices.filter(invoice => 
+        relevantClientIds.includes(invoice.clientId)
+      );
+    }
+
+    // Calculate totals
+    const totalRevenue = filteredInvoices
+      .filter(inv => filters.includeInvoiceStatus?.includes(inv.status) || !filters.includeInvoiceStatus)
+      .reduce((sum, invoice) => sum + parseFloat(invoice.totalAmount || "0"), 0);
+
+    const invoiceCount = filteredInvoices.length;
+
+    // Revenue by department
+    const revenueByDepartment = divisions.map(division => {
+      const divisionClientIds = clients
+        .filter(client => client.divisionId === division.id)
+        .map(client => client.id);
+      
+      const divisionRevenue = filteredInvoices
+        .filter(invoice => divisionClientIds.includes(invoice.clientId))
+        .reduce((sum, invoice) => sum + parseFloat(invoice.totalAmount || "0"), 0);
+
+      return {
+        department: division.name,
+        revenue: divisionRevenue,
+        invoiceCount: filteredInvoices.filter(invoice => divisionClientIds.includes(invoice.clientId)).length
+      };
+    });
+
+    // Top clients
+    const clientRevenue = new Map<string, number>();
+    filteredInvoices.forEach(invoice => {
+      const current = clientRevenue.get(invoice.clientId) || 0;
+      clientRevenue.set(invoice.clientId, current + parseFloat(invoice.totalAmount || "0"));
+    });
+
+    const topClients = Array.from(clientRevenue.entries())
+      .map(([clientId, revenue]) => {
+        const client = clients.find(c => c.id === clientId);
+        return {
+          clientName: client?.name || "Unknown",
+          revenue
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    return {
+      totalRevenue,
+      invoiceCount,
+      revenueByDepartment,
+      topClients,
+      averageInvoiceValue: invoiceCount > 0 ? totalRevenue / invoiceCount : 0
+    };
+  }
+
+  private async generateExpenseBreakdownReport(filters: any): Promise<any> {
+    const purchaseOrders = Array.from(this.purchaseOrders.values());
+    const inventoryItems = Array.from(this.inventoryItems.values());
+    const divisions = Array.from(this.divisions.values());
+
+    // Filter by date range
+    let filteredPOs = purchaseOrders;
+    if (filters.dateRange) {
+      const dateFilter = this.getDateRangeFilter(filters.dateRange);
+      filteredPOs = purchaseOrders.filter(po => 
+        po.createdAt >= dateFilter.start && po.createdAt <= dateFilter.end
+      );
+    }
+
+    // Calculate total expenses from approved purchase orders
+    const totalExpenses = filteredPOs
+      .filter(po => po.status === "approved")
+      .reduce((sum, po) => sum + parseFloat(po.totalAmount || "0"), 0);
+
+    // Expenses by department
+    const expensesByDepartment = divisions.map(division => {
+      const divisionExpenses = filteredPOs
+        .filter(po => po.divisionId === division.id && po.status === "approved")
+        .reduce((sum, po) => sum + parseFloat(po.totalAmount || "0"), 0);
+
+      return {
+        department: division.name,
+        expenses: divisionExpenses,
+        poCount: filteredPOs.filter(po => po.divisionId === division.id).length
+      };
+    });
+
+    // Top suppliers
+    const supplierExpenses = new Map<string, number>();
+    filteredPOs
+      .filter(po => po.status === "approved")
+      .forEach(po => {
+        const current = supplierExpenses.get(po.supplierId) || 0;
+        supplierExpenses.set(po.supplierId, current + parseFloat(po.totalAmount || "0"));
+      });
+
+    const topSuppliers = Array.from(supplierExpenses.entries())
+      .map(([supplierId, expenses]) => {
+        const supplier = Array.from(this.suppliers.values()).find(s => s.id === supplierId);
+        return {
+          supplierName: supplier?.name || "Unknown",
+          expenses
+        };
+      })
+      .sort((a, b) => b.expenses - a.expenses)
+      .slice(0, 5);
+
+    return {
+      totalExpenses,
+      expensesByDepartment,
+      topSuppliers,
+      purchaseOrderCount: filteredPOs.length,
+      averagePOValue: filteredPOs.length > 0 ? totalExpenses / filteredPOs.length : 0
+    };
+  }
+
+  private async generateFinancialOverviewReport(filters: any): Promise<any> {
+    const salesData = await this.generateSalesSummaryReport(filters);
+    const expenseData = await this.generateExpenseBreakdownReport(filters);
+
+    const totalRevenue = salesData.totalRevenue;
+    const totalExpenses = expenseData.totalExpenses;
+    const grossProfit = totalRevenue - totalExpenses;
+    const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    // Department profitability
+    const departmentProfitability = salesData.revenueByDepartment.map((revDept: any) => {
+      const expDept = expenseData.expensesByDepartment.find((d: any) => d.department === revDept.department);
+      const profit = revDept.revenue - (expDept?.expenses || 0);
+      const margin = revDept.revenue > 0 ? (profit / revDept.revenue) * 100 : 0;
+
+      return {
+        department: revDept.department,
+        revenue: revDept.revenue,
+        expenses: expDept?.expenses || 0,
+        profit,
+        margin
+      };
+    });
+
+    return {
+      totalRevenue,
+      totalExpenses,
+      grossProfit,
+      profitMargin,
+      departmentProfitability,
+      invoiceCount: salesData.invoiceCount,
+      purchaseOrderCount: expenseData.purchaseOrderCount
+    };
+  }
+
+  private getDateRangeFilter(dateRange: string): { start: Date; end: Date } {
+    const now = new Date();
+    const start = new Date();
+    const end = new Date();
+
+    switch (dateRange) {
+      case "last_7_days":
+        start.setDate(now.getDate() - 7);
+        break;
+      case "last_30_days":
+        start.setDate(now.getDate() - 30);
+        break;
+      case "last_90_days":
+        start.setDate(now.getDate() - 90);
+        break;
+      case "last_year":
+        start.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        start.setDate(now.getDate() - 30);
+    }
+
+    return { start, end };
   }
 
   // Activity Logs

@@ -55,6 +55,7 @@ const navigationCategories = [
     icon: Settings,
     items: [
       { name: "Reports", href: "/reports", icon: BarChart },
+      { name: "Custom Reports", href: "/custom-reports", icon: BarChart3 },
     ]
   },
 ];
