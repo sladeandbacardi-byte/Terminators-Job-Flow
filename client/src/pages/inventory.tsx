@@ -163,7 +163,7 @@ export default function Inventory() {
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title="Inventory Management" 
+          title="Stock Management" 
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
         />
         

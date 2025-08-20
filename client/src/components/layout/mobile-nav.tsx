@@ -1,19 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { BarChart3, Calendar, Users, Box, BarChart, Receipt, Mail, FileText, Building2, ShoppingCart } from "lucide-react";
+import { BarChart3, Calendar, Users, Shield, Box, BarChart, Receipt, Mail, FileText, Building2, ShoppingCart } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
-  { name: "Jobs", href: "/jobs", icon: Calendar },
-  { name: "Workers", href: "/workers", icon: Users },
-  { name: "Clients", href: "/clients", icon: Building2 },
-  { name: "Inventory", href: "/inventory", icon: Box },
-  { name: "Contracts", href: "/contracts", icon: FileText },
-  { name: "Invoices", href: "/invoices", icon: Receipt },
-  { name: "Emails", href: "/emails", icon: Mail },
-  { name: "Suppliers", href: "/suppliers", icon: Building2 },
-  { name: "Orders", href: "/purchase-orders", icon: ShoppingCart },
-  { name: "Reports", href: "/reports", icon: BarChart },
+  { name: "Clients", href: "/clients", icon: Shield, category: "Sales" },
+  { name: "Contracts", href: "/contracts", icon: FileText, category: "Sales" },
+  { name: "Emails", href: "/emails", icon: Mail, category: "Sales" },
+  { name: "Jobs", href: "/jobs", icon: Calendar, category: "Service" },
+  { name: "Workers", href: "/workers", icon: Users, category: "Service" },
+  { name: "Stock", href: "/inventory", icon: Box, category: "Service" },
+  { name: "Suppliers", href: "/suppliers", icon: Building2, category: "Service" },
+  { name: "Orders", href: "/purchase-orders", icon: ShoppingCart, category: "Service" },
+  { name: "Invoices", href: "/invoices", icon: Receipt, category: "Finance" },
+  { name: "Reports", href: "/reports", icon: BarChart, category: "Admin" },
 ];
 
 export default function MobileNavigation() {
