@@ -819,7 +819,14 @@ export class MemStorage implements IStorage {
       { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", divisionId: "div-3", role: "Washroom Technician" },
       { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", divisionId: "div-3", role: "Washroom Technician" },
       { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", divisionId: "div-3", role: "Washroom Technician" }
+      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", divisionId: "div-3", role: "Washroom Technician" },
+      
+      // Deep Cleaning Team
+      { name: "Themba Mthethwa", email: "themba@terminators.co.za", phone: "+27 41 123 4590", divisionId: "div-4", role: "Deep Cleaning Supervisor" },
+      { name: "Nomsa Dlamini", email: "nomsa@terminators.co.za", phone: "+27 41 123 4591", divisionId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Sipho Ndaba", email: "sipho@terminators.co.za", phone: "+27 41 123 4592", divisionId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Lindiwe Khumalo", email: "lindiwe@terminators.co.za", phone: "+27 41 123 4593", divisionId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Mthunzi Cele", email: "mthunzi@terminators.co.za", phone: "+27 41 123 4594", divisionId: "div-4", role: "Equipment Specialist" }
     ];
 
     workers.forEach((worker, index) => {
@@ -832,12 +839,34 @@ export class MemStorage implements IStorage {
       this.workers.set(w.id, w);
     });
 
-    // Create sample clients
+    // Create sample clients across all departments
     const clients = [
-      { name: "Pick n Pay Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5678", email: "manager@pnp-greenacres.co.za" },
-      { name: "Shoprite Checkers", address: "Walmer Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5679", email: "admin@shoprite.co.za" },
-      { name: "Baywest Mall", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5680", email: "facilities@baywest.co.za" },
-      { name: "Boardwalk Casino", address: "Marine Drive, Summerstrand, Port Elizabeth", phone: "+27 41 234 5681", email: "maintenance@boardwalk.co.za" }
+      // Retail Clients - Multiple departments
+      { name: "Pick n Pay Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5678", email: "manager@pnp-greenacres.co.za", businessType: "retail", divisionId: "div-1" },
+      { name: "Shoprite Checkers Walmer", address: "Walmer Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5679", email: "admin@shoprite.co.za", businessType: "retail", divisionId: "div-2" },
+      { name: "Baywest Mall", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5680", email: "facilities@baywest.co.za", businessType: "retail", divisionId: "div-3" },
+      { name: "Boardwalk Casino", address: "Marine Drive, Summerstrand, Port Elizabeth", phone: "+27 41 234 5681", email: "maintenance@boardwalk.co.za", businessType: "hospitality", divisionId: "div-4" },
+      
+      // Restaurant Clients - Pest Control focus
+      { name: "McDonald's Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5682", email: "manager@mcdonalds-ge.co.za", businessType: "restaurant", divisionId: "div-1" },
+      { name: "KFC Newton Park", address: "Newton Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5683", email: "store@kfc-newton.co.za", businessType: "restaurant", divisionId: "div-1" },
+      { name: "Steers Summerstrand", address: "Beach Road, Summerstrand, Port Elizabeth", phone: "+27 41 234 5684", email: "manager@steers-summ.co.za", businessType: "restaurant", divisionId: "div-1" },
+      
+      // Office Buildings - Washroom & Deep Cleaning
+      { name: "Mutual Heights Office Park", address: "Heugh Road, Walmer, Port Elizabeth", phone: "+27 41 234 5685", email: "facilities@mutualheights.co.za", businessType: "office", divisionId: "div-3" },
+      { name: "Baywest Office Tower", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5686", email: "admin@baywestoffice.co.za", businessType: "office", divisionId: "div-4" },
+      
+      // Healthcare Facilities - All services
+      { name: "Life Mercantile Hospital", address: "Mercantile Hospital Street, Port Elizabeth", phone: "+27 41 234 5687", email: "facilities@lifemercantile.co.za", businessType: "healthcare", divisionId: "div-2" },
+      { name: "Netcare Greenacres", address: "Greenacres, Port Elizabeth", phone: "+27 41 234 5688", email: "admin@netcare-ge.co.za", businessType: "healthcare", divisionId: "div-4" },
+      
+      // Schools - Multiple departments
+      { name: "Grey High School", address: "West Hill, Port Elizabeth", phone: "+27 41 234 5689", email: "admin@greyhigh.co.za", businessType: "education", divisionId: "div-2" },
+      { name: "Collegiate Girls High", address: "Mount Pleasant, Port Elizabeth", phone: "+27 41 234 5690", email: "facilities@collegiate.co.za", businessType: "education", divisionId: "div-3" },
+      
+      // Manufacturing - Deep Cleaning & Pest Control
+      { name: "Volkswagen SA", address: "Uitenhage Road, Port Elizabeth", phone: "+27 41 234 5691", email: "facilities@vw.co.za", businessType: "manufacturing", divisionId: "div-4" },
+      { name: "General Motors SA", address: "Struandale, Port Elizabeth", phone: "+27 41 234 5692", email: "maintenance@gm.co.za", businessType: "manufacturing", divisionId: "div-1" }
     ];
 
     clients.forEach((client, index) => {
@@ -1026,10 +1055,133 @@ export class MemStorage implements IStorage {
         reorderPoint: 3,
         unitPrice: "850.00",
         description: "High-pressure steam cleaner for deep sanitization",
-        divisionId: "div-3",
+        divisionId: "div-4",
         location: "Equipment Bay - Section E",
         supplier: "SteamTech Professional",
         lastRestocked: new Date('2025-08-01')
+      },
+      // More Deep Cleaning Equipment
+      {
+        name: "Carpet Cleaning Machine - Industrial",
+        type: "rental_equipment",
+        sku: "CCM-IND-001",
+        quantity: 3,
+        minStockLevel: 1,
+        maxStockLevel: 8,
+        reorderPoint: 2,
+        unitPrice: "1200.00",
+        description: "Industrial carpet cleaning machine with extraction system",
+        divisionId: "div-4",
+        location: "Equipment Bay - Section D",
+        supplier: "CleanTech Equipment",
+        lastRestocked: new Date('2025-08-03')
+      },
+      {
+        name: "Floor Polisher - Commercial",
+        type: "rental_equipment", 
+        sku: "FP-COM-001",
+        quantity: 6,
+        minStockLevel: 2,
+        maxStockLevel: 12,
+        reorderPoint: 4,
+        unitPrice: "450.00",
+        description: "Heavy-duty floor polisher for commercial spaces",
+        divisionId: "div-4",
+        location: "Equipment Bay - Section C",
+        supplier: "FloorCare Pro",
+        lastRestocked: new Date('2025-08-07')
+      },
+      {
+        name: "Glass Cleaner - Professional Grade",
+        type: "product",
+        sku: "GC-PRO-001",
+        quantity: 12,
+        minStockLevel: 20,
+        maxStockLevel: 100,
+        reorderPoint: 30,
+        unitPrice: "25.00",
+        description: "Streak-free professional glass cleaner, 5L container",
+        divisionId: "div-4",
+        location: "Chemical Storage - Section B",
+        supplier: "GlassTech Solutions",
+        lastRestocked: new Date('2025-08-09')
+      },
+      {
+        name: "Pressure Washer - Heavy Duty",
+        type: "rental_equipment",
+        sku: "PW-HD-001", 
+        quantity: 2,
+        minStockLevel: 1,
+        maxStockLevel: 5,
+        reorderPoint: 2,
+        unitPrice: "950.00",
+        description: "High-pressure washer for exterior deep cleaning",
+        divisionId: "div-4",
+        location: "Equipment Bay - Outdoor Section",
+        supplier: "PressureClean Systems",
+        lastRestocked: new Date('2025-08-11')
+      },
+      // Additional Pest Control Items
+      {
+        name: "Insecticide Spray - Professional",
+        type: "product",
+        sku: "IS-PRO-001",
+        quantity: 15,
+        minStockLevel: 25,
+        maxStockLevel: 150,
+        reorderPoint: 35,
+        unitPrice: "42.00",
+        description: "Professional-grade insecticide spray, 1L bottle",
+        divisionId: "div-1",
+        location: "Secure Storage - Locked Cabinet B",
+        supplier: "PestGuard Professional",
+        lastRestocked: new Date('2025-08-13')
+      },
+      {
+        name: "Termite Detection Kit",
+        type: "product",
+        sku: "TDK-001",
+        quantity: 8,
+        minStockLevel: 5,
+        maxStockLevel: 30,
+        reorderPoint: 10,
+        unitPrice: "125.00",
+        description: "Professional termite detection and monitoring kit",
+        divisionId: "div-1",
+        location: "Pest Control Storage - Shelf A",
+        supplier: "TermiteGuard Systems",
+        lastRestocked: new Date('2025-08-06')
+      },
+      // Additional Sanitary Bin Items
+      {
+        name: "Feminine Hygiene Disposal Unit",
+        type: "rental_equipment",
+        sku: "FHDU-001",
+        quantity: 20,
+        minStockLevel: 15,
+        maxStockLevel: 60,
+        reorderPoint: 25,
+        unitPrice: "95.00",
+        description: "Discrete feminine hygiene disposal unit with odor control",
+        divisionId: "div-2",
+        location: "Sanitary Equipment - Rack C",
+        supplier: "HygieneTech Solutions",
+        lastRestocked: new Date('2025-08-14')
+      },
+      {
+        name: "Disinfectant Spray - Hospital Grade",
+        type: "product",
+        sku: "DS-HG-001",
+        quantity: 18,
+        minStockLevel: 30,
+        maxStockLevel: 150,
+        reorderPoint: 45,
+        unitPrice: "32.00",
+        description: "Hospital-grade disinfectant spray for sanitary equipment",
+        divisionId: "div-2",
+        location: "Chemical Storage - Section A",
+        supplier: "MediClean Supplies",
+        lastRestocked: new Date('2025-08-12')
       }
     ];
 
@@ -1145,6 +1297,226 @@ export class MemStorage implements IStorage {
         });
       }
     }
+
+    // Create comprehensive sample jobs across all departments
+    const sampleJobs = [
+      // Pest Control Jobs
+      {
+        id: "job-1",
+        clientId: "client-5", // McDonald's Greenacres
+        workerId: "worker-8", // Reece Ebrahim (PCO)
+        divisionId: "div-1",
+        title: "Monthly Pest Control Inspection",
+        description: "Routine monthly pest control inspection and treatment for restaurant kitchen and dining areas",
+        status: "scheduled",
+        priority: "medium",
+        scheduledDate: new Date('2025-08-25'),
+        estimatedDuration: "2 hours",
+        estimatedCost: "450.00",
+        location: "Greenacres Shopping Centre, Port Elizabeth",
+        notes: "Focus on kitchen areas and waste disposal zones",
+        createdAt: new Date('2025-08-20')
+      },
+      {
+        id: "job-2", 
+        clientId: "client-6", // KFC Newton Park
+        workerId: "worker-9", // Garth du Preez (PCO)
+        divisionId: "div-1",
+        title: "Emergency Rodent Control",
+        description: "Emergency call for rodent infestation in storage area",
+        status: "in_progress",
+        priority: "urgent",
+        scheduledDate: new Date('2025-08-21'),
+        estimatedDuration: "3 hours",
+        estimatedCost: "750.00",
+        location: "Newton Park Shopping Centre, Port Elizabeth",
+        notes: "Customer reported rodent droppings in storage room",
+        createdAt: new Date('2025-08-20')
+      },
+      {
+        id: "job-3",
+        clientId: "client-15", // General Motors SA
+        workerId: "worker-10", // Michael Meyer (PCO)
+        divisionId: "div-1", 
+        title: "Industrial Pest Assessment",
+        description: "Comprehensive pest risk assessment for manufacturing facility",
+        status: "completed",
+        priority: "high",
+        scheduledDate: new Date('2025-08-18'),
+        completedDate: new Date('2025-08-18'),
+        estimatedDuration: "4 hours",
+        actualDuration: "3.5 hours",
+        estimatedCost: "950.00",
+        actualCost: "920.00",
+        location: "Struandale, Port Elizabeth",
+        notes: "Full facility assessment completed. Report submitted.",
+        createdAt: new Date('2025-08-17')
+      },
+
+      // Sanitary Bin Service Jobs
+      {
+        id: "job-4",
+        clientId: "client-2", // Shoprite Checkers
+        workerId: "worker-13", // Belinda (Sanitary Bin Technician)
+        divisionId: "div-2",
+        title: "Weekly Sanitary Bin Service",
+        description: "Weekly collection and maintenance of sanitary disposal units",
+        status: "scheduled",
+        priority: "medium",
+        scheduledDate: new Date('2025-08-22'),
+        estimatedDuration: "1.5 hours", 
+        estimatedCost: "180.00",
+        location: "Walmer Park Shopping Centre, Port Elizabeth",
+        notes: "Service all female restroom facilities",
+        createdAt: new Date('2025-08-19')
+      },
+      {
+        id: "job-5",
+        clientId: "client-11", // Life Mercantile Hospital
+        workerId: "worker-16", // Nandipha (Sanitary Bin Technician)
+        divisionId: "div-2",
+        title: "Hospital Sanitary Service",
+        description: "Bi-weekly sanitary bin service for hospital facilities",
+        status: "in_progress",
+        priority: "high",
+        scheduledDate: new Date('2025-08-21'),
+        estimatedDuration: "2.5 hours",
+        estimatedCost: "320.00",
+        location: "Mercantile Hospital Street, Port Elizabeth",
+        notes: "Include maternity and general wards",
+        createdAt: new Date('2025-08-18')
+      },
+      {
+        id: "job-6",
+        clientId: "client-12", // Grey High School
+        workerId: "worker-12", // Leon Coltman (Supervisor)
+        divisionId: "div-2",
+        title: "School Hygiene Program Setup",
+        description: "Installation and setup of sanitary disposal units for new term",
+        status: "completed",
+        priority: "medium",
+        scheduledDate: new Date('2025-08-19'),
+        completedDate: new Date('2025-08-19'),
+        estimatedDuration: "3 hours",
+        actualDuration: "2.5 hours",
+        estimatedCost: "420.00",
+        actualCost: "380.00",
+        location: "West Hill, Port Elizabeth",
+        notes: "20 units installed across girl's facilities. Training provided.",
+        createdAt: new Date('2025-08-16')
+      },
+
+      // Washroom Service Jobs  
+      {
+        id: "job-7",
+        clientId: "client-3", // Baywest Mall
+        workerId: "worker-19", // Siphokazi (Washroom Technician)
+        divisionId: "div-3",
+        title: "Mall Washroom Maintenance",
+        description: "Daily washroom cleaning and supply replenishment",
+        status: "scheduled",
+        priority: "medium",
+        scheduledDate: new Date('2025-08-23'),
+        estimatedDuration: "4 hours",
+        estimatedCost: "280.00",
+        location: "Baywest City, Port Elizabeth",
+        notes: "Cover all public washroom facilities in mall",
+        createdAt: new Date('2025-08-20')
+      },
+      {
+        id: "job-8",
+        clientId: "client-9", // Mutual Heights Office Park
+        workerId: "worker-21", // Zuki Sandi (Washroom Technician)
+        divisionId: "div-3",
+        title: "Office Washroom Deep Clean",
+        description: "Quarterly deep cleaning of office building washroom facilities",
+        status: "in_progress",
+        priority: "medium",
+        scheduledDate: new Date('2025-08-21'),
+        estimatedDuration: "3 hours",
+        estimatedCost: "350.00",
+        location: "Heugh Road, Walmer, Port Elizabeth",
+        notes: "Focus on tile cleaning and grout restoration",
+        createdAt: new Date('2025-08-19')
+      },
+      {
+        id: "job-9",
+        clientId: "client-13", // Collegiate Girls High
+        workerId: "worker-18", // Zain Abdol (Supervisor)
+        divisionId: "div-3",
+        title: "School Washroom Upgrade",
+        description: "Installation of new paper towel dispensers and soap dispensers",
+        status: "completed",
+        priority: "high",
+        scheduledDate: new Date('2025-08-17'),
+        completedDate: new Date('2025-08-17'),
+        estimatedDuration: "5 hours",
+        actualDuration: "4.5 hours",
+        estimatedCost: "650.00",
+        actualCost: "630.00",
+        location: "Mount Pleasant, Port Elizabeth",
+        notes: "15 new dispensers installed. Old equipment removed.",
+        createdAt: new Date('2025-08-15')
+      },
+
+      // Deep Cleaning Jobs
+      {
+        id: "job-10",
+        clientId: "client-4", // Boardwalk Casino
+        workerId: "worker-27", // Themba Mthethwa (Deep Cleaning Supervisor)
+        divisionId: "div-4",
+        title: "Casino Deep Clean Service",
+        description: "Monthly deep cleaning of casino floor and VIP areas",
+        status: "scheduled",
+        priority: "high", 
+        scheduledDate: new Date('2025-08-24'),
+        estimatedDuration: "8 hours",
+        estimatedCost: "1200.00",
+        location: "Marine Drive, Summerstrand, Port Elizabeth",
+        notes: "Night shift operation. Casino remains operational.",
+        createdAt: new Date('2025-08-18')
+      },
+      {
+        id: "job-11",
+        clientId: "client-14", // Volkswagen SA
+        workerId: "worker-28", // Nomsa Dlamini (Deep Cleaning Specialist)
+        divisionId: "div-4",
+        title: "Factory Floor Deep Clean",
+        description: "Industrial deep cleaning of production floor and equipment",
+        status: "in_progress",
+        priority: "high",
+        scheduledDate: new Date('2025-08-21'),
+        estimatedDuration: "6 hours",
+        estimatedCost: "950.00",
+        location: "Uitenhage Road, Port Elizabeth",
+        notes: "Coordinate with production schedule. Safety protocols required.",
+        createdAt: new Date('2025-08-19')
+      },
+      {
+        id: "job-12",
+        clientId: "client-10", // Baywest Office Tower
+        workerId: "worker-29", // Sipho Ndaba (Deep Cleaning Specialist)
+        divisionId: "div-4",
+        title: "Office Building Window Cleaning",
+        description: "External and internal window cleaning for 15-story office building",
+        status: "completed",
+        priority: "medium",
+        scheduledDate: new Date('2025-08-16'),
+        completedDate: new Date('2025-08-16'),
+        estimatedDuration: "10 hours",
+        actualDuration: "9 hours",
+        estimatedCost: "1850.00",
+        actualCost: "1650.00",
+        location: "Baywest City, Port Elizabeth",
+        notes: "Weather conditions excellent. All floors completed ahead of schedule.",
+        createdAt: new Date('2025-08-12')
+      }
+    ];
+
+    // Add all sample jobs
+    sampleJobs.forEach(job => {
+      this.jobs.set(job.id, job as Job);
+    });
   }
 
   // Users
