@@ -7,7 +7,8 @@ import {
   insertInvoiceSchema, insertInvoiceItemSchema,
   insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
   insertJobInventoryItemSchema, insertSupplierSchema,
-  insertPurchaseOrderSchema, insertPurchaseOrderItemSchema
+  insertPurchaseOrderSchema, insertPurchaseOrderItemSchema,
+  insertCalendarEventSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -632,12 +633,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Calendar Events Routes
   app.get("/api/calendar/events/:month?", async (req, res) => {
     try {
-      // Return empty array for now - calendar events will be derived from jobs
-      // In a real implementation, you might have a separate events table
-      res.json([]);
+      // Return existing calendar events from storage
+      const calendarEvents = await storage.getCalendarEvents();
+      res.json(calendarEvents);
     } catch (error) {
       console.error("Error fetching calendar events:", error);
       res.status(500).json({ message: "Failed to fetch calendar events" });
+    }
+  });
+
+  app.post("/api/calendar/events", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const eventData = req.body;
+      const event = await storage.createCalendarEvent(eventData);
+      
+      await logActivity({
+        userId: req.user!.id,
+        action: "create_calendar_event",
+        details: `Created calendar event: ${eventData.title}`,
+        ipAddress: req.ip || req.connection.remoteAddress || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      res.json(event);
+    } catch (error) {
+      console.error("Error creating calendar event:", error);
+      res.status(500).json({ message: "Failed to create calendar event" });
+    }
+  });
+
+  app.patch("/api/calendar/events/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      const event = await storage.updateCalendarEvent(id, updateData);
+      
+      await logActivity({
+        userId: req.user!.id,
+        action: "update_calendar_event",
+        details: `Updated calendar event: ${id}`,
+        ipAddress: req.ip || req.connection.remoteAddress || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating calendar event:", error);
+      res.status(500).json({ message: "Failed to update calendar event" });
     }
   });
 

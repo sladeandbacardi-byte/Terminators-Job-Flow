@@ -15,7 +15,8 @@ import {
   type JobInventoryItem, type InsertJobInventoryItem,
   type Supplier, type InsertSupplier,
   type PurchaseOrder, type InsertPurchaseOrder,
-  type PurchaseOrderItem, type InsertPurchaseOrderItem
+  type PurchaseOrderItem, type InsertPurchaseOrderItem,
+  type CalendarEvent, type InsertCalendarEvent
 } from "@shared/schema";
 
 export interface IStorage {
@@ -153,6 +154,13 @@ export interface IStorage {
 
   // Activity Logs (for admin audit trail)
   getActivityLogs(): Promise<any[]>;
+
+  // Calendar Events
+  getCalendarEvents(): Promise<CalendarEvent[]>;
+  getCalendarEvent(id: string): Promise<CalendarEvent | undefined>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: string, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
+  deleteCalendarEvent(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -172,6 +180,7 @@ export class MemStorage implements IStorage {
   private suppliers: Map<string, Supplier> = new Map();
   private purchaseOrders: Map<string, PurchaseOrder> = new Map();
   private purchaseOrderItems: Map<string, PurchaseOrderItem> = new Map();
+  private calendarEvents: Map<string, CalendarEvent> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 1;
@@ -2051,6 +2060,46 @@ export class MemStorage implements IStorage {
 
   async deletePurchaseOrderItem(id: string): Promise<boolean> {
     return this.purchaseOrderItems.delete(id);
+  }
+
+  // Calendar Events
+  async getCalendarEvents(): Promise<CalendarEvent[]> {
+    return Array.from(this.calendarEvents.values());
+  }
+
+  async getCalendarEvent(id: string): Promise<CalendarEvent | undefined> {
+    return this.calendarEvents.get(id);
+  }
+
+  async createCalendarEvent(insertEvent: InsertCalendarEvent): Promise<CalendarEvent> {
+    const id = randomUUID();
+    const event: CalendarEvent = { 
+      ...insertEvent, 
+      id, 
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.calendarEvents.set(id, event);
+    return event;
+  }
+
+  async updateCalendarEvent(id: string, updateData: Partial<InsertCalendarEvent>): Promise<CalendarEvent> {
+    const event = this.calendarEvents.get(id);
+    if (!event) {
+      throw new Error(`Calendar event with id ${id} not found`);
+    }
+    
+    const updatedEvent = { 
+      ...event, 
+      ...updateData, 
+      updatedAt: new Date() 
+    };
+    this.calendarEvents.set(id, updatedEvent);
+    return updatedEvent;
+  }
+
+  async deleteCalendarEvent(id: string): Promise<boolean> {
+    return this.calendarEvents.delete(id);
   }
 
   // Activity Logs
