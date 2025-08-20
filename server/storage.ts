@@ -762,6 +762,9 @@ export class MemStorage implements IStorage {
   }
 
   private initializeData() {
+    // Clear any existing divisions first to prevent duplicates
+    this.divisions.clear();
+    
     // Create divisions - Updated to match actual business services from terminators.co.za
     const pestControlDivision: Division = {
       id: "div-1",

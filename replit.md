@@ -85,6 +85,7 @@ Based on current business operations, the system now accurately reflects the fou
 - Staff role updates: Sheryl-Lyn Lee promoted to Sales Administrator, Chane du Toit added as Sales Representative
 - Enhanced reports with individual staff performance tracking including job counts and sales figures
 - **MAJOR FEATURE: Sage Accounting Integration** - Implemented comprehensive Sage Business Cloud Accounting API integration for invoice export with OAuth 2.0 authentication, automatic contact creation, and invoice synchronization
+- **Division System Cleanup (August 20, 2025)**: Fixed duplicate "Pest Control Services" division creation issue in mobile test data script. System now correctly maintains only four core divisions without creating duplicates on server restart.
 
 ### Real Staff Integration
 - Actual organizational structure from The Terminators organogram integrated

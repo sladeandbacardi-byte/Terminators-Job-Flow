@@ -6,13 +6,8 @@ export async function createMobileTestData() {
   try {
     console.log("Creating mobile test data...");
 
-    // Create a test division
-    const division = await storage.createDivision({
-      id: "div-1",
-      name: "Pest Control Services",
-      colorCode: "#22c55e",
-      description: "Professional pest control and extermination services"
-    });
+    // Use existing Pest Control division (div-1) instead of creating a new one
+    const divisionId = "div-1";
 
     // Create a test client
     const client = await storage.createClient({
@@ -23,7 +18,7 @@ export async function createMobileTestData() {
       contactPerson: "John Manager",
       businessType: "Restaurant",
       status: "active",
-      divisionId: division.id,
+      divisionId: divisionId,
       paymentTerms: "30 days",
       notes: "Monthly pest control required"
     });
@@ -33,7 +28,7 @@ export async function createMobileTestData() {
       name: "Mike Johnson",
       email: "mike.johnson@terminators.co.za",
       phone: "+27 82 123 4567",
-      divisionId: division.id,
+      divisionId: divisionId,
       role: "Field Technician",
       employeeId: "EMP001",
       pin: "1234", // Simple PIN for demo
@@ -46,7 +41,7 @@ export async function createMobileTestData() {
       description: "Routine monthly pest control inspection and treatment",
       clientId: client.id,
       workerId: worker.id,
-      divisionId: division.id,
+      divisionId: divisionId,
       serviceType: "Pest Control",
       status: "scheduled",
       scheduledDate: new Date(),
@@ -62,7 +57,7 @@ export async function createMobileTestData() {
       description: "Emergency call for rodent infestation in kitchen area",
       clientId: client.id,
       workerId: worker.id,
-      divisionId: division.id,
+      divisionId: divisionId,
       serviceType: "Rodent Control",
       status: "in_progress",
       scheduledDate: new Date(),
@@ -82,7 +77,6 @@ export async function createMobileTestData() {
       worker,
       client,
       jobs: [job1, job2],
-      division
     };
   } catch (error) {
     console.error("Error creating mobile test data:", error);
