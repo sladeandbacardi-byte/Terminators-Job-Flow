@@ -129,9 +129,16 @@ export default function RecentJobs() {
         ) : (
           displayJobs.map((job) => {
             const Icon = getJobIcon(job.divisionId);
-            const isPestControl = job.divisionId === "div-1";
-            const iconBg = isPestControl ? "bg-pest-control-100" : "bg-hygiene-100";
-            const iconColor = isPestControl ? "text-pest-control-600" : "text-hygiene-600";
+            const getDivisionColors = (divisionId: string) => {
+              switch (divisionId) {
+                case 'div-1': return { iconBg: 'bg-green-100', iconColor: 'text-green-600' };
+                case 'div-2': return { iconBg: 'bg-purple-100', iconColor: 'text-purple-600' };
+                case 'div-3': return { iconBg: 'bg-blue-100', iconColor: 'text-blue-600' };
+                case 'div-4': return { iconBg: 'bg-orange-100', iconColor: 'text-orange-600' };
+                default: return { iconBg: 'bg-gray-100', iconColor: 'text-gray-600' };
+              }
+            };
+            const { iconBg, iconColor } = getDivisionColors(job.divisionId);
             
             return (
               <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg" data-testid={`job-${job.id}`}>

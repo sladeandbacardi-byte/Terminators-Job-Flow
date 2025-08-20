@@ -46,11 +46,48 @@ export default function DivisionPerformance({ divisions, isLoading }: DivisionPe
       
       <div className="space-y-6">
         {divisions.map((divisionData) => {
-          const isPestControl = divisionData.division.name.toLowerCase().includes('pest');
-          const borderColor = isPestControl ? 'border-pest-control-600' : 'border-hygiene-600';
-          const bgColor = isPestControl ? 'bg-pest-control-50' : 'bg-hygiene-50';
-          const textColor = isPestControl ? 'text-pest-control-700' : 'text-hygiene-700';
-          const dotColor = isPestControl ? 'bg-pest-control-600' : 'bg-hygiene-600';
+          const getDivisionStyles = (divisionId: string) => {
+            switch (divisionId) {
+              case 'div-1': // Pest Control
+                return {
+                  borderColor: 'border-green-600',
+                  bgColor: 'bg-green-50',
+                  textColor: 'text-green-700',
+                  dotColor: 'bg-green-600'
+                };
+              case 'div-2': // Sanitary Bins
+                return {
+                  borderColor: 'border-purple-600',
+                  bgColor: 'bg-purple-50',
+                  textColor: 'text-purple-700',
+                  dotColor: 'bg-purple-600'
+                };
+              case 'div-3': // Washroom
+                return {
+                  borderColor: 'border-blue-600',
+                  bgColor: 'bg-blue-50',
+                  textColor: 'text-blue-700',
+                  dotColor: 'bg-blue-600'
+                };
+              case 'div-4': // Deep Cleaning
+                return {
+                  borderColor: 'border-orange-600',
+                  bgColor: 'bg-orange-50',
+                  textColor: 'text-orange-700',
+                  dotColor: 'bg-orange-600'
+                };
+              default:
+                return {
+                  borderColor: 'border-gray-600',
+                  bgColor: 'bg-gray-50',
+                  textColor: 'text-gray-700',
+                  dotColor: 'bg-gray-600'
+                };
+            }
+          };
+          
+          const styles = getDivisionStyles(divisionData.division.id);
+          const { borderColor, bgColor, textColor, dotColor } = styles;
           
           return (
             <div 

@@ -109,10 +109,16 @@ export default function TodaysSchedule() {
           </div>
         ) : (
           displaySchedule.slice(0, 6).map((item) => {
-            const isPestControl = item.divisionId === "div-1";
-            const borderColor = isPestControl ? "border-pest-control-500" : "border-hygiene-500";
-            const bgColor = isPestControl ? "bg-pest-control-50" : "bg-hygiene-50";
-            const avatarBg = isPestControl ? "bg-pest-control-600" : "bg-hygiene-600";
+            const getDivisionColors = (divisionId: string) => {
+              switch (divisionId) {
+                case 'div-1': return { borderColor: 'border-green-500', bgColor: 'bg-green-50', avatarBg: 'bg-green-600' };
+                case 'div-2': return { borderColor: 'border-purple-500', bgColor: 'bg-purple-50', avatarBg: 'bg-purple-600' };
+                case 'div-3': return { borderColor: 'border-blue-500', bgColor: 'bg-blue-50', avatarBg: 'bg-blue-600' };
+                case 'div-4': return { borderColor: 'border-orange-500', bgColor: 'bg-orange-50', avatarBg: 'bg-orange-600' };
+                default: return { borderColor: 'border-gray-500', bgColor: 'bg-gray-50', avatarBg: 'bg-gray-600' };
+              }
+            };
+            const { borderColor, bgColor, avatarBg } = getDivisionColors(item.divisionId);
             const workerName = 'workerName' in item ? item.workerName : getWorkerName(item.workerId || '');
             
             return (

@@ -1,6 +1,8 @@
 export const DIVISIONS = {
   PEST_CONTROL: 'Pest Control',
-  HYGIENE_SERVICES: 'Hygiene Services',
+  SANITARY_BINS: 'Sanitary Bins',
+  WASHROOM: 'Washroom',
+  DEEP_CLEANING: 'Deep Cleaning',
 } as const;
 
 export const JOB_STATUSES = {

@@ -48,16 +48,18 @@ export default function Workers() {
   };
 
   const getDivisionBadgeColor = (divisionId: string) => {
-    const division = divisions.find(d => d.id === divisionId);
-    if (!division) return 'bg-gray-100 text-gray-800';
-    
-    if (division.name.toLowerCase().includes('pest')) {
-      return 'bg-pest-control-100 text-pest-control-800';
+    switch (divisionId) {
+      case 'div-1': // Pest Control
+        return 'bg-green-100 text-green-800';
+      case 'div-2': // Sanitary Bins
+        return 'bg-purple-100 text-purple-800';
+      case 'div-3': // Washroom
+        return 'bg-blue-100 text-blue-800';
+      case 'div-4': // Deep Cleaning
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
-    if (division.name.toLowerCase().includes('hygiene')) {
-      return 'bg-hygiene-100 text-hygiene-800';
-    }
-    return 'bg-primary-100 text-primary-800';
   };
 
   const handleAddWorker = () => {
