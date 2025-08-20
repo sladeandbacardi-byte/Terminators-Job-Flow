@@ -825,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the email attempt
       await storage.createEmailLog({
         toEmail: recipientEmail,
-        subject: emailTemplate.subject,
+        subject: `Invoice ${invoice.invoiceNumber} from The Terminators`,
         status: emailSent ? 'sent' : 'failed',
         errorMessage: emailSent ? undefined : 'Failed to send email',
         sentAt: emailSent ? new Date() : undefined,
@@ -854,7 +854,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Client not found or has no email address" });
       }
 
-      // Create email service instance
+      // Use simple SendGrid email service instead of Outlook
+      const emailSent = await sendEmail({
+        to: client.email,
+        from: "noreply@terminators.co.za",
+        subject: subject,
+        html: `
+          <h2>${subject}</h2>
+          <p>Dear ${client.name},</p>
+          <p>${message}</p>
+          <br>
+          <p>Best regards,<br>The Terminators Team</p>
+        `
+      });
+
+      // Log the email attempt
+      await storage.createEmailLog({
+        toEmail: client.email,
+        subject: subject,
+        status: emailSent ? 'sent' : 'failed',
+        errorMessage: emailSent ? undefined : 'Failed to send email',
+        sentAt: emailSent ? new Date() : undefined,
+        relatedEntityId: clientId,
+        relatedEntityType: 'client'
+      });
+
+      if (emailSent) {
+        res.json({ message: "Email sent successfully", recipient: client.email });
+      } else {
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
+  // Keep the old code but comment it out
+  /*
       const OutlookEmailService = (await import("./email-service")).default;
       const emailService = new OutlookEmailService({
         clientId: process.env.MICROSOFT_CLIENT_ID || "your-client-id",
@@ -896,6 +932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to send email" });
     }
   });
+  */
 
   // Job Inventory Items
   app.get("/api/job-inventory", async (req, res) => {
