@@ -65,7 +65,7 @@ export default function Calendar() {
     refetchInterval: 30000,
   });
 
-  const { data: jobs = [] } = useQuery<(Job & { client: Client; worker: Worker })[]>({
+  const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
   });
 
@@ -82,21 +82,26 @@ export default function Calendar() {
   });
 
   // Convert jobs to calendar events
-  const jobEvents: CalendarEvent[] = jobs.map(job => ({
-    id: job.id,
-    title: `${job.title} - ${job.client.name}`,
-    description: job.description || '',
-    startTime: new Date(job.scheduledDate),
-    endTime: new Date(new Date(job.scheduledDate).getTime() + (job.estimatedDuration || 60) * 60000),
-    type: 'job',
-    priority: job.priority as 'low' | 'medium' | 'high',
-    clientId: job.clientId,
-    workerId: job.workerId || undefined,
-    divisionId: job.divisionId,
-    location: job.location || job.client.address,
-    status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
-    color: getPriorityColor(job.priority),
-  }));
+  const jobEvents: CalendarEvent[] = jobs.map(job => {
+    const client = clients.find(c => c.id === job.clientId);
+    const worker = workers.find(w => w.id === job.workerId);
+    
+    return {
+      id: job.id,
+      title: `${job.title}${client ? ` - ${client.name}` : ''}`,
+      description: job.description || '',
+      startTime: new Date(job.scheduledDate),
+      endTime: new Date(new Date(job.scheduledDate).getTime() + (job.estimatedDuration || 60) * 60000),
+      type: 'job',
+      priority: job.priority as 'low' | 'medium' | 'high',
+      clientId: job.clientId,
+      workerId: job.workerId || undefined,
+      divisionId: job.divisionId,
+      location: job.location || (client ? client.address : '') || undefined,
+      status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
+      color: getPriorityColor(job.priority),
+    };
+  });
 
   const allEvents = [...events, ...jobEvents];
 
