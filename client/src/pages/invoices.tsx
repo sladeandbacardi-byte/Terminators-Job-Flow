@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
-import { Plus, FileText, Eye, Edit, Trash2, DollarSign, AlertCircle, CheckCircle, Mail } from "lucide-react";
+import { Plus, FileText, Eye, Edit, Trash2, DollarSign, AlertCircle, CheckCircle, Mail, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -167,6 +167,14 @@ export default function Invoices() {
             entityName="Invoices"
             variant="outline"
           />
+          <Button 
+            onClick={() => window.open('/api/invoices/export/csv', '_blank')}
+            variant="outline"
+            data-testid="export-sage-csv-button"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export for Sage
+          </Button>
           <Button onClick={handleCreateInvoice} className="bg-primary-600 hover:bg-primary-700" data-testid="create-invoice-button">
             <Plus className="h-4 w-4 mr-2" />
             New Invoice

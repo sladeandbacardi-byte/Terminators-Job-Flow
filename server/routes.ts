@@ -617,6 +617,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Invoice CSV Export for Sage Import
+  app.get("/api/invoices/export/csv", async (req, res) => {
+    try {
+      const { status, fromDate, toDate } = req.query;
+      let invoices;
+      
+      if (status) {
+        invoices = await storage.getInvoicesByStatus(status as string);
+      } else {
+        invoices = await storage.getInvoices();
+      }
+      
+      // Filter by date range if provided
+      if (fromDate || toDate) {
+        invoices = invoices.filter(invoice => {
+          const invoiceDate = new Date(invoice.issueDate);
+          if (fromDate && invoiceDate < new Date(fromDate as string)) return false;
+          if (toDate && invoiceDate > new Date(toDate as string)) return false;
+          return true;
+        });
+      }
+      
+      // Get client details for each invoice
+      const csvRows = [];
+      csvRows.push([
+        'Invoice Number',
+        'Client Name', 
+        'Client Email',
+        'Issue Date',
+        'Due Date',
+        'Subtotal',
+        'Tax Amount',
+        'Total Amount',
+        'Status',
+        'Notes',
+        'Payment Terms'
+      ]);
+      
+      for (const invoice of invoices) {
+        const client = await storage.getClient(invoice.clientId);
+        csvRows.push([
+          invoice.invoiceNumber,
+          client?.name || '',
+          client?.email || '',
+          invoice.issueDate.toISOString().split('T')[0],
+          invoice.dueDate.toISOString().split('T')[0],
+          invoice.subtotal,
+          invoice.taxAmount,
+          invoice.total,
+          invoice.status || 'pending',
+          invoice.notes || '',
+          invoice.terms || ''
+        ]);
+      }
+      
+      // Convert to CSV format
+      const csvContent = csvRows.map(row => 
+        row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+      ).join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="invoices_export.csv"');
+      res.send(csvContent);
+    } catch (error) {
+      console.error('CSV export error:', error);
+      res.status(500).json({ error: 'Failed to export invoices' });
+    }
+  });
+
   // Notifications
   app.get("/api/notifications", async (req, res) => {
     const { unread } = req.query;

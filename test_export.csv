@@ -1,0 +1,4 @@
+"Invoice Number","Client Name","Client Email","Issue Date","Due Date","Subtotal","Tax Amount","Total Amount","Status","Notes","Payment Terms"
+"INV-2024-001","Pick n Pay - Fourways","facilities@picknpay.co.za","2025-08-21","2025-09-20","2422.50","427.50","2850.00","sent","Monthly rental fee and service charges for August 2024",""
+"INV-2024-002","Discovery Health Head Office","facilities@discovery.co.za","2025-08-20","2025-09-19","4845.00","855.00","5700.00","paid","Monthly pest control services and equipment rental - August 2024",""
+"INV-2024-003","Woolworths - Sandton City","operations@woolworths.co.za","2025-08-19","2025-09-18","1759.50","310.50","2070.00","overdue","Hand sanitizer rental and refill services - August 2024",""

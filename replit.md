@@ -63,29 +63,23 @@ Based on current business operations, the system now accurately reflects the fou
 - **Washroom** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
 - **Deep Cleaning** (div-4): Orange branding (#f59e0b), professional deep cleaning and specialized cleaning services
 
-**Recent Changes (August 20, 2025)**:
+**Recent Changes (August 21, 2025)**:
+- **Complete Customer Workflow Testing**: Validated entire business process from customer creation through service completion to invoice generation
+- **Critical API Date Fixes**: Applied comprehensive date string-to-Date object conversion across job creation, job updates, and invoice creation routes
+- **Enhanced Error Handling**: Added detailed validation error messages with specific field information for troubleshooting
+- **CSV Invoice Export for Sage**: Implemented alternative Sage integration method allowing manual CSV export and import
+  - New "Export for Sage" button on Invoices page downloads Sage-compatible CSV format
+  - Includes all essential invoice data: numbers, client details, dates, amounts, status, notes
+  - Provides immediate Sage integration without requiring API credentials
 - **Navigation Reorganization**: Complete restructuring of application navigation into four business categories
   - 📊 **Sales**: Clients, Rental Contracts, Email Center
   - 🔧 **Service**: Calendar, Job Scheduling, Field Workers, Stock Management, Suppliers, Purchase Orders
   - 💰 **Finance**: Invoices
   - ⚙️ **Admin**: Reports
 - **Calendar Implementation**: Full Microsoft Outlook-style calendar with multiple view types
-  - Month, Week, Day, and Agenda views
-  - Job integration with automatic event generation from scheduled jobs
-  - Event filtering by division, status, and search
-  - Event details popup with job information
-  - Mobile-responsive calendar interface
 - **Terminology Updates**: Changed "Inventory" to "Stock Management" throughout application
-- **Mobile Navigation**: Updated mobile menu to reflect new categorization structure
-- Removed non-core divisions (Hygiene Services, Ablution Deep Cleaning, Daily Cleaning Services)
-- Consolidated all washroom-related services under single Washroom Services division
-- Redistributed 24 staff members across the three core service divisions
-- Updated all inventory items to reflect correct division assignments
-- Multi-tenant Support: Division-based filtering and assignment of workers, jobs, and inventory across the three core divisions
-- Staff role updates: Sheryl-Lyn Lee promoted to Sales Administrator, Chane du Toit added as Sales Representative
-- Enhanced reports with individual staff performance tracking including job counts and sales figures
 - **MAJOR FEATURE: Sage Accounting Integration** - Implemented comprehensive Sage Business Cloud Accounting API integration for invoice export with OAuth 2.0 authentication, automatic contact creation, and invoice synchronization
-- **Division System Cleanup (August 20, 2025)**: Fixed duplicate "Pest Control Services" division creation issue in mobile test data script. System now correctly maintains only four core divisions without creating duplicates on server restart.
+- **Division System Cleanup**: Fixed duplicate division creation issues in mobile test data script
 
 ### Real Staff Integration
 - Actual organizational structure from The Terminators organogram integrated
