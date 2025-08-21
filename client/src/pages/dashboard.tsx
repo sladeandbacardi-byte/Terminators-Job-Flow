@@ -9,6 +9,7 @@ import NotificationsPanel from "@/components/dashboard/notifications";
 import RecentJobs from "@/components/dashboard/recent-jobs";
 import TodaysSchedule from "@/components/dashboard/schedule";
 import QuickActions from "@/components/dashboard/quick-actions";
+import SalesPerformance from "@/components/dashboard/sales-performance";
 import { DepartmentOverview } from "@/components/dashboard/department-overview";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useToast } from "@/hooks/use-toast";
@@ -270,6 +271,9 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* Sales Performance Dashboard */}
+            <SalesPerformance className="mb-6" />
 
             {/* Division Performance and Quick Actions */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

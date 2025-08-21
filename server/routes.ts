@@ -474,21 +474,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs", async (req, res) => {
     try {
-      const job = insertJobSchema.parse(req.body);
+      // Convert date strings to Date objects
+      const jobData = {
+        ...req.body,
+        scheduledDate: req.body.scheduledDate ? new Date(req.body.scheduledDate) : undefined,
+        startTime: req.body.startTime ? new Date(req.body.startTime) : undefined,
+        endTime: req.body.endTime ? new Date(req.body.endTime) : undefined,
+      };
+      
+      const job = insertJobSchema.parse(jobData);
       const created = await storage.createJob(job);
       res.status(201).json(created);
     } catch (error) {
-      res.status(400).json({ error: "Invalid job data" });
+      console.error("Job creation error:", error);
+      res.status(400).json({ error: "Invalid job data", details: error.message });
     }
   });
 
   app.put("/api/jobs/:id", async (req, res) => {
     try {
-      const updateData = insertJobSchema.partial().parse(req.body);
+      // Convert date strings to Date objects
+      const jobData = {
+        ...req.body,
+        scheduledDate: req.body.scheduledDate ? new Date(req.body.scheduledDate) : undefined,
+        startTime: req.body.startTime ? new Date(req.body.startTime) : undefined,
+        endTime: req.body.endTime ? new Date(req.body.endTime) : undefined,
+      };
+      
+      const updateData = insertJobSchema.partial().parse(jobData);
       const updated = await storage.updateJob(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
-      res.status(400).json({ error: "Invalid job data" });
+      console.error("Job update error:", error);
+      res.status(400).json({ error: "Invalid job data", details: error.message });
     }
   });
 
@@ -533,11 +551,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices", async (req, res) => {
     try {
-      const invoice = insertInvoiceSchema.parse(req.body);
+      // Convert date strings to Date objects
+      const invoiceData = {
+        ...req.body,
+        issueDate: req.body.issueDate ? new Date(req.body.issueDate) : undefined,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
+        paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : undefined,
+      };
+      
+      const invoice = insertInvoiceSchema.parse(invoiceData);
       const created = await storage.createInvoice(invoice);
       res.status(201).json(created);
     } catch (error) {
-      res.status(400).json({ error: "Invalid invoice data" });
+      console.error("Invoice creation error:", error);
+      res.status(400).json({ error: "Invalid invoice data", details: error.message });
     }
   });
 
