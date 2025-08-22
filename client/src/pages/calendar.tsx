@@ -216,17 +216,27 @@ export default function Calendar() {
     },
   });
 
-  // Convert jobs to calendar events
+  // Convert jobs to calendar events with safe date handling
   const jobEvents: CalendarEvent[] = jobs.map(job => {
     const client = clients.find(c => c.id === job.clientId);
     const worker = workers.find(w => w.id === job.workerId);
+    
+    const scheduledDate = new Date(job.scheduledDate);
+    
+    // Validate the scheduled date
+    if (isNaN(scheduledDate.getTime())) {
+      console.warn(`Invalid scheduled date for job ${job.id}:`, job.scheduledDate);
+      return null;
+    }
+    
+    const endTime = new Date(scheduledDate.getTime() + (job.estimatedDuration || 60) * 60000);
     
     return {
       id: job.id,
       title: `${job.title}${client ? ` - ${client.name}` : ''}`,
       description: job.description || '',
-      startTime: new Date(job.scheduledDate),
-      endTime: new Date(new Date(job.scheduledDate).getTime() + (job.estimatedDuration || 60) * 60000),
+      startTime: scheduledDate,
+      endTime: endTime,
       type: 'job',
       priority: job.priority as 'low' | 'medium' | 'high',
       clientId: job.clientId,
@@ -236,7 +246,7 @@ export default function Calendar() {
       status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
       color: getPriorityColor(job.priority),
     };
-  });
+  }).filter(Boolean) as CalendarEvent[];
 
   const allEvents = [...events, ...jobEvents];
 
@@ -275,6 +285,14 @@ export default function Calendar() {
       if (job) {
         setEditingJob(job);
         const scheduledDate = new Date(job.scheduledDate);
+        
+        // Validate date before formatting
+        if (isNaN(scheduledDate.getTime())) {
+          console.error('Invalid date for job editing:', job.scheduledDate);
+          toast({ title: "Error: Invalid job date", variant: "destructive" });
+          return;
+        }
+        
         jobEditForm.reset({
           title: job.title,
           description: job.description || "",
@@ -337,15 +355,32 @@ export default function Calendar() {
     e.preventDefault();
     dragCounter.current = 0;
     
-    if (draggedEvent) {
-      const newDate = new Date(targetDate);
-      newDate.setHours(draggedEvent.startTime.getHours());
-      newDate.setMinutes(draggedEvent.startTime.getMinutes());
-      
-      moveEventMutation.mutate({
-        eventId: draggedEvent.id,
-        newDate: newDate.toISOString()
-      });
+    if (draggedEvent && targetDate && !isNaN(targetDate.getTime())) {
+      try {
+        const newDate = new Date(targetDate);
+        
+        // Safely get hours and minutes from the dragged event
+        if (draggedEvent.startTime && !isNaN(draggedEvent.startTime.getTime())) {
+          newDate.setHours(draggedEvent.startTime.getHours());
+          newDate.setMinutes(draggedEvent.startTime.getMinutes());
+        } else {
+          // Default to current time if startTime is invalid
+          const now = new Date();
+          newDate.setHours(now.getHours());
+          newDate.setMinutes(now.getMinutes());
+        }
+        
+        // Validate the final date before sending
+        if (!isNaN(newDate.getTime())) {
+          moveEventMutation.mutate({
+            eventId: draggedEvent.id,
+            newDate: newDate.toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('Error in handleDrop:', error);
+        toast({ title: "Failed to move event", variant: "destructive" });
+      }
     }
     setDraggedEvent(null);
   };
@@ -522,7 +557,11 @@ export default function Calendar() {
                     onDragOver={handleDragOver}
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, new Date(day.setHours(hour)))}
+                    onDrop={(e) => {
+                      const dropDate = new Date(day);
+                      dropDate.setHours(hour, 0, 0, 0);
+                      handleDrop(e, dropDate);
+                    }}
                   >
                     {dayHourEvents.map(event => (
                       <div
