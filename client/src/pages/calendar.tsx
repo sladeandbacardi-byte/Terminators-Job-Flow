@@ -281,8 +281,12 @@ export default function Calendar() {
     };
   }).filter(Boolean) as CalendarEvent[];
 
-  // Debug: Log job events
-  console.log(`Total job events: ${jobEvents.length}`, jobEvents.map(e => ({ id: e.id, title: e.title, date: e.startTime })));
+  // Debug: Log job events and current month
+  const currentMonthStr = format(currentDate, 'yyyy-MM');
+  const eventsThisMonth = jobEvents.filter(e => format(e.startTime, 'yyyy-MM') === currentMonthStr);
+  console.log(`Calendar showing month: ${currentMonthStr}`);
+  console.log(`Total job events: ${jobEvents.length}, Events this month: ${eventsThisMonth.length}`);
+  console.log('Events this month:', eventsThisMonth.map(e => ({ id: e.id, title: e.title.split(' - ')[0], date: format(e.startTime, 'yyyy-MM-dd') })));
 
   const allEvents = [...events, ...jobEvents];
 
