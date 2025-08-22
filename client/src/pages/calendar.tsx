@@ -197,21 +197,27 @@ export default function Calendar() {
       const event = allEvents.find(e => e.id === eventId);
       if (!event) throw new Error('Event not found');
 
+      console.log(`Moving event ${eventId} to ${newDate}`);
+
       if (event.type === 'job') {
         const job = jobs.find(j => j.id === eventId);
         if (!job) throw new Error('Job not found');
         
-        return apiRequest('PATCH', `/api/jobs/${eventId}`, { scheduledDate: newDate });
+        const response = await apiRequest('PATCH', `/api/jobs/${eventId}`, { scheduledDate: newDate });
+        console.log('Job move response:', response);
+        return response;
       } else {
         return apiRequest('PATCH', `/api/calendar/events/${eventId}`, { scheduledDate: newDate });
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Move successful, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
       toast({ title: "Event moved successfully" });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Move failed:', error);
       toast({ title: "Failed to move event", variant: "destructive" });
     },
   });

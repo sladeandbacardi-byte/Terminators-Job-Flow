@@ -510,6 +510,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH route for calendar drag and drop
+  app.patch("/api/jobs/:id", async (req, res) => {
+    try {
+      // Convert date strings to Date objects
+      const jobData = {
+        ...req.body,
+        scheduledDate: req.body.scheduledDate ? new Date(req.body.scheduledDate) : undefined,
+        startTime: req.body.startTime ? new Date(req.body.startTime) : undefined,
+        endTime: req.body.endTime ? new Date(req.body.endTime) : undefined,
+      };
+      
+      const updateData = insertJobSchema.partial().parse(jobData);
+      const updated = await storage.updateJob(req.params.id, updateData);
+      res.json(updated);
+    } catch (error) {
+      console.error("Job patch error:", error);
+      res.status(400).json({ error: "Invalid job data", details: error.message });
+    }
+  });
+
   app.delete("/api/jobs/:id", async (req, res) => {
     const deleted = await storage.deleteJob(req.params.id);
     if (!deleted) {
