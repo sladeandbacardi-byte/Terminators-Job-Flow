@@ -210,11 +210,28 @@ export default function Calendar() {
         return apiRequest('PATCH', `/api/calendar/events/${eventId}`, { scheduledDate: newDate });
       }
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       console.log('Move successful, invalidating queries');
+      
+      // Force refetch of jobs data immediately
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
-      toast({ title: "Event moved successfully" });
+      
+      // Check if event was moved to a different month
+      const movedToDate = new Date(variables.newDate);
+      const movedToMonth = format(movedToDate, 'yyyy-MM');
+      const currentMonth = format(currentDate, 'yyyy-MM');
+      
+      if (movedToMonth !== currentMonth) {
+        // Event moved to different month - navigate to that month
+        setCurrentDate(movedToDate);
+        toast({ 
+          title: "Event moved to " + format(movedToDate, 'MMMM yyyy'),
+          description: "Calendar updated to show the new date"
+        });
+      } else {
+        toast({ title: "Event moved successfully" });
+      }
     },
     onError: (error) => {
       console.error('Move failed:', error);
