@@ -210,21 +210,25 @@ export default function Calendar() {
         return apiRequest('PATCH', `/api/calendar/events/${eventId}`, { scheduledDate: newDate });
       }
     },
-    onSuccess: (data, variables) => {
-      console.log('Move successful, invalidating queries');
+    onSuccess: async (data, variables) => {
+      console.log('Move successful, invalidating queries and refetching');
       
-      // Force refetch of jobs data immediately
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
+      // Force immediate refetch instead of just invalidation
+      await queryClient.refetchQueries({ queryKey: ['/api/jobs'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/calendar/events'] });
       
       // Check if event was moved to a different month
       const movedToDate = new Date(variables.newDate);
       const movedToMonth = format(movedToDate, 'yyyy-MM');
       const currentMonth = format(currentDate, 'yyyy-MM');
       
+      console.log(`Event moved from ${currentMonth} to ${movedToMonth}`);
+      
+      // Always navigate to the new date to ensure the event is visible
+      console.log('Navigating to new date:', format(movedToDate, 'yyyy-MM-dd'));
+      setCurrentDate(movedToDate);
+      
       if (movedToMonth !== currentMonth) {
-        // Event moved to different month - navigate to that month
-        setCurrentDate(movedToDate);
         toast({ 
           title: "Event moved to " + format(movedToDate, 'MMMM yyyy'),
           description: "Calendar updated to show the new date"
@@ -254,6 +258,11 @@ export default function Calendar() {
     
     const endTime = new Date(scheduledDate.getTime() + (job.estimatedDuration || 60) * 60000);
     
+    // Debug logging for job conversion
+    if (job.id === 'job-9') {
+      console.log(`Converting job-9: scheduled date = ${job.scheduledDate}, parsed date = ${scheduledDate.toISOString()}`);
+    }
+    
     return {
       id: job.id,
       title: `${job.title}${client ? ` - ${client.name}` : ''}`,
@@ -270,6 +279,9 @@ export default function Calendar() {
       color: getPriorityColor(job.priority),
     };
   }).filter(Boolean) as CalendarEvent[];
+
+  // Debug: Log job events
+  console.log(`Total job events: ${jobEvents.length}`, jobEvents.map(e => ({ id: e.id, title: e.title, date: e.startTime })));
 
   const allEvents = [...events, ...jobEvents];
 
