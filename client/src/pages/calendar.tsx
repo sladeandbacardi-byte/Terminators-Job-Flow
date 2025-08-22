@@ -224,16 +224,17 @@ export default function Calendar() {
       
       console.log(`Event moved from ${currentMonth} to ${movedToMonth}`);
       
-      // Always navigate to the new date to ensure the event is visible
-      console.log('Navigating to new date:', format(movedToDate, 'yyyy-MM-dd'));
-      setCurrentDate(movedToDate);
-      
       if (movedToMonth !== currentMonth) {
+        // Only navigate if event moved to a different month
+        console.log('Navigating to new month:', movedToMonth);
+        setCurrentDate(movedToDate);
         toast({ 
           title: "Event moved to " + format(movedToDate, 'MMMM yyyy'),
           description: "Calendar updated to show the new date"
         });
       } else {
+        // Event stayed in same month - just show success message
+        console.log('Event moved within same month');
         toast({ title: "Event moved successfully" });
       }
     },
@@ -394,16 +395,19 @@ export default function Calendar() {
       try {
         const newDate = new Date(targetDate);
         
-        // Safely get hours and minutes from the dragged event
+        // Preserve the original time when moving the event
         if (draggedEvent.startTime && !isNaN(draggedEvent.startTime.getTime())) {
           newDate.setHours(draggedEvent.startTime.getHours());
           newDate.setMinutes(draggedEvent.startTime.getMinutes());
+          newDate.setSeconds(draggedEvent.startTime.getSeconds());
         } else {
-          // Default to current time if startTime is invalid
-          const now = new Date();
-          newDate.setHours(now.getHours());
-          newDate.setMinutes(now.getMinutes());
+          // Default to 9 AM if startTime is invalid
+          newDate.setHours(9);
+          newDate.setMinutes(0);
+          newDate.setSeconds(0);
         }
+        
+        console.log(`Dropping event ${draggedEvent.id} on ${format(targetDate, 'yyyy-MM-dd')} at ${format(newDate, 'HH:mm')}`);
         
         // Validate the final date before sending
         if (!isNaN(newDate.getTime())) {
