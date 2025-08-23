@@ -197,22 +197,17 @@ export default function Calendar() {
       const event = allEvents.find(e => e.id === eventId);
       if (!event) throw new Error('Event not found');
 
-      console.log(`Moving event ${eventId} to ${newDate}`);
 
       if (event.type === 'job') {
         const job = jobs.find(j => j.id === eventId);
         if (!job) throw new Error('Job not found');
         
-        const response = await apiRequest('PATCH', `/api/jobs/${eventId}`, { scheduledDate: newDate });
-        console.log('Job move response:', response);
-        return response;
+        return await apiRequest('PATCH', `/api/jobs/${eventId}`, { scheduledDate: newDate });
       } else {
         return apiRequest('PATCH', `/api/calendar/events/${eventId}`, { scheduledDate: newDate });
       }
     },
     onSuccess: async (data, variables) => {
-      console.log('Move successful, invalidating queries and refetching');
-      
       // Force immediate refetch instead of just invalidation
       await queryClient.refetchQueries({ queryKey: ['/api/jobs'] });
       await queryClient.refetchQueries({ queryKey: ['/api/calendar/events'] });
@@ -222,11 +217,9 @@ export default function Calendar() {
       const movedToMonth = format(movedToDate, 'yyyy-MM');
       const currentMonth = format(currentDate, 'yyyy-MM');
       
-      console.log(`Event moved from ${currentMonth} to ${movedToMonth}`);
       
       if (movedToMonth !== currentMonth) {
         // Only navigate if event moved to a different month
-        console.log('Navigating to new month:', movedToMonth);
         setCurrentDate(movedToDate);
         toast({ 
           title: "Event moved to " + format(movedToDate, 'MMMM yyyy'),
@@ -234,7 +227,6 @@ export default function Calendar() {
         });
       } else {
         // Event stayed in same month - just show success message
-        console.log('Event moved within same month');
         toast({ title: "Event moved successfully" });
       }
     },
@@ -259,10 +251,6 @@ export default function Calendar() {
     
     const endTime = new Date(scheduledDate.getTime() + (job.estimatedDuration || 60) * 60000);
     
-    // Debug logging for job conversion
-    if (job.id === 'job-9') {
-      console.log(`Converting job-9: scheduled date = ${job.scheduledDate}, parsed date = ${scheduledDate.toISOString()}`);
-    }
     
     return {
       id: job.id,
@@ -280,13 +268,6 @@ export default function Calendar() {
       color: getPriorityColor(job.priority),
     };
   }).filter(Boolean) as CalendarEvent[];
-
-  // Debug: Log job events and current month
-  const currentMonthStr = format(currentDate, 'yyyy-MM');
-  const eventsThisMonth = jobEvents.filter(e => format(e.startTime, 'yyyy-MM') === currentMonthStr);
-  console.log(`Calendar showing month: ${currentMonthStr}`);
-  console.log(`Total job events: ${jobEvents.length}, Events this month: ${eventsThisMonth.length}`);
-  console.log('Events this month:', eventsThisMonth.map(e => ({ id: e.id, title: e.title.split(' - ')[0], date: format(e.startTime, 'yyyy-MM-dd') })));
 
   const allEvents = [...events, ...jobEvents];
 
@@ -411,7 +392,6 @@ export default function Calendar() {
           newDate.setSeconds(0);
         }
         
-        console.log(`Dropping event ${draggedEvent.id} on ${format(targetDate, 'yyyy-MM-dd')} at ${format(newDate, 'HH:mm')}`);
         
         // Validate the final date before sending
         if (!isNaN(newDate.getTime())) {
@@ -477,29 +457,30 @@ export default function Calendar() {
 
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
-        const dayEvents = getEventsForDate(day);
-        const isCurrentMonth = isSameMonth(day, currentDate);
-        const isCurrentDay = isToday(day);
+        const currentDay = new Date(day); // Create a copy to avoid reference issues
+        const dayEvents = getEventsForDate(currentDay);
+        const isCurrentMonth = isSameMonth(currentDay, currentDate);
+        const isCurrentDayFlag = isToday(currentDay);
 
         days.push(
           <div
-            key={day.toString()}
+            key={currentDay.toString()}
             className={cn(
               "min-h-[120px] p-2 border border-gray-200 cursor-pointer hover:bg-gray-50",
               !isCurrentMonth && "bg-gray-100 text-gray-400",
-              isCurrentDay && "bg-blue-50 border-blue-300"
+              isCurrentDayFlag && "bg-blue-50 border-blue-300"
             )}
-            onClick={() => setCurrentDate(day)}
+            onClick={() => setCurrentDate(currentDay)}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, day)}
+            onDrop={(e) => handleDrop(e, currentDay)}
           >
             <div className={cn(
               "text-sm font-medium mb-1",
-              isCurrentDay && "text-blue-600"
+              isCurrentDayFlag && "text-blue-600"
             )}>
-              {format(day, 'd')}
+              {format(currentDay, 'd')}
             </div>
             <div className="space-y-1">
               {dayEvents.slice(0, 3).map((event, index) => (
