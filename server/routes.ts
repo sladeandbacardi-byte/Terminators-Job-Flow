@@ -487,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(created);
     } catch (error) {
       console.error("Job creation error:", error);
-      res.status(400).json({ error: "Invalid job data", details: error.message });
+      res.status(400).json({ error: "Invalid job data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -506,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       console.error("Job update error:", error);
-      res.status(400).json({ error: "Invalid job data", details: error.message });
+      res.status(400).json({ error: "Invalid job data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -526,7 +526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       console.error("Job patch error:", error);
-      res.status(400).json({ error: "Invalid job data", details: error.message });
+      res.status(400).json({ error: "Invalid job data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -584,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(created);
     } catch (error) {
       console.error("Invoice creation error:", error);
-      res.status(400).json({ error: "Invalid invoice data", details: error.message });
+      res.status(400).json({ error: "Invalid invoice data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -1568,7 +1568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reportData = await storage.runCustomReport(req.params.id);
       res.json(reportData);
     } catch (error) {
-      if (error.message === "Custom report not found") {
+      if (error instanceof Error && error.message === "Custom report not found") {
         return res.status(404).json({ error: "Custom report not found" });
       }
       res.status(500).json({ error: "Failed to run custom report" });

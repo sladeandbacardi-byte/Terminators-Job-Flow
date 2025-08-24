@@ -161,7 +161,8 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
         ...data,
         items: undefined, // Remove items from invoice data
       };
-      const createdInvoice = await apiRequest('POST', '/api/invoices', invoiceData);
+      const response = await apiRequest('POST', '/api/invoices', invoiceData);
+      const createdInvoice = await response.json();
       
       // Create invoice items
       for (const item of data.items) {
@@ -474,6 +475,7 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
                     placeholder="Additional notes for the client" 
                     className="min-h-[100px]" 
                     {...field} 
+                    value={field.value || ''}
                     data-testid="input-notes"
                   />
                 </FormControl>
@@ -493,6 +495,7 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
                     placeholder="Payment terms and conditions" 
                     className="min-h-[100px]" 
                     {...field} 
+                    value={field.value || ''}
                     data-testid="input-terms"
                   />
                 </FormControl>
