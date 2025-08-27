@@ -1,50 +1,37 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-
-const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LogIn, AlertCircle, User } from "lucide-react";
+import type { Worker } from "@shared/schema";
 
 interface LoginFormProps {
   onSuccess: (token: string, user: any) => void;
 }
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
-  const [showPassword, setShowPassword] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
 
-  const form = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-    },
+  // Fetch workers for user selection
+  const { data: workers = [], isLoading: workersLoading } = useQuery<Worker[]>({
+    queryKey: ["/api/workers"],
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
+    mutationFn: async (userId: string) => {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ userId }),
       });
       
       if (!response.ok) {
-        throw new Error("Invalid username or password");
+        throw new Error("Login failed");
       }
       
       return response.json();
@@ -54,8 +41,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     },
   });
 
-  const onSubmit = (data: LoginForm) => {
-    loginMutation.mutate(data);
+  const handleLogin = () => {
+    if (selectedUserId) {
+      loginMutation.mutate(selectedUserId);
+    }
   };
 
   return (
@@ -63,7 +52,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-green-600 flex items-center justify-center">
-            <LogIn className="h-6 w-6 text-white" />
+            <User className="h-6 w-6 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
             The Terminators
@@ -79,75 +68,52 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               <AlertDescription>
                 {loginMutation.error instanceof Error 
                   ? loginMutation.error.message 
-                  : "Invalid username or password"}
+                  : "Login failed"}
               </AlertDescription>
             </Alert>
           )}
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Enter your username"
-                data-testid="input-username"
-                {...form.register("username")}
-                disabled={loginMutation.isPending}
-              />
-              {form.formState.errors.username && (
-                <p className="text-sm text-red-600">
-                  {form.formState.errors.username.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  data-testid="input-password"
-                  {...form.register("password")}
-                  disabled={loginMutation.isPending}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loginMutation.isPending}
-                  data-testid="button-toggle-password"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
-                </Button>
-              </div>
-              {form.formState.errors.password && (
-                <p className="text-sm text-red-600">
-                  {form.formState.errors.password.message}
-                </p>
-              )}
+              <Label htmlFor="user-select">Select User</Label>
+              <Select
+                value={selectedUserId}
+                onValueChange={setSelectedUserId}
+                disabled={loginMutation.isPending || workersLoading}
+              >
+                <SelectTrigger data-testid="select-user">
+                  <SelectValue placeholder={workersLoading ? "Loading users..." : "Choose a user to continue"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {workers.map((worker) => (
+                    <SelectItem key={worker.id} value={worker.id} data-testid={`user-option-${worker.id}`}>
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                          <User className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{worker.name}</p>
+                          <p className="text-xs text-gray-500">{worker.role || 'Worker'}</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <Button
-              type="submit"
+              onClick={handleLogin}
               className="w-full bg-green-600 hover:bg-green-700"
-              disabled={loginMutation.isPending}
+              disabled={loginMutation.isPending || !selectedUserId}
               data-testid="button-login"
             >
-              {loginMutation.isPending ? "Signing in..." : "Sign In"}
+              {loginMutation.isPending ? "Signing in..." : "Continue"}
             </Button>
-          </form>
+          </div>
 
           <div className="text-center text-sm text-gray-500">
-            <p>Admin access only • Secure authentication</p>
+            <p>Select any user to access the system</p>
           </div>
         </CardContent>
       </Card>

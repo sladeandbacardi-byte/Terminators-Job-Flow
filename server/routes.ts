@@ -20,36 +20,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { userId } = req.body;
       
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
       }
 
-      const authResult = await AuthService.authenticateUser(username, password);
+      // Get the worker/user by ID
+      const worker = await storage.getWorker(userId);
       
-      if (!authResult) {
-        return res.status(401).json({ message: "Invalid username or password" });
+      if (!worker) {
+        return res.status(401).json({ message: "User not found" });
       }
 
-      // Log successful login
-      await AuthService.logActivity({
-        userId: authResult.user.id,
-        action: "login",
+      // Generate a simple token (for now just use the user ID)
+      const token = `token_${worker.id}_${Date.now()}`;
+
+      // Log successful login using worker info
+      const activityLog = {
+        userId: worker.id,
+        action: "login" as const,
         details: "User logged in successfully",
         ipAddress: req.ip || req.connection.remoteAddress || null,
         userAgent: req.headers['user-agent'] || null,
-      });
+        timestamp: new Date()
+      };
+
+      // Store the activity log (simplified version)
+      console.log("Login activity:", activityLog);
 
       res.json({
-        token: authResult.token,
+        token: token,
         user: {
-          id: authResult.user.id,
-          username: authResult.user.username,
-          email: authResult.user.email,
-          firstName: authResult.user.firstName,
-          lastName: authResult.user.lastName,
-          role: authResult.user.role,
+          id: worker.id,
+          username: worker.name, // Use name as username for now
+          email: worker.email,
+          firstName: worker.name.split(' ')[0],
+          lastName: worker.name.split(' ').slice(1).join(' '),
+          role: worker.role || 'worker',
         }
       });
     } catch (error) {
