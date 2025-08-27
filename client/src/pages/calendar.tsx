@@ -272,6 +272,18 @@ export default function Calendar() {
   const allEvents = [...events, ...jobEvents];
 
   const filteredEvents = allEvents.filter(event => {
+    // Safety check for event validity
+    if (!event || !event.startTime || !event.title) {
+      console.warn('Invalid event found:', event);
+      return false;
+    }
+
+    // Validate startTime is a valid Date
+    if (!(event.startTime instanceof Date) || isNaN(event.startTime.getTime())) {
+      console.warn('Invalid startTime for event:', event.id, event.startTime);
+      return false;
+    }
+
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDivision = divisionFilter === "all" || event.divisionId === divisionFilter;
@@ -440,9 +452,19 @@ export default function Calendar() {
   };
 
   const getEventsForDate = (date: Date) => {
-    return filteredEvents.filter(event => 
-      isSameDay(event.startTime, date)
-    );
+    if (!date || isNaN(date.getTime())) {
+      console.warn('Invalid date passed to getEventsForDate:', date);
+      return [];
+    }
+    
+    return filteredEvents.filter(event => {
+      try {
+        return event && event.startTime && isSameDay(event.startTime, date);
+      } catch (error) {
+        console.warn('Error comparing dates for event:', event?.id, error);
+        return false;
+      }
+    });
   };
 
   const renderMonthView = () => {
@@ -614,9 +636,14 @@ export default function Calendar() {
   };
 
   const renderDayView = () => {
-    const dayEvents = getEventsForDate(currentDate).sort((a, b) => 
-      a.startTime.getTime() - b.startTime.getTime()
-    );
+    const dayEvents = getEventsForDate(currentDate).sort((a, b) => {
+      try {
+        return a.startTime.getTime() - b.startTime.getTime();
+      } catch (error) {
+        console.warn('Error sorting events:', error, { a: a?.id, b: b?.id });
+        return 0;
+      }
+    });
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
@@ -638,40 +665,57 @@ export default function Calendar() {
           
           {/* Events overlay */}
           {dayEvents.map(event => {
-            const startHour = event.startTime.getHours();
-            const startMinute = event.startTime.getMinutes();
-            const duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
-            const top = (startHour * 64) + (startMinute * 64 / 60);
-            const height = (duration * 64 / 60);
+            try {
+              // Safety checks for event properties
+              if (!event || !event.startTime || !event.endTime) {
+                console.warn('Skipping invalid event in day view:', event?.id);
+                return null;
+              }
 
-            return (
-              <div
-                key={event.id}
-                className="absolute left-2 right-2 p-2 rounded cursor-pointer hover:opacity-80"
-                style={{ 
-                  top: `${top}px`, 
-                  height: `${height}px`,
-                  backgroundColor: event.color + '20',
-                  color: event.color,
-                  minHeight: '40px'
-                }}
-                onClick={() => {
-                  setSelectedEvent(event);
-                  setIsEventDialogOpen(true);
-                }}
-              >
-                <div className="font-medium text-sm">{event.title}</div>
-                <div className="text-xs text-gray-600">
-                  {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                </div>
-                {event.location && (
-                  <div className="text-xs text-gray-500 truncate">
-                    📍 {event.location}
+              const startHour = event.startTime.getHours();
+              const startMinute = event.startTime.getMinutes();
+              const duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
+              const top = (startHour * 64) + (startMinute * 64 / 60);
+              const height = Math.max((duration * 64 / 60), 40); // Ensure minimum height
+
+              // Validate calculated values
+              if (isNaN(top) || isNaN(height) || top < 0 || height < 0) {
+                console.warn('Invalid positioning for event:', event.id, { top, height, startHour, startMinute, duration });
+                return null;
+              }
+
+              return (
+                <div
+                  key={event.id}
+                  className="absolute left-2 right-2 p-2 rounded cursor-pointer hover:opacity-80"
+                  style={{ 
+                    top: `${top}px`, 
+                    height: `${height}px`,
+                    backgroundColor: (event.color || '#6b7280') + '20',
+                    color: event.color || '#6b7280',
+                    minHeight: '40px'
+                  }}
+                  onClick={() => {
+                    setSelectedEvent(event);
+                    setIsEventDialogOpen(true);
+                  }}
+                >
+                  <div className="font-medium text-sm">{event.title}</div>
+                  <div className="text-xs text-gray-600">
+                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  {event.location && (
+                    <div className="text-xs text-gray-500 truncate">
+                      📍 {event.location}
+                    </div>
+                  )}
+                </div>
+              );
+            } catch (error) {
+              console.error('Error rendering event in day view:', event?.id, error);
+              return null;
+            }
+          }).filter(Boolean)}
         </div>
       </div>
     );
@@ -750,12 +794,33 @@ export default function Calendar() {
   };
 
   const renderCurrentView = () => {
-    switch (viewType) {
-      case 'month': return renderMonthView();
-      case 'week': return renderWeekView();
-      case 'day': return renderDayView();
-      case 'agenda': return renderAgendaView();
-      default: return renderMonthView();
+    try {
+      switch (viewType) {
+        case 'month': return renderMonthView();
+        case 'week': return renderWeekView();
+        case 'day': return renderDayView();
+        case 'agenda': return renderAgendaView();
+        default: return renderMonthView();
+      }
+    } catch (error) {
+      console.error('Error rendering calendar view:', viewType, error);
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-red-600 mb-2">Error loading calendar view</div>
+            <Button 
+              onClick={() => {
+                setViewType('month');
+                setDivisionFilter('all');
+                setStatusFilter('all');
+              }}
+              variant="outline"
+            >
+              Reset Calendar
+            </Button>
+          </div>
+        </div>
+      );
     }
   };
 
