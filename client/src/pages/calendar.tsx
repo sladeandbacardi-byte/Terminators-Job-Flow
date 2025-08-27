@@ -476,16 +476,29 @@ export default function Calendar() {
     const startDate = startOfWeek(monthStart);
     const endDate = endOfWeek(monthEnd);
 
+    console.log('Month view debug:', {
+      currentDate: currentDate.toISOString(),
+      monthStart: monthStart.toISOString(),
+      monthEnd: monthEnd.toISOString(),
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
+
     const rows = [];
     let days = [];
     let day = new Date(startDate);
+    let dayCount = 0;
 
+    // Use a different approach to ensure we get all days
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
         const currentDay = new Date(day); // Create a copy to avoid reference issues
         const dayEvents = getEventsForDate(currentDay);
         const isCurrentMonth = isSameMonth(currentDay, currentDate);
         const isCurrentDayFlag = isToday(currentDay);
+
+        console.log(`Day ${dayCount}: ${currentDay.toDateString()}, isCurrentMonth: ${isCurrentMonth}, date: ${format(currentDay, 'd')}`);
+        dayCount++;
 
         days.push(
           <div
