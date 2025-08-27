@@ -63,7 +63,16 @@ Based on current business operations, the system now accurately reflects the fou
 - **Washroom** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
 - **Deep Cleaning** (div-4): Orange branding (#f59e0b), professional deep cleaning and specialized cleaning services
 
-**Recent Changes (August 21, 2025)**:
+**Recent Changes (August 27, 2025)**:
+- **Landscape Daily Department Schedule Cards**: Implemented printable daily job schedules optimized for A4 landscape format
+  - Compact table layout displaying one department per day with horizontal job listings
+  - 8-column structure: Job#, Time, Job & Client, Worker, Location, Status, Notes
+  - Print-optimized CSS with reduced margins (0.3in) and font sizes for single-page printing
+  - Accessible from Calendar page via "Print Daily Schedule" button with department and date selection
+  - API endpoint `/api/jobs/daily/:divisionId/:date` for fetching division-specific daily jobs
+  - Prevents table row breaks across pages for clean printing
+
+**Previous Changes (August 21, 2025)**:
 - **Complete Customer Workflow Testing**: Validated entire business process from customer creation through service completion to invoice generation
 - **Critical API Date Fixes**: Applied comprehensive date string-to-Date object conversion across job creation, job updates, and invoice creation routes
 - **Enhanced Error Handling**: Added detailed validation error messages with specific field information for troubleshooting
