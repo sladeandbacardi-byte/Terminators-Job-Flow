@@ -477,7 +477,7 @@ export default function Calendar() {
 
     const rows = [];
     let days = [];
-    let day = startDate;
+    let day = new Date(startDate);
 
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
@@ -488,13 +488,13 @@ export default function Calendar() {
 
         days.push(
           <div
-            key={currentDay.toString()}
+            key={currentDay.toISOString()}
             className={cn(
               "min-h-[120px] p-2 border border-gray-200 cursor-pointer hover:bg-gray-50",
               !isCurrentMonth && "bg-gray-100 text-gray-400",
               isCurrentDayFlag && "bg-blue-50 border-blue-300"
             )}
-            onClick={() => setCurrentDate(currentDay)}
+            onClick={() => setCurrentDate(new Date(currentDay))}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
@@ -542,7 +542,7 @@ export default function Calendar() {
         day = addDays(day, 1);
       }
       rows.push(
-        <div key={day.toString()} className="grid grid-cols-7">
+        <div key={`week-${rows.length}`} className="grid grid-cols-7">
           {days}
         </div>
       );
