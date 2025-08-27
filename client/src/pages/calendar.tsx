@@ -28,8 +28,10 @@ import {
   Search,
   Edit,
   Save,
-  X
+  X,
+  FileText
 } from "lucide-react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -880,6 +882,18 @@ export default function Calendar() {
               </div>
 
               <div className="flex items-center space-x-2">
+                {/* Daily Department Card Button */}
+                <Link href="/daily-department-card">
+                  <Button
+                    variant="outline"
+                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                    data-testid="daily-department-card"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Print Daily Schedule
+                  </Button>
+                </Link>
+                
                 {/* Create Appointment Button */}
                 <Button
                   onClick={() => setIsCreateDialogOpen(true)}

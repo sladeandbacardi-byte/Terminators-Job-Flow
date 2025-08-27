@@ -21,6 +21,7 @@ import PurchaseOrders from "@/pages/purchase-orders";
 import Mobile from "@/pages/mobile";
 import Calendar from "@/pages/calendar";
 import JobCard from "@/pages/job-card";
+import DailyDepartmentCard from "@/pages/daily-department-card";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -58,6 +59,7 @@ function AuthenticatedApp() {
       <Route path="/purchase-orders" component={PurchaseOrders} />
       <Route path="/calendar" component={Calendar} />
       <Route path="/jobs/:id/card" component={JobCard} />
+      <Route path="/daily-department-card" component={DailyDepartmentCard} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -73,6 +73,7 @@ export interface IStorage {
   getJobsByDivision(divisionId: string): Promise<Job[]>;
   getJobsByStatus(status: string): Promise<Job[]>;
   getJobsByDateRange(startDate: Date, endDate: Date): Promise<Job[]>;
+  getJobsByDivisionAndDateRange(divisionId: string, startDate: Date, endDate: Date): Promise<(Job & { client: Client; worker: Worker; inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] })[]>;
   getTodaysJobs(): Promise<Job[]>;
   updateJobStatus(jobId: string, status: string): Promise<Job>;
   getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, division: Division, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined>;
@@ -2011,6 +2012,77 @@ export class MemStorage implements IStorage {
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     return this.getJobsByDateRange(today, tomorrow);
+  }
+
+  async getJobsByDivisionAndDateRange(divisionId: string, startDate: Date, endDate: Date): Promise<(Job & { client: Client; worker: Worker; inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] })[]> {
+    const jobs = Array.from(this.jobs.values()).filter(job => {
+      const jobDate = new Date(job.scheduledDate);
+      return job.divisionId === divisionId && jobDate >= startDate && jobDate <= endDate;
+    });
+
+    // Enrich jobs with client, worker, and inventory item details
+    const enrichedJobs = jobs.map(job => {
+      const client = this.clients.get(job.clientId);
+      const worker = this.workers.get(job.workerId);
+      
+      // Get job inventory items with full inventory item details
+      const jobInventoryItems = Array.from(this.jobInventoryItems.values())
+        .filter(item => item.jobId === job.id)
+        .map(jobItem => {
+          const inventoryItem = this.inventoryItems.get(jobItem.inventoryItemId);
+          return {
+            ...jobItem,
+            inventoryItem: inventoryItem || {
+              id: jobItem.inventoryItemId,
+              name: 'Unknown Item',
+              description: '',
+              sku: '',
+              type: 'unknown',
+              divisionId: '',
+              unit: '',
+              currentStock: 0,
+              minStock: 0,
+              maxStock: 0,
+              unitCost: 0,
+              supplierInfo: '',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          };
+        });
+
+      return {
+        ...job,
+        client: client || {
+          id: job.clientId,
+          name: 'Unknown Client',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          address: '',
+          notes: '',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        worker: worker || {
+          id: job.workerId,
+          name: 'Unknown Worker',
+          email: '',
+          phone: '',
+          divisionId: job.divisionId,
+          role: 'technician',
+          employeeId: '',
+          pin: '',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        inventoryItems: jobInventoryItems
+      };
+    });
+
+    return enrichedJobs;
   }
 
   async createJob(insertJob: InsertJob): Promise<Job> {

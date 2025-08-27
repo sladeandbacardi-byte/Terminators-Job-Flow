@@ -551,6 +551,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/jobs/daily/:divisionId/:date", async (req, res) => {
+    try {
+      const { divisionId, date } = req.params;
+      
+      // Parse the date and get start/end of day
+      const targetDate = new Date(date + 'T00:00:00');
+      const nextDay = new Date(targetDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      // Get all jobs for the division on this date
+      const jobs = await storage.getJobsByDivisionAndDateRange(divisionId, targetDate, nextDay);
+      
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching daily division jobs:", error);
+      res.status(500).json({ message: "Failed to fetch daily division jobs" });
+    }
+  });
+
   app.delete("/api/jobs/:id", async (req, res) => {
     const deleted = await storage.deleteJob(req.params.id);
     if (!deleted) {
