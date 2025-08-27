@@ -99,6 +99,7 @@ export default function Calendar() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
+  const [showBusinessHoursOnly, setShowBusinessHoursOnly] = useState(true);
   const dragCounter = useRef(0);
 
   const { toast } = useToast();
@@ -565,76 +566,105 @@ export default function Calendar() {
   };
 
   const renderWeekView = () => {
-    const weekStart = startOfWeek(currentDate);
-    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-    const hours = Array.from({ length: 24 }, (_, i) => i);
+    try {
+      const weekStart = startOfWeek(currentDate);
+      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+      const hours = Array.from({ length: 24 }, (_, i) => i);
 
-    return (
-      <div className="flex flex-col h-full">
-        {/* Week header */}
-        <div className="grid grid-cols-8 border-b bg-gray-50">
-          <div className="p-3 border-r"></div>
-          {weekDays.map(day => (
-            <div key={day.toString()} className="p-3 text-center border-r border-gray-200 last:border-r-0">
-              <div className="font-medium">{format(day, 'EEE')}</div>
-              <div className={cn(
-                "text-lg",
-                isToday(day) ? "text-blue-600 font-bold" : "text-gray-900"
-              )}>
-                {format(day, 'd')}
+      return (
+        <div className="flex flex-col h-full">
+          {/* Week header */}
+          <div className="grid grid-cols-8 border-b bg-gray-50">
+            <div className="p-3 border-r"></div>
+            {weekDays.map(day => (
+              <div key={day.toISOString()} className="p-3 text-center border-r border-gray-200 last:border-r-0">
+                <div className="font-medium">{format(day, 'EEE')}</div>
+                <div className={cn(
+                  "text-lg",
+                  isToday(day) ? "text-blue-600 font-bold" : "text-gray-900"
+                )}>
+                  {format(day, 'd')}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* Time grid */}
-        <div className="flex-1 overflow-auto">
-          {hours.map(hour => (
-            <div key={hour} className="grid grid-cols-8 border-b border-gray-100">
-              <div className="p-2 text-xs text-gray-500 border-r bg-gray-50 text-right">
-                {format(new Date().setHours(hour, 0), 'HH:mm')}
-              </div>
-              {weekDays.map(day => {
-                const dayHourEvents = filteredEvents.filter(event => 
-                  isSameDay(event.startTime, day) && 
-                  event.startTime.getHours() === hour
-                );
-                
-                return (
-                  <div key={`${day}-${hour}`} className="min-h-[60px] p-1 border-r border-gray-100 last:border-r-0 relative"
-                    onDragOver={handleDragOver}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => {
-                      const dropDate = new Date(day);
-                      dropDate.setHours(hour, 0, 0, 0);
-                      handleDrop(e, dropDate);
-                    }}
-                  >
-                    {dayHourEvents.map(event => (
-                      <div
-                        key={event.id}
-                        className="absolute left-1 right-1 top-1 text-xs p-1 rounded cursor-pointer hover:opacity-80 group"
-                        style={{ backgroundColor: event.color + '20', color: event.color }}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, event)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => handleEventClick(event)}
+          {/* Time grid */}
+          <div className="flex-1 overflow-auto">
+            {hours.map(hour => (
+              <div key={hour} className="grid grid-cols-8 border-b border-gray-100">
+                <div className="p-2 text-xs text-gray-500 border-r bg-gray-50 text-right">
+                  {format(new Date().setHours(hour, 0), 'HH:mm')}
+                </div>
+                {weekDays.map(day => {
+                  try {
+                    const dayHourEvents = filteredEvents.filter(event => {
+                      try {
+                        return event && event.startTime && 
+                               isSameDay(event.startTime, day) && 
+                               event.startTime.getHours() === hour;
+                      } catch (error) {
+                        console.warn('Error filtering week events:', error, event?.id);
+                        return false;
+                      }
+                    });
+                    
+                    return (
+                      <div key={`${day.toISOString()}-${hour}`} className="min-h-[60px] p-1 border-r border-gray-100 last:border-r-0 relative"
+                        onDragOver={handleDragOver}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => {
+                          const dropDate = new Date(day);
+                          dropDate.setHours(hour, 0, 0, 0);
+                          handleDrop(e, dropDate);
+                        }}
                       >
-                        <div className="font-medium truncate">{event.title}</div>
-                        <div className="text-gray-600 truncate">
-                          {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                        </div>
+                        {dayHourEvents.map(event => (
+                          <div
+                            key={event.id}
+                            className="absolute left-1 right-1 top-1 text-xs p-1 rounded cursor-pointer hover:opacity-80 group"
+                            style={{ backgroundColor: event.color + '20', color: event.color }}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, event)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => handleEventClick(event)}
+                          >
+                            <div className="font-medium truncate">{event.title}</div>
+                            <div className="text-gray-600 truncate">
+                              {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                    );
+                  } catch (error) {
+                    console.warn('Error rendering week day cell:', error, day);
+                    return (
+                      <div key={`${day.toISOString()}-${hour}`} className="min-h-[60px] p-1 border-r border-gray-100 last:border-r-0 relative">
+                        {/* Empty cell for error case */}
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    );
+      );
+    } catch (error) {
+      console.error('Error in renderWeekView:', error);
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-red-600 mb-2">Error loading week view</div>
+            <Button onClick={() => setViewType('month')} variant="outline">
+              Switch to Month View
+            </Button>
+          </div>
+        </div>
+      );
+    }
   };
 
   const renderDayView = () => {
@@ -646,7 +676,10 @@ export default function Calendar() {
         return 0;
       }
     });
-    const hours = Array.from({ length: 24 }, (_, i) => i);
+    // Business hours: 9 AM to 6 PM (can be adjusted) or full day
+    const businessHours = Array.from({ length: 9 }, (_, i) => i + 9);
+    const allHours = Array.from({ length: 24 }, (_, i) => i);
+    const hours = showBusinessHoursOnly ? businessHours : allHours;
 
     return (
       <div className="flex h-full">
@@ -662,7 +695,7 @@ export default function Calendar() {
         {/* Events column */}
         <div className="flex-1 relative">
           {hours.map(hour => (
-            <div key={hour} className="h-16 border-b border-gray-100"></div>
+            <div key={hour} className="h-16 border-b border-gray-100 hover:bg-gray-50"></div>
           ))}
           
           {/* Events overlay */}
@@ -677,7 +710,17 @@ export default function Calendar() {
               const startHour = event.startTime.getHours();
               const startMinute = event.startTime.getMinutes();
               const duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
-              const top = (startHour * 64) + (startMinute * 64 / 60);
+              
+              // Calculate position based on whether we're showing business hours or full day
+              const hourOffset = showBusinessHoursOnly ? 9 : 0; // Business hours start at 9 AM
+              const adjustedHour = startHour - hourOffset;
+              
+              // Skip events outside business hours if we're in business hours mode
+              if (showBusinessHoursOnly && (startHour < 9 || startHour >= 18)) {
+                return null;
+              }
+              
+              const top = (adjustedHour * 64) + (startMinute * 64 / 60);
               const height = Math.max((duration * 64 / 60), 40); // Ensure minimum height
 
               // Validate calculated values
@@ -685,6 +728,34 @@ export default function Calendar() {
                 console.warn('Invalid positioning for event:', event.id, { top, height, startHour, startMinute, duration });
                 return null;
               }
+
+              return (
+                <div
+                  key={event.id}
+                  className="absolute left-2 right-2 p-2 rounded cursor-pointer hover:opacity-80 border border-gray-200"
+                  style={{ 
+                    top: `${top}px`, 
+                    height: `${height}px`,
+                    backgroundColor: (event.color || '#6b7280') + '20',
+                    color: event.color || '#6b7280',
+                    minHeight: '40px'
+                  }}
+                  onClick={() => handleEventClick(event)}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, event)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="font-medium text-sm truncate">{event.title}</div>
+                  <div className="text-xs text-gray-600">
+                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                  </div>
+                  {event.location && (
+                    <div className="text-xs text-gray-500 truncate">
+                      📍 {event.location}
+                    </div>
+                  )}
+                </div>
+              );
 
               return (
                 <div
@@ -955,6 +1026,22 @@ export default function Calendar() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Business Hours Toggle for Day View */}
+              {viewType === 'day' && (
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium">View:</label>
+                  <Button
+                    variant={showBusinessHoursOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowBusinessHoursOnly(!showBusinessHoursOnly)}
+                    data-testid="business-hours-toggle"
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    {showBusinessHoursOnly ? "Business Hours (9AM-6PM)" : "Full Day (24 Hours)"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
