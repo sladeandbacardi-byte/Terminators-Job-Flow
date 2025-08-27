@@ -600,9 +600,18 @@ export default function Calendar() {
                   try {
                     const dayHourEvents = filteredEvents.filter(event => {
                       try {
-                        return event && event.startTime && 
-                               isSameDay(event.startTime, day) && 
-                               event.startTime.getHours() === hour;
+                        if (!event || !event.startTime || !event.id) {
+                          return false;
+                        }
+                        
+                        // Ensure startTime is a valid Date object
+                        const eventDate = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
+                        if (isNaN(eventDate.getTime())) {
+                          console.warn('Invalid date for event:', event.id);
+                          return false;
+                        }
+                        
+                        return isSameDay(eventDate, day) && eventDate.getHours() === hour;
                       } catch (error) {
                         console.warn('Error filtering week events:', error, event?.id);
                         return false;
@@ -620,22 +629,32 @@ export default function Calendar() {
                           handleDrop(e, dropDate);
                         }}
                       >
-                        {dayHourEvents.map(event => (
-                          <div
-                            key={event.id}
-                            className="absolute left-1 right-1 top-1 text-xs p-1 rounded cursor-pointer hover:opacity-80 group"
-                            style={{ backgroundColor: event.color + '20', color: event.color }}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, event)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => handleEventClick(event)}
-                          >
-                            <div className="font-medium truncate">{event.title}</div>
-                            <div className="text-gray-600 truncate">
-                              {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                            </div>
-                          </div>
-                        ))}
+                        {dayHourEvents.map(event => {
+                          try {
+                            if (!event || !event.id || !event.startTime || !event.endTime) {
+                              return null;
+                            }
+                            return (
+                              <div
+                                key={event.id}
+                                className="absolute left-1 right-1 top-1 text-xs p-1 rounded cursor-pointer hover:opacity-80 group"
+                                style={{ backgroundColor: (event.color || '#6b7280') + '20', color: event.color || '#6b7280' }}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, event)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => handleEventClick(event)}
+                              >
+                                <div className="font-medium truncate">{event.title || 'Untitled'}</div>
+                                <div className="text-gray-600 truncate">
+                                  {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                                </div>
+                              </div>
+                            );
+                          } catch (error) {
+                            console.warn('Error rendering week event:', event?.id, error);
+                            return null;
+                          }
+                        }).filter(Boolean)}
                       </div>
                     );
                   } catch (error) {
