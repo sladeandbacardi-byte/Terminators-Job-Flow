@@ -476,29 +476,17 @@ export default function Calendar() {
     const startDate = startOfWeek(monthStart);
     const endDate = endOfWeek(monthEnd);
 
-    console.log('Month view debug:', {
-      currentDate: currentDate.toISOString(),
-      monthStart: monthStart.toISOString(),
-      monthEnd: monthEnd.toISOString(),
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString()
-    });
-
     const rows = [];
     let days = [];
     let day = new Date(startDate);
-    let dayCount = 0;
 
-    // Use a different approach to ensure we get all days
+    // Generate complete calendar grid - ensuring we show all days including the last day of month
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
-        const currentDay = new Date(day); // Create a copy to avoid reference issues
+        const currentDay = new Date(day);
         const dayEvents = getEventsForDate(currentDay);
         const isCurrentMonth = isSameMonth(currentDay, currentDate);
         const isCurrentDayFlag = isToday(currentDay);
-
-        console.log(`Day ${dayCount}: ${currentDay.toDateString()}, isCurrentMonth: ${isCurrentMonth}, date: ${format(currentDay, 'd')}`);
-        dayCount++;
 
         days.push(
           <div
@@ -525,7 +513,7 @@ export default function Calendar() {
                 <div
                   key={event.id}
                   className="text-xs p-1 rounded cursor-pointer hover:opacity-80 group relative"
-                  style={{ backgroundColor: event.color + '20', color: event.color }}
+                  style={{ backgroundColor: (event.color || '#6b7280') + '20', color: event.color || '#6b7280' }}
                   draggable
                   onDragStart={(e) => handleDragStart(e, event)}
                   onDragEnd={handleDragEnd}
@@ -553,8 +541,11 @@ export default function Calendar() {
             </div>
           </div>
         );
+        
         day = addDays(day, 1);
       }
+      
+      // Create a row with the 7 days
       rows.push(
         <div key={`week-${rows.length}`} className="grid grid-cols-7">
           {days}
