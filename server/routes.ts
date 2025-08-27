@@ -530,6 +530,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/jobs/:id/card", async (req, res) => {
+    try {
+      const jobCardData = await storage.getJobCardData(req.params.id);
+      if (!jobCardData) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.json(jobCardData);
+    } catch (error) {
+      console.error("Job card data error:", error);
+      res.status(500).json({ error: "Failed to fetch job card data" });
+    }
+  });
+
   app.delete("/api/jobs/:id", async (req, res) => {
     const deleted = await storage.deleteJob(req.params.id);
     if (!deleted) {

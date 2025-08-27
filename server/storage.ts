@@ -75,6 +75,7 @@ export interface IStorage {
   getJobsByDateRange(startDate: Date, endDate: Date): Promise<Job[]>;
   getTodaysJobs(): Promise<Job[]>;
   updateJobStatus(jobId: string, status: string): Promise<Job>;
+  getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, division: Division, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined>;
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: string, job: Partial<InsertJob>): Promise<Job>;
   deleteJob(id: string): Promise<boolean>;
@@ -2069,6 +2070,40 @@ export class MemStorage implements IStorage {
     const updatedJob = { ...job, status };
     this.jobs.set(jobId, updatedJob);
     return updatedJob;
+  }
+
+  async getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, division: Division, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined> {
+    const job = this.jobs.get(jobId);
+    if (!job) return undefined;
+
+    const client = this.clients.get(job.clientId);
+    if (!client) return undefined;
+
+    const worker = job.workerId ? this.workers.get(job.workerId) : undefined;
+    if (!worker) return undefined;
+
+    const division = this.divisions.get(job.divisionId);
+    if (!division) return undefined;
+
+    // Get job inventory items
+    const jobInventoryItems = Array.from(this.jobInventoryItems.values())
+      .filter(item => item.jobId === jobId);
+    
+    const inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] = [];
+    for (const jobItem of jobInventoryItems) {
+      const inventoryItem = this.inventoryItems.get(jobItem.inventoryItemId);
+      if (inventoryItem) {
+        inventoryItems.push({ ...jobItem, inventoryItem });
+      }
+    }
+
+    return {
+      ...job,
+      client,
+      worker,
+      division,
+      inventoryItems
+    };
   }
 
   // Invoices

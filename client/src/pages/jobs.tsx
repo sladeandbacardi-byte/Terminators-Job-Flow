@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Search, Plus, Filter, Download } from "lucide-react";
+import { Calendar, Search, Plus, Filter, Download, Printer, Edit } from "lucide-react";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
 import type { Job } from "@shared/schema";
+import { Link } from "wouter";
 
 export default function Jobs() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -169,18 +170,42 @@ export default function Jobs() {
                         <h4 className="font-semibold text-gray-900" data-testid={`job-title-${job.id}`}>
                           {job.title}
                         </h4>
-                        <Badge 
-                          variant={getStatusBadgeVariant(job.status)}
-                          className={`${
-                            getStatusColor(job.status) === 'green' ? 'bg-green-100 text-green-800' :
-                            getStatusColor(job.status) === 'orange' ? 'bg-orange-100 text-orange-800' :
-                            getStatusColor(job.status) === 'red' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}
-                          data-testid={`job-status-${job.id}`}
-                        >
-                          {job.status.replace('_', ' ')}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={getStatusBadgeVariant(job.status)}
+                            className={`${
+                              getStatusColor(job.status) === 'green' ? 'bg-green-100 text-green-800' :
+                              getStatusColor(job.status) === 'orange' ? 'bg-orange-100 text-orange-800' :
+                              getStatusColor(job.status) === 'red' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}
+                            data-testid={`job-status-${job.id}`}
+                          >
+                            {job.status.replace('_', ' ')}
+                          </Badge>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingJob(job);
+                                setIsJobFormOpen(true);
+                              }}
+                              data-testid={`button-edit-job-${job.id}`}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Link href={`/jobs/${job.id}/card`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-testid={`button-print-job-${job.id}`}
+                              >
+                                <Printer className="h-3 w-3" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm text-gray-600">
