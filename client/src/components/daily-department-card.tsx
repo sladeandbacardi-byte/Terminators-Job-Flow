@@ -22,12 +22,12 @@ interface DailyDepartmentCardProps {
 export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyDepartmentCardProps) {
   // Fetch division details
   const { data: division } = useQuery<Division>({
-    queryKey: ['/api/divisions', divisionId],
+    queryKey: [`/api/divisions/${divisionId}`],
   });
 
   // Fetch jobs for the specific division and date
   const { data: jobs = [], isLoading } = useQuery<JobWithDetails[]>({
-    queryKey: ['/api/jobs/daily', divisionId, format(date, 'yyyy-MM-dd')],
+    queryKey: [`/api/jobs/daily/${divisionId}/${format(date, 'yyyy-MM-dd')}`],
   });
 
   // Fetch all workers to get details

@@ -213,6 +213,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(divisions);
   });
 
+  app.get("/api/divisions/:id", async (req, res) => {
+    const division = await storage.getDivision(req.params.id);
+    if (!division) {
+      return res.status(404).json({ error: "Division not found" });
+    }
+    res.json(division);
+  });
+
   app.post("/api/divisions", async (req, res) => {
     try {
       const division = insertDivisionSchema.parse(req.body);
