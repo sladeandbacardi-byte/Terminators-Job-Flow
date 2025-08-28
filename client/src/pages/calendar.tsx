@@ -720,8 +720,8 @@ export default function Calendar() {
     dayEvents.forEach(event => {
       console.log(`  Event: ${event.title} at ${format(event.startTime, 'HH:mm')}`);
     });
-    // Business hours: 9 AM to 6 PM (can be adjusted) or full day
-    const businessHours = Array.from({ length: 9 }, (_, i) => i + 9);
+    // Business hours: 7 AM to 5 PM or full day
+    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
     const allHours = Array.from({ length: 24 }, (_, i) => i);
     const hours = showBusinessHoursOnly ? businessHours : allHours;
 
@@ -763,11 +763,11 @@ export default function Calendar() {
               }
               
               // Calculate position based on whether we're showing business hours or full day
-              const hourOffset = showBusinessHoursOnly ? 9 : 0; // Business hours start at 9 AM
+              const hourOffset = showBusinessHoursOnly ? 7 : 0; // Business hours start at 7 AM
               const adjustedHour = startHour - hourOffset;
               
               // Skip events outside business hours if we're in business hours mode
-              if (showBusinessHoursOnly && (startHour < 9 || startHour >= 18)) {
+              if (showBusinessHoursOnly && (startHour < 7 || startHour >= 17)) {
                 return null;
               }
               
