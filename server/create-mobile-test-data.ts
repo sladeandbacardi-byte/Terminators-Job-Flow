@@ -18,7 +18,7 @@ export async function createMobileTestData() {
       contactPerson: "John Manager",
       businessType: "Restaurant",
       status: "active",
-      divisionId: divisionId,
+      departmentId: divisionId,
       paymentTerms: "30 days",
       notes: "Monthly pest control required"
     });
@@ -28,7 +28,7 @@ export async function createMobileTestData() {
       name: "Mike Johnson",
       email: "mike.johnson@terminators.co.za",
       phone: "+27 82 123 4567",
-      divisionId: divisionId,
+      departmentId: divisionId,
       role: "Field Technician",
       employeeId: "EMP001",
       pin: "1234", // Simple PIN for demo
@@ -41,7 +41,7 @@ export async function createMobileTestData() {
       description: "Routine monthly pest control inspection and treatment",
       clientId: client.id,
       workerId: worker.id,
-      divisionId: divisionId,
+      departmentId: divisionId,
       serviceType: "Pest Control",
       status: "scheduled",
       scheduledDate: new Date(),
@@ -57,7 +57,7 @@ export async function createMobileTestData() {
       description: "Emergency call for rodent infestation in kitchen area",
       clientId: client.id,
       workerId: worker.id,
-      divisionId: divisionId,
+      departmentId: divisionId,
       serviceType: "Rodent Control",
       status: "in_progress",
       scheduledDate: new Date(),

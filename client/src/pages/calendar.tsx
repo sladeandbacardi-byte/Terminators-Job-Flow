@@ -296,6 +296,11 @@ export default function Calendar() {
     const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
     
+    // Debug logging for department filtering
+    if (viewType === 'day' && departmentFilter !== "all") {
+      console.log(`Department filter debug - Event: ${event.title}, DepartmentId: ${event.departmentId}, Filter: ${departmentFilter}, Matches: ${matchesDepartment}`);
+    }
+    
     return matchesSearch && matchesDepartment && matchesStatus;
   });
 
