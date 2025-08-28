@@ -450,7 +450,7 @@ export default function Calendar() {
         const weekEnd = endOfWeek(currentDate);
         return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
       case 'day':
-        return format(currentDate, 'EEEE, MMMM d, yyyy');
+        return format(currentDate, 'EEEE, d MMMM yyyy');
       case 'agenda':
         return 'Upcoming Events';
       default:
