@@ -100,6 +100,7 @@ export default function Calendar() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
+  const [showAllHours, setShowAllHours] = useState(false);
 
   const dragCounter = useRef(0);
 
@@ -720,8 +721,10 @@ export default function Calendar() {
     dayEvents.forEach(event => {
       console.log(`  Event: ${event.title} at ${format(event.startTime, 'HH:mm')}`);
     });
-    // Display hours: 7 AM to 5 PM (business hours)
-    const hours = Array.from({ length: 10 }, (_, i) => i + 7);
+    // Display hours: 7 AM to 5 PM (business hours) or full day
+    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
+    const allHours = Array.from({ length: 24 }, (_, i) => i);
+    const hours = showAllHours ? allHours : businessHours;
 
     return (
       <div className="flex h-full">
@@ -760,12 +763,12 @@ export default function Calendar() {
                 duration = event.estimatedDuration;
               }
               
-              // Calculate position based on 7 AM start time
-              const hourOffset = 7; // Business hours start at 7 AM
+              // Calculate position based on whether we're showing business hours or full day
+              const hourOffset = showAllHours ? 0 : 7; // Business hours start at 7 AM
               const adjustedHour = startHour - hourOffset;
               
-              // Skip events outside business hours (7 AM to 5 PM)
-              if (startHour < 7 || startHour >= 17) {
+              // Skip events outside visible hours
+              if (!showAllHours && (startHour < 7 || startHour >= 17)) {
                 return null;
               }
               
@@ -1055,6 +1058,21 @@ export default function Calendar() {
                 </SelectContent>
               </Select>
 
+              {/* Hour View Toggle for Day View */}
+              {viewType === 'day' && (
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium">View:</label>
+                  <Button
+                    variant={showAllHours ? "outline" : "default"}
+                    size="sm"
+                    onClick={() => setShowAllHours(!showAllHours)}
+                    data-testid="hour-view-toggle"
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    {showAllHours ? "Full Day (24 Hours)" : "Business Hours (7AM-5PM)"}
+                  </Button>
+                </div>
+              )}
 
             </div>
           </div>
