@@ -155,17 +155,17 @@ export default function SalesPerformance({ className }: SalesPerformanceProps) {
         return job.workerId === worker.id && jobDate >= start && jobDate <= end;
       });
 
-      // Get clients in their division
-      const divisionClients = clients.filter(client => 
-        client.divisionId === worker.divisionId &&
+      // Get clients in their department
+      const departmentClients = clients.filter(client => 
+        client.departmentId === worker.departmentId &&
         new Date(client.createdAt || client.updatedAt || new Date()) >= start &&
         new Date(client.createdAt || client.updatedAt || new Date()) <= end
       );
 
-      // Get contracts for their division
-      const divisionContracts = contracts.filter(contract => {
+      // Get contracts for their department
+      const departmentContracts = contracts.filter(contract => {
         const client = clients.find(c => c.id === contract.clientId);
-        return client?.divisionId === worker.divisionId &&
+        return client?.departmentId === worker.departmentId &&
                new Date(contract.startDate) >= start &&
                new Date(contract.startDate) <= end;
       });
@@ -174,22 +174,22 @@ export default function SalesPerformance({ className }: SalesPerformanceProps) {
       const revenue = invoices
         .filter(invoice => {
           const client = clients.find(c => c.id === invoice.clientId);
-          return client?.divisionId === worker.divisionId &&
+          return client?.departmentId === worker.departmentId &&
                  new Date(invoice.issueDate) >= start &&
                  new Date(invoice.issueDate) <= end &&
                  invoice.status === "paid";
         })
         .reduce((sum, invoice) => sum + Number(invoice.total), 0);
 
-      const averageDealSize = divisionContracts.length > 0 
-        ? revenue / divisionContracts.length 
+      const averageDealSize = departmentContracts.length > 0 
+        ? revenue / departmentContracts.length 
         : 0;
 
       return {
         worker,
         revenue,
-        clientsAcquired: divisionClients.length,
-        contractsSigned: divisionContracts.length,
+        clientsAcquired: departmentClients.length,
+        contractsSigned: departmentContracts.length,
         jobsCompleted: workerJobs.filter(job => job.status === "completed").length,
         averageDealSize,
         ranking: 0, // Will be calculated after sorting
@@ -327,17 +327,17 @@ export default function SalesPerformance({ className }: SalesPerformanceProps) {
                           <div 
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: 
-                              rep.worker.divisionId === 'div-1' ? '#22c55e' :
-                              rep.worker.divisionId === 'div-2' ? '#8b5cf6' :
-                              rep.worker.divisionId === 'div-3' ? '#3b82f6' :
-                              rep.worker.divisionId === 'div-4' ? '#f59e0b' : '#6b7280'
+                              rep.worker.departmentId === 'div-1' ? '#22c55e' :
+                              rep.worker.departmentId === 'div-2' ? '#8b5cf6' :
+                              rep.worker.departmentId === 'div-3' ? '#3b82f6' :
+                              rep.worker.departmentId === 'div-4' ? '#f59e0b' : '#6b7280'
                             }}
                           />
                           <span className="text-xs text-gray-500">
-                            {rep.worker.divisionId === 'div-1' ? 'Pest Control' :
-                             rep.worker.divisionId === 'div-2' ? 'Sanitary Bins' :
-                             rep.worker.divisionId === 'div-3' ? 'Washroom' :
-                             rep.worker.divisionId === 'div-4' ? 'Deep Cleaning' : 'Unknown'}
+                            {rep.worker.departmentId === 'div-1' ? 'Pest Control' :
+                             rep.worker.departmentId === 'div-2' ? 'Sanitary Bins' :
+                             rep.worker.departmentId === 'div-3' ? 'Washroom' :
+                             rep.worker.departmentId === 'div-4' ? 'Deep Cleaning' : 'Unknown'}
                           </span>
                         </div>
                       </div>

@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
-export const divisions = pgTable("divisions", {
+export const departments = pgTable("departments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   colorCode: text("color_code").notNull(),
@@ -21,7 +21,7 @@ export const workers = pgTable("workers", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone").notNull(),
-  divisionId: varchar("division_id").notNull(),
+  departmentId: varchar("department_id").notNull(),
   role: text("role"),
   employeeId: text("employee_id").unique(), // For mobile login
   pin: text("pin"), // 4-digit PIN for mobile login (hashed)
@@ -38,7 +38,7 @@ export const clients = pgTable("clients", {
   contactPerson: text("contact_person"),
   businessType: text("business_type"),
   status: text("status").notNull().default('active'), // active, inactive, suspended
-  divisionId: varchar("division_id").notNull(),
+  departmentId: varchar("department_id").notNull(),
   taxNumber: text("tax_number"),
   paymentTerms: text("payment_terms"),
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
@@ -58,7 +58,7 @@ export const inventoryItems = pgTable("inventory_items", {
   reorderPoint: integer("reorder_point").notNull().default(20),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   description: text("description"),
-  divisionId: varchar("division_id"),
+  departmentId: varchar("department_id"),
   location: text("location"), // Storage location/warehouse
   supplier: text("supplier"), // Supplier information
   lastRestocked: timestamp("last_restocked"),
@@ -84,7 +84,7 @@ export const jobs = pgTable("jobs", {
   description: text("description"),
   clientId: varchar("client_id").notNull(),
   workerId: varchar("worker_id"),
-  divisionId: varchar("division_id").notNull(),
+  departmentId: varchar("department_id").notNull(),
   serviceType: text("service_type").notNull(),
   status: text("status").notNull().default('scheduled'), // scheduled, in_progress, completed, cancelled
   scheduledDate: timestamp("scheduled_date").notNull(),
@@ -209,7 +209,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
-export const insertDivisionSchema = createInsertSchema(divisions).omit({
+export const insertDepartmentSchema = createInsertSchema(departments).omit({
   id: true,
 });
 
@@ -281,8 +281,8 @@ export const insertCustomReportSchema = createInsertSchema(customReports).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-export type InsertDivision = z.infer<typeof insertDivisionSchema>;
-export type Division = typeof divisions.$inferSelect;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+export type Department = typeof departments.$inferSelect;
 
 export type InsertWorker = z.infer<typeof insertWorkerSchema>;
 export type Worker = typeof workers.$inferSelect;
@@ -459,7 +459,7 @@ export const calendarEvents = pgTable("calendar_events", {
   priority: varchar("priority").notNull().default("medium"), // low, medium, high
   clientId: varchar("client_id").references(() => clients.id),
   workerId: varchar("worker_id").references(() => workers.id),
-  divisionId: varchar("division_id").references(() => divisions.id),
+  departmentId: varchar("department_id").references(() => departments.id),
   location: text("location"),
   status: varchar("status").notNull().default("scheduled"), // scheduled, in_progress, completed, cancelled
   color: varchar("color"),

@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
-import type { CustomReport, Division } from "@shared/schema";
+import type { CustomReport, Department } from "@shared/schema";
 
 interface ReportTemplate {
   id: string;
@@ -91,8 +91,8 @@ export default function CustomReports() {
     queryKey: ["/api/custom-reports"],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   const createReportMutation = useMutation({
@@ -189,7 +189,7 @@ export default function CustomReports() {
   const getDepartmentNames = (departmentIds: string[]) => {
     if (!departmentIds || departmentIds.length === 0) return "All Departments";
     return departmentIds
-      .map(id => divisions.find(d => d.id === id)?.name)
+      .map(id => departments.find(d => d.id === id)?.name)
       .filter(Boolean)
       .join(", ");
   };

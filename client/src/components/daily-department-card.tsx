@@ -4,7 +4,7 @@ import { MapPin, Clock, User, Phone, Mail, FileText, Package, AlertTriangle, Cal
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getStatusColor } from "@/lib/utils";
-import type { Job, Client, Worker, Division, JobInventoryItem, InventoryItem } from "@shared/schema";
+import type { Job, Client, Worker, Department, JobInventoryItem, InventoryItem } from "@shared/schema";
 import termLogoPath from "@assets/termlogobig_1755598359265.jpg";
 
 interface JobWithDetails extends Job {
@@ -14,20 +14,20 @@ interface JobWithDetails extends Job {
 }
 
 interface DailyDepartmentCardProps {
-  divisionId: string;
+  departmentId: string;
   date: Date;
   className?: string;
 }
 
-export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyDepartmentCardProps) {
-  // Fetch division details
-  const { data: division } = useQuery<Division>({
-    queryKey: [`/api/divisions/${divisionId}`],
+export function DailyDepartmentCard({ departmentId, date, className = "" }: DailyDepartmentCardProps) {
+  // Fetch department details
+  const { data: department } = useQuery<Department>({
+    queryKey: [`/api/departments/${departmentId}`],
   });
 
-  // Fetch jobs for the specific division and date
+  // Fetch jobs for the specific department and date
   const { data: jobs = [], isLoading } = useQuery<JobWithDetails[]>({
-    queryKey: [`/api/jobs/daily/${divisionId}/${format(date, 'yyyy-MM-dd')}`],
+    queryKey: [`/api/jobs/daily/${departmentId}/${format(date, 'yyyy-MM-dd')}`],
   });
 
   // Fetch all workers to get details
@@ -55,12 +55,12 @@ export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyD
     );
   }
 
-  if (!division) {
+  if (!department) {
     return (
       <div className={`bg-white p-8 ${className}`}>
         <div className="text-center text-gray-500">
           <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-          <p>Division not found</p>
+          <p>Department not found</p>
         </div>
       </div>
     );
@@ -97,10 +97,10 @@ export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyD
             </div>
           </div>
           <Badge 
-            style={{ backgroundColor: division.colorCode }}
+            style={{ backgroundColor: department.colorCode }}
             className="text-white text-sm print:text-xs px-3 py-1 print:px-2 print:py-0.5"
           >
-            {division.name}
+            {department.name}
           </Badge>
         </div>
       </div>
@@ -116,7 +116,7 @@ export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyD
           <div className="space-y-2 print:space-y-1">
             {/* Table Header */}
             <div className="grid grid-cols-8 gap-2 print:gap-1 p-2 print:p-1 bg-gray-100 rounded text-xs print:text-xs font-semibold border-2" 
-                 style={{ borderColor: division.colorCode }}>
+                 style={{ borderColor: department.colorCode }}>
               <div className="text-center">#</div>
               <div>Time</div>
               <div className="col-span-2">Job & Client</div>
@@ -129,7 +129,7 @@ export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyD
             {/* Job Rows */}
             {sortedJobs.map((job, index) => (
               <div key={job.id} className="grid grid-cols-8 gap-2 print:gap-1 p-2 print:p-1 border rounded hover:bg-gray-50 text-xs print:text-xs print:break-inside-avoid"
-                   style={{ borderLeftColor: division.colorCode, borderLeftWidth: '3px' }}>
+                   style={{ borderLeftColor: department.colorCode, borderLeftWidth: '3px' }}>
                 {/* Job Number */}
                 <div className="text-center font-mono font-bold">
                   {index + 1}
@@ -225,7 +225,7 @@ export function DailyDepartmentCard({ divisionId, date, className = "" }: DailyD
   );
 }
 
-export function PrintableDailyDepartmentCard({ divisionId, date }: { divisionId: string; date: Date }) {
+export function PrintableDailyDepartmentCard({ departmentId, date }: { departmentId: string; date: Date }) {
   return (
     <div className="print:block">
       <style>{`
@@ -249,7 +249,7 @@ export function PrintableDailyDepartmentCard({ divisionId, date }: { divisionId:
         }
       `}</style>
       <DailyDepartmentCard 
-        divisionId={divisionId} 
+        departmentId={departmentId} 
         date={date} 
         className="print:text-black print:bg-white print:text-xs" 
       />

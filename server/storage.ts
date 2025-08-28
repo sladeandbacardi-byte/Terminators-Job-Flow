@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { 
   type User, type InsertUser,
-  type Division, type InsertDivision,
+  type Department, type InsertDepartment,
   type Worker, type InsertWorker,
   type Client, type InsertClient,
   type InventoryItem, type InsertInventoryItem,
@@ -26,16 +26,16 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
-  // Divisions
-  getDivisions(): Promise<Division[]>;
-  getDivision(id: string): Promise<Division | undefined>;
-  createDivision(division: InsertDivision): Promise<Division>;
+  // Departments
+  getDepartments(): Promise<Department[]>;
+  getDepartment(id: string): Promise<Department | undefined>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
 
   // Workers
   getWorkers(): Promise<Worker[]>;
   getWorker(id: string): Promise<Worker | undefined>;
   getWorkerByEmployeeId(employeeId: string): Promise<Worker | undefined>;
-  getWorkersByDivision(divisionId: string): Promise<Worker[]>;
+  getWorkersByDepartment(departmentId: string): Promise<Worker[]>;
   createWorker(worker: InsertWorker): Promise<Worker>;
   updateWorker(id: string, worker: Partial<InsertWorker>): Promise<Worker>;
   deleteWorker(id: string): Promise<boolean>;
@@ -51,7 +51,7 @@ export interface IStorage {
   getInventoryItems(): Promise<InventoryItem[]>;
   getInventoryItem(id: string): Promise<InventoryItem | undefined>;
   getInventoryItemsByType(type: string): Promise<InventoryItem[]>;
-  getInventoryItemsByDivision(divisionId: string): Promise<InventoryItem[]>;
+  getInventoryItemsByDepartment(departmentId: string): Promise<InventoryItem[]>;
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: string, item: Partial<InsertInventoryItem>): Promise<InventoryItem>;
   deleteInventoryItem(id: string): Promise<boolean>;
@@ -70,13 +70,13 @@ export interface IStorage {
   getJob(id: string): Promise<Job | undefined>;
   getJobsByWorker(workerId: string): Promise<Job[]>;
   getJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]>;
-  getJobsByDivision(divisionId: string): Promise<Job[]>;
+  getJobsByDepartment(departmentId: string): Promise<Job[]>;
   getJobsByStatus(status: string): Promise<Job[]>;
   getJobsByDateRange(startDate: Date, endDate: Date): Promise<Job[]>;
-  getJobsByDivisionAndDateRange(divisionId: string, startDate: Date, endDate: Date): Promise<(Job & { client: Client; worker: Worker; inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] })[]>;
+  getJobsByDepartmentAndDateRange(departmentId: string, startDate: Date, endDate: Date): Promise<(Job & { client: Client; worker: Worker; inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] })[]>;
   getTodaysJobs(): Promise<Job[]>;
   updateJobStatus(jobId: string, status: string): Promise<Job>;
-  getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, division: Division, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined>;
+  getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, department: Department, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined>;
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: string, job: Partial<InsertJob>): Promise<Job>;
   deleteJob(id: string): Promise<boolean>;
@@ -177,7 +177,7 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<string, User> = new Map();
-  private divisions: Map<string, Division> = new Map();
+  private departments: Map<string, Department> = new Map();
   private workers: Map<string, Worker> = new Map();
   private clients: Map<string, Client> = new Map();
   private inventoryItems: Map<string, InventoryItem> = new Map();
@@ -311,7 +311,7 @@ export class MemStorage implements IStorage {
         id: "job-1",
         clientId: "client-1",
         workerId: "worker-1", 
-        divisionId: "div-2", // Hygiene Services
+        departmentId: "div-2", // Hygiene Services
         title: "Monthly Paper Towel Refill - Pick n Pay Fourways",
         description: "Refill all paper towel dispensers and check dispenser functionality",
         status: "completed",
@@ -328,7 +328,7 @@ export class MemStorage implements IStorage {
         id: "job-2", 
         clientId: "client-4",
         workerId: "worker-5", // Pest control worker
-        divisionId: "div-1", // Pest Control
+        departmentId: "div-1", // Pest Control
         title: "Monthly Pest Inspection - Discovery Head Office",
         description: "Check all pest monitoring stations and bait levels",
         status: "in_progress",
@@ -343,7 +343,7 @@ export class MemStorage implements IStorage {
         id: "job-3",
         clientId: "client-2",
         workerId: "worker-3",
-        divisionId: "div-2", // Hygiene Services  
+        departmentId: "div-2", // Hygiene Services  
         title: "Sanitizer Refill - Woolworths Sandton",
         description: "Refill hand sanitizer stations and clean dispensers",
         status: "pending",
@@ -358,7 +358,7 @@ export class MemStorage implements IStorage {
         id: "job-4",
         clientId: "client-3",
         workerId: "worker-2",
-        divisionId: "div-2",
+        departmentId: "div-2",
         title: "Soap Dispenser Maintenance - McDonald's Menlyn",
         description: "Clean and refill soap dispensers, check functionality",
         status: "pending", 
@@ -373,7 +373,7 @@ export class MemStorage implements IStorage {
         id: "job-5",
         clientId: "client-5",
         workerId: "worker-6", 
-        divisionId: "div-1", // Pest Control
+        departmentId: "div-1", // Pest Control
         title: "Initial Pest Assessment - Steers Mall of Africa",
         description: "Comprehensive pest assessment for new client setup",
         status: "completed",
@@ -494,7 +494,7 @@ export class MemStorage implements IStorage {
         email: client.email || null,
         phone: client.phone || null,
         address: client.address || null,
-        divisionId: client.divisionId,
+        departmentId: client.departmentId,
         paymentTerms: client.paymentTerms || null,
         notes: client.notes || null,
         isActive: client.isActive,
@@ -527,7 +527,7 @@ export class MemStorage implements IStorage {
         id: job.id,
         clientId: job.clientId,
         workerId: job.workerId,
-        divisionId: job.divisionId,
+        departmentId: job.departmentId,
         title: job.title,
         description: job.description || null,
         status: job.status,
@@ -641,7 +641,7 @@ export class MemStorage implements IStorage {
         address: "123 Industrial Road, Johannesburg, 2001",
         website: "https://hygienetech.co.za",
         category: "hygiene",
-        divisionId: "div-2", // Sanitary Bin Services
+        departmentId: "div-2", // Sanitary Bin Services
         paymentTerms: "30 days",
         isActive: true,
         notes: "Primary supplier for paper towel dispensers and hygiene equipment",
@@ -656,7 +656,7 @@ export class MemStorage implements IStorage {
         address: "456 Commerce Street, Cape Town, 8001",
         website: "https://paperproducts.co.za",
         category: "hygiene",
-        divisionId: "div-3", // Washroom Services
+        departmentId: "div-3", // Washroom Services
         paymentTerms: "15 days",
         isActive: true,
         notes: "Reliable supplier for paper towel refills and tissue products",
@@ -671,7 +671,7 @@ export class MemStorage implements IStorage {
         address: "789 Security Avenue, Pretoria, 0001",
         website: "https://pestpro.co.za",
         category: "pest_control",
-        divisionId: "div-1", // Pest Control Services
+        departmentId: "div-1", // Pest Control Services
         paymentTerms: "45 days",
         isActive: true,
         notes: "Specialized pest control supplies and baits",
@@ -686,7 +686,7 @@ export class MemStorage implements IStorage {
         address: "321 Cleaning Way, Sandton, 2196",
         website: "https://safeclean.co.za",
         category: "hygiene",
-        divisionId: "div-3", // Washroom Services
+        departmentId: "div-3", // Washroom Services
         paymentTerms: "30 days",
         isActive: true,
         notes: "Hand sanitizers and antibacterial products",
@@ -701,7 +701,7 @@ export class MemStorage implements IStorage {
         address: "654 Industrial Park, Durban, 4001",
         website: "https://traptech.co.za",
         category: "pest_control",
-        divisionId: "div-1", // Pest Control Services
+        departmentId: "div-1", // Pest Control Services
         paymentTerms: "60 days",
         isActive: true,
         notes: "Monitoring stations and pest control equipment",
@@ -716,7 +716,7 @@ export class MemStorage implements IStorage {
         address: "987 Tech Boulevard, Midrand, 1686",
         website: "https://autoclean.co.za",
         category: "equipment",
-        divisionId: "div-2", // Sanitary Bin Services
+        departmentId: "div-2", // Sanitary Bin Services
         paymentTerms: "30 days",
         isActive: false, // Inactive supplier example
         notes: "Automatic dispensers and smart hygiene solutions. Currently on hold due to quality issues.",
@@ -765,84 +765,84 @@ export class MemStorage implements IStorage {
 
   private initializeData() {
     // Clear any existing divisions first to prevent duplicates
-    this.divisions.clear();
+    this.departments.clear();
     
     // Create divisions - Updated to match actual business services from terminators.co.za
-    const pestControlDivision: Division = {
+    const pestControlDivision: Department = {
       id: "div-1",
       name: "Pest Control",
       colorCode: "#22c55e",
       description: "Professional pest control and extermination services for residential and commercial clients"
     };
 
-    const sanitaryBinDivision: Division = {
+    const sanitaryBinDivision: Department = {
       id: "div-2",
       name: "Sanitary Bins",
       colorCode: "#8b5cf6",
       description: "Sanitary waste collection, disposal and feminine hygiene services"
     };
 
-    const washroomDivision: Division = {
+    const washroomDivision: Department = {
       id: "div-3",
       name: "Washroom",
       colorCode: "#3b82f6",
       description: "Complete washroom maintenance, hygiene and supply services"
     };
 
-    const deepCleaningDivision: Division = {
+    const deepCleaningDivision: Department = {
       id: "div-4",
       name: "Deep Cleaning",
       colorCode: "#f59e0b",
       description: "Professional deep cleaning and specialized cleaning services"
     };
 
-    this.divisions.set(pestControlDivision.id, pestControlDivision);
-    this.divisions.set(sanitaryBinDivision.id, sanitaryBinDivision);
-    this.divisions.set(washroomDivision.id, washroomDivision);
-    this.divisions.set(deepCleaningDivision.id, deepCleaningDivision);
+    this.departments.set(pestControlDivision.id, pestControlDivision);
+    this.departments.set(sanitaryBinDivision.id, sanitaryBinDivision);
+    this.departments.set(washroomDivision.id, washroomDivision);
+    this.departments.set(deepCleaningDivision.id, deepCleaningDivision);
 
     // Create workers based on actual organogram
     const workers = [
       // Management Team
-      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", divisionId: "div-1", role: "Managing Member/Operations" },
-      { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", divisionId: "div-2", role: "Sales Administrator" },
-      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", divisionId: "div-2", role: "Finance/HR Manager" },
-      { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", divisionId: "div-2", role: "Sales Representative" },
-      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", divisionId: "div-2", role: "Hygiene Services Manager" },
-      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", divisionId: "div-1", role: "Pest Control Services Manager" },
+      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-1", role: "Managing Member/Operations" },
+      { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", departmentId: "div-2", role: "Sales Administrator" },
+      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: "div-2", role: "Finance/HR Manager" },
+      { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-2", role: "Sales Representative" },
+      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-2", role: "Hygiene Services Manager" },
+      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-1", role: "Pest Control Services Manager" },
       
       // Pest Control Team
-      { name: "Reece Ebrahim", email: "reece@terminators.co.za", phone: "+27 41 123 4572", divisionId: "div-1", role: "PCO" },
-      { name: "Garth du Preez", email: "garth@terminators.co.za", phone: "+27 41 123 4573", divisionId: "div-1", role: "PCO" },
-      { name: "Michael Meyer", email: "michael@terminators.co.za", phone: "+27 41 123 4574", divisionId: "div-1", role: "PCO" },
-      { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", divisionId: "div-1", role: "PCO" },
+      { name: "Reece Ebrahim", email: "reece@terminators.co.za", phone: "+27 41 123 4572", departmentId: "div-1", role: "PCO" },
+      { name: "Garth du Preez", email: "garth@terminators.co.za", phone: "+27 41 123 4573", departmentId: "div-1", role: "PCO" },
+      { name: "Michael Meyer", email: "michael@terminators.co.za", phone: "+27 41 123 4574", departmentId: "div-1", role: "PCO" },
+      { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", departmentId: "div-1", role: "PCO" },
       
       // Sanitary Bin Service A Team
-      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", divisionId: "div-2", role: "Supervisor" },
-      { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", divisionId: "div-2", role: "Sanitary Bin Technician" },
-      { name: "Maryldene", email: "maryldene@terminators.co.za", phone: "+27 41 123 4578", divisionId: "div-2", role: "Sanitary Bin Technician" },
+      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
+      { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", departmentId: "div-2", role: "Sanitary Bin Technician" },
+      { name: "Maryldene", email: "maryldene@terminators.co.za", phone: "+27 41 123 4578", departmentId: "div-2", role: "Sanitary Bin Technician" },
       
       // Sanitary Bin Service B Team
-      { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", divisionId: "div-2", role: "Supervisor" },
-      { name: "Nandipha", email: "nandipha@terminators.co.za", phone: "+27 41 123 4580", divisionId: "div-2", role: "Sanitary Bin Technician" },
-      { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", divisionId: "div-2", role: "Sanitary Bin Technician" },
+      { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", departmentId: "div-2", role: "Supervisor" },
+      { name: "Nandipha", email: "nandipha@terminators.co.za", phone: "+27 41 123 4580", departmentId: "div-2", role: "Sanitary Bin Technician" },
+      { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", departmentId: "div-2", role: "Sanitary Bin Technician" },
       
       // Washroom Services Team
-      { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", divisionId: "div-3", role: "Supervisor" },
-      { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", divisionId: "div-3", role: "Washroom Technician" },
-      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", divisionId: "div-3", role: "Washroom Technician" },
+      { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", departmentId: "div-3", role: "Supervisor" },
+      { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", departmentId: "div-3", role: "Washroom Technician" },
       
       // Deep Cleaning Team
-      { name: "Themba Mthethwa", email: "themba@terminators.co.za", phone: "+27 41 123 4590", divisionId: "div-4", role: "Deep Cleaning Supervisor" },
-      { name: "Nomsa Dlamini", email: "nomsa@terminators.co.za", phone: "+27 41 123 4591", divisionId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Sipho Ndaba", email: "sipho@terminators.co.za", phone: "+27 41 123 4592", divisionId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Lindiwe Khumalo", email: "lindiwe@terminators.co.za", phone: "+27 41 123 4593", divisionId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Mthunzi Cele", email: "mthunzi@terminators.co.za", phone: "+27 41 123 4594", divisionId: "div-4", role: "Equipment Specialist" }
+      { name: "Themba Mthethwa", email: "themba@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-4", role: "Deep Cleaning Supervisor" },
+      { name: "Nomsa Dlamini", email: "nomsa@terminators.co.za", phone: "+27 41 123 4591", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Sipho Ndaba", email: "sipho@terminators.co.za", phone: "+27 41 123 4592", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Lindiwe Khumalo", email: "lindiwe@terminators.co.za", phone: "+27 41 123 4593", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Mthunzi Cele", email: "mthunzi@terminators.co.za", phone: "+27 41 123 4594", departmentId: "div-4", role: "Equipment Specialist" }
     ];
 
     workers.forEach((worker, index) => {
@@ -858,31 +858,31 @@ export class MemStorage implements IStorage {
     // Create sample clients across all departments
     const clients = [
       // Retail Clients - Multiple departments
-      { name: "Pick n Pay Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5678", email: "manager@pnp-greenacres.co.za", businessType: "retail", divisionId: "div-1" },
-      { name: "Shoprite Checkers Walmer", address: "Walmer Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5679", email: "admin@shoprite.co.za", businessType: "retail", divisionId: "div-2" },
-      { name: "Baywest Mall", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5680", email: "facilities@baywest.co.za", businessType: "retail", divisionId: "div-3" },
-      { name: "Boardwalk Casino", address: "Marine Drive, Summerstrand, Port Elizabeth", phone: "+27 41 234 5681", email: "maintenance@boardwalk.co.za", businessType: "hospitality", divisionId: "div-4" },
+      { name: "Pick n Pay Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5678", email: "manager@pnp-greenacres.co.za", businessType: "retail", departmentId: "div-1" },
+      { name: "Shoprite Checkers Walmer", address: "Walmer Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5679", email: "admin@shoprite.co.za", businessType: "retail", departmentId: "div-2" },
+      { name: "Baywest Mall", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5680", email: "facilities@baywest.co.za", businessType: "retail", departmentId: "div-3" },
+      { name: "Boardwalk Casino", address: "Marine Drive, Summerstrand, Port Elizabeth", phone: "+27 41 234 5681", email: "maintenance@boardwalk.co.za", businessType: "hospitality", departmentId: "div-4" },
       
       // Restaurant Clients - Pest Control focus
-      { name: "McDonald's Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5682", email: "manager@mcdonalds-ge.co.za", businessType: "restaurant", divisionId: "div-1" },
-      { name: "KFC Newton Park", address: "Newton Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5683", email: "store@kfc-newton.co.za", businessType: "restaurant", divisionId: "div-1" },
-      { name: "Steers Summerstrand", address: "Beach Road, Summerstrand, Port Elizabeth", phone: "+27 41 234 5684", email: "manager@steers-summ.co.za", businessType: "restaurant", divisionId: "div-1" },
+      { name: "McDonald's Greenacres", address: "Greenacres Shopping Centre, Port Elizabeth", phone: "+27 41 234 5682", email: "manager@mcdonalds-ge.co.za", businessType: "restaurant", departmentId: "div-1" },
+      { name: "KFC Newton Park", address: "Newton Park Shopping Centre, Port Elizabeth", phone: "+27 41 234 5683", email: "store@kfc-newton.co.za", businessType: "restaurant", departmentId: "div-1" },
+      { name: "Steers Summerstrand", address: "Beach Road, Summerstrand, Port Elizabeth", phone: "+27 41 234 5684", email: "manager@steers-summ.co.za", businessType: "restaurant", departmentId: "div-1" },
       
       // Office Buildings - Washroom & Deep Cleaning
-      { name: "Mutual Heights Office Park", address: "Heugh Road, Walmer, Port Elizabeth", phone: "+27 41 234 5685", email: "facilities@mutualheights.co.za", businessType: "office", divisionId: "div-3" },
-      { name: "Baywest Office Tower", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5686", email: "admin@baywestoffice.co.za", businessType: "office", divisionId: "div-4" },
+      { name: "Mutual Heights Office Park", address: "Heugh Road, Walmer, Port Elizabeth", phone: "+27 41 234 5685", email: "facilities@mutualheights.co.za", businessType: "office", departmentId: "div-3" },
+      { name: "Baywest Office Tower", address: "Baywest City, Port Elizabeth", phone: "+27 41 234 5686", email: "admin@baywestoffice.co.za", businessType: "office", departmentId: "div-4" },
       
       // Healthcare Facilities - All services
-      { name: "Life Mercantile Hospital", address: "Mercantile Hospital Street, Port Elizabeth", phone: "+27 41 234 5687", email: "facilities@lifemercantile.co.za", businessType: "healthcare", divisionId: "div-2" },
-      { name: "Netcare Greenacres", address: "Greenacres, Port Elizabeth", phone: "+27 41 234 5688", email: "admin@netcare-ge.co.za", businessType: "healthcare", divisionId: "div-4" },
+      { name: "Life Mercantile Hospital", address: "Mercantile Hospital Street, Port Elizabeth", phone: "+27 41 234 5687", email: "facilities@lifemercantile.co.za", businessType: "healthcare", departmentId: "div-2" },
+      { name: "Netcare Greenacres", address: "Greenacres, Port Elizabeth", phone: "+27 41 234 5688", email: "admin@netcare-ge.co.za", businessType: "healthcare", departmentId: "div-4" },
       
       // Schools - Multiple departments
-      { name: "Grey High School", address: "West Hill, Port Elizabeth", phone: "+27 41 234 5689", email: "admin@greyhigh.co.za", businessType: "education", divisionId: "div-2" },
-      { name: "Collegiate Girls High", address: "Mount Pleasant, Port Elizabeth", phone: "+27 41 234 5690", email: "facilities@collegiate.co.za", businessType: "education", divisionId: "div-3" },
+      { name: "Grey High School", address: "West Hill, Port Elizabeth", phone: "+27 41 234 5689", email: "admin@greyhigh.co.za", businessType: "education", departmentId: "div-2" },
+      { name: "Collegiate Girls High", address: "Mount Pleasant, Port Elizabeth", phone: "+27 41 234 5690", email: "facilities@collegiate.co.za", businessType: "education", departmentId: "div-3" },
       
       // Manufacturing - Deep Cleaning & Pest Control
-      { name: "Volkswagen SA", address: "Uitenhage Road, Port Elizabeth", phone: "+27 41 234 5691", email: "facilities@vw.co.za", businessType: "manufacturing", divisionId: "div-4" },
-      { name: "General Motors SA", address: "Struandale, Port Elizabeth", phone: "+27 41 234 5692", email: "maintenance@gm.co.za", businessType: "manufacturing", divisionId: "div-1" }
+      { name: "Volkswagen SA", address: "Uitenhage Road, Port Elizabeth", phone: "+27 41 234 5691", email: "facilities@vw.co.za", businessType: "manufacturing", departmentId: "div-4" },
+      { name: "General Motors SA", address: "Struandale, Port Elizabeth", phone: "+27 41 234 5692", email: "maintenance@gm.co.za", businessType: "manufacturing", departmentId: "div-1" }
     ];
 
     clients.forEach((client, index) => {
@@ -906,7 +906,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 20,
         unitPrice: "149.99",
         description: "Professional wall-mounted paper towel dispenser, lockable design",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Main Warehouse - Shelf A3",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-10')
@@ -921,7 +921,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 25,
         unitPrice: "12.50",
         description: "High-quality paper towel rolls for dispensers, 200m per roll",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Main Warehouse - Shelf B2",
         supplier: "PaperCorp Industries",
         lastRestocked: new Date('2025-08-05')
@@ -936,7 +936,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 10,
         unitPrice: "199.99",
         description: "Touchless automatic hand sanitizer dispenser with sensor",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Main Warehouse - Shelf A1",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-12')
@@ -951,7 +951,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 30,
         unitPrice: "35.00",
         description: "Premium hand sanitizer refill, alcohol-based formula",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Storage Room B - Shelf 1",
         supplier: "ChemiClean Supplies",
         lastRestocked: new Date('2025-07-28')
@@ -966,7 +966,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 15,
         unitPrice: "89.99",
         description: "Tamper-resistant bait station for rodent control",
-        divisionId: "div-1",
+        departmentId: "div-1",
         location: "Pest Control Storage - Rack C",
         supplier: "PestTech Professional",
         lastRestocked: new Date('2025-08-14')
@@ -981,7 +981,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 20,
         unitPrice: "25.00",
         description: "Professional rodenticide bait blocks",
-        divisionId: "div-1",
+        departmentId: "div-1",
         location: "Secure Storage - Locked Cabinet A",
         supplier: "ToxiGuard Solutions",
         lastRestocked: new Date('2025-08-01')
@@ -996,7 +996,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 8,
         unitPrice: "85.00",
         description: "Complete washroom cleaning kit with disinfectants and tools",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Cleaning Supplies - Shelf D1",
         supplier: "CleanTech Professional",
         lastRestocked: new Date('2025-08-10')
@@ -1011,7 +1011,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 12,
         unitPrice: "120.00",
         description: "Heavy-duty commercial toilet paper dispenser",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Washroom Equipment - Rack A",
         supplier: "RestroomPro Systems",
         lastRestocked: new Date('2025-08-12')
@@ -1026,7 +1026,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 15,
         unitPrice: "75.00",
         description: "Hygienic pedal-operated sanitary waste bin with liner",
-        divisionId: "div-2",
+        departmentId: "div-2",
         location: "Sanitary Equipment - Shelf B",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-08')
@@ -1041,7 +1041,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 75,
         unitPrice: "18.50",
         description: "Eco-friendly biodegradable sanitary waste bin liners, pack of 50",
-        divisionId: "div-2",
+        departmentId: "div-2",
         location: "Consumables Storage - Bin C",
         supplier: "EcoWaste Solutions",
         lastRestocked: new Date('2025-08-15')
@@ -1056,7 +1056,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 15,
         unitPrice: "45.00",
         description: "Industrial-strength disinfectant for deep cleaning services, 5L container",
-        divisionId: "div-3",
+        departmentId: "div-3",
         location: "Chemical Storage - Locked Section",
         supplier: "ChemiClean Industrial",
         lastRestocked: new Date('2025-08-05')
@@ -1071,7 +1071,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 3,
         unitPrice: "850.00",
         description: "High-pressure steam cleaner for deep sanitization",
-        divisionId: "div-4",
+        departmentId: "div-4",
         location: "Equipment Bay - Section E",
         supplier: "SteamTech Professional",
         lastRestocked: new Date('2025-08-01')
@@ -1087,7 +1087,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 2,
         unitPrice: "1200.00",
         description: "Industrial carpet cleaning machine with extraction system",
-        divisionId: "div-4",
+        departmentId: "div-4",
         location: "Equipment Bay - Section D",
         supplier: "CleanTech Equipment",
         lastRestocked: new Date('2025-08-03')
@@ -1102,7 +1102,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 4,
         unitPrice: "450.00",
         description: "Heavy-duty floor polisher for commercial spaces",
-        divisionId: "div-4",
+        departmentId: "div-4",
         location: "Equipment Bay - Section C",
         supplier: "FloorCare Pro",
         lastRestocked: new Date('2025-08-07')
@@ -1117,7 +1117,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 30,
         unitPrice: "25.00",
         description: "Streak-free professional glass cleaner, 5L container",
-        divisionId: "div-4",
+        departmentId: "div-4",
         location: "Chemical Storage - Section B",
         supplier: "GlassTech Solutions",
         lastRestocked: new Date('2025-08-09')
@@ -1132,7 +1132,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 2,
         unitPrice: "950.00",
         description: "High-pressure washer for exterior deep cleaning",
-        divisionId: "div-4",
+        departmentId: "div-4",
         location: "Equipment Bay - Outdoor Section",
         supplier: "PressureClean Systems",
         lastRestocked: new Date('2025-08-11')
@@ -1148,7 +1148,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 35,
         unitPrice: "42.00",
         description: "Professional-grade insecticide spray, 1L bottle",
-        divisionId: "div-1",
+        departmentId: "div-1",
         location: "Secure Storage - Locked Cabinet B",
         supplier: "PestGuard Professional",
         lastRestocked: new Date('2025-08-13')
@@ -1163,7 +1163,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 10,
         unitPrice: "125.00",
         description: "Professional termite detection and monitoring kit",
-        divisionId: "div-1",
+        departmentId: "div-1",
         location: "Pest Control Storage - Shelf A",
         supplier: "TermiteGuard Systems",
         lastRestocked: new Date('2025-08-06')
@@ -1179,7 +1179,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 25,
         unitPrice: "95.00",
         description: "Discrete feminine hygiene disposal unit with odor control",
-        divisionId: "div-2",
+        departmentId: "div-2",
         location: "Sanitary Equipment - Rack C",
         supplier: "HygieneTech Solutions",
         lastRestocked: new Date('2025-08-14')
@@ -1194,7 +1194,7 @@ export class MemStorage implements IStorage {
         reorderPoint: 45,
         unitPrice: "32.00",
         description: "Hospital-grade disinfectant spray for sanitary equipment",
-        divisionId: "div-2",
+        departmentId: "div-2",
         location: "Chemical Storage - Section A",
         supplier: "MediClean Supplies",
         lastRestocked: new Date('2025-08-12')
@@ -1321,7 +1321,7 @@ export class MemStorage implements IStorage {
         id: "job-1",
         clientId: "client-5", // McDonald's Greenacres
         workerId: "worker-8", // Reece Ebrahim (PCO)
-        divisionId: "div-1",
+        departmentId: "div-1",
         title: "Monthly Pest Control Inspection",
         description: "Routine monthly pest control inspection and treatment for restaurant kitchen and dining areas",
         status: "scheduled",
@@ -1337,7 +1337,7 @@ export class MemStorage implements IStorage {
         id: "job-2", 
         clientId: "client-6", // KFC Newton Park
         workerId: "worker-9", // Garth du Preez (PCO)
-        divisionId: "div-1",
+        departmentId: "div-1",
         title: "Emergency Rodent Control",
         description: "Emergency call for rodent infestation in storage area",
         status: "in_progress",
@@ -1353,7 +1353,7 @@ export class MemStorage implements IStorage {
         id: "job-3",
         clientId: "client-15", // General Motors SA
         workerId: "worker-10", // Michael Meyer (PCO)
-        divisionId: "div-1", 
+        departmentId: "div-1", 
         title: "Industrial Pest Assessment",
         description: "Comprehensive pest risk assessment for manufacturing facility",
         status: "completed",
@@ -1374,7 +1374,7 @@ export class MemStorage implements IStorage {
         id: "job-4",
         clientId: "client-2", // Shoprite Checkers
         workerId: "worker-13", // Belinda (Sanitary Bin Technician)
-        divisionId: "div-2",
+        departmentId: "div-2",
         title: "Weekly Sanitary Bin Service",
         description: "Weekly collection and maintenance of sanitary disposal units",
         status: "scheduled",
@@ -1390,7 +1390,7 @@ export class MemStorage implements IStorage {
         id: "job-5",
         clientId: "client-11", // Life Mercantile Hospital
         workerId: "worker-16", // Nandipha (Sanitary Bin Technician)
-        divisionId: "div-2",
+        departmentId: "div-2",
         title: "Hospital Sanitary Service",
         description: "Bi-weekly sanitary bin service for hospital facilities",
         status: "in_progress",
@@ -1406,7 +1406,7 @@ export class MemStorage implements IStorage {
         id: "job-6",
         clientId: "client-12", // Grey High School
         workerId: "worker-12", // Leon Coltman (Supervisor)
-        divisionId: "div-2",
+        departmentId: "div-2",
         title: "School Hygiene Program Setup",
         description: "Installation and setup of sanitary disposal units for new term",
         status: "completed",
@@ -1427,7 +1427,7 @@ export class MemStorage implements IStorage {
         id: "job-7",
         clientId: "client-3", // Baywest Mall
         workerId: "worker-19", // Siphokazi (Washroom Technician)
-        divisionId: "div-3",
+        departmentId: "div-3",
         title: "Mall Washroom Maintenance",
         description: "Daily washroom cleaning and supply replenishment",
         status: "scheduled",
@@ -1443,7 +1443,7 @@ export class MemStorage implements IStorage {
         id: "job-8",
         clientId: "client-9", // Mutual Heights Office Park
         workerId: "worker-21", // Zuki Sandi (Washroom Technician)
-        divisionId: "div-3",
+        departmentId: "div-3",
         title: "Office Washroom Deep Clean",
         description: "Quarterly deep cleaning of office building washroom facilities",
         status: "in_progress",
@@ -1459,7 +1459,7 @@ export class MemStorage implements IStorage {
         id: "job-9",
         clientId: "client-13", // Collegiate Girls High
         workerId: "worker-18", // Zain Abdol (Supervisor)
-        divisionId: "div-3",
+        departmentId: "div-3",
         title: "School Washroom Upgrade",
         description: "Installation of new paper towel dispensers and soap dispensers",
         status: "completed",
@@ -1480,7 +1480,7 @@ export class MemStorage implements IStorage {
         id: "job-10",
         clientId: "client-4", // Boardwalk Casino
         workerId: "worker-27", // Themba Mthethwa (Deep Cleaning Supervisor)
-        divisionId: "div-4",
+        departmentId: "div-4",
         title: "Casino Deep Clean Service",
         description: "Monthly deep cleaning of casino floor and VIP areas",
         status: "scheduled",
@@ -1496,7 +1496,7 @@ export class MemStorage implements IStorage {
         id: "job-11",
         clientId: "client-14", // Volkswagen SA
         workerId: "worker-28", // Nomsa Dlamini (Deep Cleaning Specialist)
-        divisionId: "div-4",
+        departmentId: "div-4",
         title: "Factory Floor Deep Clean",
         description: "Industrial deep cleaning of production floor and equipment",
         status: "in_progress",
@@ -1512,7 +1512,7 @@ export class MemStorage implements IStorage {
         id: "job-12",
         clientId: "client-10", // Baywest Office Tower
         workerId: "worker-29", // Sipho Ndaba (Deep Cleaning Specialist)
-        divisionId: "div-4",
+        departmentId: "div-4",
         title: "Office Building Window Cleaning",
         description: "External and internal window cleaning for 15-story office building",
         status: "completed",
@@ -1551,24 +1551,24 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  // Divisions
-  async getDivisions(): Promise<Division[]> {
-    return Array.from(this.divisions.values());
+  // Departments
+  async getDepartments(): Promise<Department[]> {
+    return Array.from(this.departments.values());
   }
 
-  async getDivision(id: string): Promise<Division | undefined> {
-    return this.divisions.get(id);
+  async getDepartment(id: string): Promise<Department | undefined> {
+    return this.departments.get(id);
   }
 
-  async createDivision(insertDivision: InsertDivision): Promise<Division> {
+  async createDepartment(insertDepartment: InsertDepartment): Promise<Department> {
     const id = randomUUID();
-    const division: Division = { 
-      ...insertDivision, 
+    const department: Department = { 
+      ...insertDepartment, 
       id,
-      description: insertDivision.description || null
+      description: insertDepartment.description || null
     };
-    this.divisions.set(id, division);
-    return division;
+    this.departments.set(id, department);
+    return department;
   }
 
   // Workers
@@ -1584,8 +1584,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.workers.values()).find(w => w.employeeId === employeeId);
   }
 
-  async getWorkersByDivision(divisionId: string): Promise<Worker[]> {
-    return Array.from(this.workers.values()).filter(worker => worker.divisionId === divisionId);
+  async getWorkersByDepartment(departmentId: string): Promise<Worker[]> {
+    return Array.from(this.workers.values()).filter(worker => worker.departmentId === departmentId);
   }
 
   async createWorker(insertWorker: InsertWorker): Promise<Worker> {
@@ -1668,8 +1668,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.inventoryItems.values()).filter(item => item.type === type);
   }
 
-  async getInventoryItemsByDivision(divisionId: string): Promise<InventoryItem[]> {
-    return Array.from(this.inventoryItems.values()).filter(item => item.divisionId === divisionId);
+  async getInventoryItemsByDepartment(departmentId: string): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter(item => item.departmentId === departmentId);
   }
 
   async createInventoryItem(insertItem: InsertInventoryItem): Promise<InventoryItem> {
@@ -1678,7 +1678,7 @@ export class MemStorage implements IStorage {
       ...insertItem, 
       id, 
       createdAt: new Date(),
-      divisionId: insertItem.divisionId || null,
+      departmentId: insertItem.departmentId || null,
       description: insertItem.description || null,
       supplier: insertItem.supplier || null,
       location: insertItem.location || null,
@@ -1990,8 +1990,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.jobs.values()).filter(job => job.workerId === workerId);
   }
 
-  async getJobsByDivision(divisionId: string): Promise<Job[]> {
-    return Array.from(this.jobs.values()).filter(job => job.divisionId === divisionId);
+  async getJobsByDepartment(departmentId: string): Promise<Job[]> {
+    return Array.from(this.jobs.values()).filter(job => job.departmentId === departmentId);
   }
 
   async getJobsByStatus(status: string): Promise<Job[]> {
@@ -2014,10 +2014,10 @@ export class MemStorage implements IStorage {
     return this.getJobsByDateRange(today, tomorrow);
   }
 
-  async getJobsByDivisionAndDateRange(divisionId: string, startDate: Date, endDate: Date): Promise<(Job & { client: Client; worker: Worker; inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] })[]> {
+  async getJobsByDepartmentAndDateRange(departmentId: string, startDate: Date, endDate: Date): Promise<(Job & { client: Client; worker: Worker; inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] })[]> {
     const jobs = Array.from(this.jobs.values()).filter(job => {
       const jobDate = new Date(job.scheduledDate);
-      return job.divisionId === divisionId && jobDate >= startDate && jobDate <= endDate;
+      return job.departmentId === departmentId && jobDate >= startDate && jobDate <= endDate;
     });
 
     // Enrich jobs with client, worker, and inventory item details
@@ -2038,7 +2038,7 @@ export class MemStorage implements IStorage {
               description: '',
               sku: '',
               type: 'unknown',
-              divisionId: '',
+              departmentId: '',
               unit: '',
               currentStock: 0,
               minStock: 0,
@@ -2070,7 +2070,7 @@ export class MemStorage implements IStorage {
           name: 'Unknown Worker',
           email: '',
           phone: '',
-          divisionId: job.divisionId,
+          departmentId: job.departmentId,
           role: 'technician',
           employeeId: '',
           pin: '',
@@ -2144,7 +2144,7 @@ export class MemStorage implements IStorage {
     return updatedJob;
   }
 
-  async getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, division: Division, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined> {
+  async getJobCardData(jobId: string): Promise<(Job & { client: Client, worker: Worker, department: Department, inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[] }) | undefined> {
     const job = this.jobs.get(jobId);
     if (!job) return undefined;
 
@@ -2154,8 +2154,8 @@ export class MemStorage implements IStorage {
     const worker = job.workerId ? this.workers.get(job.workerId) : undefined;
     if (!worker) return undefined;
 
-    const division = this.divisions.get(job.divisionId);
-    if (!division) return undefined;
+    const department = this.departments.get(job.departmentId);
+    if (!department) return undefined;
 
     // Get job inventory items
     const jobInventoryItems = Array.from(this.jobInventoryItems.values())
@@ -2173,7 +2173,7 @@ export class MemStorage implements IStorage {
       ...job,
       client,
       worker,
-      division,
+      department,
       inventoryItems
     };
   }
@@ -2440,7 +2440,7 @@ export class MemStorage implements IStorage {
       phone: insertSupplier.phone || null,
       address: insertSupplier.address || null,
       website: insertSupplier.website || null,
-      divisionId: insertSupplier.divisionId || null,
+      departmentId: insertSupplier.departmentId || null,
       paymentTerms: insertSupplier.paymentTerms || null,
       notes: insertSupplier.notes || null
     };
@@ -2689,7 +2689,7 @@ export class MemStorage implements IStorage {
   private async generateSalesSummaryReport(filters: any): Promise<any> {
     const invoices = Array.from(this.invoices.values());
     const clients = Array.from(this.clients.values());
-    const divisions = Array.from(this.divisions.values());
+    const divisions = Array.from(this.departments.values());
     
     // Filter by date range
     let filteredInvoices = invoices;
@@ -2703,7 +2703,7 @@ export class MemStorage implements IStorage {
     // Filter by departments
     if (filters.departments && filters.departments.length > 0) {
       const relevantClientIds = clients
-        .filter(client => filters.departments.includes(client.divisionId))
+        .filter(client => filters.departments.includes(client.departmentId))
         .map(client => client.id);
       filteredInvoices = filteredInvoices.filter(invoice => 
         relevantClientIds.includes(invoice.clientId)
@@ -2720,7 +2720,7 @@ export class MemStorage implements IStorage {
     // Revenue by department
     const revenueByDepartment = divisions.map(division => {
       const divisionClientIds = clients
-        .filter(client => client.divisionId === division.id)
+        .filter(client => client.departmentId === division.id)
         .map(client => client.id);
       
       const divisionRevenue = filteredInvoices
@@ -2764,7 +2764,7 @@ export class MemStorage implements IStorage {
   private async generateExpenseBreakdownReport(filters: any): Promise<any> {
     const purchaseOrders = Array.from(this.purchaseOrders.values());
     const inventoryItems = Array.from(this.inventoryItems.values());
-    const divisions = Array.from(this.divisions.values());
+    const divisions = Array.from(this.departments.values());
 
     // Filter by date range
     let filteredPOs = purchaseOrders;
@@ -2783,13 +2783,13 @@ export class MemStorage implements IStorage {
     // Expenses by department
     const expensesByDepartment = divisions.map(division => {
       const divisionExpenses = filteredPOs
-        .filter(po => po.divisionId === division.id && po.status === "approved")
+        .filter(po => po.departmentId === division.id && po.status === "approved")
         .reduce((sum, po) => sum + parseFloat(po.totalAmount || "0"), 0);
 
       return {
         department: division.name,
         expenses: divisionExpenses,
-        poCount: filteredPOs.filter(po => po.divisionId === division.id).length
+        poCount: filteredPOs.filter(po => po.departmentId === division.id).length
       };
     });
 

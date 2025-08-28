@@ -9,25 +9,25 @@ import { Printer, ArrowLeft, CalendarIcon } from "lucide-react";
 import { Link } from "wouter";
 import { PrintableDailyDepartmentCard } from "@/components/daily-department-card";
 import { cn } from "@/lib/utils";
-import type { Division } from "@shared/schema";
+import type { Department } from "@shared/schema";
 
 export default function DailyDepartmentCardPage() {
-  const [selectedDivision, setSelectedDivision] = useState<string>("");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Fetch divisions for selection
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  // Fetch departments for selection
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const handlePrint = () => {
-    if (selectedDivision) {
+    if (selectedDepartment) {
       window.print();
     }
   };
 
-  const isReadyToPrint = selectedDivision && selectedDate;
+  const isReadyToPrint = selectedDepartment && selectedDate;
 
   return (
     <div className="min-h-screen bg-gray-50" data-testid="daily-department-card-page">
@@ -42,17 +42,17 @@ export default function DailyDepartmentCardPage() {
           </Link>
           
           <div className="flex items-center gap-4">
-            {/* Division Selection */}
+            {/* Department Selection */}
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Department:</label>
-              <Select value={selectedDivision} onValueChange={setSelectedDivision}>
-                <SelectTrigger className="w-48" data-testid="division-select">
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-48" data-testid="department-select">
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {divisions.map(division => (
-                    <SelectItem key={division.id} value={division.id}>
-                      {division.name}
+                  {departments.map(department => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -132,7 +132,7 @@ export default function DailyDepartmentCardPage() {
           </div>
         ) : (
           <PrintableDailyDepartmentCard 
-            divisionId={selectedDivision} 
+            departmentId={selectedDepartment} 
             date={selectedDate} 
           />
         )}

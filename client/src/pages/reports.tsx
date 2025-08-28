@@ -15,7 +15,7 @@ import { ExportButton } from "@/components/export-button";
 import { exportAllData } from "@/lib/data-export";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import type { Job, RentalContract, Worker, Division } from "@shared/schema";
+import type { Job, RentalContract, Worker, Department } from "@shared/schema";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -40,8 +40,8 @@ export default function Reports() {
     queryKey: ['/api/workers'],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   // Staff performance data
@@ -78,29 +78,29 @@ export default function Reports() {
     cancelled: filteredJobs.filter(j => j.status === 'cancelled').length,
   };
 
-  // Calculate division performance
-  const divisionStats = divisions.map(division => {
-    const divisionJobs = filteredJobs.filter(j => j.divisionId === division.id);
-    const divisionWorkers = workers.filter(w => w.divisionId === division.id && w.isActive);
+  // Calculate department performance
+  const departmentStats = departments.map(department => {
+    const departmentJobs = filteredJobs.filter(j => j.departmentId === department.id);
+    const departmentWorkers = workers.filter(w => w.departmentId === department.id && w.isActive);
     
     return {
-      division,
-      jobCount: divisionJobs.length,
-      completedJobs: divisionJobs.filter(j => j.status === 'completed').length,
-      activeWorkers: divisionWorkers.length,
-      completionRate: divisionJobs.length > 0 ? 
-        Math.round((divisionJobs.filter(j => j.status === 'completed').length / divisionJobs.length) * 100) : 0,
+      department,
+      jobCount: departmentJobs.length,
+      completedJobs: departmentJobs.filter(j => j.status === 'completed').length,
+      activeWorkers: departmentWorkers.length,
+      completionRate: departmentJobs.length > 0 ? 
+        Math.round((departmentJobs.filter(j => j.status === 'completed').length / departmentJobs.length) * 100) : 0,
     };
   });
 
   // Calculate worker performance
   const workerStats = workers.map(worker => {
     const workerJobs = filteredJobs.filter(j => j.workerId === worker.id);
-    const division = divisions.find(d => d.id === worker.divisionId);
+    const department = departments.find(d => d.id === worker.departmentId);
     
     return {
       worker,
-      division,
+      department,
       jobCount: workerJobs.length,
       completedJobs: workerJobs.filter(j => j.status === 'completed').length,
       completionRate: workerJobs.length > 0 ? 
@@ -186,7 +186,7 @@ export default function Reports() {
                     jobs: filteredJobs,
                     contracts,
                     workers,
-                    divisions,
+                    departments,
                     dateRange
                   });
                 }}
@@ -265,22 +265,22 @@ export default function Reports() {
                 </Card>
               </div>
 
-              {/* Division Performance */}
+              {/* Department Performance */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Division Performance</CardTitle>
+                  <CardTitle>Department Performance</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {divisionStats.map((stat) => (
-                      <div key={stat.division.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`division-stat-${stat.division.id}`}>
+                    {departmentStats.map((stat) => (
+                      <div key={stat.department.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`department-stat-${stat.department.id}`}>
                         <div className="flex items-center space-x-4">
                           <div 
                             className="w-4 h-4 rounded-full"
-                            style={{ backgroundColor: stat.division.colorCode }}
+                            style={{ backgroundColor: stat.department.colorCode }}
                           ></div>
                           <div>
-                            <h4 className="font-medium">{stat.division.name}</h4>
+                            <h4 className="font-medium">{stat.department.name}</h4>
                             <p className="text-sm text-gray-600">{stat.activeWorkers} active workers</p>
                           </div>
                         </div>
@@ -350,7 +350,7 @@ export default function Reports() {
                           </div>
                           <div>
                             <h4 className="font-medium">{stat.worker.name}</h4>
-                            <p className="text-sm text-gray-600">{stat.division?.name || 'Unknown Division'}</p>
+                            <p className="text-sm text-gray-600">{stat.department?.name || 'Unknown Department'}</p>
                           </div>
                         </div>
                         <div className="text-right">
@@ -392,10 +392,10 @@ export default function Reports() {
                             .filter(w => w.isActive)
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map((worker) => {
-                              const division = divisions.find(d => d.id === worker.divisionId);
+                              const department = departments.find(d => d.id === worker.departmentId);
                               return (
                                 <SelectItem key={worker.id} value={worker.id}>
-                                  {worker.name} {division && `(${division.name})`}
+                                  {worker.name} {department && `(${department.name})`}
                                 </SelectItem>
                               );
                             })}

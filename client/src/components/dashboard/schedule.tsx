@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { formatDateTime, getInitials, getDivisionColor } from "@/lib/utils";
+import { formatDateTime, getInitials, getDepartmentColor } from "@/lib/utils";
 import type { Job, Worker } from "@shared/schema";
 
 export default function TodaysSchedule() {
@@ -23,7 +23,7 @@ export default function TodaysSchedule() {
       id: "1",
       workerId: "worker-1",
       workerName: "John Smith",
-      divisionId: "div-1",
+      departmentId: "div-1",
       location: "Baywest Mall",
       serviceType: "Pest Control",
       scheduledDate: new Date(new Date().setHours(8, 0)),
@@ -32,7 +32,7 @@ export default function TodaysSchedule() {
       id: "2", 
       workerId: "worker-2",
       workerName: "Sarah Williams",
-      divisionId: "div-2",
+      departmentId: "div-2",
       location: "Greenacres Hospital", 
       serviceType: "Hygiene",
       scheduledDate: new Date(new Date().setHours(9, 30)),
@@ -41,7 +41,7 @@ export default function TodaysSchedule() {
       id: "3",
       workerId: "worker-3", 
       workerName: "David Brown",
-      divisionId: "div-1",
+      departmentId: "div-1",
       location: "Newton Park Library",
       serviceType: "Pest Control",
       scheduledDate: new Date(new Date().setHours(11, 0)),
@@ -50,7 +50,7 @@ export default function TodaysSchedule() {
       id: "4",
       workerId: "worker-4",
       workerName: "Lisa Johnson", 
-      divisionId: "div-2",
+      departmentId: "div-2",
       location: "Walmer Park",
       serviceType: "Sanitizer Service",
       scheduledDate: new Date(new Date().setHours(14, 0)),
@@ -59,7 +59,7 @@ export default function TodaysSchedule() {
       id: "5",
       workerId: "worker-5",
       workerName: "Mike Johnson",
-      divisionId: "div-1", 
+      departmentId: "div-1", 
       location: "Shoprite Checkers",
       serviceType: "Follow-up",
       scheduledDate: new Date(new Date().setHours(16, 0)),
@@ -109,8 +109,8 @@ export default function TodaysSchedule() {
           </div>
         ) : (
           displaySchedule.slice(0, 6).map((item) => {
-            const getDivisionColors = (divisionId: string) => {
-              switch (divisionId) {
+            const getDepartmentColors = (departmentId: string) => {
+              switch (departmentId) {
                 case 'div-1': return { borderColor: 'border-green-500', bgColor: 'bg-green-50', avatarBg: 'bg-green-600' };
                 case 'div-2': return { borderColor: 'border-purple-500', bgColor: 'bg-purple-50', avatarBg: 'bg-purple-600' };
                 case 'div-3': return { borderColor: 'border-blue-500', bgColor: 'bg-blue-50', avatarBg: 'bg-blue-600' };
@@ -118,7 +118,7 @@ export default function TodaysSchedule() {
                 default: return { borderColor: 'border-gray-500', bgColor: 'bg-gray-50', avatarBg: 'bg-gray-600' };
               }
             };
-            const { borderColor, bgColor, avatarBg } = getDivisionColors(item.divisionId);
+            const { borderColor, bgColor, avatarBg } = getDepartmentColors(item.departmentId);
             const workerName = 'workerName' in item ? item.workerName : getWorkerName(item.workerId || '');
             
             return (

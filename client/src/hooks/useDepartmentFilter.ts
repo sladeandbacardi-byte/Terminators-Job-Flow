@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Division } from "@shared/schema";
+import type { Department } from "@shared/schema";
 
 export interface DepartmentFilterState {
   selectedDepartments: string[];
   setSelectedDepartments: (departments: string[]) => void;
   isAllSelected: boolean;
-  filteredData: <T extends { divisionId?: string | null }>(data: T[]) => T[];
-  divisions: Division[];
+  filteredData: <T extends { departmentId?: string | null }>(data: T[]) => T[];
+  departments: Department[];
   isLoading: boolean;
 }
 
@@ -19,24 +19,24 @@ export interface DepartmentFilterState {
 export function useDepartmentFilter(initialSelection: string[] = []): DepartmentFilterState {
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>(initialSelection);
 
-  const { data: divisions = [], isLoading } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [], isLoading } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   const isAllSelected = selectedDepartments.length === 0;
 
   /**
    * Filter data based on selected departments
-   * @param data - Array of objects with optional divisionId property
+   * @param data - Array of objects with optional departmentId property
    * @returns Filtered array based on department selection
    */
   const filteredData = useMemo(() => {
-    return function <T extends { divisionId?: string | null }>(data: T[]): T[] {
+    return function <T extends { departmentId?: string | null }>(data: T[]): T[] {
       if (isAllSelected) {
         return data;
       }
       return data.filter(item => 
-        item.divisionId && selectedDepartments.includes(item.divisionId)
+        item.departmentId && selectedDepartments.includes(item.departmentId)
       );
     };
   }, [selectedDepartments, isAllSelected]);
@@ -46,7 +46,7 @@ export function useDepartmentFilter(initialSelection: string[] = []): Department
     setSelectedDepartments,
     isAllSelected,
     filteredData,
-    divisions,
+    departments,
     isLoading,
   };
 }

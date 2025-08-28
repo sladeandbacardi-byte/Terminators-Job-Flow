@@ -71,7 +71,7 @@ import { SupplierForm } from "@/components/forms/supplier-form";
 import { ExportButton } from "@/components/export-button";
 import { exportSuppliers } from "@/lib/data-export";
 import { apiRequest } from "@/lib/queryClient";
-import type { Supplier, Division } from "@shared/schema";
+import type { Supplier, Department } from "@shared/schema";
 
 export default function SuppliersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -80,7 +80,7 @@ export default function SuppliersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [divisionFilter, setDivisionFilter] = useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const { toast } = useToast();
@@ -90,8 +90,8 @@ export default function SuppliersPage() {
     queryKey: ["/api/suppliers"],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   const createMutation = useMutation({
@@ -149,9 +149,9 @@ export default function SuppliersPage() {
     const matchesStatus = statusFilter === "all" || 
                          (statusFilter === "active" && supplier.isActive) ||
                          (statusFilter === "inactive" && !supplier.isActive);
-    const matchesDivision = divisionFilter === "all" || supplier.divisionId === divisionFilter;
+    const matchesDepartment = departmentFilter === "all" || supplier.departmentId === departmentFilter;
     
-    return matchesSearch && matchesCategory && matchesStatus && matchesDivision;
+    return matchesSearch && matchesCategory && matchesStatus && matchesDepartment;
   });
 
   const categoryStats = suppliers.reduce((acc: any, supplier: Supplier) => {
@@ -336,15 +336,15 @@ export default function SuppliersPage() {
           </SelectContent>
         </Select>
 
-        <Select value={divisionFilter} onValueChange={setDivisionFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-division-filter">
+        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="select-department-filter">
             <SelectValue placeholder="All Departments" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Departments</SelectItem>
-            {divisions.map((division) => (
-              <SelectItem key={division.id} value={division.id}>
-                {division.name}
+            {departments.map((department) => (
+              <SelectItem key={department.id} value={department.id}>
+                {department.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -397,17 +397,17 @@ export default function SuppliersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {supplier.divisionId ? (
+                    {supplier.departmentId ? (
                       <Badge 
                         variant="outline"
                         className={
-                          supplier.divisionId === "div-1" ? "border-green-500 text-green-700 bg-green-50" :
-                          supplier.divisionId === "div-2" ? "border-purple-500 text-purple-700 bg-purple-50" :
-                          supplier.divisionId === "div-3" ? "border-blue-500 text-blue-700 bg-blue-50" :
+                          supplier.departmentId === "div-1" ? "border-green-500 text-green-700 bg-green-50" :
+                          supplier.departmentId === "div-2" ? "border-purple-500 text-purple-700 bg-purple-50" :
+                          supplier.departmentId === "div-3" ? "border-blue-500 text-blue-700 bg-blue-50" :
                           "border-gray-500 text-gray-700 bg-gray-50"
                         }
                       >
-                        {divisions.find(d => d.id === supplier.divisionId)?.name || "Unassigned"}
+                        {departments.find(d => d.id === supplier.departmentId)?.name || "Unassigned"}
                       </Badge>
                     ) : (
                       <span className="text-sm text-muted-foreground">Unassigned</span>

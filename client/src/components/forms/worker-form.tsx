@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertWorkerSchema } from "@shared/schema";
-import type { Worker, Division } from "@shared/schema";
+import type { Worker, Department } from "@shared/schema";
 import { z } from "zod";
 
 const workerFormSchema = insertWorkerSchema.extend({
@@ -29,8 +29,8 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const form = useForm<WorkerFormData>({
@@ -39,7 +39,7 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
       name: worker?.name || "",
       email: worker?.email || "",
       phone: worker?.phone || "",
-      divisionId: worker?.divisionId || "",
+      departmentId: worker?.departmentId || "",
       isActive: worker?.isActive ?? true,
     },
   });
@@ -154,20 +154,20 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
 
           <FormField
             control={form.control}
-            name="divisionId"
+            name="departmentId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Division</FormLabel>
+                <FormLabel>Department</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-division">
-                      <SelectValue placeholder="Select a division" />
+                    <SelectTrigger data-testid="select-department">
+                      <SelectValue placeholder="Select a department" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {divisions.map((division) => (
-                      <SelectItem key={division.id} value={division.id}>
-                        {division.name}
+                    {departments.map((department) => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

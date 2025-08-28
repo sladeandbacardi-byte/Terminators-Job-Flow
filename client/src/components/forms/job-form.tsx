@@ -17,7 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertJobSchema } from "@shared/schema";
 import { SERVICE_TYPES, JOB_PRIORITIES, RECURRING_PATTERNS } from "@/lib/constants";
-import type { Job, Client, Worker, Division, InventoryItem, InsertJobInventoryItem } from "@shared/schema";
+import type { Job, Client, Worker, Department, InventoryItem, InsertJobInventoryItem } from "@shared/schema";
 import { z } from "zod";
 import { useState } from "react";
 
@@ -50,7 +50,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   const [selectedItems, setSelectedItems] = useState<SelectedInventoryItem[]>([]);
   const [showItemSelector, setShowItemSelector] = useState(false);
   const [itemSearchTerm, setItemSearchTerm] = useState("");
-  const [itemDivisionFilter, setItemDivisionFilter] = useState("all");
+  const [itemDepartmentFilter, setItemDepartmentFilter] = useState("all");
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
@@ -60,8 +60,8 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
     queryKey: ['/api/workers'],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
@@ -75,7 +75,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
       description: job?.description || "",
       clientId: job?.clientId || "",
       workerId: job?.workerId || "",
-      divisionId: job?.divisionId || "",
+      departmentId: job?.departmentId || "",
       serviceType: job?.serviceType || "",
       status: job?.status || "pending",
       scheduledDate: job ? new Date(job.scheduledDate) : new Date(),
@@ -158,9 +158,9 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
     }
   };
 
-  const selectedDivision = form.watch("divisionId");
+  const selectedDepartment = form.watch("departmentId");
   const availableWorkers = workers.filter(worker => 
-    worker.isActive && (!selectedDivision || worker.divisionId === selectedDivision)
+    worker.isActive && (!selectedDepartment || worker.departmentId === selectedDepartment)
   );
 
   const isRecurring = form.watch("isRecurring");
@@ -200,7 +200,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
     ));
   };
 
-  // Enhanced filtering for inventory items with search and division filter
+  // Enhanced filtering for inventory items with search and department filter
   const availableInventory = inventoryItems.filter(item => {
     // Search filter - matches name, description, or SKU
     const matchesSearch = itemSearchTerm === "" || 
@@ -208,12 +208,12 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
       item.description?.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
       item.sku.toLowerCase().includes(itemSearchTerm.toLowerCase());
     
-    // Division filter
-    const matchesDivision = itemDivisionFilter === "all" || 
-      item.divisionId === itemDivisionFilter ||
-      !item.divisionId; // Include unassigned items
+    // Department filter
+    const matchesDepartment = itemDepartmentFilter === "all" || 
+      item.departmentId === itemDepartmentFilter ||
+      !item.departmentId; // Include unassigned items
     
-    return matchesSearch && matchesDivision;
+    return matchesSearch && matchesDepartment;
   });
 
   return (
@@ -268,20 +268,20 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="divisionId"
+              name="departmentId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Division</FormLabel>
+                  <FormLabel>Department</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-division">
-                        <SelectValue placeholder="Select a division" />
+                      <SelectTrigger data-testid="select-department">
+                        <SelectValue placeholder="Select a department" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {divisions.map((division) => (
-                        <SelectItem key={division.id} value={division.id}>
-                          {division.name}
+                      {departments.map((department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          {department.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -605,7 +605,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                       onClick={() => {
                         setShowItemSelector(false);
                         setItemSearchTerm("");
-                        setItemDivisionFilter("all");
+                        setItemDepartmentFilter("all");
                       }}
                       data-testid="button-close-selector"
                     >
@@ -625,15 +625,15 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                         data-testid="input-search-items"
                       />
                     </div>
-                    <Select value={itemDivisionFilter} onValueChange={setItemDivisionFilter}>
-                      <SelectTrigger data-testid="select-division-filter">
-                        <SelectValue placeholder="Filter by division" />
+                    <Select value={itemDepartmentFilter} onValueChange={setItemDepartmentFilter}>
+                      <SelectTrigger data-testid="select-department-filter">
+                        <SelectValue placeholder="Filter by department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Divisions</SelectItem>
-                        {divisions.map(division => (
-                          <SelectItem key={division.id} value={division.id}>
-                            {division.name}
+                        <SelectItem value="all">All Departments</SelectItem>
+                        {departments.map(department => (
+                          <SelectItem key={department.id} value={department.id}>
+                            {department.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -664,7 +664,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                       <p className="text-muted-foreground text-center py-8">
                         {itemSearchTerm ? 
                           `No products or services found matching "${itemSearchTerm}"` : 
-                          "No products or services available for the selected division."
+                          "No products or services available for the selected department."
                         }
                       </p>
                     ) : (
@@ -685,11 +685,11 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                                   <span>Stock: {item.quantity}</span>
                                   <span>•</span>
                                   <span>SKU: {item.sku}</span>
-                                  {item.divisionId && (
+                                  {item.departmentId && (
                                     <>
                                       <span>•</span>
                                       <span className="text-blue-600 font-medium">
-                                        {divisions.find(d => d.id === item.divisionId)?.name || 'Unknown Division'}
+                                        {departments.find(d => d.id === item.departmentId)?.name || 'Unknown Department'}
                                       </span>
                                     </>
                                   )}

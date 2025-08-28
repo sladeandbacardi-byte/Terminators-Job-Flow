@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertInventoryItemSchema } from "@shared/schema";
-import type { InventoryItem, Division } from "@shared/schema";
+import type { InventoryItem, Department } from "@shared/schema";
 import { z } from "zod";
 
 const inventoryFormSchema = insertInventoryItemSchema.extend({
@@ -29,8 +29,8 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const form = useForm<InventoryFormData>({
@@ -45,7 +45,7 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
       reorderPoint: item?.reorderPoint || 20,
       unitPrice: item?.unitPrice || undefined,
       description: item?.description || "",
-      divisionId: item?.divisionId || undefined,
+      departmentId: item?.departmentId || undefined,
       location: item?.location || "",
       supplier: item?.supplier || "",
     },
@@ -160,21 +160,21 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
 
             <FormField
               control={form.control}
-              name="divisionId"
+              name="departmentId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Division</FormLabel>
+                  <FormLabel>Department</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-division">
-                        <SelectValue placeholder="Select division (optional)" />
+                      <SelectTrigger data-testid="select-department">
+                        <SelectValue placeholder="Select department (optional)" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">General (No specific division)</SelectItem>
-                      {divisions.map((division) => (
-                        <SelectItem key={division.id} value={division.id}>
-                          {division.name}
+                      <SelectItem value="">General (No specific department)</SelectItem>
+                      {departments.map((department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          {department.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -69,7 +69,7 @@ import { ClientForm } from "@/components/forms/client-form";
 import { ExportButton } from "@/components/export-button";
 import { apiRequest } from "@/lib/queryClient";
 import { exportClients } from "@/lib/data-export";
-import type { Client, Division } from "@shared/schema";
+import type { Client, Department } from "@shared/schema";
 
 export default function ClientsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -78,7 +78,7 @@ export default function ClientsPage() {
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [divisionFilter, setDivisionFilter] = useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const { toast } = useToast();
@@ -88,8 +88,8 @@ export default function ClientsPage() {
     queryKey: ["/api/clients"],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   const createMutation = useMutation({
@@ -145,9 +145,9 @@ export default function ClientsPage() {
                          client.businessType?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || client.status === statusFilter;
-    const matchesDivision = divisionFilter === "all" || client.divisionId === divisionFilter;
+    const matchesDepartment = departmentFilter === "all" || client.departmentId === departmentFilter;
     
-    return matchesSearch && matchesStatus && matchesDivision;
+    return matchesSearch && matchesStatus && matchesDepartment;
   });
 
   const statusStats = clients.reduce((acc: any, client: Client) => {
@@ -168,9 +168,9 @@ export default function ClientsPage() {
     }
   };
 
-  const getDivisionName = (divisionId: string) => {
-    const division = divisions.find(d => d.id === divisionId);
-    return division?.name || "Unknown Division";
+  const getDepartmentName = (departmentId: string) => {
+    const department = departments.find(d => d.id === departmentId);
+    return department?.name || "Unknown Department";
   };
 
   const handleExportCSV = () => {
@@ -304,15 +304,15 @@ export default function ClientsPage() {
           </SelectContent>
         </Select>
 
-        <Select value={divisionFilter} onValueChange={setDivisionFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-division-filter">
-            <SelectValue placeholder="All Divisions" />
+        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="select-department-filter">
+            <SelectValue placeholder="All Departments" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Divisions</SelectItem>
-            {divisions.map((division) => (
-              <SelectItem key={division.id} value={division.id}>
-                {division.name}
+            <SelectItem value="all">All Departments</SelectItem>
+            {departments.map((department) => (
+              <SelectItem key={department.id} value={department.id}>
+                {department.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -328,7 +328,7 @@ export default function ClientsPage() {
               <TableHead>Contact Person</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Division</TableHead>
+              <TableHead>Department</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -374,7 +374,7 @@ export default function ClientsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{getDivisionName(client.divisionId)}</Badge>
+                    <Badge variant="outline">{getDepartmentName(client.departmentId)}</Badge>
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(client.status)}
@@ -433,7 +433,7 @@ export default function ClientsPage() {
                     <div><strong>Name:</strong> {viewingClient.name}</div>
                     <div><strong>Business Type:</strong> {viewingClient.businessType || "Not specified"}</div>
                     <div><strong>Status:</strong> {getStatusBadge(viewingClient.status)}</div>
-                    <div><strong>Division:</strong> {getDivisionName(viewingClient.divisionId)}</div>
+                    <div><strong>Department:</strong> {getDepartmentName(viewingClient.departmentId)}</div>
                   </div>
                 </div>
                 <div>

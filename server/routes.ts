@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
-  insertDivisionSchema, insertWorkerSchema, insertClientSchema,
+  insertDepartmentSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
   insertInvoiceSchema, insertInvoiceItemSchema,
   insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
@@ -100,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: worker.name,
           email: worker.email,
           phone: worker.phone,
-          divisionId: worker.divisionId,
+          departmentId: worker.departmentId,
           role: worker.role,
           employeeId: worker.employeeId,
         }
@@ -208,23 +208,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Divisions
-  app.get("/api/divisions", async (req, res) => {
-    const divisions = await storage.getDivisions();
-    res.json(divisions);
+  app.get("/api/departments", async (req, res) => {
+    const departments = await storage.getDepartments();
+    res.json(departments);
   });
 
-  app.get("/api/divisions/:id", async (req, res) => {
-    const division = await storage.getDivision(req.params.id);
+  app.get("/api/departments/:id", async (req, res) => {
+    const division = await storage.getDepartment(req.params.id);
     if (!division) {
       return res.status(404).json({ error: "Division not found" });
     }
     res.json(division);
   });
 
-  app.post("/api/divisions", async (req, res) => {
+  app.post("/api/departments", async (req, res) => {
     try {
-      const division = insertDivisionSchema.parse(req.body);
-      const created = await storage.createDivision(division);
+      const division = insertDepartmentSchema.parse(req.body);
+      const created = await storage.createDepartment(division);
       res.status(201).json(created);
     } catch (error) {
       res.status(400).json({ error: "Invalid division data" });
@@ -233,9 +233,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Workers
   app.get("/api/workers", async (req, res) => {
-    const { divisionId } = req.query;
-    if (divisionId) {
-      const workers = await storage.getWorkersByDivision(divisionId as string);
+    const { departmentId } = req.query;
+    if (departmentId) {
+      const workers = await storage.getWorkersByDepartment(departmentId as string);
       res.json(workers);
     } else {
       const workers = await storage.getWorkers();
@@ -323,13 +323,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Inventory Items
   app.get("/api/inventory", async (req, res) => {
-    const { type, divisionId } = req.query;
+    const { type, departmentId } = req.query;
     let items;
     
     if (type) {
       items = await storage.getInventoryItemsByType(type as string);
-    } else if (divisionId) {
-      items = await storage.getInventoryItemsByDivision(divisionId as string);
+    } else if (departmentId) {
+      items = await storage.getInventoryItemsByDepartment(departmentId as string);
     } else {
       items = await storage.getInventoryItems();
     }
@@ -457,15 +457,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Jobs
   app.get("/api/jobs", async (req, res) => {
-    const { workerId, divisionId, status, date, today } = req.query;
+    const { workerId, departmentId, status, date, today } = req.query;
     let jobs;
     
     if (today === "true") {
       jobs = await storage.getTodaysJobs();
     } else if (workerId) {
       jobs = await storage.getJobsByWorker(workerId as string);
-    } else if (divisionId) {
-      jobs = await storage.getJobsByDivision(divisionId as string);
+    } else if (departmentId) {
+      jobs = await storage.getJobsByDepartment(departmentId as string);
     } else if (status) {
       jobs = await storage.getJobsByStatus(status as string);
     } else if (date) {
@@ -559,9 +559,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/jobs/daily/:divisionId/:date", async (req, res) => {
+  app.get("/api/jobs/daily/:departmentId/:date", async (req, res) => {
     try {
-      const { divisionId, date } = req.params;
+      const { departmentId, date } = req.params;
       
       // Parse the date and get start/end of day
       const targetDate = new Date(date + 'T00:00:00');
@@ -569,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       nextDay.setDate(nextDay.getDate() + 1);
       
       // Get all jobs for the division on this date
-      const jobs = await storage.getJobsByDivisionAndDateRange(divisionId, targetDate, nextDay);
+      const jobs = await storage.getJobsByDepartmentAndDateRange(departmentId, targetDate, nextDay);
       
       res.json(jobs);
     } catch (error) {
@@ -846,12 +846,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard Analytics
   app.get("/api/dashboard/metrics", async (req, res) => {
     try {
-      const [activeJobs, allWorkers, expiringContracts, allJobs, divisions] = await Promise.all([
+      const [activeJobs, allWorkers, expiringContracts, allJobs, departments] = await Promise.all([
         storage.getJobsByStatus('in_progress'),
         storage.getWorkers(),
         storage.getExpiringContracts(30),
         storage.getJobs(),
-        storage.getDivisions()
+        storage.getDepartments()
       ]);
 
       const activeWorkers = allWorkers.filter(w => w.isActive);
@@ -864,10 +864,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Calculate division performance
-      const divisionStats = await Promise.all(divisions.map(async (division) => {
+      const divisionStats = await Promise.all(departments.map(async (division) => {
         const [todayJobs, workers] = await Promise.all([
-          storage.getJobsByDivision(division.id),
-          storage.getWorkersByDivision(division.id)
+          storage.getJobsByDepartment(division.id),
+          storage.getWorkersByDepartment(division.id)
         ]);
 
         const todayJobsFiltered = todayJobs.filter(job => {
@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiringContracts: expiringContracts.length,
         monthlyRevenue: 45680, // This would be calculated from contracts
         completedJobsThisMonth: completedJobsThisMonth.length,
-        divisions: divisionStats
+        departments: divisionStats
       };
 
       res.json(metrics);

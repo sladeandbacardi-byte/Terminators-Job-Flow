@@ -16,7 +16,7 @@ import { ExportButton } from "@/components/export-button";
 import { exportInventory } from "@/lib/data-export";
 import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
-import type { InventoryItem, Division } from "@shared/schema";
+import type { InventoryItem, Department } from "@shared/schema";
 
 interface StockAlerts {
   lowStock: InventoryItem[];
@@ -41,8 +41,8 @@ export default function Inventory() {
     queryKey: ['/api/inventory'],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const { data: stockAlerts } = useQuery<StockAlerts>({
@@ -92,10 +92,10 @@ export default function Inventory() {
     })
   );
 
-  const getDivisionName = (divisionId: string | null) => {
-    if (!divisionId) return "General";
-    const division = divisions.find(d => d.id === divisionId);
-    return division?.name || 'Unknown Division';
+  const getDepartmentName = (departmentId: string | null) => {
+    if (!departmentId) return "General";
+    const department = departments.find(d => d.id === departmentId);
+    return department?.name || 'Unknown Department';
   };
 
   const getTypeBadgeColor = (type: string) => {
@@ -411,8 +411,8 @@ export default function Inventory() {
                         </div>
                         
                         <div className="flex justify-between">
-                          <span className="font-medium">Division:</span>
-                          <span data-testid={`item-division-${item.id}`}>{getDivisionName(item.divisionId)}</span>
+                          <span className="font-medium">Department:</span>
+                          <span data-testid={`item-department-${item.id}`}>{getDepartmentName(item.departmentId)}</span>
                         </div>
                         
                         {item.lastRestocked && (

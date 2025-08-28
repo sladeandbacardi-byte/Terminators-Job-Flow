@@ -3,13 +3,13 @@ import { format } from "date-fns";
 import { MapPin, Clock, User, Phone, Mail, FileText, Package, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getStatusColor, formatDateTime } from "@/lib/utils";
-import type { Job, Client, Worker, Division, JobInventoryItem, InventoryItem } from "@shared/schema";
+import type { Job, Client, Worker, Department, JobInventoryItem, InventoryItem } from "@shared/schema";
 import termLogoPath from "@assets/termlogobig_1755598359265.jpg";
 
 interface JobCardData extends Job {
   client: Client;
   worker: Worker;
-  division: Division;
+  department: Department;
   inventoryItems: (JobInventoryItem & { inventoryItem: InventoryItem })[];
 }
 
@@ -93,12 +93,12 @@ export function JobCard({ jobId, className = "" }: JobCardProps) {
                 <p className="text-base">{jobData.serviceType}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-700">Division</p>
+                <p className="text-sm font-medium text-gray-700">Department</p>
                 <Badge 
-                  style={{ backgroundColor: jobData.division.colorCode }}
+                  style={{ backgroundColor: jobData.department.colorCode }}
                   className="text-white"
                 >
-                  {jobData.division.name}
+                  {jobData.department.name}
                 </Badge>
               </div>
               <div className="flex gap-4">

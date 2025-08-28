@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
-import type { Client, Division } from "@shared/schema";
+import type { Client, Department } from "@shared/schema";
 
 const clientFormSchema = z.object({
   name: z.string().min(1, "Company name is required"),
@@ -31,7 +31,7 @@ const clientFormSchema = z.object({
   contactPerson: z.string().optional(),
   businessType: z.string().optional(),
   status: z.enum(["active", "inactive", "suspended"]),
-  divisionId: z.string().min(1, "Division is required"),
+  departmentId: z.string().min(1, "Department is required"),
   taxNumber: z.string().optional(),
   paymentTerms: z.string().optional(),
   creditLimit: z.number().min(0).optional(),
@@ -47,8 +47,8 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   const form = useForm<ClientFormData>({
@@ -61,7 +61,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
       contactPerson: client?.contactPerson || "",
       businessType: client?.businessType || "",
       status: client?.status || "active",
-      divisionId: client?.divisionId || "",
+      departmentId: client?.departmentId || "",
       taxNumber: client?.taxNumber || "",
       paymentTerms: client?.paymentTerms || "",
       creditLimit: client?.creditLimit || undefined,
@@ -189,20 +189,20 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
 
         <FormField
           control={form.control}
-          name="divisionId"
+          name="departmentId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Division *</FormLabel>
+              <FormLabel>Department *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <SelectTrigger data-testid="select-division">
-                    <SelectValue placeholder="Select division" />
+                  <SelectTrigger data-testid="select-department">
+                    <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {divisions.map((division) => (
-                    <SelectItem key={division.id} value={division.id}>
-                      {division.name}
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -1,5 +1,5 @@
-interface DivisionData {
-  division: {
+interface DepartmentData {
+  department: {
     id: string;
     name: string;
     colorCode: string;
@@ -11,12 +11,12 @@ interface DivisionData {
   pending: number;
 }
 
-interface DivisionPerformanceProps {
-  divisions: DivisionData[];
+interface DepartmentPerformanceProps {
+  departments: DepartmentData[];
   isLoading?: boolean;
 }
 
-export default function DivisionPerformance({ divisions, isLoading }: DivisionPerformanceProps) {
+export default function DepartmentPerformance({ departments, isLoading }: DepartmentPerformanceProps) {
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -41,13 +41,13 @@ export default function DivisionPerformance({ divisions, isLoading }: DivisionPe
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6" data-testid="division-performance">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Division Performance</h3>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6" data-testid="department-performance">
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Department Performance</h3>
       
       <div className="space-y-6">
-        {divisions.map((divisionData) => {
-          const getDivisionStyles = (divisionId: string) => {
-            switch (divisionId) {
+        {departments.map((departmentData) => {
+          const getDepartmentStyles = (departmentId: string) => {
+            switch (departmentId) {
               case 'div-1': // Pest Control
                 return {
                   borderColor: 'border-green-600',
@@ -86,49 +86,49 @@ export default function DivisionPerformance({ divisions, isLoading }: DivisionPe
             }
           };
           
-          const styles = getDivisionStyles(divisionData.division.id);
+          const styles = getDepartmentStyles(departmentData.department.id);
           const { borderColor, bgColor, textColor, dotColor } = styles;
           
           return (
             <div 
-              key={divisionData.division.id} 
+              key={departmentData.department.id} 
               className={`border-l-4 ${borderColor} ${bgColor} rounded-r-lg p-4`}
-              data-testid={`division-${divisionData.division.id}`}
+              data-testid={`department-${departmentData.department.id}`}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
                   <div className={`w-3 h-3 ${dotColor} rounded-full`}></div>
-                  <h4 className="font-medium text-gray-900" data-testid={`division-name-${divisionData.division.id}`}>
-                    {divisionData.division.name}
+                  <h4 className="font-medium text-gray-900" data-testid={`department-name-${departmentData.department.id}`}>
+                    {departmentData.department.name}
                   </h4>
                 </div>
-                <span className={`text-sm ${textColor} font-medium`} data-testid={`division-workers-${divisionData.division.id}`}>
-                  {divisionData.activeWorkers} Workers Active
+                <span className={`text-sm ${textColor} font-medium`} data-testid={`department-workers-${departmentData.department.id}`}>
+                  {departmentData.activeWorkers} Workers Active
                 </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600">Jobs Today</p>
-                  <p className="font-semibold text-gray-900" data-testid={`jobs-today-${divisionData.division.id}`}>
-                    {divisionData.jobsToday}
+                  <p className="font-semibold text-gray-900" data-testid={`jobs-today-${departmentData.department.id}`}>
+                    {departmentData.jobsToday}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">Completed</p>
-                  <p className={`font-semibold ${textColor}`} data-testid={`completed-${divisionData.division.id}`}>
-                    {divisionData.completed}
+                  <p className={`font-semibold ${textColor}`} data-testid={`completed-${departmentData.department.id}`}>
+                    {departmentData.completed}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">In Progress</p>
-                  <p className="font-semibold text-orange-600" data-testid={`in-progress-${divisionData.division.id}`}>
-                    {divisionData.inProgress}
+                  <p className="font-semibold text-orange-600" data-testid={`in-progress-${departmentData.department.id}`}>
+                    {departmentData.inProgress}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">Pending</p>
-                  <p className="font-semibold text-gray-600" data-testid={`pending-${divisionData.division.id}`}>
-                    {divisionData.pending}
+                  <p className="font-semibold text-gray-600" data-testid={`pending-${departmentData.department.id}`}>
+                    {departmentData.pending}
                   </p>
                 </div>
               </div>

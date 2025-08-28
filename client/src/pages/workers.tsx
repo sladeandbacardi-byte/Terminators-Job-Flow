@@ -9,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Search, Plus, Phone, Mail } from "lucide-react";
-import { getInitials, getDivisionColor } from "@/lib/utils";
+import { getInitials, getDepartmentColor } from "@/lib/utils";
 import WorkerForm from "@/components/forms/worker-form";
 import { ExportButton } from "@/components/export-button";
 import { exportWorkers } from "@/lib/data-export";
 import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
-import type { Worker, Division } from "@shared/schema";
+import type { Worker, Department } from "@shared/schema";
 
 export default function Workers() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -26,8 +26,8 @@ export default function Workers() {
     queryKey: ['/api/workers'],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const departmentFilter = useDepartmentFilter();
@@ -42,13 +42,13 @@ export default function Workers() {
     })
   );
 
-  const getDivisionName = (divisionId: string) => {
-    const division = divisions.find(d => d.id === divisionId);
-    return division?.name || 'Unknown Division';
+  const getDepartmentName = (departmentId: string) => {
+    const department = departments.find(d => d.id === departmentId);
+    return department?.name || 'Unknown Department';
   };
 
-  const getDivisionBadgeColor = (divisionId: string) => {
-    switch (divisionId) {
+  const getDepartmentBadgeColor = (departmentId: string) => {
+    switch (departmentId) {
       case 'div-1': // Pest Control
         return 'bg-green-100 text-green-800';
       case 'div-2': // Sanitary Bins
@@ -186,10 +186,10 @@ export default function Workers() {
                             {worker.name}
                           </h4>
                           <Badge 
-                            className={getDivisionBadgeColor(worker.divisionId)}
-                            data-testid={`worker-division-${worker.id}`}
+                            className={getDepartmentBadgeColor(worker.departmentId)}
+                            data-testid={`worker-department-${worker.id}`}
                           >
-                            {getDivisionName(worker.divisionId)}
+                            {getDepartmentName(worker.departmentId)}
                           </Badge>
                         </div>
                       </div>

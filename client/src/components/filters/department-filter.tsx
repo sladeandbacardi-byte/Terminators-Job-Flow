@@ -9,7 +9,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import type { Division } from "@shared/schema";
+import type { Department } from "@shared/schema";
 
 interface DepartmentFilterProps {
   selectedDepartments: string[];
@@ -26,8 +26,8 @@ export function DepartmentFilter({
 }: DepartmentFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   // Handle "All Departments" selection
@@ -51,16 +51,16 @@ export function DepartmentFilter({
     if (selectedDepartments.length === 0) {
       return "All Departments";
     } else if (selectedDepartments.length === 1) {
-      const division = divisions.find(d => d.id === selectedDepartments[0]);
-      return division?.name || "1 Department";
+      const department = departments.find(d => d.id === selectedDepartments[0]);
+      return department?.name || "1 Department";
     } else {
       return `${selectedDepartments.length} Departments`;
     }
   };
 
-  // Get selected division names for badges
-  const getSelectedDivisionNames = () => {
-    return divisions
+  // Get selected department names for badges
+  const getSelectedDepartmentNames = () => {
+    return departments
       .filter(d => selectedDepartments.includes(d.id))
       .map(d => ({ id: d.id, name: d.name, colorCode: d.colorCode }));
   };
@@ -103,28 +103,28 @@ export function DepartmentFilter({
             )}
 
             {/* Individual Department Options */}
-            {divisions.map((division) => (
+            {departments.map((department) => (
               <div 
-                key={division.id} 
+                key={department.id} 
                 className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded"
-                data-testid={`department-option-${division.id}`}
+                data-testid={`department-option-${department.id}`}
               >
                 <Checkbox
-                  id={`dept-${division.id}`}
-                  checked={selectedDepartments.includes(division.id)}
-                  onCheckedChange={(checked) => handleDepartmentToggle(division.id, checked as boolean)}
-                  data-testid={`checkbox-department-${division.id}`}
+                  id={`dept-${department.id}`}
+                  checked={selectedDepartments.includes(department.id)}
+                  onCheckedChange={(checked) => handleDepartmentToggle(department.id, checked as boolean)}
+                  data-testid={`checkbox-department-${department.id}`}
                 />
                 <div className="flex items-center gap-2 flex-1">
                   <div 
                     className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: division.colorCode }}
+                    style={{ backgroundColor: department.colorCode }}
                   />
-                  <label htmlFor={`dept-${division.id}`} className="cursor-pointer">
-                    {division.name}
+                  <label htmlFor={`dept-${department.id}`} className="cursor-pointer">
+                    {department.name}
                   </label>
                 </div>
-                {selectedDepartments.includes(division.id) && (
+                {selectedDepartments.includes(department.id) && (
                   <Check className="h-4 w-4 text-green-600" />
                 )}
               </div>
@@ -151,22 +151,22 @@ export function DepartmentFilter({
       {/* Selected Department Badges */}
       {selectedDepartments.length > 0 && (
         <div className="flex flex-wrap gap-1" data-testid="selected-departments-badges">
-          {getSelectedDivisionNames().map((division) => (
+          {getSelectedDepartmentNames().map((department) => (
             <Badge 
-              key={division.id} 
+              key={department.id} 
               variant="secondary" 
               className="text-xs"
               style={{ 
-                backgroundColor: `${division.colorCode}20`, 
-                borderColor: division.colorCode 
+                backgroundColor: `${department.colorCode}20`, 
+                borderColor: department.colorCode 
               }}
-              data-testid={`badge-department-${division.id}`}
+              data-testid={`badge-department-${department.id}`}
             >
-              {division.name}
+              {department.name}
               <button
                 className="ml-1 hover:bg-gray-200 rounded-full"
-                onClick={() => handleDepartmentToggle(division.id, false)}
-                data-testid={`button-remove-department-${division.id}`}
+                onClick={() => handleDepartmentToggle(department.id, false)}
+                data-testid={`button-remove-department-${department.id}`}
               >
                 ×
               </button>

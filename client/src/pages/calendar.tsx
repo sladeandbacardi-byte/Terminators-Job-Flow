@@ -37,7 +37,7 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Job, Client, Worker, Division } from "@shared/schema";
+import type { Job, Client, Worker, Department } from "@shared/schema";
 
 interface CalendarEvent {
   id: string;
@@ -145,8 +145,8 @@ export default function Calendar() {
     queryKey: ['/api/jobs'],
   });
 
-  const { data: departments = [] } = useQuery<Division[]>({
-    queryKey: ['/api/divisions'],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   const { data: workers = [] } = useQuery<Worker[]>({
@@ -979,7 +979,7 @@ export default function Calendar() {
             <Button 
               onClick={() => {
                 setViewType('month');
-                setDivisionFilter('all');
+                setDepartmentFilter('all');
                 setStatusFilter('all');
               }}
               variant="outline"

@@ -4,7 +4,7 @@ import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
 import MetricsCards from "@/components/dashboard/metrics-cards";
-import DivisionPerformance from "@/components/dashboard/division-performance";
+import DepartmentPerformance from "@/components/dashboard/department-performance";
 import NotificationsPanel from "@/components/dashboard/notifications";
 import RecentJobs from "@/components/dashboard/recent-jobs";
 import TodaysSchedule from "@/components/dashboard/schedule";
@@ -19,8 +19,8 @@ interface DashboardMetrics {
   activeWorkers: number;
   expiringContracts: number;
   monthlyRevenue: number;
-  divisions: Array<{
-    division: {
+  departments: Array<{
+    department: {
       id: string;
       name: string;
       colorCode: string;
@@ -275,11 +275,11 @@ export default function Dashboard() {
             {/* Sales Performance Dashboard */}
             <SalesPerformance className="mb-6" />
 
-            {/* Division Performance and Quick Actions */}
+            {/* Department Performance and Quick Actions */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2">
-                <DivisionPerformance
-                  divisions={metrics?.divisions || []}
+                <DepartmentPerformance
+                  departments={metrics?.departments || []}
                   isLoading={isLoading}
                 />
               </div>

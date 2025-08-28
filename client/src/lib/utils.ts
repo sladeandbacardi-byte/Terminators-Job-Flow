@@ -40,11 +40,11 @@ export function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function getDivisionColor(divisionName: string): string {
-  if (divisionName.toLowerCase().includes('pest')) {
+export function getDepartmentColor(departmentName: string): string {
+  if (departmentName.toLowerCase().includes('pest')) {
     return 'pest-control';
   }
-  if (divisionName.toLowerCase().includes('hygiene')) {
+  if (departmentName.toLowerCase().includes('hygiene')) {
     return 'hygiene';
   }
   return 'primary';

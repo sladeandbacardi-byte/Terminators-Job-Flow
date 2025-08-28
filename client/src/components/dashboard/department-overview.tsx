@@ -5,7 +5,7 @@ import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Briefcase, Package, TrendingUp } from "lucide-react";
-import type { Worker, Job, InventoryItem, Client, Division } from "@shared/schema";
+import type { Worker, Job, InventoryItem, Client, Department } from "@shared/schema";
 
 interface DepartmentOverviewProps {
   className?: string;
@@ -25,8 +25,8 @@ interface DepartmentStats {
 export function DepartmentOverview({ className = "" }: DepartmentOverviewProps) {
   const departmentFilter = useDepartmentFilter();
 
-  const { data: divisions = [] } = useQuery<Division[]>({
-    queryKey: ["/api/divisions"],
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
   });
 
   const { data: workers = [] } = useQuery<Worker[]>({
@@ -49,28 +49,28 @@ export function DepartmentOverview({ className = "" }: DepartmentOverviewProps) 
   const getDepartmentStats = (): DepartmentStats[] => {
     if (departmentFilter.isAllSelected) {
       // Show all departments
-      return divisions.map(division => ({
-        id: division.id,
-        name: division.name,
-        colorCode: division.colorCode,
-        totalWorkers: workers.filter(w => w.divisionId === division.id).length,
-        activeJobs: jobs.filter(j => j.divisionId === division.id && j.status !== 'completed').length,
-        totalClients: clients.filter(c => c.divisionId === division.id).length,
-        inventoryItems: inventory.filter(i => i.divisionId === division.id).length,
+      return departments.map(department => ({
+        id: department.id,
+        name: department.name,
+        colorCode: department.colorCode,
+        totalWorkers: workers.filter(w => w.departmentId === department.id).length,
+        activeJobs: jobs.filter(j => j.departmentId === department.id && j.status !== 'completed').length,
+        totalClients: clients.filter(c => c.departmentId === department.id).length,
+        inventoryItems: inventory.filter(i => i.departmentId === department.id).length,
         monthlyRevenue: 0, // This would come from actual revenue calculations
       }));
     } else {
       // Show only selected departments
-      return divisions
-        .filter(division => departmentFilter.selectedDepartments.includes(division.id))
-        .map(division => ({
-          id: division.id,
-          name: division.name,
-          colorCode: division.colorCode,
-          totalWorkers: workers.filter(w => w.divisionId === division.id).length,
-          activeJobs: jobs.filter(j => j.divisionId === division.id && j.status !== 'completed').length,
-          totalClients: clients.filter(c => c.divisionId === division.id).length,
-          inventoryItems: inventory.filter(i => i.divisionId === division.id).length,
+      return departments
+        .filter(department => departmentFilter.selectedDepartments.includes(department.id))
+        .map(department => ({
+          id: department.id,
+          name: department.name,
+          colorCode: department.colorCode,
+          totalWorkers: workers.filter(w => w.departmentId === department.id).length,
+          activeJobs: jobs.filter(j => j.departmentId === department.id && j.status !== 'completed').length,
+          totalClients: clients.filter(c => c.departmentId === department.id).length,
+          inventoryItems: inventory.filter(i => i.departmentId === department.id).length,
           monthlyRevenue: 0,
         }));
     }

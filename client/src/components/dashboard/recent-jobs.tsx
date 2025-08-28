@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bug, Sparkles } from "lucide-react";
-import { formatDateTime, getStatusColor, getDivisionColor } from "@/lib/utils";
+import { formatDateTime, getStatusColor, getDepartmentColor } from "@/lib/utils";
 import type { Job } from "@shared/schema";
 
 export default function RecentJobs() {
@@ -16,7 +16,7 @@ export default function RecentJobs() {
       title: "Monthly Pest Control",
       clientId: "client-1",
       workerId: "worker-1", 
-      divisionId: "div-1",
+      departmentId: "div-1",
       serviceType: "Pest Control Inspection",
       status: "completed" as const,
       scheduledDate: new Date(),
@@ -30,7 +30,7 @@ export default function RecentJobs() {
       title: "Sanitizer Refill & Maintenance", 
       clientId: "client-2",
       workerId: "worker-2",
-      divisionId: "div-2", 
+      departmentId: "div-2", 
       serviceType: "Hand Sanitizer Service",
       status: "in_progress" as const,
       scheduledDate: new Date(),
@@ -44,7 +44,7 @@ export default function RecentJobs() {
       title: "Rodent Control Inspection",
       clientId: "client-3", 
       workerId: "worker-3",
-      divisionId: "div-1",
+      departmentId: "div-1",
       serviceType: "Rodent Control", 
       status: "pending" as const,
       scheduledDate: new Date(Date.now() + 60 * 60 * 1000),
@@ -56,8 +56,8 @@ export default function RecentJobs() {
 
   const displayJobs = jobs.length > 0 ? jobs.slice(-5) : mockJobs;
 
-  const getJobIcon = (divisionId: string) => {
-    return divisionId === "div-1" ? Bug : Sparkles;
+  const getJobIcon = (departmentId: string) => {
+    return departmentId === "div-1" ? Bug : Sparkles;
   };
 
   const getStatusBadge = (status: string) => {
@@ -128,9 +128,9 @@ export default function RecentJobs() {
           </div>
         ) : (
           displayJobs.map((job) => {
-            const Icon = getJobIcon(job.divisionId);
-            const getDivisionColors = (divisionId: string) => {
-              switch (divisionId) {
+            const Icon = getJobIcon(job.departmentId);
+            const getDepartmentColors = (departmentId: string) => {
+              switch (departmentId) {
                 case 'div-1': return { iconBg: 'bg-green-100', iconColor: 'text-green-600' };
                 case 'div-2': return { iconBg: 'bg-purple-100', iconColor: 'text-purple-600' };
                 case 'div-3': return { iconBg: 'bg-blue-100', iconColor: 'text-blue-600' };
@@ -138,7 +138,7 @@ export default function RecentJobs() {
                 default: return { iconBg: 'bg-gray-100', iconColor: 'text-gray-600' };
               }
             };
-            const { iconBg, iconColor } = getDivisionColors(job.divisionId);
+            const { iconBg, iconColor } = getDepartmentColors(job.departmentId);
             
             return (
               <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg" data-testid={`job-${job.id}`}>
