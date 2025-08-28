@@ -100,7 +100,7 @@ export default function Calendar() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
-  const [showBusinessHoursOnly, setShowBusinessHoursOnly] = useState(true);
+
   const dragCounter = useRef(0);
 
   const { toast } = useToast();
@@ -720,10 +720,8 @@ export default function Calendar() {
     dayEvents.forEach(event => {
       console.log(`  Event: ${event.title} at ${format(event.startTime, 'HH:mm')}`);
     });
-    // Business hours: 7 AM to 5 PM or full day
-    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
-    const allHours = Array.from({ length: 24 }, (_, i) => i);
-    const hours = showBusinessHoursOnly ? businessHours : allHours;
+    // Display hours: 7 AM to 5 PM (business hours)
+    const hours = Array.from({ length: 10 }, (_, i) => i + 7);
 
     return (
       <div className="flex h-full">
@@ -762,12 +760,12 @@ export default function Calendar() {
                 duration = event.estimatedDuration;
               }
               
-              // Calculate position based on whether we're showing business hours or full day
-              const hourOffset = showBusinessHoursOnly ? 7 : 0; // Business hours start at 7 AM
+              // Calculate position based on 7 AM start time
+              const hourOffset = 7; // Business hours start at 7 AM
               const adjustedHour = startHour - hourOffset;
               
-              // Skip events outside business hours if we're in business hours mode
-              if (showBusinessHoursOnly && (startHour < 7 || startHour >= 17)) {
+              // Skip events outside business hours (7 AM to 5 PM)
+              if (startHour < 7 || startHour >= 17) {
                 return null;
               }
               
@@ -777,7 +775,7 @@ export default function Calendar() {
               // Validate calculated values
               if (isNaN(top) || isNaN(height) || top < 0 || height < 0 || adjustedHour < 0) {
                 console.warn('Invalid positioning for event:', event.id, { 
-                  top, height, startHour, startMinute, duration, adjustedHour, showBusinessHoursOnly 
+                  top, height, startHour, startMinute, duration, adjustedHour 
                 });
                 return null;
               }
@@ -1057,21 +1055,7 @@ export default function Calendar() {
                 </SelectContent>
               </Select>
 
-              {/* Business Hours Toggle for Day View */}
-              {viewType === 'day' && (
-                <div className="flex items-center space-x-2">
-                  <label className="text-sm font-medium">View:</label>
-                  <Button
-                    variant={showBusinessHoursOnly ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setShowBusinessHoursOnly(!showBusinessHoursOnly)}
-                    data-testid="business-hours-toggle"
-                  >
-                    <Clock className="h-4 w-4 mr-2" />
-                    {showBusinessHoursOnly ? "Business Hours (9AM-6PM)" : "Full Day (24 Hours)"}
-                  </Button>
-                </div>
-              )}
+
             </div>
           </div>
 
