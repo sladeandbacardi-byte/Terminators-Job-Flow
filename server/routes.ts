@@ -863,11 +863,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                jobDate.getFullYear() === now.getFullYear();
       });
 
-      // Calculate division performance
-      const divisionStats = await Promise.all(departments.map(async (division) => {
+      // Calculate department performance
+      const departmentStats = await Promise.all(departments.map(async (department) => {
         const [todayJobs, workers] = await Promise.all([
-          storage.getJobsByDepartment(division.id),
-          storage.getWorkersByDepartment(division.id)
+          storage.getJobsByDepartment(department.id),
+          storage.getWorkersByDepartment(department.id)
         ]);
 
         const todayJobsFiltered = todayJobs.filter(job => {
@@ -877,7 +877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         return {
-          division,
+          department: department,
           activeWorkers: workers.filter(w => w.isActive).length,
           jobsToday: todayJobsFiltered.length,
           completed: todayJobsFiltered.filter(j => j.status === 'completed').length,
@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiringContracts: expiringContracts.length,
         monthlyRevenue: 45680, // This would be calculated from contracts
         completedJobsThisMonth: completedJobsThisMonth.length,
-        departments: divisionStats
+        departments: departmentStats
       };
 
       res.json(metrics);
