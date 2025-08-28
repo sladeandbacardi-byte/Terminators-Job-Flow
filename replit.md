@@ -64,6 +64,10 @@ Based on current business operations, the system now accurately reflects the fou
 - **Deep Cleaning** (div-4): Orange branding (#f59e0b), professional deep cleaning and specialized cleaning services
 
 **Recent Changes (August 28, 2025)**:
+- **Day View Date Picker**: Added clickable date picker to day view allowing users to select any date via small calendar popup
+- **Date Format Standardization**: Updated day view date display to "day, date month year" format (e.g., "Wednesday, 28 August 2025")
+- **Overlapping Events Fix**: Implemented automatic overlap detection and side-by-side positioning for events scheduled at the same time
+- **Department Terminology**: Standardized terminology from "division" to "department" throughout calendar interface
 - **Calendar Hour View Toggle**: Added toggle between Business Hours (7AM-5PM) and Full Day (24 Hours) views for day calendar
 - **Calendar Height Fix**: Fixed month view calendar container height to prevent bottom row cutoff, changed from fixed height to scrollable
 - **Department Selection in Appointments**: Added department dropdown to Create Appointment form for proper categorization
