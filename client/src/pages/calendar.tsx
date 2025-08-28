@@ -454,15 +454,29 @@ export default function Calendar() {
     }
   };
 
-  const getEventsForDate = (date: Date) => {
+  const getEventsForDate = (date: Date, useFiltered = true) => {
     if (!date || isNaN(date.getTime())) {
       console.warn('Invalid date passed to getEventsForDate:', date);
       return [];
     }
     
-    return filteredEvents.filter(event => {
+    // Use allEvents for day view to show everything, filteredEvents for other views
+    const eventsToSearch = useFiltered ? filteredEvents : allEvents;
+    
+    return eventsToSearch.filter(event => {
       try {
-        return event && event.startTime && isSameDay(event.startTime, date);
+        if (!event || !event.startTime) {
+          return false;
+        }
+        
+        // Ensure startTime is a valid Date object
+        const eventDate = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
+        if (isNaN(eventDate.getTime())) {
+          console.warn('Invalid date for event:', event.id);
+          return false;
+        }
+        
+        return isSameDay(eventDate, date);
       } catch (error) {
         console.warn('Error comparing dates for event:', event?.id, error);
         return false;
@@ -691,13 +705,19 @@ export default function Calendar() {
   };
 
   const renderDayView = () => {
-    const dayEvents = getEventsForDate(currentDate).sort((a, b) => {
+    // Use allEvents for day view to show all jobs, bypass filters
+    const dayEvents = getEventsForDate(currentDate, false).sort((a, b) => {
       try {
         return a.startTime.getTime() - b.startTime.getTime();
       } catch (error) {
         console.warn('Error sorting events:', error, { a: a?.id, b: b?.id });
         return 0;
       }
+    });
+    
+    console.log(`Day view for ${format(currentDate, 'yyyy-MM-dd')}: Found ${dayEvents.length} events`);
+    dayEvents.forEach(event => {
+      console.log(`  Event: ${event.title} at ${format(event.startTime, 'HH:mm')}`);
     });
     // Business hours: 9 AM to 6 PM (can be adjusted) or full day
     const businessHours = Array.from({ length: 9 }, (_, i) => i + 9);
