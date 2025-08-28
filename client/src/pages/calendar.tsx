@@ -47,7 +47,7 @@ interface CalendarEvent {
   priority: 'low' | 'medium' | 'high';
   clientId?: string;
   workerId?: string;
-  divisionId?: string;
+  departmentId?: string;
   location?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   color?: string;
@@ -65,7 +65,7 @@ const appointmentSchema = z.object({
   duration: z.number().min(15, "Duration must be at least 15 minutes"),
   clientId: z.string().optional(),
   workerId: z.string().optional(),
-  divisionId: z.string().optional(),
+  departmentId: z.string().optional(),
   location: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]),
 });
@@ -78,7 +78,7 @@ const jobEditSchema = z.object({
   estimatedDuration: z.number().min(15, "Duration must be at least 15 minutes"),
   clientId: z.string().min(1, "Client is required"),
   workerId: z.string().optional(),
-  divisionId: z.string().min(1, "Division is required"),
+  departmentId: z.string().min(1, "Department is required"),
   location: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]),
   status: z.enum(["scheduled", "in_progress", "completed", "cancelled"]),
@@ -96,7 +96,7 @@ export default function Calendar() {
   const [isEditJobDialogOpen, setIsEditJobDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [divisionFilter, setDivisionFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
@@ -143,7 +143,7 @@ export default function Calendar() {
     queryKey: ['/api/jobs'],
   });
 
-  const { data: divisions = [] } = useQuery<Division[]>({
+  const { data: departments = [] } = useQuery<Division[]>({
     queryKey: ['/api/divisions'],
   });
 
@@ -267,7 +267,7 @@ export default function Calendar() {
       priority: job.priority as 'low' | 'medium' | 'high',
       clientId: job.clientId,
       workerId: job.workerId || undefined,
-      divisionId: job.divisionId,
+      departmentId: job.departmentId,
       location: job.location || (client ? client.address : '') || undefined,
       status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
       color: getPriorityColor(job.priority),
@@ -291,10 +291,10 @@ export default function Calendar() {
 
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesDivision = divisionFilter === "all" || event.divisionId === divisionFilter;
+    const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
     
-    return matchesSearch && matchesDivision && matchesStatus;
+    return matchesSearch && matchesDepartment && matchesStatus;
   });
 
   function getPriorityColor(priority: string): string {
@@ -339,7 +339,7 @@ export default function Calendar() {
           estimatedDuration: job.estimatedDuration || 60,
           clientId: job.clientId,
           workerId: job.workerId || "",
-          divisionId: job.divisionId,
+          departmentId: job.departmentId,
           location: job.location || "",
           priority: job.priority as "low" | "medium" | "high",
           status: job.status as "scheduled" | "in_progress" | "completed" | "cancelled",
@@ -1031,15 +1031,15 @@ export default function Calendar() {
                 />
               </div>
 
-              <Select value={divisionFilter} onValueChange={setDivisionFilter}>
-                <SelectTrigger className="w-48" data-testid="division-filter">
-                  <SelectValue placeholder="All Divisions" />
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger className="w-48" data-testid="department-filter">
+                  <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Divisions</SelectItem>
-                  {divisions.map(division => (
-                    <SelectItem key={division.id} value={division.id}>
-                      {division.name}
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map(department => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1199,20 +1199,20 @@ export default function Calendar() {
 
                   <FormField
                     control={appointmentForm.control}
-                    name="divisionId"
+                    name="departmentId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Department</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="appointment-division">
+                            <SelectTrigger data-testid="appointment-department">
                               <SelectValue placeholder="Select department" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {divisions.map(division => (
-                              <SelectItem key={division.id} value={division.id}>
-                                {division.name}
+                            {departments.map(department => (
+                              <SelectItem key={department.id} value={department.id}>
+                                {department.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1450,20 +1450,20 @@ export default function Calendar() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={jobEditForm.control}
-                      name="divisionId"
+                      name="departmentId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Division</FormLabel>
+                          <FormLabel>Department</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                              <SelectTrigger data-testid="job-division">
-                                <SelectValue placeholder="Select division" />
+                              <SelectTrigger data-testid="job-department">
+                                <SelectValue placeholder="Select department" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {divisions.map(division => (
-                                <SelectItem key={division.id} value={division.id}>
-                                  {division.name}
+                              {departments.map(department => (
+                                <SelectItem key={department.id} value={department.id}>
+                                  {department.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
