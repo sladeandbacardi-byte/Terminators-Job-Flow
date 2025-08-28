@@ -63,7 +63,12 @@ Based on current business operations, the system now accurately reflects the fou
 - **Washroom** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
 - **Deep Cleaning** (div-4): Orange branding (#f59e0b), professional deep cleaning and specialized cleaning services
 
-**Recent Changes (August 27, 2025)**:
+**Recent Changes (August 28, 2025)**:
+- **Calendar Hour View Toggle**: Added toggle between Business Hours (7AM-5PM) and Full Day (24 Hours) views for day calendar
+- **Calendar Height Fix**: Fixed month view calendar container height to prevent bottom row cutoff, changed from fixed height to scrollable
+- **Department Selection in Appointments**: Added department dropdown to Create Appointment form for proper categorization
+
+**Previous Changes (August 27, 2025)**:
 - **Landscape Daily Department Schedule Cards**: Implemented printable daily job schedules optimized for A4 landscape format
   - Compact table layout displaying one department per day with horizontal job listings
   - 8-column structure: Job#, Time, Job & Client, Worker, Location, Status, Notes
