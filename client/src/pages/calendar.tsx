@@ -296,10 +296,7 @@ export default function Calendar() {
     const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
     
-    // Debug logging for department filtering
-    if (viewType === 'day' && departmentFilter !== "all") {
-      console.log(`Department filter debug - Event: ${event.title}, DepartmentId: ${event.departmentId}, Filter: ${departmentFilter}, Matches: ${matchesDepartment}`);
-    }
+
     
     return matchesSearch && matchesDepartment && matchesStatus;
   });
@@ -714,8 +711,8 @@ export default function Calendar() {
   };
 
   const renderDayView = () => {
-    // Use allEvents for day view to show all jobs, bypass filters
-    const dayEvents = getEventsForDate(currentDate, false).sort((a, b) => {
+    // Use filtered events for day view to respect department and status filters
+    const dayEvents = getEventsForDate(currentDate, true).sort((a, b) => {
       try {
         return a.startTime.getTime() - b.startTime.getTime();
       } catch (error) {
