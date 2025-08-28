@@ -51,6 +51,7 @@ interface CalendarEvent {
   location?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   color?: string;
+  estimatedDuration?: number;
 }
 
 type ViewType = 'month' | 'week' | 'day' | 'agenda';
@@ -745,14 +746,21 @@ export default function Calendar() {
           {dayEvents.map(event => {
             try {
               // Safety checks for event properties
-              if (!event || !event.startTime || !event.endTime) {
+              if (!event || !event.startTime) {
                 console.warn('Skipping invalid event in day view:', event?.id);
                 return null;
               }
 
               const startHour = event.startTime.getHours();
               const startMinute = event.startTime.getMinutes();
-              const duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
+              
+              // Calculate duration with proper fallback
+              let duration = 60; // Default 1 hour
+              if (event.endTime && event.endTime instanceof Date && !isNaN(event.endTime.getTime())) {
+                duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
+              } else if (event.estimatedDuration) {
+                duration = event.estimatedDuration;
+              }
               
               // Calculate position based on whether we're showing business hours or full day
               const hourOffset = showBusinessHoursOnly ? 9 : 0; // Business hours start at 9 AM
@@ -767,10 +775,17 @@ export default function Calendar() {
               const height = Math.max((duration * 64 / 60), 40); // Ensure minimum height
 
               // Validate calculated values
-              if (isNaN(top) || isNaN(height) || top < 0 || height < 0) {
-                console.warn('Invalid positioning for event:', event.id, { top, height, startHour, startMinute, duration });
+              if (isNaN(top) || isNaN(height) || top < 0 || height < 0 || adjustedHour < 0) {
+                console.warn('Invalid positioning for event:', event.id, { 
+                  top, height, startHour, startMinute, duration, adjustedHour, showBusinessHoursOnly 
+                });
                 return null;
               }
+
+              // Create end time for display
+              const displayEndTime = event.endTime && event.endTime instanceof Date 
+                ? event.endTime 
+                : new Date(event.startTime.getTime() + duration * 60000);
 
               return (
                 <div
@@ -790,35 +805,7 @@ export default function Calendar() {
                 >
                   <div className="font-medium text-sm truncate">{event.title}</div>
                   <div className="text-xs text-gray-600">
-                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                  </div>
-                  {event.location && (
-                    <div className="text-xs text-gray-500 truncate">
-                      📍 {event.location}
-                    </div>
-                  )}
-                </div>
-              );
-
-              return (
-                <div
-                  key={event.id}
-                  className="absolute left-2 right-2 p-2 rounded cursor-pointer hover:opacity-80"
-                  style={{ 
-                    top: `${top}px`, 
-                    height: `${height}px`,
-                    backgroundColor: (event.color || '#6b7280') + '20',
-                    color: event.color || '#6b7280',
-                    minHeight: '40px'
-                  }}
-                  onClick={() => {
-                    setSelectedEvent(event);
-                    setIsEventDialogOpen(true);
-                  }}
-                >
-                  <div className="font-medium text-sm">{event.title}</div>
-                  <div className="text-xs text-gray-600">
-                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                    {format(event.startTime, 'HH:mm')} - {format(displayEndTime, 'HH:mm')}
                   </div>
                   {event.location && (
                     <div className="text-xs text-gray-500 truncate">
