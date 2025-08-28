@@ -723,6 +723,111 @@ export default function Calendar() {
     dayEvents.forEach(event => {
       console.log(`  Event: ${event.title} at ${format(event.startTime, 'HH:mm')}`);
     });
+
+    // Function to detect overlapping events and calculate positioning
+    const calculateEventPositions = (events: CalendarEvent[]) => {
+      const positionedEvents = events.map(event => {
+        // Safety checks for event properties
+        if (!event || !event.startTime) {
+          console.warn('Skipping invalid event in day view:', event?.id);
+          return null;
+        }
+
+        const startHour = event.startTime.getHours();
+        const startMinute = event.startTime.getMinutes();
+        
+        // Calculate duration with proper fallback
+        let duration = 60; // Default 1 hour
+        if (event.endTime && event.endTime instanceof Date && !isNaN(event.endTime.getTime())) {
+          duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
+        } else if (event.estimatedDuration) {
+          duration = event.estimatedDuration;
+        }
+        
+        // Calculate position based on whether we're showing business hours or full day
+        const hourOffset = showAllHours ? 0 : 7; // Business hours start at 7 AM
+        const adjustedHour = startHour - hourOffset;
+        
+        // Skip events outside visible hours
+        if (!showAllHours && (startHour < 7 || startHour >= 17)) {
+          return null;
+        }
+        
+        const top = (adjustedHour * 64) + (startMinute * 64 / 60);
+        const height = Math.max((duration * 64 / 60), 40); // Ensure minimum height
+
+        // Validate calculated values
+        if (isNaN(top) || isNaN(height) || top < 0 || height < 0 || adjustedHour < 0) {
+          console.warn('Invalid positioning for event:', event.id, { 
+            top, height, startHour, startMinute, duration, adjustedHour 
+          });
+          return null;
+        }
+
+        return {
+          ...event,
+          top,
+          height,
+          duration,
+          startTime: event.startTime,
+          endTime: event.endTime && event.endTime instanceof Date 
+            ? event.endTime 
+            : new Date(event.startTime.getTime() + duration * 60000)
+        };
+      }).filter(Boolean);
+
+      // Group overlapping events
+      const groups: Array<typeof positionedEvents> = [];
+      
+      for (const event of positionedEvents) {
+        if (!event) continue;
+        
+        let addedToGroup = false;
+        
+        for (const group of groups) {
+          // Check if this event overlaps with any event in the group
+          const overlaps = group.some(groupEvent => {
+            if (!groupEvent) return false;
+            const eventEnd = event.top + event.height;
+            const groupEventEnd = groupEvent.top + groupEvent.height;
+            
+            return !(event.top >= groupEventEnd || groupEvent.top >= eventEnd);
+          });
+          
+          if (overlaps) {
+            group.push(event);
+            addedToGroup = true;
+            break;
+          }
+        }
+        
+        if (!addedToGroup) {
+          groups.push([event]);
+        }
+      }
+
+      // Calculate positions for each group
+      const finalEvents: Array<typeof positionedEvents[0] & { left: string; width: string; column: number }> = [];
+      
+      for (const group of groups) {
+        const groupSize = group.length;
+        const columnWidth = `${100 / groupSize}%`;
+        
+        group.forEach((event, index) => {
+          if (!event) return;
+          finalEvents.push({
+            ...event,
+            left: `${(index * 100) / groupSize}%`,
+            width: columnWidth,
+            column: index
+          });
+        });
+      }
+
+      return finalEvents.filter(Boolean);
+    };
+
+    const positionedEvents = calculateEventPositions(dayEvents);
     // Display hours: 7 AM to 5 PM (business hours) or full day
     const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
     const allHours = Array.from({ length: 24 }, (_, i) => i);
@@ -746,69 +851,30 @@ export default function Calendar() {
           ))}
           
           {/* Events overlay */}
-          {dayEvents.map(event => {
-            try {
-              // Safety checks for event properties
-              if (!event || !event.startTime) {
-                console.warn('Skipping invalid event in day view:', event?.id);
-                return null;
-              }
-
-              const startHour = event.startTime.getHours();
-              const startMinute = event.startTime.getMinutes();
-              
-              // Calculate duration with proper fallback
-              let duration = 60; // Default 1 hour
-              if (event.endTime && event.endTime instanceof Date && !isNaN(event.endTime.getTime())) {
-                duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
-              } else if (event.estimatedDuration) {
-                duration = event.estimatedDuration;
-              }
-              
-              // Calculate position based on whether we're showing business hours or full day
-              const hourOffset = showAllHours ? 0 : 7; // Business hours start at 7 AM
-              const adjustedHour = startHour - hourOffset;
-              
-              // Skip events outside visible hours
-              if (!showAllHours && (startHour < 7 || startHour >= 17)) {
-                return null;
-              }
-              
-              const top = (adjustedHour * 64) + (startMinute * 64 / 60);
-              const height = Math.max((duration * 64 / 60), 40); // Ensure minimum height
-
-              // Validate calculated values
-              if (isNaN(top) || isNaN(height) || top < 0 || height < 0 || adjustedHour < 0) {
-                console.warn('Invalid positioning for event:', event.id, { 
-                  top, height, startHour, startMinute, duration, adjustedHour 
-                });
-                return null;
-              }
-
-              // Create end time for display
-              const displayEndTime = event.endTime && event.endTime instanceof Date 
-                ? event.endTime 
-                : new Date(event.startTime.getTime() + duration * 60000);
-
-              return (
-                <div
-                  key={event.id}
-                  className="absolute left-2 right-2 p-2 rounded cursor-pointer hover:opacity-80 border border-gray-200"
-                  style={{ 
-                    top: `${top}px`, 
-                    height: `${height}px`,
-                    backgroundColor: (event.color || '#6b7280') + '20',
-                    color: event.color || '#6b7280',
-                    minHeight: '40px'
-                  }}
-                  onClick={() => handleEventClick(event)}
-                  draggable
+          {positionedEvents.map(event => {
+            return (
+              <div
+                key={event.id}
+                className="absolute p-2 rounded cursor-pointer hover:opacity-80 border border-gray-200 overflow-hidden"
+                style={{ 
+                  top: `${event.top}px`, 
+                  height: `${event.height}px`,
+                  left: event.left,
+                  width: event.width,
+                  backgroundColor: (event.color || '#6b7280') + '20',
+                  color: event.color || '#6b7280',
+                  minHeight: '40px',
+                  marginLeft: '4px',
+                  marginRight: '4px'
+                }}
+                onClick={() => handleEventClick(event)}
+                draggable
                   onDragStart={(e) => handleDragStart(e, event)}
                   onDragEnd={handleDragEnd}
                 >
                   <div className="font-medium text-sm truncate">{event.title}</div>
                   <div className="text-xs text-gray-600">
-                    {format(event.startTime, 'HH:mm')} - {format(displayEndTime, 'HH:mm')}
+                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
                   </div>
                   {event.location && (
                     <div className="text-xs text-gray-500 truncate">
@@ -817,10 +883,6 @@ export default function Calendar() {
                   )}
                 </div>
               );
-            } catch (error) {
-              console.error('Error rendering event in day view:', event?.id, error);
-              return null;
-            }
           }).filter(Boolean)}
         </div>
       </div>
