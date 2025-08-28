@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -980,7 +982,35 @@ export default function Calendar() {
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <h2 className="text-xl font-semibold text-gray-900">{getViewTitle()}</h2>
+                {viewType === 'day' ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="text-xl font-semibold text-gray-900 hover:bg-gray-100 h-auto p-2"
+                        data-testid="date-picker-trigger"
+                      >
+                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        {getViewTitle()}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={currentDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setCurrentDate(date);
+                          }
+                        }}
+                        initialFocus
+                        data-testid="date-picker-calendar"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <h2 className="text-xl font-semibold text-gray-900">{getViewTitle()}</h2>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">
