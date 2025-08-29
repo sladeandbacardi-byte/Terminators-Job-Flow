@@ -63,11 +63,21 @@ Based on current business operations, the system now accurately reflects the fou
 - **Washroom** (div-3): Blue branding (#3b82f6), complete washroom maintenance, hygiene and supply services
 - **Deep Cleaning** (div-4): Orange branding (#f59e0b), professional deep cleaning and specialized cleaning services
 
-**Recent Changes (August 28, 2025)**:
+**Recent Changes (August 29, 2025)**:
+- **Complete Department Terminology Migration**: Successfully changed all "division" references to "department" throughout the entire application
+  - Updated all server-side files (shared/schema.ts, server/storage.ts, server/routes.ts) with department terminology
+  - Systematically updated all client-side components, forms, pages, and hooks using batch replacements
+  - Fixed API response structure to return "department" instead of "division"
+  - Updated mobile test data creation to use correct "departmentId" field instead of legacy "divisionId"
+- **Calendar Department Filtering Fix**: Resolved critical issue where day view department filtering was not working
+  - Fixed renderDayView function to use filtered events instead of bypassing filters
+  - Department filtering now works correctly across all calendar views
+  - Users can now select specific departments and see only relevant events in day view
+
+**Previous Changes (August 28, 2025)**:
 - **Day View Date Picker**: Added clickable date picker to day view allowing users to select any date via small calendar popup
 - **Date Format Standardization**: Updated day view date display to "day, date month year" format (e.g., "Wednesday, 28 August 2025")
 - **Overlapping Events Fix**: Implemented automatic overlap detection and side-by-side positioning for events scheduled at the same time
-- **Department Terminology**: Standardized terminology from "division" to "department" throughout calendar interface
 - **Calendar Hour View Toggle**: Added toggle between Business Hours (7AM-5PM) and Full Day (24 Hours) views for day calendar
 - **Calendar Height Fix**: Fixed month view calendar container height to prevent bottom row cutoff, changed from fixed height to scrollable
 - **Department Selection in Appointments**: Added department dropdown to Create Appointment form for proper categorization
