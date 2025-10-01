@@ -830,12 +830,12 @@ export class MemStorage implements IStorage {
       // Washroom Services Team
       { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", departmentId: "div-3", role: "Supervisor" },
       { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", departmentId: "div-3", role: "Washroom Technician" },
+      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", departmentId: "div-4", role: "Deep Cleaning Specialist" },
+      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", departmentId: "div-4", role: "Deep Cleaning Specialist" },
       
       // Deep Cleaning Team
       { name: "Themba Mthethwa", email: "themba@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-4", role: "Deep Cleaning Supervisor" },
