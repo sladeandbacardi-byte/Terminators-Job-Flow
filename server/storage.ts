@@ -814,7 +814,6 @@ export class MemStorage implements IStorage {
       // Pest Control Team
       { name: "Reece Ebrahim", email: "reece@terminators.co.za", phone: "+27 41 123 4572", departmentId: "div-1", role: "PCO" },
       { name: "Garth du Preez", email: "garth@terminators.co.za", phone: "+27 41 123 4573", departmentId: "div-1", role: "PCO" },
-      { name: "Michael Meyer", email: "michael@terminators.co.za", phone: "+27 41 123 4574", departmentId: "div-1", role: "PCO" },
       { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", departmentId: "div-1", role: "PCO" },
       
       // Sanitary Bin Service A Team
@@ -835,14 +834,7 @@ export class MemStorage implements IStorage {
       { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", departmentId: "div-4", role: "Deep Cleaning Specialist" },
       { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", departmentId: "div-4", role: "Deep Cleaning Specialist" },
       { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      
-      // Deep Cleaning Team
-      { name: "Themba Mthethwa", email: "themba@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-4", role: "Deep Cleaning Supervisor" },
-      { name: "Nomsa Dlamini", email: "nomsa@terminators.co.za", phone: "+27 41 123 4591", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Sipho Ndaba", email: "sipho@terminators.co.za", phone: "+27 41 123 4592", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Lindiwe Khumalo", email: "lindiwe@terminators.co.za", phone: "+27 41 123 4593", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Mthunzi Cele", email: "mthunzi@terminators.co.za", phone: "+27 41 123 4594", departmentId: "div-4", role: "Equipment Specialist" }
+      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", departmentId: "div-4", role: "Deep Cleaning Specialist" }
     ];
 
     workers.forEach((worker, index) => {
