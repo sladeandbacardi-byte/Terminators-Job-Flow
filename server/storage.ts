@@ -804,12 +804,12 @@ export class MemStorage implements IStorage {
     // Create workers based on actual organogram
     const workers = [
       // Management Team
-      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-1", role: "Managing Member/Operations" },
+      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-1", role: "Operational Manager" },
       { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", departmentId: "div-2", role: "Sales Administrator" },
-      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: "div-2", role: "Finance/HR Manager" },
-      { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-2", role: "Sales Representative" },
-      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-2", role: "Hygiene Services Manager" },
-      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-1", role: "Pest Control Services Manager" },
+      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: "div-2", role: "Finance and Human Resources Manager" },
+      { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-2", role: "Sales Consultant" },
+      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-2", role: "Hygiene Services Coordinator" },
+      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-1", role: "Pest Control Services Coordinator" },
       
       // Pest Control Team
       { name: "Reece Ebrahim", email: "reece@terminators.co.za", phone: "+27 41 123 4572", departmentId: "div-1", role: "PCO" },
