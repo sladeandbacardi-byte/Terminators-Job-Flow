@@ -820,7 +820,7 @@ export class MemStorage implements IStorage {
     // Create workers based on actual organogram
     const workers = [
       // Management Team
-      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-1", role: "Operational Manager" },
+      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-6", role: "Operational Manager" },
       { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", departmentId: "div-5", role: "Sales Administrator" },
       { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: "div-6", role: "Finance and Human Resources Manager" },
       { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-5", role: "Sales Consultant" },
