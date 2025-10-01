@@ -176,37 +176,76 @@ export default function Inventory() {
           {stockAlerts && (stockAlerts.lowStock.length > 0 || stockAlerts.reorderRequired.length > 0 || stockAlerts.overstocked.length > 0) && (
             <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               {stockAlerts.lowStock.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-                    <div>
-                      <h3 className="font-semibold text-red-800">Critical Stock</h3>
-                      <p className="text-sm text-red-600">{stockAlerts.lowStock.length} items below minimum</p>
+                <button
+                  onClick={() => setAlertsFilter(alertsFilter === "critical" ? "all" : "critical")}
+                  className={`${
+                    alertsFilter === "critical"
+                      ? "bg-red-100 border-red-300 ring-2 ring-red-400"
+                      : "bg-red-50 border-red-200"
+                  } border rounded-lg p-4 text-left hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer`}
+                  data-testid="alert-critical-stock"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                      <div>
+                        <h3 className="font-semibold text-red-800">Critical Stock</h3>
+                        <p className="text-sm text-red-600">{stockAlerts.lowStock.length} items below minimum</p>
+                      </div>
                     </div>
+                    {alertsFilter === "critical" && (
+                      <span className="text-red-600 text-xs font-medium">Filtered</span>
+                    )}
                   </div>
-                </div>
+                </button>
               )}
               {stockAlerts.reorderRequired.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
-                    <div>
-                      <h3 className="font-semibold text-yellow-800">Reorder Required</h3>
-                      <p className="text-sm text-yellow-600">{stockAlerts.reorderRequired.length} items need restocking</p>
+                <button
+                  onClick={() => setAlertsFilter(alertsFilter === "reorder" ? "all" : "reorder")}
+                  className={`${
+                    alertsFilter === "reorder"
+                      ? "bg-yellow-100 border-yellow-300 ring-2 ring-yellow-400"
+                      : "bg-yellow-50 border-yellow-200"
+                  } border rounded-lg p-4 text-left hover:bg-yellow-100 hover:border-yellow-300 transition-all cursor-pointer`}
+                  data-testid="alert-reorder-required"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                      <div>
+                        <h3 className="font-semibold text-yellow-800">Reorder Required</h3>
+                        <p className="text-sm text-yellow-600">{stockAlerts.reorderRequired.length} items need restocking</p>
+                      </div>
                     </div>
+                    {alertsFilter === "reorder" && (
+                      <span className="text-yellow-600 text-xs font-medium">Filtered</span>
+                    )}
                   </div>
-                </div>
+                </button>
               )}
               {stockAlerts.overstocked.length > 0 && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
-                    <div>
-                      <h3 className="font-semibold text-purple-800">Overstocked</h3>
-                      <p className="text-sm text-purple-600">{stockAlerts.overstocked.length} items above maximum</p>
+                <button
+                  onClick={() => setAlertsFilter(alertsFilter === "overstocked" ? "all" : "overstocked")}
+                  className={`${
+                    alertsFilter === "overstocked"
+                      ? "bg-purple-100 border-purple-300 ring-2 ring-purple-400"
+                      : "bg-purple-50 border-purple-200"
+                  } border rounded-lg p-4 text-left hover:bg-purple-100 hover:border-purple-300 transition-all cursor-pointer`}
+                  data-testid="alert-overstocked"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                      <div>
+                        <h3 className="font-semibold text-purple-800">Overstocked</h3>
+                        <p className="text-sm text-purple-600">{stockAlerts.overstocked.length} items above maximum</p>
+                      </div>
                     </div>
+                    {alertsFilter === "overstocked" && (
+                      <span className="text-purple-600 text-xs font-medium">Filtered</span>
+                    )}
                   </div>
-                </div>
+                </button>
               )}
             </div>
           )}
