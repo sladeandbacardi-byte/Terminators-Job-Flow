@@ -824,7 +824,7 @@ export class MemStorage implements IStorage {
       { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", departmentId: "div-5", role: "Sales Administrator" },
       { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: "div-6", role: "Finance and Human Resources Manager" },
       { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-5", role: "Sales Consultant" },
-      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-2", role: "Hygiene Services Coordinator" },
+      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-6", role: "Hygiene Services Coordinator" },
       { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-1", role: "Pest Control Services Coordinator" },
       
       // Pest Control Team
