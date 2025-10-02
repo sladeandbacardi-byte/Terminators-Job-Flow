@@ -79,7 +79,7 @@ export function ExportButton({
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleExportAll} data-testid="export-all">
           <Database className="mr-2 h-4 w-4" />
-          Export All Data (JSON)
+          Export Complete Database (ZIP)
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

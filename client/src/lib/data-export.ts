@@ -2,6 +2,38 @@ import type {
   Job, Worker, Client, InventoryItem, RentalContract, Invoice, InvoiceItem,
   Supplier, PurchaseOrder, PurchaseOrderItem, EmailLog, Notification
 } from "@shared/schema";
+import JSZip from 'jszip';
+
+// Helper function to generate CSV content
+function generateCSVContent(data: any[]): string {
+  if (data.length === 0) {
+    return '';
+  }
+
+  const allKeys = new Set<string>();
+  data.forEach(item => {
+    Object.keys(item).forEach(key => allKeys.add(key));
+  });
+  
+  const headers = Array.from(allKeys);
+  
+  const csvContent = [
+    headers.join(','),
+    ...data.map(item => 
+      headers.map(header => {
+        const value = item[header];
+        if (value === null || value === undefined) return '';
+        const stringValue = String(value);
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      }).join(',')
+    )
+  ].join('\n');
+
+  return csvContent;
+}
 
 // CSV Export utility
 export function exportToCSV(data: any[], filename: string) {
@@ -281,7 +313,7 @@ export function exportNotifications(notifications: Notification[]) {
   exportToCSV(exportData, 'notifications-export');
 }
 
-// Export all data as a comprehensive report
+// Export all data as a comprehensive ZIP file with CSVs
 export async function exportAllData() {
   try {
     // Fetch all data
@@ -292,44 +324,227 @@ export async function exportAllData() {
       fetch('/api/inventory').then(r => r.json()),
       fetch('/api/contracts').then(r => r.json()),
       fetch('/api/invoices').then(r => r.json()),
+      fetch('/api/invoice-items').then(r => r.json()),
       fetch('/api/suppliers').then(r => r.json()),
       fetch('/api/purchase-orders').then(r => r.json()),
-      fetch('/api/notifications').then(r => r.json()),
+      fetch('/api/purchase-order-items').then(r => r.json()),
+      fetch('/api/departments').then(r => r.json()),
     ]);
 
-    const [jobs, workers, clients, inventory, contracts, invoices, suppliers, purchaseOrders, notifications] = responses;
+    const [jobs, workers, clients, inventory, contracts, invoices, invoiceItems, suppliers, purchaseOrders, poItems, departments] = responses;
 
-    // Create a comprehensive report
-    const report = {
-      exportDate: new Date().toLocaleString(),
-      summary: {
-        totalJobs: jobs.length,
-        totalWorkers: workers.length,
-        totalClients: clients.length,
-        totalInventoryItems: inventory.length,
-        totalContracts: contracts.length,
-        totalInvoices: invoices.length,
-        totalSuppliers: suppliers.length,
-        totalPurchaseOrders: purchaseOrders.length,
-        totalNotifications: notifications.length,
-      },
-      jobsData: jobs,
-      workersData: workers,
-      clientsData: clients,
-      inventoryData: inventory,
-      contractsData: contracts,
-      invoicesData: invoices,
-      suppliersData: suppliers,
-      purchaseOrdersData: purchaseOrders,
-      notificationsData: notifications,
-    };
+    // Create ZIP file
+    const zip = new JSZip();
+    const exportDate = new Date().toISOString().split('T')[0];
 
-    // Export as JSON for complete data preservation
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    // Add README file
+    const readme = `Terminators Field Service Management - Database Export
+Export Date: ${new Date().toLocaleString()}
+
+This archive contains all your business data in CSV format:
+
+- clients.csv: Client information and contacts (${clients.length} records)
+- jobs.csv: Job scheduling and assignments (${jobs.length} records)
+- workers.csv: Staff and worker information (${workers.length} records)
+- inventory.csv: Stock and inventory items (${inventory.length} records)
+- contracts.csv: Rental contracts (${contracts.length} records)
+- invoices.csv: Invoice records (${invoices.length} records)
+- invoice_items.csv: Invoice line items (${invoiceItems.length} records)
+- suppliers.csv: Supplier information (${suppliers.length} records)
+- purchase_orders.csv: Purchase orders (${purchaseOrders.length} records)
+- purchase_order_items.csv: Purchase order items (${poItems.length} records)
+- departments.csv: Department information (${departments.length} records)
+
+You can open these CSV files with Excel, Google Sheets, or any spreadsheet application.
+`;
+    zip.file('README.txt', readme);
+
+    // Prepare and add CSV files
+    if (clients.length > 0) {
+      const clientsData = clients.map((c: Client) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email || '',
+        phone: c.phone || '',
+        address: c.address || '',
+        contactPerson: c.contactPerson || '',
+        businessType: c.businessType || '',
+        status: c.status,
+        departmentId: c.departmentId,
+        taxNumber: c.taxNumber || '',
+        paymentTerms: c.paymentTerms || '',
+        creditLimit: c.creditLimit || '',
+        notes: c.notes || '',
+        createdAt: new Date(c.createdAt).toLocaleString(),
+      }));
+      zip.file('clients.csv', generateCSVContent(clientsData));
+    }
+
+    if (jobs.length > 0) {
+      const jobsData = jobs.map((j: Job) => ({
+        id: j.id,
+        title: j.title,
+        description: j.description,
+        status: j.status,
+        priority: j.priority,
+        type: j.type,
+        clientId: j.clientId,
+        workerId: j.workerId || '',
+        departmentId: j.departmentId,
+        scheduledStart: j.scheduledStart ? new Date(j.scheduledStart).toLocaleString() : '',
+        scheduledEnd: j.scheduledEnd ? new Date(j.scheduledEnd).toLocaleString() : '',
+        actualStart: j.actualStart ? new Date(j.actualStart).toLocaleString() : '',
+        actualEnd: j.actualEnd ? new Date(j.actualEnd).toLocaleString() : '',
+        estimatedDuration: j.estimatedDuration || '',
+        actualDuration: j.actualDuration || '',
+        location: j.location || '',
+        notes: j.notes || '',
+        createdAt: new Date(j.createdAt).toLocaleString(),
+      }));
+      zip.file('jobs.csv', generateCSVContent(jobsData));
+    }
+
+    if (workers.length > 0) {
+      const workersData = workers.map((w: Worker) => ({
+        id: w.id,
+        name: w.name,
+        email: w.email,
+        phone: w.phone || '',
+        departmentId: w.departmentId,
+        role: w.role || '',
+        status: w.status,
+        hireDate: w.hireDate ? new Date(w.hireDate).toLocaleDateString() : '',
+        skills: w.skills || '',
+        certifications: w.certifications || '',
+        emergencyContact: w.emergencyContact || '',
+        notes: w.notes || '',
+        createdAt: new Date(w.createdAt).toLocaleString(),
+      }));
+      zip.file('workers.csv', generateCSVContent(workersData));
+    }
+
+    if (inventory.length > 0) {
+      const inventoryData = inventory.map((i: InventoryItem) => ({
+        id: i.id,
+        name: i.name,
+        description: i.description || '',
+        sku: i.sku,
+        category: i.category,
+        supplier: i.supplier || '',
+        quantity: i.quantity,
+        minStockLevel: i.minStockLevel,
+        maxStockLevel: i.maxStockLevel,
+        reorderPoint: i.reorderPoint,
+        unitPrice: i.unitPrice,
+        location: i.location || '',
+        status: i.status,
+        departmentId: i.departmentId,
+        lastRestocked: i.lastRestocked ? new Date(i.lastRestocked).toLocaleDateString() : '',
+        expirationDate: i.expirationDate ? new Date(i.expirationDate).toLocaleDateString() : '',
+        createdAt: new Date(i.createdAt).toLocaleString(),
+      }));
+      zip.file('inventory.csv', generateCSVContent(inventoryData));
+    }
+
+    if (contracts.length > 0) {
+      const contractsData = contracts.map((c: RentalContract) => ({
+        id: c.id,
+        contractNumber: c.contractNumber,
+        clientId: c.clientId,
+        equipmentType: c.equipmentType,
+        quantity: c.quantity,
+        monthlyRate: c.monthlyRate,
+        status: c.status,
+        startDate: new Date(c.startDate).toLocaleDateString(),
+        endDate: c.endDate ? new Date(c.endDate).toLocaleDateString() : '',
+        autoRenewal: c.autoRenewal ? 'Yes' : 'No',
+        paymentFrequency: c.paymentFrequency,
+        totalValue: c.totalValue,
+        notes: c.notes || '',
+        terms: c.terms || '',
+        createdAt: new Date(c.createdAt).toLocaleString(),
+      }));
+      zip.file('contracts.csv', generateCSVContent(contractsData));
+    }
+
+    if (invoices.length > 0) {
+      const invoicesData = invoices.map((i: Invoice) => ({
+        id: i.id,
+        invoiceNumber: i.invoiceNumber,
+        clientId: i.clientId,
+        status: i.status,
+        issueDate: new Date(i.issueDate).toLocaleDateString(),
+        dueDate: new Date(i.dueDate).toLocaleDateString(),
+        paidDate: i.paidDate ? new Date(i.paidDate).toLocaleDateString() : '',
+        subtotal: i.subtotal,
+        taxAmount: i.taxAmount,
+        totalAmount: i.totalAmount,
+        paymentTerms: i.paymentTerms || '',
+        notes: i.notes || '',
+        createdAt: new Date(i.createdAt).toLocaleString(),
+      }));
+      zip.file('invoices.csv', generateCSVContent(invoicesData));
+    }
+
+    if (invoiceItems.length > 0) {
+      zip.file('invoice_items.csv', generateCSVContent(invoiceItems));
+    }
+
+    if (suppliers.length > 0) {
+      const suppliersData = suppliers.map((s: Supplier) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        phone: s.phone || '',
+        address: s.address || '',
+        contactPerson: s.contactPerson || '',
+        category: s.category,
+        paymentTerms: s.paymentTerms || '',
+        taxNumber: s.taxNumber || '',
+        website: s.website || '',
+        notes: s.notes || '',
+        isActive: s.isActive ? 'Yes' : 'No',
+        rating: s.rating || '',
+        createdAt: new Date(s.createdAt).toLocaleString(),
+      }));
+      zip.file('suppliers.csv', generateCSVContent(suppliersData));
+    }
+
+    if (purchaseOrders.length > 0) {
+      const poData = purchaseOrders.map((po: PurchaseOrder) => ({
+        id: po.id,
+        poNumber: po.poNumber,
+        supplierId: po.supplierId,
+        requestedById: po.requestedById,
+        approvedById: po.approvedById || '',
+        status: po.status,
+        totalAmount: po.totalAmount,
+        requestDate: new Date(po.requestDate).toLocaleDateString(),
+        approvalDate: po.approvalDate ? new Date(po.approvalDate).toLocaleDateString() : '',
+        sentDate: po.sentDate ? new Date(po.sentDate).toLocaleDateString() : '',
+        expectedDeliveryDate: po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString() : '',
+        actualDeliveryDate: po.actualDeliveryDate ? new Date(po.actualDeliveryDate).toLocaleDateString() : '',
+        notes: po.notes || '',
+        rejectionReason: po.rejectionReason || '',
+        createdAt: new Date(po.createdAt).toLocaleString(),
+      }));
+      zip.file('purchase_orders.csv', generateCSVContent(poData));
+    }
+
+    if (poItems.length > 0) {
+      zip.file('purchase_order_items.csv', generateCSVContent(poItems));
+    }
+
+    if (departments.length > 0) {
+      zip.file('departments.csv', generateCSVContent(departments));
+    }
+
+    // Generate ZIP file and download
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(zipBlob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `terminators-complete-export-${new Date().toISOString().split('T')[0]}.json`);
+    link.setAttribute('download', `terminators-database-export-${exportDate}.zip`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
