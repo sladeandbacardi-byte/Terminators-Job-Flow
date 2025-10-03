@@ -393,7 +393,7 @@ export default function Calendar() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, targetDate: Date) => {
+  const handleDrop = (e: React.DragEvent, targetDate: Date, preserveTime: boolean = true) => {
     e.preventDefault();
     dragCounter.current = 0;
     
@@ -401,11 +401,15 @@ export default function Calendar() {
       try {
         const newDate = new Date(targetDate);
         
-        // Preserve the original time when moving the event
-        if (draggedEvent.startTime && !isNaN(draggedEvent.startTime.getTime())) {
+        // In day view, use the target time (hour from drop zone)
+        // In month/week view, preserve the original time
+        if (preserveTime && draggedEvent.startTime && !isNaN(draggedEvent.startTime.getTime())) {
           newDate.setHours(draggedEvent.startTime.getHours());
           newDate.setMinutes(draggedEvent.startTime.getMinutes());
           newDate.setSeconds(draggedEvent.startTime.getSeconds());
+        } else if (!preserveTime) {
+          // Use the exact time from targetDate (includes hour from drop zone in day view)
+          // Already set in targetDate, no need to modify
         } else {
           // Default to 9 AM if startTime is invalid
           newDate.setHours(9);
@@ -858,7 +862,7 @@ export default function Calendar() {
               onDrop={(e) => {
                 const dropDate = new Date(currentDate);
                 dropDate.setHours(hour, 0, 0, 0);
-                handleDrop(e, dropDate);
+                handleDrop(e, dropDate, false);
               }}
             ></div>
           ))}
