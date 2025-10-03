@@ -849,7 +849,18 @@ export default function Calendar() {
         {/* Events column */}
         <div className="flex-1 relative">
           {hours.map(hour => (
-            <div key={hour} className="h-16 border-b border-gray-100 hover:bg-gray-50"></div>
+            <div 
+              key={hour} 
+              className="h-16 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => {
+                const dropDate = new Date(currentDate);
+                dropDate.setHours(hour, 0, 0, 0);
+                handleDrop(e, dropDate);
+              }}
+            ></div>
           ))}
           
           {/* Events overlay */}
