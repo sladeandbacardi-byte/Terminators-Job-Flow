@@ -482,3 +482,29 @@ export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
 export type UserSession = typeof userSessions.$inferSelect;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
+
+// Quote submissions from public website
+export const quoteSubmissions = pgTable("quote_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull(),
+  contactPerson: text("contact_person").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  serviceType: varchar("service_type").notNull(), // pest_control, sanitary_bins, washroom, deep_cleaning
+  description: text("description").notNull(),
+  address: text("address"),
+  preferredContactMethod: varchar("preferred_contact_method").notNull().default("email"), // email, phone, either
+  status: varchar("status").notNull().default("new"), // new, contacted, quoted, converted, declined
+  assignedTo: varchar("assigned_to"), // Worker ID who handles this quote
+  notes: text("notes"), // Internal notes about the quote
+  submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
+  followUpDate: timestamp("follow_up_date"),
+});
+
+export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
+export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;
+export type QuoteSubmission = typeof quoteSubmissions.$inferSelect;

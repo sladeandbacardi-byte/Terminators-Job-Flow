@@ -17,7 +17,8 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder,
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type CalendarEvent, type InsertCalendarEvent,
-  type CustomReport, type InsertCustomReport
+  type CustomReport, type InsertCustomReport,
+  type QuoteSubmission, type InsertQuoteSubmission
 } from "@shared/schema";
 
 export interface IStorage {
@@ -173,6 +174,14 @@ export interface IStorage {
   updateCustomReport(id: string, report: Partial<InsertCustomReport>): Promise<CustomReport>;
   deleteCustomReport(id: string): Promise<boolean>;
   runCustomReport(id: string): Promise<any>;
+
+  // Quote Submissions
+  getQuoteSubmissions(): Promise<QuoteSubmission[]>;
+  getQuoteSubmission(id: string): Promise<QuoteSubmission | undefined>;
+  getQuoteSubmissionsByStatus(status: string): Promise<QuoteSubmission[]>;
+  createQuoteSubmission(submission: InsertQuoteSubmission): Promise<QuoteSubmission>;
+  updateQuoteSubmission(id: string, submission: Partial<InsertQuoteSubmission>): Promise<QuoteSubmission>;
+  deleteQuoteSubmission(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -194,6 +203,7 @@ export class MemStorage implements IStorage {
   private purchaseOrderItems: Map<string, PurchaseOrderItem> = new Map();
   private calendarEvents: Map<string, CalendarEvent> = new Map();
   private customReports: Map<string, CustomReport> = new Map();
+  private quoteSubmissions: Map<string, QuoteSubmission> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 1;
@@ -2889,6 +2899,47 @@ export class MemStorage implements IStorage {
     }
 
     return { start, end };
+  }
+
+  // Quote Submissions
+  async getQuoteSubmissions(): Promise<QuoteSubmission[]> {
+    return Array.from(this.quoteSubmissions.values()).sort((a, b) => 
+      b.submittedAt.getTime() - a.submittedAt.getTime()
+    );
+  }
+
+  async getQuoteSubmission(id: string): Promise<QuoteSubmission | undefined> {
+    return this.quoteSubmissions.get(id);
+  }
+
+  async getQuoteSubmissionsByStatus(status: string): Promise<QuoteSubmission[]> {
+    return Array.from(this.quoteSubmissions.values())
+      .filter(q => q.status === status)
+      .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
+  }
+
+  async createQuoteSubmission(submission: InsertQuoteSubmission): Promise<QuoteSubmission> {
+    const id = randomUUID();
+    const newSubmission: QuoteSubmission = {
+      ...submission,
+      id,
+      submittedAt: new Date(),
+    };
+    this.quoteSubmissions.set(id, newSubmission);
+    return newSubmission;
+  }
+
+  async updateQuoteSubmission(id: string, updateData: Partial<InsertQuoteSubmission>): Promise<QuoteSubmission> {
+    const submission = this.quoteSubmissions.get(id);
+    if (!submission) throw new Error("Quote submission not found");
+    
+    const updatedSubmission = { ...submission, ...updateData };
+    this.quoteSubmissions.set(id, updatedSubmission);
+    return updatedSubmission;
+  }
+
+  async deleteQuoteSubmission(id: string): Promise<boolean> {
+    return this.quoteSubmissions.delete(id);
   }
 
   // Activity Logs

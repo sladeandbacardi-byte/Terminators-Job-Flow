@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Flow</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
+
+    /* Header / Navbar */
+    header {
+      background: #1f2937;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+    }
+
+    header .logo {
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    nav a {
+      color: white;
+      margin-left: 1rem;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+
+    /* Hero section */
+    .hero {
+      text-align: center;
+      padding: 4rem 1rem;
+      background: #ffffff;
+    }
+
+    .hero h1 {
+      margin-bottom: 1rem;
+      font-size: 2rem;
+    }
+
+    .hero p {
+      margin-bottom: 2rem;
+      color: #555;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .btn-primary:hover {
+      background: #1e4ebb;
+    }
+
+    /* Features section */
+    .features {
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    .features h2 {
+      margin-bottom: 1rem;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: white;
+      padding: 1rem;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Footer */
+    footer {
+      background: #1f2937;
+      color: white;
+      text-align: center;
+      padding: 1rem;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="logo">Job Flow</div>
+    <nav>
+      <a href="#">Home</a>
+      <a href="#">Features</a>
+      <a href="#">Login</a>
+      <a href="#">Register</a>
+    </nav>
+  </header>
+
+  <!-- Hero section -->
+  <section class="hero">
+    <h1>Streamline Your Job Workflow</h1>
+    <p>Track applicants, manage interviews, and stay organized with ease.</p>
+    <button class="btn-primary">Get Started</button>
+  </section>
+
+  <!-- Features section -->
+  <section class="features">
+    <h2>Key Features</h2>
+    <div class="feature-grid">
+      <div class="feature-card">Track Candidates</div>
+      <div class="feature-card">Manage Job Postings</div>
+      <div class="feature-card">Schedule Interviews</div>
+      <div class="feature-card">View Pipeline</div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    © 2025 Job Flow - All rights reserved.
+  </footer>
+</body>
+</html>

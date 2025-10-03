@@ -8,7 +8,8 @@ import {
   insertNotificationSchema, insertEmailTemplateSchema, insertEmailLogSchema,
   insertJobInventoryItemSchema, insertSupplierSchema,
   insertPurchaseOrderSchema, insertPurchaseOrderItemSchema,
-  insertCalendarEventSchema, insertCustomReportSchema
+  insertCalendarEventSchema, insertCustomReportSchema,
+  insertQuoteSubmissionSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -1620,6 +1621,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Custom report not found" });
       }
       res.status(500).json({ error: "Failed to run custom report" });
+    }
+  });
+
+  // Quote Submission Routes (public-facing)
+  app.get("/api/quote-submissions", async (req, res) => {
+    try {
+      const { status } = req.query;
+      let submissions;
+      
+      if (status) {
+        submissions = await storage.getQuoteSubmissionsByStatus(status as string);
+      } else {
+        submissions = await storage.getQuoteSubmissions();
+      }
+      
+      res.json(submissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote submissions" });
+    }
+  });
+
+  app.get("/api/quote-submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getQuoteSubmission(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Quote submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote submission" });
+    }
+  });
+
+  // Public endpoint for quote submission (no auth required)
+  app.post("/api/public/quote-request", async (req, res) => {
+    try {
+      const submissionData = insertQuoteSubmissionSchema.parse(req.body);
+      const submission = await storage.createQuoteSubmission(submissionData);
+      
+      // Send email notification to admin/sales team
+      const serviceTypes: Record<string, string> = {
+        pest_control: "Pest Control",
+        sanitary_bins: "Sanitary Bins",
+        washroom: "Washroom Services",
+        deep_cleaning: "Deep Cleaning"
+      };
+      
+      const emailData = {
+        to: "quotes@theterminators.co.za", // Update with your actual email
+        from: "noreply@theterminators.co.za",
+        subject: `New Quote Request - ${serviceTypes[submission.serviceType]}`,
+        html: `
+          <h2>New Quote Request Received</h2>
+          <p><strong>Company:</strong> ${submission.companyName}</p>
+          <p><strong>Contact Person:</strong> ${submission.contactPerson}</p>
+          <p><strong>Email:</strong> ${submission.email}</p>
+          <p><strong>Phone:</strong> ${submission.phone}</p>
+          <p><strong>Service Type:</strong> ${serviceTypes[submission.serviceType]}</p>
+          <p><strong>Preferred Contact:</strong> ${submission.preferredContactMethod}</p>
+          ${submission.address ? `<p><strong>Address:</strong> ${submission.address}</p>` : ''}
+          <p><strong>Description:</strong></p>
+          <p>${submission.description}</p>
+          <p><strong>Submitted:</strong> ${submission.submittedAt.toLocaleString()}</p>
+          <hr>
+          <p>Login to your dashboard to view and respond to this quote request.</p>
+        `
+      };
+      
+      await sendEmail(emailData);
+      
+      res.status(201).json({ 
+        success: true, 
+        message: "Quote request submitted successfully. We'll contact you soon!",
+        id: submission.id 
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid submission data", details: error.errors });
+      }
+      console.error("Quote submission error:", error);
+      res.status(500).json({ error: "Failed to submit quote request" });
+    }
+  });
+
+  app.patch("/api/quote-submissions/:id", async (req, res) => {
+    try {
+      const updateData = insertQuoteSubmissionSchema.partial().parse(req.body);
+      const updated = await storage.updateQuoteSubmission(req.params.id, updateData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update quote submission" });
+    }
+  });
+
+  app.delete("/api/quote-submissions/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteQuoteSubmission(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Quote submission not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete quote submission" });
     }
   });
 
