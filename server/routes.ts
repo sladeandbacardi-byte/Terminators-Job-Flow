@@ -15,6 +15,8 @@ import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
 import { createSageService } from "./sage-integration";
 import { AuthService, requireAuth, logActivity, type AuthenticatedRequest } from "./auth-service";
+import multer from "multer";
+import * as XLSX from "xlsx";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -400,6 +402,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(400).json({ error: "Failed to update inventory quantity" });
+    }
+  });
+
+  // Excel Import for Inventory
+  const upload = multer({ storage: multer.memoryStorage() });
+  
+  app.post("/api/inventory/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Parse Excel file
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+
+      const results = {
+        total: data.length,
+        successful: 0,
+        failed: 0,
+        errors: [] as any[]
+      };
+
+      // Process each row
+      for (let i = 0; i < data.length; i++) {
+        const row: any = data[i];
+        
+        try {
+          // Map Excel columns to inventory item schema
+          const itemData = {
+            name: row.name || row.Name,
+            type: row.type || row.Type || 'product',
+            sku: row.sku || row.SKU,
+            quantity: parseInt(row.quantity || row.Quantity || '0'),
+            minStockLevel: parseInt(row.minStockLevel || row['Min Stock Level'] || row.min_stock_level || '10'),
+            maxStockLevel: parseInt(row.maxStockLevel || row['Max Stock Level'] || row.max_stock_level || '100'),
+            reorderPoint: parseInt(row.reorderPoint || row['Reorder Point'] || row.reorder_point || '20'),
+            unitPrice: row.unitPrice || row['Unit Price'] || row.unit_price || '0',
+            description: row.description || row.Description || '',
+            departmentId: row.departmentId || row['Department ID'] || row.department_id || null,
+            location: row.location || row.Location || '',
+            supplier: row.supplier || row.Supplier || ''
+          };
+
+          // Validate and create item
+          const validatedItem = insertInventoryItemSchema.parse(itemData);
+          await storage.createInventoryItem(validatedItem);
+          results.successful++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            row: i + 2, // +2 because Excel is 1-indexed and has header row
+            data: row,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Imported ${results.successful} of ${results.total} items`,
+        results
+      });
+    } catch (error) {
+      console.error("Excel import error:", error);
+      res.status(500).json({ 
+        error: "Failed to import Excel file",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
