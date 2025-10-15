@@ -432,20 +432,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const row: any = data[i];
         
         try {
-          // Map Excel columns to inventory item schema
+          // Normalize column names to lowercase for flexible matching
+          const normalizedRow: any = {};
+          Object.keys(row).forEach(key => {
+            normalizedRow[key.toLowerCase().replace(/\s+/g, '_')] = row[key];
+          });
+
+          // Map Excel columns to inventory item schema with flexible column matching
           const itemData = {
-            name: row.name || row.Name,
-            type: row.type || row.Type || 'product',
-            sku: row.sku || row.SKU,
-            quantity: parseInt(row.quantity || row.Quantity || '0'),
-            minStockLevel: parseInt(row.minStockLevel || row['Min Stock Level'] || row.min_stock_level || '10'),
-            maxStockLevel: parseInt(row.maxStockLevel || row['Max Stock Level'] || row.max_stock_level || '100'),
-            reorderPoint: parseInt(row.reorderPoint || row['Reorder Point'] || row.reorder_point || '20'),
-            unitPrice: row.unitPrice || row['Unit Price'] || row.unit_price || '0',
-            description: row.description || row.Description || '',
-            departmentId: row.departmentId || row['Department ID'] || row.department_id || null,
-            location: row.location || row.Location || '',
-            supplier: row.supplier || row.Supplier || ''
+            name: normalizedRow.name || row.name || row.Name || '',
+            type: normalizedRow.type || row.type || row.Type || 'product',
+            sku: normalizedRow.sku || row.sku || row.SKU || '',
+            quantity: Number(normalizedRow.quantity || row.quantity || row.Quantity || 0),
+            minStockLevel: Number(normalizedRow.min_stock_level || normalizedRow.minstocklevel || row.minStockLevel || row['Min Stock Level'] || 10),
+            maxStockLevel: Number(normalizedRow.max_stock_level || normalizedRow.maxstocklevel || row.maxStockLevel || row['Max Stock Level'] || 100),
+            reorderPoint: Number(normalizedRow.reorder_point || normalizedRow.reorderpoint || row.reorderPoint || row['Reorder Point'] || 20),
+            unitPrice: parseFloat(normalizedRow.unit_price || normalizedRow.unitprice || row.unitPrice || row['Unit Price'] || '0') || 0,
+            description: normalizedRow.description || row.description || row.Description || '',
+            departmentId: normalizedRow.department_id || normalizedRow.departmentid || row.departmentId || row['Department ID'] || null,
+            location: normalizedRow.location || row.location || row.Location || '',
+            supplier: normalizedRow.supplier || row.supplier || row.Supplier || ''
           };
 
           // Validate and create item
@@ -454,10 +460,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           results.successful++;
         } catch (error) {
           results.failed++;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           results.errors.push({
             row: i + 2, // +2 because Excel is 1-indexed and has header row
-            data: row,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            name: row.name || row.Name || 'Unknown',
+            sku: row.sku || row.SKU || 'N/A',
+            error: errorMessage
           });
         }
       }

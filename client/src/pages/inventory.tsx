@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Plus, Package, Settings, Edit, Trash2, Upload } from "lucide-react";
+import { Search, Plus, Package, Settings, Edit, Trash2, Upload, HelpCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -94,17 +94,23 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
       queryClient.invalidateQueries({ queryKey: ['/api/inventory/alerts/stock'] });
       
-      toast({
-        title: "Import Complete",
-        description: result.message || `Successfully imported ${result.results.successful} items`,
-      });
-
       if (result.results.failed > 0) {
-        console.warn('Import errors:', result.results.errors);
+        // Show detailed error information
+        const errorSummary = result.results.errors.slice(0, 3).map((err: any) => 
+          `Row ${err.row}: ${err.name || err.sku} - ${err.error}`
+        ).join('\n');
+        
         toast({
-          title: "Some items failed",
-          description: `${result.results.failed} items failed to import. Check console for details.`,
+          title: `Import partially complete: ${result.results.successful} succeeded, ${result.results.failed} failed`,
+          description: errorSummary + (result.results.errors.length > 3 ? '\n...and more errors' : ''),
           variant: "destructive",
+        });
+        
+        console.error('Import errors:', result.results.errors);
+      } else {
+        toast({
+          title: "Import Complete",
+          description: result.message || `Successfully imported ${result.results.successful} items`,
         });
       }
 
@@ -353,7 +359,7 @@ export default function Inventory() {
                 variant="outline"
                 size="sm"
               />
-              <div>
+              <div className="flex gap-1">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -372,6 +378,56 @@ export default function Inventory() {
                   <Upload className="h-4 w-4 mr-2" />
                   {isImporting ? "Importing..." : "Import Excel"}
                 </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="px-2" data-testid="button-import-help">
+                      <HelpCircle className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Excel Import Format</DialogTitle>
+                      <DialogDescription>
+                        Your Excel file should have the following columns (column names are flexible):
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-semibold mb-2">Required Columns:</h4>
+                        <ul className="text-sm space-y-1">
+                          <li>• <strong>name</strong> - Item name</li>
+                          <li>• <strong>sku</strong> - Stock keeping unit (must be unique)</li>
+                          <li>• <strong>type</strong> - Either "product" or "rental_equipment"</li>
+                        </ul>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-semibold mb-2">Optional Columns:</h4>
+                        <ul className="text-sm space-y-1">
+                          <li>• <strong>quantity</strong> - Current stock quantity (default: 0)</li>
+                          <li>• <strong>unit_price</strong> or <strong>unitPrice</strong> - Price per unit</li>
+                          <li>• <strong>min_stock_level</strong> - Minimum stock (default: 10)</li>
+                          <li>• <strong>max_stock_level</strong> - Maximum stock (default: 100)</li>
+                          <li>• <strong>reorder_point</strong> - Reorder threshold (default: 20)</li>
+                          <li>• <strong>description</strong> - Item description</li>
+                          <li>• <strong>department_id</strong> - Department ID (div-1, div-2, etc.)</li>
+                          <li>• <strong>location</strong> - Storage location</li>
+                          <li>• <strong>supplier</strong> - Supplier name</li>
+                        </ul>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          <strong>Tip:</strong> Column names are case-insensitive and can use spaces or underscores. 
+                          For example, "Unit Price", "unit_price", and "unitPrice" all work!
+                        </p>
+                      </div>
+                      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Note:</strong> The first row should contain column headers. Data starts from row 2.
+                        </p>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogTrigger asChild>
