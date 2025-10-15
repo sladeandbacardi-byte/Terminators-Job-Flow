@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Plus, Package, Settings, Edit, Trash2 } from "lucide-react";
+import { Search, Plus, Package, Settings, Edit, Trash2, Upload } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -31,8 +31,10 @@ export default function Inventory() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [alertsFilter, setAlertsFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const departmentFilter = useDepartmentFilter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -67,6 +69,60 @@ export default function Inventory() {
       });
     },
   });
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/inventory/import', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Import failed');
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/alerts/stock'] });
+      
+      toast({
+        title: "Import Complete",
+        description: result.message || `Successfully imported ${result.results.successful} items`,
+      });
+
+      if (result.results.failed > 0) {
+        console.warn('Import errors:', result.results.errors);
+        toast({
+          title: "Some items failed",
+          description: `${result.results.failed} items failed to import. Check console for details.`,
+          variant: "destructive",
+        });
+      }
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: "Import Failed",
+        description: error instanceof Error ? error.message : "Failed to import Excel file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const filteredItems = departmentFilter.filteredData(
     items.filter(item => {
@@ -297,6 +353,26 @@ export default function Inventory() {
                 variant="outline"
                 size="sm"
               />
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileImport}
+                  className="hidden"
+                  data-testid="input-import-file"
+                />
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  data-testid="button-import-excel"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isImporting ? "Importing..." : "Import Excel"}
+                </Button>
+              </div>
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogTrigger asChild>
                   <Button data-testid="button-add-item">
