@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -22,6 +22,7 @@ import Mobile from "@/pages/mobile";
 import Calendar from "@/pages/calendar";
 import JobCard from "@/pages/job-card";
 import DailyDepartmentCard from "@/pages/daily-department-card";
+import QuoteRequest from "@/pages/quote-request";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -66,6 +67,20 @@ function AuthenticatedApp() {
 }
 
 function App() {
+  const [location] = useLocation();
+  
+  // Public routes that don't require authentication
+  if (location === '/quote-request') {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <QuoteRequest />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
