@@ -511,20 +511,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contracts", async (req, res) => {
     try {
-      const contract = insertRentalContractSchema.parse(req.body);
+      const data = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+        lastPriceIncrease: req.body.lastPriceIncrease ? new Date(req.body.lastPriceIncrease) : undefined,
+      };
+      const contract = insertRentalContractSchema.parse(data);
       const created = await storage.createRentalContract(contract);
       res.status(201).json(created);
     } catch (error) {
+      console.error("Contract creation error:", error);
       res.status(400).json({ error: "Invalid rental contract data" });
     }
   });
 
   app.put("/api/contracts/:id", async (req, res) => {
     try {
-      const updateData = insertRentalContractSchema.partial().parse(req.body);
+      const data = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+        lastPriceIncrease: req.body.lastPriceIncrease ? new Date(req.body.lastPriceIncrease) : undefined,
+      };
+      const updateData = insertRentalContractSchema.partial().parse(data);
       const updated = await storage.updateRentalContract(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
+      console.error("Contract update error:", error);
       res.status(400).json({ error: "Invalid rental contract data" });
     }
   });

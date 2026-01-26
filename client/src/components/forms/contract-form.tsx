@@ -325,7 +325,8 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
                   <Textarea 
                     placeholder="Additional contract notes or terms" 
                     className="min-h-[100px]" 
-                    {...field} 
+                    {...field}
+                    value={field.value || ""}
                     data-testid="input-notes"
                   />
                 </FormControl>
