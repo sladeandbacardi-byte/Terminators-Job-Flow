@@ -60,11 +60,11 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
       address: client?.address || "",
       contactPerson: client?.contactPerson || "",
       businessType: client?.businessType || "",
-      status: client?.status || "active",
+      status: (client?.status as "active" | "inactive" | "suspended") || "active",
       departmentId: client?.departmentId || "",
       taxNumber: client?.taxNumber || "",
       paymentTerms: client?.paymentTerms || "",
-      creditLimit: client?.creditLimit || undefined,
+      creditLimit: client?.creditLimit ? parseFloat(String(client.creditLimit)) : undefined,
       notes: client?.notes || "",
     },
   });
