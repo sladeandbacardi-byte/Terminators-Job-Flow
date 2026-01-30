@@ -87,18 +87,18 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Company Name *</FormLabel>
+                <FormLabel className="text-sm">Company Name *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter company name" {...field} data-testid="input-company-name" />
+                  <Input placeholder="Enter company name" {...field} data-testid="input-company-name" className="h-8 text-sm" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -108,27 +108,27 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
             name="businessType"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Business Type</FormLabel>
+                <FormLabel className="text-sm">Business Type</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Restaurant, Office, Retail" {...field} data-testid="input-business-type" />
+                  <Input placeholder="e.g., Restaurant, Office, Retail" {...field} data-testid="input-business-type" className="h-8 text-sm" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="contactPerson"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Contact Person</FormLabel>
+                <FormLabel className="text-sm">Contact Person</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter contact person name" {...field} data-testid="input-contact-person" />
+                  <Input placeholder="Enter contact person name" {...field} data-testid="input-contact-person" className="h-8 text-sm" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -138,27 +138,27 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel className="text-sm">Email</FormLabel>
                 <FormControl>
-                  <Input type="email" placeholder="Enter email address" {...field} data-testid="input-email" />
+                  <Input type="email" placeholder="Enter email address" {...field} data-testid="input-email" className="h-8 text-sm" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone</FormLabel>
+                <FormLabel className="text-sm">Phone</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter phone number" {...field} data-testid="input-phone" />
+                  <Input placeholder="Enter phone number" {...field} data-testid="input-phone" className="h-8 text-sm" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -168,10 +168,10 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
             name="status"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Status *</FormLabel>
+                <FormLabel className="text-sm">Status *</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-status">
+                    <SelectTrigger data-testid="select-status" className="h-8 text-sm">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                   </FormControl>
@@ -181,7 +181,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
                     <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -192,10 +192,10 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
           name="departmentId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Department *</FormLabel>
+              <FormLabel className="text-sm">Department *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <SelectTrigger data-testid="select-department">
+                  <SelectTrigger data-testid="select-department" className="h-8 text-sm">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                 </FormControl>
@@ -207,7 +207,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
@@ -217,30 +217,31 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
           name="address"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Address</FormLabel>
+              <FormLabel className="text-sm">Address</FormLabel>
               <FormControl>
                 <Textarea 
                   placeholder="Enter full business address" 
                   {...field} 
                   data-testid="textarea-address"
+                  className="min-h-[60px] text-sm py-1"
                 />
               </FormControl>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="taxNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Tax Number</FormLabel>
+                <FormLabel className="text-sm">Tax Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter tax/VAT number" {...field} data-testid="input-tax-number" />
+                  <Input placeholder="Enter tax/VAT number" {...field} data-testid="input-tax-number" className="h-8 text-sm" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -250,7 +251,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
             name="creditLimit"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Credit Limit</FormLabel>
+                <FormLabel className="text-sm">Credit Limit</FormLabel>
                 <FormControl>
                   <Input 
                     type="number" 
@@ -259,9 +260,10 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
                     onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                     value={field.value || ""}
                     data-testid="input-credit-limit"
+                    className="h-8 text-sm"
                   />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -272,14 +274,11 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
           name="paymentTerms"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Payment Terms</FormLabel>
+              <FormLabel className="text-sm">Payment Terms</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., Net 30, Cash on Delivery" {...field} data-testid="input-payment-terms" />
+                <Input placeholder="e.g., Net 30, Cash on Delivery" {...field} data-testid="input-payment-terms" className="h-8 text-sm" />
               </FormControl>
-              <FormDescription>
-                Specify the payment terms for this client
-              </FormDescription>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
@@ -289,24 +288,25 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
           name="notes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Notes</FormLabel>
+              <FormLabel className="text-sm">Notes</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Additional notes or comments about this client" 
+                  placeholder="Additional notes" 
                   {...field} 
                   data-testid="textarea-notes"
+                  className="min-h-[60px] text-sm py-1"
                 />
               </FormControl>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
 
-        <div className="flex justify-end space-x-2 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel">
+        <div className="flex justify-end space-x-2 pt-2">
+          <Button type="button" variant="outline" size="sm" onClick={onCancel} data-testid="button-cancel">
             Cancel
           </Button>
-          <Button type="submit" data-testid="button-submit">
+          <Button type="submit" size="sm" data-testid="button-submit">
             {client ? "Update Client" : "Create Client"}
           </Button>
         </div>
