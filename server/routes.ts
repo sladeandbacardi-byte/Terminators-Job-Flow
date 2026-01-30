@@ -304,6 +304,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(created);
     } catch (error) {
       console.error("Client creation error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') 
+        });
+      }
       res.status(400).json({ error: "Invalid client data", details: error instanceof Error ? error.message : String(error) });
     }
   });

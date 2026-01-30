@@ -72,15 +72,15 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
   const handleSubmit = (data: ClientFormData) => {
     const submitData = {
       ...data,
-      email: data.email || undefined,
-      phone: data.phone || undefined,
-      address: data.address || undefined,
-      contactPerson: data.contactPerson || undefined,
-      businessType: data.businessType || undefined,
-      taxNumber: data.taxNumber || undefined,
-      paymentTerms: data.paymentTerms || undefined,
-      creditLimit: data.creditLimit || undefined,
-      notes: data.notes || undefined,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null,
+      contactPerson: data.contactPerson || null,
+      businessType: data.businessType || null,
+      taxNumber: data.taxNumber || null,
+      paymentTerms: data.paymentTerms || null,
+      creditLimit: data.creditLimit !== undefined ? data.creditLimit : null,
+      notes: data.notes || null,
     };
     onSubmit(submitData);
   };
