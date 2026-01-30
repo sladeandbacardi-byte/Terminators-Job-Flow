@@ -298,21 +298,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients", async (req, res) => {
     try {
+      console.log("Creating client with data:", JSON.stringify(req.body));
       const client = insertClientSchema.parse(req.body);
       const created = await storage.createClient(client);
       res.status(201).json(created);
     } catch (error) {
-      res.status(400).json({ error: "Invalid client data" });
+      console.error("Client creation error:", error);
+      res.status(400).json({ error: "Invalid client data", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
   app.put("/api/clients/:id", async (req, res) => {
     try {
+      console.log(`Updating client ${req.params.id} with data:`, JSON.stringify(req.body));
       const updateData = insertClientSchema.partial().parse(req.body);
       const updated = await storage.updateClient(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
-      res.status(400).json({ error: "Invalid client data" });
+      console.error("Client update error:", error);
+      res.status(400).json({ error: "Invalid client data", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
