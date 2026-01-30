@@ -93,7 +93,7 @@ export default function ClientsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/clients", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/clients", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setIsCreateDialogOpen(false);
