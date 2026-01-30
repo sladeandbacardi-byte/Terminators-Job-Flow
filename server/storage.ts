@@ -1643,6 +1643,7 @@ export class MemStorage implements IStorage {
   }
 
   async createClient(insertClient: InsertClient): Promise<Client> {
+    console.log("MemStorage: Creating client with data:", JSON.stringify(insertClient));
     const id = randomUUID();
     const client: Client = { 
       ...insertClient, 
@@ -1654,7 +1655,8 @@ export class MemStorage implements IStorage {
       address: insertClient.address || null,
       paymentTerms: insertClient.paymentTerms || null,
       notes: insertClient.notes || null,
-      website: insertClient.website || null,
+      website: (insertClient as any).website || null,
+      category: (insertClient as any).category || null,
       updatedAt: new Date()
     };
     this.clients.set(id, client);

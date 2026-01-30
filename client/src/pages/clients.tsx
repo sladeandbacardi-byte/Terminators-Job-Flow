@@ -99,9 +99,9 @@ export default function ClientsPage() {
       setIsCreateDialogOpen(false);
       toast({ description: "Client created successfully" });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({ 
-        description: "Failed to create client", 
+        description: `Failed to create client: ${error.message}`, 
         variant: "destructive" 
       });
     },
