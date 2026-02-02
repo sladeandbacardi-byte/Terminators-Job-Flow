@@ -79,7 +79,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
       businessType: data.businessType || null,
       taxNumber: data.taxNumber || null,
       paymentTerms: data.paymentTerms || null,
-      creditLimit: data.creditLimit !== undefined ? data.creditLimit : null,
+      creditLimit: data.creditLimit !== undefined ? String(data.creditLimit) : null,
       notes: data.notes || null,
     };
     onSubmit(submitData);
