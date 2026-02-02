@@ -32,7 +32,7 @@ export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
 
   const handleLogout = async () => {
     await logout();
-    setLocation("/login");
+    setLocation("/");
   };
 
   const userName = user ? `${user.firstName} ${user.lastName}` : "Guest";
