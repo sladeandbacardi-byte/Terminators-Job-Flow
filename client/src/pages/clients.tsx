@@ -109,7 +109,7 @@ export default function ClientsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest(`/api/clients/${id}`, "PATCH", data),
+      apiRequest("PATCH", `/api/clients/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setEditingClient(null);
@@ -124,7 +124,7 @@ export default function ClientsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/clients/${id}`, "DELETE"),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/clients/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setDeletingClient(null);
