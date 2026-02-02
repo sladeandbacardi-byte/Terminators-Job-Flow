@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
-import { Menu } from "lucide-react";
+import { Menu, LogOut, ChevronDown, User } from "lucide-react";
 import { formatDateTime, getInitials } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
 
 interface HeaderProps {
   title: string;
@@ -9,14 +19,24 @@ interface HeaderProps {
 
 export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { user, logout, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+    }, 60000);
 
     return () => clearInterval(timer);
   }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setLocation("/login");
+  };
+
+  const userName = user ? `${user.firstName} ${user.lastName}` : "Guest";
+  const userRole = user?.role || "User";
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4" data-testid="header">
@@ -36,17 +56,41 @@ export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
           <div className="text-sm text-gray-600" data-testid="current-time">
             <span>{formatDateTime(currentTime)} SAST</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center" data-testid="user-avatar">
-              <span className="text-white text-sm font-medium">
-                {getInitials("Admin Manager")}
-              </span>
-            </div>
-            <div className="hidden md:block">
-              <p className="text-sm font-medium text-gray-900" data-testid="user-name">Admin Manager</p>
-              <p className="text-xs text-gray-500" data-testid="user-location">Port Elizabeth</p>
-            </div>
-          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors cursor-pointer" data-testid="user-menu-trigger">
+                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center" data-testid="user-avatar">
+                  <span className="text-white text-sm font-medium">
+                    {getInitials(userName)}
+                  </span>
+                </div>
+                <div className="hidden md:block text-left">
+                  <p className="text-sm font-medium text-gray-900" data-testid="user-name">{userName}</p>
+                  <p className="text-xs text-gray-500" data-testid="user-role">{userRole}</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-gray-500 hidden md:block" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span>{userName}</span>
+                  <span className="text-xs font-normal text-gray-500">{user?.email || ""}</span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setLocation("/profile")}>
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
