@@ -86,20 +86,41 @@ export const jobs = pgTable("jobs", {
   workerId: varchar("worker_id"),
   departmentId: varchar("department_id").notNull(),
   serviceType: text("service_type").notNull(),
-  status: text("status").notNull().default('scheduled'), // scheduled, in_progress, completed, cancelled
+  status: text("status").notNull().default('scheduled'),
   scheduledDate: timestamp("scheduled_date").notNull(),
-  scheduledTime: text("scheduled_time"), // Time as string for mobile display
+  scheduledTime: text("scheduled_time"),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
-  priority: text("priority").notNull().default('medium'), // low, medium, high, urgent
-  estimatedDuration: integer("estimated_duration"), // in minutes
-  actualDuration: integer("actual_duration"), // in minutes
+  priority: text("priority").notNull().default('medium'),
+  estimatedDuration: integer("estimated_duration"),
+  actualDuration: integer("actual_duration"),
   location: text("location"),
   notes: text("notes"),
   completionNotes: text("completion_notes"),
   isRecurring: boolean("is_recurring").notNull().default(false),
-  recurringPattern: text("recurring_pattern"), // daily, weekly, monthly, yearly
-  parentJobId: varchar("parent_job_id"), // for recurring jobs
+  recurringPattern: text("recurring_pattern"),
+  parentJobId: varchar("parent_job_id"),
+  diary: text("diary"),
+  howInvoiced: text("how_invoiced"),
+  email: text("email"),
+  areaCode: text("area_code"),
+  salesperson: text("salesperson"),
+  contractNo: text("contract_no"),
+  isContract: boolean("is_contract").notNull().default(false),
+  service: text("service"),
+  insects: text("insects"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  pricePerUnit: decimal("price_per_unit", { precision: 10, scale: 2 }),
+  increaseDate: text("increase_date"),
+  specialInstructions: text("special_instructions"),
+  internalInstructions: text("internal_instructions"),
+  isFixed: boolean("is_fixed").notNull().default(false),
+  orderNo: text("order_no"),
+  recurrenceInterval: integer("recurrence_interval"),
+  recurrencePeriod: text("recurrence_period"),
+  recurrenceDay: text("recurrence_day"),
+  recurrenceCount: integer("recurrence_count"),
+  recurrenceYears: integer("recurrence_years"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

@@ -51,3 +51,33 @@ export const RECURRING_PATTERNS = {
   MONTHLY: 'monthly',
   YEARLY: 'yearly',
 } as const;
+
+export const RECURRENCE_PERIODS = [
+  { value: 'W', label: 'Week(s)' },
+  { value: '2W', label: '2 Weeks' },
+  { value: 'M', label: 'Month(s)' },
+  { value: '2M', label: '2 Months' },
+  { value: '3M', label: '3 Months (Quarterly)' },
+  { value: '6M', label: '6 Months' },
+  { value: 'Y', label: 'Year(s)' },
+  { value: '2M/S', label: '2 Month Sanitary' },
+] as const;
+
+export const DAYS_OF_WEEK = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+] as const;
+
+export const DIARY_OPTIONS = [
+  'Pest Control',
+  'Sanitary Bins - Leon',
+  'Sanitary Bins - Team A',
+  'Sanitary Bins - Team B',
+  'Washroom',
+  'Deep Cleaning',
+] as const;
