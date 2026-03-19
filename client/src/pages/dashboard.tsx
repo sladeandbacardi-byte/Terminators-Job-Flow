@@ -10,6 +10,7 @@ import RecentJobs from "@/components/dashboard/recent-jobs";
 import TodaysSchedule from "@/components/dashboard/schedule";
 import QuickActions from "@/components/dashboard/quick-actions";
 import SalesPerformance from "@/components/dashboard/sales-performance";
+import { WorkerJobsSummary } from "@/components/dashboard/worker-jobs-summary";
 import { DepartmentOverview } from "@/components/dashboard/department-overview";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useToast } from "@/hooks/use-toast";
@@ -271,6 +272,9 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* Worker Jobs Summary */}
+            <WorkerJobsSummary />
 
             {/* Sales Performance Dashboard */}
             <SalesPerformance className="mb-6" />

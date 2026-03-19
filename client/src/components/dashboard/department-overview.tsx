@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import { useQuery } from "@tanstack/react-query";
@@ -211,6 +211,9 @@ export function DepartmentOverview({ className = "" }: DepartmentOverviewProps) 
                   />
                   {selectedDept.name}
                 </DialogTitle>
+                <DialogDescription>
+                  Workers, jobs, clients and stock items for this department.
+                </DialogDescription>
               </DialogHeader>
 
               {/* Summary bar */}
