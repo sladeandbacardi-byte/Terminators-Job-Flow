@@ -842,9 +842,9 @@ export class MemStorage implements IStorage {
       { name: "Garth du Preez", email: "garth@terminators.co.za", phone: "+27 41 123 4573", departmentId: "div-1", role: "PCO" },
       { name: "Michael Meyer", email: "michael@terminators.co.za", phone: "+27 41 123 4574", departmentId: "div-1", role: "PCO" },
       { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", departmentId: "div-1", role: "PCO" },
+      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-1", role: "Assistant" },
       
       // Sanitary Bin Service A Team
-      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
       { name: "Donovan", email: "donovan@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
       { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", departmentId: "div-2", role: "Sanitary Bin Technician" },
       // Sanitary Bin Service B Team
