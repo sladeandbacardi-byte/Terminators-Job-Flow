@@ -846,18 +846,14 @@ export class MemStorage implements IStorage {
       // Sanitary Bin Service A Team
       { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
       { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", departmentId: "div-2", role: "Sanitary Bin Technician" },
-      { name: "Maryldene", email: "maryldene@terminators.co.za", phone: "+27 41 123 4578", departmentId: "div-2", role: "Sanitary Bin Technician" },
-      
       // Sanitary Bin Service B Team
       { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", departmentId: "div-2", role: "Supervisor" },
-      { name: "Nandipha", email: "nandipha@terminators.co.za", phone: "+27 41 123 4580", departmentId: "div-2", role: "Sanitary Bin Technician" },
       { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", departmentId: "div-2", role: "Sanitary Bin Technician" },
       
       // Washroom Services Team
       { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", departmentId: "div-3", role: "Supervisor" },
       { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", departmentId: "div-3", role: "Washroom Technician" },
       { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Nosipho", email: "nosipho@terminators.co.za", phone: "+27 41 123 4585", departmentId: "div-4", role: "Deep Cleaning Specialist" },
       { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", departmentId: "div-4", role: "Deep Cleaning Specialist" },
       { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", departmentId: "div-4", role: "Deep Cleaning Specialist" },
       { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", departmentId: "div-4", role: "Deep Cleaning Specialist" },
@@ -1408,7 +1404,7 @@ export class MemStorage implements IStorage {
       {
         id: "job-5",
         clientId: "client-11", // Life Mercantile Hospital
-        workerId: "worker-16", // Nandipha (Sanitary Bin Technician)
+        workerId: "worker-16", // Sanitary Bin Technician
         departmentId: "div-2",
         title: "Hospital Sanitary Service",
         description: "Bi-weekly sanitary bin service for hospital facilities",
