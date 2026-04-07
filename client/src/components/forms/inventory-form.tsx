@@ -309,6 +309,7 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
                       <Input 
                         placeholder="e.g., Main Warehouse - Shelf A3" 
                         {...field} 
+                        value={field.value ?? ""}
                         data-testid="input-location"
                       />
                     </FormControl>
@@ -327,6 +328,7 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
                       <Input 
                         placeholder="e.g., HygieneTech Solutions" 
                         {...field} 
+                        value={field.value ?? ""}
                         data-testid="input-supplier"
                       />
                     </FormControl>
@@ -348,6 +350,7 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
                     placeholder="Enter item description" 
                     className="min-h-[100px]" 
                     {...field} 
+                    value={field.value ?? ""}
                     data-testid="input-description"
                   />
                 </FormControl>

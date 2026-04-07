@@ -139,7 +139,7 @@ export default function TodaysSchedule() {
                     {workerName}
                   </p>
                   <p className="text-xs text-gray-600" data-testid={`schedule-location-${item.id}`}>
-                    {'location' in item ? item.location : item.title} - {'serviceType' in item ? item.serviceType : 'Service'}
+                    {'location' in item ? item.location : (item as any).title} - {'serviceType' in item ? item.serviceType : 'Service'}
                   </p>
                 </div>
                 <div className="text-xs text-gray-500" data-testid={`schedule-time-${item.id}`}>

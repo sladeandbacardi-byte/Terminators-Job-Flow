@@ -27,6 +27,8 @@ import { Plus, Trash2, Package } from "lucide-react";
 import { insertPurchaseOrderSchema, type PurchaseOrder, type Supplier, type InventoryItem } from "@shared/schema";
 
 const formSchema = insertPurchaseOrderSchema.extend({
+  expectedDeliveryDate: z.string().optional(),
+  notes: z.string().optional(),
   items: z.array(z.object({
     inventoryItemId: z.string().min(1, "Please select an item"),
     quantity: z.number().min(1, "Quantity must be at least 1"),
@@ -34,6 +36,8 @@ const formSchema = insertPurchaseOrderSchema.extend({
     notes: z.string().optional(),
   })).min(1, "At least one item is required"),
 });
+
+type FormValues = z.infer<typeof formSchema>;
 
 interface PurchaseOrderFormProps {
   purchaseOrder?: PurchaseOrder;
@@ -52,8 +56,8 @@ export function PurchaseOrderForm({ purchaseOrder, onSubmit, onCancel }: Purchas
     queryKey: ["/api/inventory"],
   });
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       poNumber: purchaseOrder?.poNumber || "",
       supplierId: purchaseOrder?.supplierId || "",
@@ -73,7 +77,7 @@ export function PurchaseOrderForm({ purchaseOrder, onSubmit, onCancel }: Purchas
   });
 
   const { fields, append, remove } = useFieldArray({
-    control: form.control,
+    control: form.control as any,
     name: "items",
   });
 
@@ -190,7 +194,8 @@ export function PurchaseOrderForm({ purchaseOrder, onSubmit, onCancel }: Purchas
               <FormControl>
                 <Textarea 
                   placeholder="Enter any notes about this purchase order" 
-                  {...field} 
+                  {...field}
+                  value={field.value ?? ""}
                   data-testid="textarea-notes"
                 />
               </FormControl>
