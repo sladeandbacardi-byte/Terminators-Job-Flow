@@ -56,11 +56,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token: token,
         user: {
           id: worker.id,
-          username: worker.name, // Use name as username for now
+          username: worker.name,
           email: worker.email,
           firstName: worker.name.split(' ')[0],
           lastName: worker.name.split(' ').slice(1).join(' '),
           role: worker.role || 'worker',
+          departmentId: worker.departmentId,
         }
       });
     } catch (error) {
