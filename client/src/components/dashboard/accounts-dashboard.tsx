@@ -1,18 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock } from "lucide-react";
-import type { Client, RentalContract, Invoice } from "@shared/schema";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, ShoppingCart, Building2 } from "lucide-react";
+import type { Client, RentalContract, Invoice, PurchaseOrder, Supplier } from "@shared/schema";
 
 export function AccountsDashboard() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: contracts = [] } = useQuery<RentalContract[]>({ queryKey: ["/api/contracts"] });
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({ queryKey: ["/api/purchase-orders"] });
+  const { data: suppliers = [] } = useQuery<Supplier[]>({ queryKey: ["/api/suppliers"] });
 
   const paid = invoices.filter(i => i.status === "paid");
   const outstanding = invoices.filter(i => i.status === "sent");
   const overdue = invoices.filter(i => i.status === "overdue");
-  const draft = invoices.filter(i => i.status === "draft");
 
   const totalPaid = paid.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
   const totalOutstanding = outstanding.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
@@ -22,8 +23,33 @@ export function AccountsDashboard() {
   const activeContracts = contracts.filter(c => c.isActive === true);
   const monthlyContractValue = activeContracts.reduce((s, c) => s + parseFloat(c.monthlyPrice ?? "0"), 0);
 
-  // Collection rate
   const collectionRate = totalRevenue > 0 ? Math.round((totalPaid / totalRevenue) * 100) : 0;
+
+  // Creditors: POs that are pending, approved, or sent (money owed to suppliers)
+  const owedStatuses = ["pending", "approved", "sent"];
+  const creditorPOs = purchaseOrders.filter(po => owedStatuses.includes(po.status));
+  const receivedPOs = purchaseOrders.filter(po => po.status === "received");
+  const totalOwed = creditorPOs.reduce((s, po) => s + parseFloat(po.totalAmount ?? "0"), 0);
+  const totalPOPaid = receivedPOs.reduce((s, po) => s + parseFloat(po.totalAmount ?? "0"), 0);
+
+  // Group creditor POs by supplier
+  const creditorsBySupplier = suppliers
+    .map(sup => {
+      const pos = creditorPOs.filter(po => po.supplierId === sup.id);
+      const totalDue = pos.reduce((s, po) => s + parseFloat(po.totalAmount ?? "0"), 0);
+      return { supplier: sup, pos, totalDue };
+    })
+    .filter(entry => entry.pos.length > 0)
+    .sort((a, b) => b.totalDue - a.totalDue);
+
+  const poStatusColor: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800",
+    approved: "bg-blue-100 text-blue-800",
+    sent: "bg-purple-100 text-purple-800",
+    received: "bg-green-100 text-green-800",
+    cancelled: "bg-gray-100 text-gray-600",
+    rejected: "bg-red-100 text-red-800",
+  };
 
   return (
     <div className="space-y-6">
@@ -32,29 +58,59 @@ export function AccountsDashboard() {
         <p className="text-gray-500 text-sm">Revenue, debtors, creditors and financial overview</p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Invoiced", value: `R${totalRevenue.toLocaleString()}`, sub: `${invoices.length} invoices`, icon: DollarSign, color: "bg-blue-50 text-blue-600" },
-          { label: "Collected (Paid)", value: `R${totalPaid.toLocaleString()}`, sub: `${collectionRate}% collection rate`, icon: CheckCircle, color: "bg-green-50 text-green-600" },
-          { label: "Outstanding", value: `R${totalOutstanding.toLocaleString()}`, sub: `${outstanding.length} invoices`, icon: Clock, color: "bg-amber-50 text-amber-600" },
-          { label: "Overdue", value: `R${totalOverdue.toLocaleString()}`, sub: `${overdue.length} invoices`, icon: AlertTriangle, color: "bg-red-50 text-red-600" },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{label}</p>
-                  <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
-                  <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      {/* Summary cards — Debtors */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Debtors (Money Owed to Us)</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: "Total Invoiced", value: `R${totalRevenue.toLocaleString()}`, sub: `${invoices.length} invoices`, icon: DollarSign, color: "bg-blue-50 text-blue-600" },
+            { label: "Collected (Paid)", value: `R${totalPaid.toLocaleString()}`, sub: `${collectionRate}% collection rate`, icon: CheckCircle, color: "bg-green-50 text-green-600" },
+            { label: "Outstanding", value: `R${totalOutstanding.toLocaleString()}`, sub: `${outstanding.length} invoices`, icon: Clock, color: "bg-amber-50 text-amber-600" },
+            { label: "Overdue", value: `R${totalOverdue.toLocaleString()}`, sub: `${overdue.length} invoices`, icon: AlertTriangle, color: "bg-red-50 text-red-600" },
+          ].map(({ label, value, sub, icon: Icon, color }) => (
+            <Card key={label}>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">{label}</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
+                    <p className="text-xs text-gray-400 mt-1">{sub}</p>
+                  </div>
+                  <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
                 </div>
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
-                  <Icon className="h-5 w-5" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary cards — Creditors */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Creditors (Money We Owe)</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { label: "Total Outstanding POs", value: `R${totalOwed.toLocaleString()}`, sub: `${creditorPOs.length} purchase orders`, icon: ShoppingCart, color: "bg-orange-50 text-orange-600" },
+            { label: "Suppliers Owed", value: `${creditorsBySupplier.length}`, sub: "with outstanding balances", icon: Building2, color: "bg-purple-50 text-purple-600" },
+            { label: "POs Received (Paid)", value: `R${totalPOPaid.toLocaleString()}`, sub: `${receivedPOs.length} orders fulfilled`, icon: CheckCircle, color: "bg-green-50 text-green-600" },
+          ].map(({ label, value, sub, icon: Icon, color }) => (
+            <Card key={label}>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">{label}</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
+                    <p className="text-xs text-gray-400 mt-1">{sub}</p>
+                  </div>
+                  <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Revenue bar */}
@@ -119,33 +175,70 @@ export function AccountsDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recurring Revenue (Contracts) */}
+        {/* Creditors - Suppliers with outstanding POs */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-400" /> Recurring Revenue
+              <TrendingUp className="h-4 w-4 text-orange-400" /> Creditors (Amounts Owed)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-4 border-b mb-4">
+            {creditorsBySupplier.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">No outstanding supplier balances</p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {creditorsBySupplier.map(({ supplier, pos, totalDue }) => (
+                  <div key={supplier.id} className="border rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium truncate">{supplier.name}</p>
+                      <span className="text-sm font-bold text-orange-600 ml-2 flex-shrink-0">R{totalDue.toLocaleString()}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {pos.map(po => (
+                        <span key={po.id} className="inline-flex items-center gap-1 text-xs">
+                          <span className="text-gray-400">{po.poNumber}</span>
+                          <Badge className={`text-xs py-0 px-1.5 ${poStatusColor[po.status] ?? "bg-gray-100 text-gray-600"}`}>
+                            {po.status}
+                          </Badge>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recurring Revenue (Contracts) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-green-400" /> Recurring Revenue (Active Contracts)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6 border-b pb-4 mb-4">
+            <div className="text-center">
               <p className="text-xs text-gray-500 mb-1">Monthly Contract Revenue</p>
               <p className="text-3xl font-bold text-green-600">R{monthlyContractValue.toLocaleString()}</p>
               <p className="text-xs text-gray-400">{activeContracts.length} active contracts</p>
             </div>
-            <div className="space-y-2 max-h-52 overflow-y-auto">
-              {activeContracts.map(contract => {
-                const client = clients.find(c => c.id === contract.clientId);
-                return (
-                  <div key={contract.id} className="flex items-center justify-between">
-                    <p className="text-sm text-gray-700 truncate">{client?.name ?? "Unknown"}</p>
-                    <p className="text-sm font-semibold text-green-600">R{parseFloat(contract.monthlyPrice ?? "0").toLocaleString()}/mo</p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <div className="space-y-2 max-h-52 overflow-y-auto">
+            {activeContracts.map(contract => {
+              const client = clients.find(c => c.id === contract.clientId);
+              return (
+                <div key={contract.id} className="flex items-center justify-between">
+                  <p className="text-sm text-gray-700 truncate">{client?.name ?? "Unknown"}</p>
+                  <p className="text-sm font-semibold text-green-600">R{parseFloat(contract.monthlyPrice ?? "0").toLocaleString()}/mo</p>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* All invoices table */}
       <Card>
