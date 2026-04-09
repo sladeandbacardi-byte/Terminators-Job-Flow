@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogIn, AlertCircle, User, Briefcase, TrendingUp, DollarSign, Shield } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
+import { TerminatorsLogo } from "@/components/terminators-logo";
 import type { Worker } from "@shared/schema";
 
 const roleIcons: Record<string, JSX.Element> = {
@@ -57,14 +58,13 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 text-center pb-4">
-          <div className="mx-auto mb-3 h-14 w-14 rounded-full bg-green-600 flex items-center justify-center shadow">
-            <User className="h-7 w-7 text-white" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="space-y-3 text-center pb-4">
+          <div className="mx-auto pt-2">
+            <TerminatorsLogo size="lg" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">The Terminators</CardTitle>
-          <CardDescription className="text-gray-600">Field Service Management System</CardDescription>
+          <CardDescription className="text-gray-600 font-medium">Field Service Management System</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-5">

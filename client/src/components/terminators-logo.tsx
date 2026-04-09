@@ -1,4 +1,4 @@
-import logoImage from "@assets/termlogobig_1755598359265.jpg";
+import logoImage from "@assets/termlogobig_1775739810095.jpg";
 
 interface TerminatorsLogoProps {
   className?: string;
@@ -7,9 +7,9 @@ interface TerminatorsLogoProps {
 
 export function TerminatorsLogo({ className = "", size = 'md' }: TerminatorsLogoProps) {
   const sizeClasses = {
-    sm: 'h-8 w-auto',
-    md: 'h-12 w-auto', 
-    lg: 'h-20 w-auto'
+    sm: 'h-10 w-auto max-w-[180px]',
+    md: 'h-14 w-auto max-w-[220px]',
+    lg: 'h-24 w-auto max-w-[320px]'
   };
 
   return (
