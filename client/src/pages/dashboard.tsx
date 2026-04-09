@@ -122,7 +122,7 @@ export default function Dashboard() {
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title="Dashboard" 
+          title="Terminators Job Flow" 
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
         />
         
