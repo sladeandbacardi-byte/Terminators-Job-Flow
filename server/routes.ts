@@ -1731,6 +1731,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quote Submission Routes (public-facing)
+  app.post("/api/quote-submissions", async (req, res) => {
+    try {
+      const submissionData = insertQuoteSubmissionSchema.parse(req.body);
+      const submission = await storage.createQuoteSubmission(submissionData);
+      res.status(201).json(submission);
+    } catch (error: any) {
+      res.status(400).json({ error: "Failed to create lead", details: error.message });
+    }
+  });
+
   app.get("/api/quote-submissions", async (req, res) => {
     try {
       const { status } = req.query;

@@ -18,6 +18,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  TrendingUp,
 } from "lucide-react";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 
@@ -26,6 +27,7 @@ const navigationCategories = [
     name: "Sales",
     icon: DollarSign,
     items: [
+      { name: "Leads", href: "/leads", icon: TrendingUp },
       { name: "Clients", href: "/clients", icon: Shield },
       { name: "Rental Contracts", href: "/contracts", icon: FileText },
       { name: "Email Center", href: "/emails", icon: Mail },

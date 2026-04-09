@@ -23,6 +23,7 @@ import Calendar from "@/pages/calendar";
 import JobCard from "@/pages/job-card";
 import DailyDepartmentCard from "@/pages/daily-department-card";
 import QuoteRequest from "@/pages/quote-request";
+import Leads from "@/pages/leads";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -61,6 +62,7 @@ function AuthenticatedApp() {
       <Route path="/calendar" component={Calendar} />
       <Route path="/jobs/:id/card" component={JobCard} />
       <Route path="/daily-department-card" component={DailyDepartmentCard} />
+      <Route path="/leads" component={Leads} />
       <Route component={NotFound} />
     </Switch>
   );
