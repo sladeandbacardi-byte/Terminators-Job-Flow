@@ -494,90 +494,34 @@ export class MemStorage implements IStorage {
       }
     ];
 
-    // Store all example data
-    // Map data to proper types with required properties
+    // Store all example data - skip clients here since initializeData already seeds them
+    // (createExampleData runs after initializeData and would overwrite them without status)
+    // Only seed clients if they're not already present
     clients.forEach(client => {
+      if (this.clients.has(client.id)) return; // don't overwrite
       const clientData: Client = {
         id: client.id,
         name: client.name,
+        status: "active",
         contactPerson: client.contactPerson || null,
         email: client.email || null,
         phone: client.phone || null,
         address: client.address || null,
-        departmentId: client.departmentId,
-        paymentTerms: client.paymentTerms || null,
+        departmentId: client.departmentId || "div-1",
+        businessType: client.type || null,
+        taxNumber: null,
+        creditLimit: null,
+        paymentTerms: client.paymentTerms || "30 days",
         notes: client.notes || null,
-        isActive: client.isActive,
-        website: client.website || null,
-        category: client.category,
         createdAt: client.createdAt,
         updatedAt: new Date()
       };
       this.clients.set(client.id, clientData);
     });
     
-    contracts.forEach(contract => {
-      const contractData: RentalContract = {
-        id: contract.id,
-        clientId: contract.clientId,
-        inventoryItemId: contract.inventoryItemId,
-        monthlyPrice: contract.monthlyRate,
-        startDate: new Date(contract.startDate),
-        endDate: contract.endDate ? new Date(contract.endDate) : null,
-        isActive: contract.isActive,
-        notes: contract.description || null,
-        createdAt: contract.createdAt,
-        lastPriceIncrease: null
-      };
-      this.rentalContracts.set(contract.id, contractData);
-    });
-    
-    jobs.forEach(job => {
-      const jobData: Job = {
-        id: job.id,
-        clientId: job.clientId,
-        workerId: job.workerId,
-        departmentId: job.departmentId,
-        title: job.title,
-        description: job.description || null,
-        status: job.status,
-        priority: job.priority,
-        scheduledDate: job.scheduledDate,
-        completedDate: job.completedDate || null,
-        estimatedDuration: job.estimatedDuration || null,
-        actualDuration: job.actualDuration || null,
-        serviceType: job.serviceType || null,
-        location: job.location || null,
-        startTime: job.startTime || null,
-        endTime: job.endTime || null,
-        notes: job.notes || null,
-        createdAt: job.createdAt,
-        updatedAt: new Date(),
-        parentJobId: null
-      };
-      this.jobs.set(job.id, jobData);
-    });
-    
-    invoices.forEach(invoice => {
-      const invoiceData: Invoice = {
-        id: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        clientId: invoice.clientId,
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-        status: invoice.status,
-        subtotal: invoice.subtotalAmount,
-        taxAmount: invoice.taxAmount,
-        total: invoice.totalAmount,
-        paidAmount: invoice.paidAmount || "0.00",
-        paymentDate: invoice.paidDate || null,
-        notes: invoice.notes || null,
-        createdAt: invoice.createdAt,
-        updatedAt: new Date(),
-        terms: null
-      };
-      this.invoices.set(invoice.id, invoiceData);
-    });
+    // Skip contracts — initializeData already seeds rc-* contracts
+    // Skip jobs — initializeData already seeds job-* with current dates
+    // Skip invoices — initializeData already seeds sinv-* invoices
     
     invoiceItems.forEach(item => {
       const itemData: InvoiceItem = {
@@ -904,6 +848,13 @@ export class MemStorage implements IStorage {
     clients.forEach((client, index) => {
       const c: Client = {
         id: `client-${index + 1}`,
+        status: "active",
+        taxNumber: null,
+        creditLimit: null,
+        contactPerson: null,
+        paymentTerms: "30 days",
+        notes: null,
+        updatedAt: new Date(),
         ...client,
         createdAt: new Date()
       };
@@ -1331,223 +1282,375 @@ export class MemStorage implements IStorage {
     }
 
     // Create comprehensive sample jobs across all departments
+    // Use dates relative to now so today/this week filters always show data
+    const now = new Date();
+    const d = (offsetDays: number) => {
+      const dt = new Date(now);
+      dt.setDate(dt.getDate() + offsetDays);
+      dt.setHours(8, 0, 0, 0);
+      return dt;
+    };
+
     const sampleJobs = [
       // Pest Control Jobs
       {
         id: "job-1",
-        clientId: "client-5", // McDonald's Greenacres
-        workerId: "worker-8", // Reece Ebrahim (PCO)
+        clientId: "client-5",
+        workerId: "worker-7",
         departmentId: "div-1",
         title: "Monthly Pest Control Inspection",
         description: "Routine monthly pest control inspection and treatment for restaurant kitchen and dining areas",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: new Date('2025-08-25'),
-        estimatedDuration: "2 hours",
-        estimatedCost: "450.00",
+        scheduledDate: d(1),
+        estimatedDuration: 120,
         location: "Greenacres Shopping Centre, Port Elizabeth",
         notes: "Focus on kitchen areas and waste disposal zones",
-        createdAt: new Date('2025-08-20')
+        createdAt: d(-5)
       },
       {
-        id: "job-2", 
-        clientId: "client-6", // KFC Newton Park
-        workerId: "worker-9", // Garth du Preez (PCO)
+        id: "job-2",
+        clientId: "client-6",
+        workerId: "worker-8",
         departmentId: "div-1",
         title: "Emergency Rodent Control",
         description: "Emergency call for rodent infestation in storage area",
         status: "in_progress",
-        priority: "urgent",
-        scheduledDate: new Date('2025-08-21'),
-        estimatedDuration: "3 hours",
-        estimatedCost: "750.00",
+        priority: "high",
+        scheduledDate: d(0),
+        estimatedDuration: 180,
         location: "Newton Park Shopping Centre, Port Elizabeth",
         notes: "Customer reported rodent droppings in storage room",
-        createdAt: new Date('2025-08-20')
+        createdAt: d(-1)
       },
       {
         id: "job-3",
-        clientId: "client-15", // General Motors SA
-        workerId: "worker-10", // Michael Meyer (PCO)
-        departmentId: "div-1", 
+        clientId: "client-15",
+        workerId: "worker-9",
+        departmentId: "div-1",
         title: "Industrial Pest Assessment",
         description: "Comprehensive pest risk assessment for manufacturing facility",
         status: "completed",
         priority: "high",
-        scheduledDate: new Date('2025-08-18'),
-        completedDate: new Date('2025-08-18'),
-        estimatedDuration: "4 hours",
-        actualDuration: "3.5 hours",
-        estimatedCost: "950.00",
-        actualCost: "920.00",
+        scheduledDate: d(-3),
+        completedDate: d(-3),
+        estimatedDuration: 240,
+        actualDuration: 210,
         location: "Struandale, Port Elizabeth",
         notes: "Full facility assessment completed. Report submitted.",
-        createdAt: new Date('2025-08-17')
+        createdAt: d(-5)
+      },
+      {
+        id: "job-4",
+        clientId: "client-7",
+        workerId: "worker-10",
+        departmentId: "div-1",
+        title: "Restaurant Kitchen Fumigation",
+        description: "Full kitchen area fumigation and treatment",
+        status: "scheduled",
+        priority: "medium",
+        scheduledDate: d(3),
+        estimatedDuration: 90,
+        location: "Summerstrand, Port Elizabeth",
+        notes: "After-hours treatment required",
+        createdAt: d(-2)
       },
 
       // Sanitary Bin Service Jobs
       {
-        id: "job-4",
-        clientId: "client-2", // Shoprite Checkers
-        workerId: "worker-13", // Belinda (Sanitary Bin Technician)
+        id: "job-5",
+        clientId: "client-2",
+        workerId: "worker-13",
         departmentId: "div-2",
         title: "Weekly Sanitary Bin Service",
         description: "Weekly collection and maintenance of sanitary disposal units",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: new Date('2025-08-22'),
-        estimatedDuration: "1.5 hours", 
-        estimatedCost: "180.00",
+        scheduledDate: d(2),
+        estimatedDuration: 90,
         location: "Walmer Park Shopping Centre, Port Elizabeth",
         notes: "Service all female restroom facilities",
-        createdAt: new Date('2025-08-19')
+        createdAt: d(-3)
       },
       {
-        id: "job-5",
-        clientId: "client-11", // Life Mercantile Hospital
-        workerId: "worker-16", // Sanitary Bin Technician
+        id: "job-6",
+        clientId: "client-11",
+        workerId: "worker-14",
         departmentId: "div-2",
         title: "Hospital Sanitary Service",
         description: "Bi-weekly sanitary bin service for hospital facilities",
         status: "in_progress",
         priority: "high",
-        scheduledDate: new Date('2025-08-21'),
-        estimatedDuration: "2.5 hours",
-        estimatedCost: "320.00",
+        scheduledDate: d(0),
+        estimatedDuration: 150,
         location: "Mercantile Hospital Street, Port Elizabeth",
         notes: "Include maternity and general wards",
-        createdAt: new Date('2025-08-18')
+        createdAt: d(-2)
       },
       {
-        id: "job-6",
-        clientId: "client-12", // Grey High School
-        workerId: "worker-12", // Leon Coltman (Supervisor)
+        id: "job-7",
+        clientId: "client-12",
+        workerId: "worker-15",
         departmentId: "div-2",
         title: "School Hygiene Program Setup",
         description: "Installation and setup of sanitary disposal units for new term",
         status: "completed",
         priority: "medium",
-        scheduledDate: new Date('2025-08-19'),
-        completedDate: new Date('2025-08-19'),
-        estimatedDuration: "3 hours",
-        actualDuration: "2.5 hours",
-        estimatedCost: "420.00",
-        actualCost: "380.00",
+        scheduledDate: d(-4),
+        completedDate: d(-4),
+        estimatedDuration: 180,
+        actualDuration: 150,
         location: "West Hill, Port Elizabeth",
         notes: "20 units installed across girl's facilities. Training provided.",
-        createdAt: new Date('2025-08-16')
+        createdAt: d(-6)
       },
 
-      // Washroom Service Jobs  
+      // Washroom Service Jobs
       {
-        id: "job-7",
-        clientId: "client-3", // Baywest Mall
-        workerId: "worker-19", // Siphokazi (Washroom Technician)
+        id: "job-8",
+        clientId: "client-3",
+        workerId: "worker-20",
         departmentId: "div-3",
         title: "Mall Washroom Maintenance",
         description: "Daily washroom cleaning and supply replenishment",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: new Date('2025-08-23'),
-        estimatedDuration: "4 hours",
-        estimatedCost: "280.00",
+        scheduledDate: d(1),
+        estimatedDuration: 240,
         location: "Baywest City, Port Elizabeth",
         notes: "Cover all public washroom facilities in mall",
-        createdAt: new Date('2025-08-20')
+        createdAt: d(-2)
       },
       {
-        id: "job-8",
-        clientId: "client-9", // Mutual Heights Office Park
-        workerId: "worker-21", // Zuki Sandi (Washroom Technician)
+        id: "job-9",
+        clientId: "client-8",
+        workerId: "worker-21",
         departmentId: "div-3",
         title: "Office Washroom Deep Clean",
         description: "Quarterly deep cleaning of office building washroom facilities",
         status: "in_progress",
         priority: "medium",
-        scheduledDate: new Date('2025-08-21'),
-        estimatedDuration: "3 hours",
-        estimatedCost: "350.00",
+        scheduledDate: d(0),
+        estimatedDuration: 180,
         location: "Heugh Road, Walmer, Port Elizabeth",
         notes: "Focus on tile cleaning and grout restoration",
-        createdAt: new Date('2025-08-19')
+        createdAt: d(-1)
       },
       {
-        id: "job-9",
-        clientId: "client-13", // Collegiate Girls High
-        workerId: "worker-18", // Zain Abdol (Supervisor)
+        id: "job-10",
+        clientId: "client-13",
+        workerId: "worker-19",
         departmentId: "div-3",
         title: "School Washroom Upgrade",
         description: "Installation of new paper towel dispensers and soap dispensers",
         status: "completed",
         priority: "high",
-        scheduledDate: new Date('2025-08-17'),
-        completedDate: new Date('2025-08-17'),
-        estimatedDuration: "5 hours",
-        actualDuration: "4.5 hours",
-        estimatedCost: "650.00",
-        actualCost: "630.00",
+        scheduledDate: d(-5),
+        completedDate: d(-5),
+        estimatedDuration: 300,
+        actualDuration: 270,
         location: "Mount Pleasant, Port Elizabeth",
         notes: "15 new dispensers installed. Old equipment removed.",
-        createdAt: new Date('2025-08-15')
+        createdAt: d(-7)
       },
 
       // Deep Cleaning Jobs
       {
-        id: "job-10",
-        clientId: "client-4", // Boardwalk Casino
-        workerId: "worker-27", // Themba Mthethwa (Deep Cleaning Supervisor)
+        id: "job-11",
+        clientId: "client-4",
+        workerId: "worker-23",
         departmentId: "div-4",
         title: "Casino Deep Clean Service",
         description: "Monthly deep cleaning of casino floor and VIP areas",
         status: "scheduled",
-        priority: "high", 
-        scheduledDate: new Date('2025-08-24'),
-        estimatedDuration: "8 hours",
-        estimatedCost: "1200.00",
+        priority: "high",
+        scheduledDate: d(4),
+        estimatedDuration: 480,
         location: "Marine Drive, Summerstrand, Port Elizabeth",
         notes: "Night shift operation. Casino remains operational.",
-        createdAt: new Date('2025-08-18')
+        createdAt: d(-3)
       },
       {
-        id: "job-11",
-        clientId: "client-14", // Volkswagen SA
-        workerId: "worker-28", // Nomsa Dlamini (Deep Cleaning Specialist)
+        id: "job-12",
+        clientId: "client-14",
+        workerId: "worker-24",
         departmentId: "div-4",
         title: "Factory Floor Deep Clean",
         description: "Industrial deep cleaning of production floor and equipment",
         status: "in_progress",
         priority: "high",
-        scheduledDate: new Date('2025-08-21'),
-        estimatedDuration: "6 hours",
-        estimatedCost: "950.00",
+        scheduledDate: d(0),
+        estimatedDuration: 360,
         location: "Uitenhage Road, Port Elizabeth",
         notes: "Coordinate with production schedule. Safety protocols required.",
-        createdAt: new Date('2025-08-19')
+        createdAt: d(-2)
       },
       {
-        id: "job-12",
-        clientId: "client-10", // Baywest Office Tower
-        workerId: "worker-29", // Sipho Ndaba (Deep Cleaning Specialist)
+        id: "job-13",
+        clientId: "client-10",
+        workerId: "worker-22",
         departmentId: "div-4",
         title: "Office Building Window Cleaning",
         description: "External and internal window cleaning for 15-story office building",
         status: "completed",
         priority: "medium",
-        scheduledDate: new Date('2025-08-16'),
-        completedDate: new Date('2025-08-16'),
-        estimatedDuration: "10 hours",
-        actualDuration: "9 hours",
-        estimatedCost: "1850.00",
-        actualCost: "1650.00",
+        scheduledDate: d(-6),
+        completedDate: d(-6),
+        estimatedDuration: 600,
+        actualDuration: 540,
         location: "Baywest City, Port Elizabeth",
         notes: "Weather conditions excellent. All floors completed ahead of schedule.",
-        createdAt: new Date('2025-08-12')
+        createdAt: d(-8)
       }
     ];
 
     // Add all sample jobs
     sampleJobs.forEach(job => {
-      this.jobs.set(job.id, job as Job);
+      this.jobs.set(job.id, {
+        ...job,
+        serviceType: "scheduled",
+        scheduledTime: null,
+        startTime: null,
+        endTime: null,
+        completionNotes: null,
+        isRecurring: false,
+        recurringPattern: null,
+        parentJobId: null,
+        diary: null,
+        howInvoiced: null,
+        email: null,
+        areaCode: null,
+        salesperson: null,
+        contractNo: null,
+        isContract: false,
+        service: null,
+        insects: null,
+        price: null,
+        pricePerUnit: null,
+        increaseDate: null,
+        specialInstructions: null,
+        internalInstructions: null,
+        isFixed: false,
+        orderNo: null,
+        recurrenceInterval: null,
+        recurrencePeriod: null,
+        recurrenceDay: null,
+        recurrenceCount: null,
+        recurrenceYears: null,
+        description: (job as any).description || null,
+        completedDate: (job as any).completedDate || null,
+        actualDuration: (job as any).actualDuration || null,
+        updatedAt: new Date()
+      } as Job);
+    });
+
+    // Create sample rental contracts
+    const rentalContracts = [
+      {
+        id: "rc-1",
+        clientId: "client-1",
+        inventoryItemId: "inv-1",
+        monthlyPrice: "2500.00",
+        startDate: new Date(now.getFullYear(), now.getMonth() - 6, 1),
+        endDate: new Date(now.getFullYear() + 1, now.getMonth() - 6, 1),
+        isActive: true,
+        notes: "Monthly paper towel dispenser rental - Pick n Pay Greenacres",
+      },
+      {
+        id: "rc-2",
+        clientId: "client-2",
+        inventoryItemId: "inv-3",
+        monthlyPrice: "1800.00",
+        startDate: new Date(now.getFullYear(), now.getMonth() - 4, 1),
+        endDate: new Date(now.getFullYear() + 1, now.getMonth() - 4, 1),
+        isActive: true,
+        notes: "Hand sanitizer stations rental - Shoprite Walmer",
+      },
+      {
+        id: "rc-3",
+        clientId: "client-5",
+        inventoryItemId: "inv-5",
+        monthlyPrice: "3200.00",
+        startDate: new Date(now.getFullYear(), now.getMonth() - 8, 1),
+        endDate: new Date(now.getFullYear(), now.getMonth() + 1, 1), // expires next month
+        isActive: true,
+        notes: "Pest control station rental - McDonald's Greenacres",
+      },
+      {
+        id: "rc-4",
+        clientId: "client-4",
+        inventoryItemId: "inv-7",
+        monthlyPrice: "4500.00",
+        startDate: new Date(now.getFullYear(), now.getMonth() - 3, 1),
+        endDate: new Date(now.getFullYear() + 1, now.getMonth() - 3, 1),
+        isActive: true,
+        notes: "Washroom cleaning service contract - Boardwalk Casino",
+      },
+      {
+        id: "rc-5",
+        clientId: "client-10",
+        inventoryItemId: "inv-8",
+        monthlyPrice: "1950.00",
+        startDate: new Date(now.getFullYear(), now.getMonth() - 2, 1),
+        endDate: new Date(now.getFullYear() + 1, now.getMonth() - 2, 1),
+        isActive: true,
+        notes: "Feminine hygiene disposal unit rental - Baywest Office Tower",
+      },
+      {
+        id: "rc-6",
+        clientId: "client-11",
+        inventoryItemId: "inv-4",
+        monthlyPrice: "5200.00",
+        startDate: new Date(now.getFullYear(), now.getMonth() - 5, 1),
+        endDate: new Date(now.getFullYear() + 1, now.getMonth() - 5, 1),
+        isActive: true,
+        notes: "Full hygiene service contract - Life Mercantile Hospital",
+      }
+    ];
+
+    rentalContracts.forEach(rc => {
+      this.rentalContracts.set(rc.id, {
+        ...rc,
+        lastPriceIncrease: null,
+        createdAt: new Date()
+      } as RentalContract);
+    });
+
+    // Create comprehensive sample invoices
+    const sampleInvoices = [
+      { clientId: "client-1", status: "paid", issueDate: d(-60), dueDate: d(-30), paymentDate: d(-35), subtotal: "2173.91", taxAmount: "326.09", total: "2500.00", paidAmount: "2500.00", notes: "March contract payment - Pick n Pay" },
+      { clientId: "client-2", status: "paid", issueDate: d(-55), dueDate: d(-25), paymentDate: d(-28), subtotal: "1565.22", taxAmount: "234.78", total: "1800.00", paidAmount: "1800.00", notes: "March contract payment - Shoprite" },
+      { clientId: "client-4", status: "paid", issueDate: d(-50), dueDate: d(-20), paymentDate: d(-22), subtotal: "3913.04", taxAmount: "586.96", total: "4500.00", paidAmount: "4500.00", notes: "March washroom contract - Boardwalk" },
+      { clientId: "client-1", status: "sent", issueDate: d(-15), dueDate: d(15), subtotal: "2173.91", taxAmount: "326.09", total: "2500.00", paidAmount: "0.00", notes: "April contract payment - Pick n Pay" },
+      { clientId: "client-2", status: "sent", issueDate: d(-10), dueDate: d(20), subtotal: "1565.22", taxAmount: "234.78", total: "1800.00", paidAmount: "0.00", notes: "April contract payment - Shoprite" },
+      { clientId: "client-5", status: "sent", issueDate: d(-8), dueDate: d(22), subtotal: "2782.61", taxAmount: "417.39", total: "3200.00", paidAmount: "0.00", notes: "April pest control rental - McDonald's" },
+      { clientId: "client-3", status: "overdue", issueDate: d(-45), dueDate: d(-15), subtotal: "2608.70", taxAmount: "391.30", total: "3000.00", paidAmount: "0.00", notes: "February washroom service - Baywest Mall" },
+      { clientId: "client-12", status: "overdue", issueDate: d(-40), dueDate: d(-10), subtotal: "1304.35", taxAmount: "195.65", total: "1500.00", paidAmount: "0.00", notes: "February hygiene - Grey High School" },
+      { clientId: "client-11", status: "paid", issueDate: d(-35), dueDate: d(-5), paymentDate: d(-8), subtotal: "4521.74", taxAmount: "678.26", total: "5200.00", paidAmount: "5200.00", notes: "March hospital service - Life Mercantile" },
+      { clientId: "client-6", status: "draft", issueDate: d(-2), dueDate: d(28), subtotal: "652.17", taxAmount: "97.83", total: "750.00", paidAmount: "0.00", notes: "April rodent control - KFC Newton Park" },
+    ];
+
+    sampleInvoices.forEach((inv, i) => {
+      const id = `sinv-${i + 1}`;
+      this.invoices.set(id, {
+        id,
+        invoiceNumber: `INV-${now.getFullYear()}-${String(i + 4).padStart(4, '0')}`,
+        clientId: inv.clientId,
+        status: inv.status,
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+        subtotal: inv.subtotal,
+        taxAmount: inv.taxAmount,
+        total: inv.total,
+        paidAmount: inv.paidAmount,
+        paymentDate: (inv as any).paymentDate || null,
+        notes: inv.notes,
+        terms: "Payment due within 30 days",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        sageInvoiceId: null,
+        sageStatus: null
+      } as Invoice);
     });
   }
 

@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock } from "lucide-react";
-import type { Client, Contract, Invoice } from "@shared/schema";
+import type { Client, RentalContract, Invoice } from "@shared/schema";
 
 export function AccountsDashboard() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
-  const { data: contracts = [] } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
+  const { data: contracts = [] } = useQuery<RentalContract[]>({ queryKey: ["/api/contracts"] });
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
 
   const paid = invoices.filter(i => i.status === "paid");
@@ -14,13 +14,13 @@ export function AccountsDashboard() {
   const overdue = invoices.filter(i => i.status === "overdue");
   const draft = invoices.filter(i => i.status === "draft");
 
-  const totalPaid = paid.reduce((s, i) => s + parseFloat(i.amount ?? "0"), 0);
-  const totalOutstanding = outstanding.reduce((s, i) => s + parseFloat(i.amount ?? "0"), 0);
-  const totalOverdue = overdue.reduce((s, i) => s + parseFloat(i.amount ?? "0"), 0);
+  const totalPaid = paid.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
+  const totalOutstanding = outstanding.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
+  const totalOverdue = overdue.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
   const totalRevenue = totalPaid + totalOutstanding + totalOverdue;
 
-  const activeContracts = contracts.filter(c => c.status === "active");
-  const monthlyContractValue = activeContracts.reduce((s, c) => s + parseFloat(c.monthlyValue ?? "0"), 0);
+  const activeContracts = contracts.filter(c => c.isActive === true);
+  const monthlyContractValue = activeContracts.reduce((s, c) => s + parseFloat(c.monthlyPrice ?? "0"), 0);
 
   // Collection rate
   const collectionRate = totalRevenue > 0 ? Math.round((totalPaid / totalRevenue) * 100) : 0;
@@ -106,7 +106,7 @@ export function AccountsDashboard() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="text-sm font-semibold">R{parseFloat(inv.amount ?? "0").toLocaleString()}</span>
+                        <span className="text-sm font-semibold">R{parseFloat(inv.total ?? "0").toLocaleString()}</span>
                         <Badge className={inv.status === "overdue" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}>
                           {inv.status}
                         </Badge>
@@ -138,7 +138,7 @@ export function AccountsDashboard() {
                 return (
                   <div key={contract.id} className="flex items-center justify-between">
                     <p className="text-sm text-gray-700 truncate">{client?.name ?? "Unknown"}</p>
-                    <p className="text-sm font-semibold text-green-600">R{parseFloat(contract.monthlyValue ?? "0").toLocaleString()}/mo</p>
+                    <p className="text-sm font-semibold text-green-600">R{parseFloat(contract.monthlyPrice ?? "0").toLocaleString()}/mo</p>
                   </div>
                 );
               })}
@@ -165,7 +165,7 @@ export function AccountsDashboard() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">R{parseFloat(inv.amount ?? "0").toLocaleString()}</span>
+                    <span className="text-sm font-semibold">R{parseFloat(inv.total ?? "0").toLocaleString()}</span>
                     <Badge className={
                       inv.status === "paid" ? "bg-green-100 text-green-800" :
                       inv.status === "overdue" ? "bg-red-100 text-red-800" :

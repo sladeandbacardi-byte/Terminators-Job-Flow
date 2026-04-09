@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DepartmentOverview } from "./department-overview";
 import { WorkerJobsSummary } from "./worker-jobs-summary";
 import { Users, Briefcase, DollarSign, FileText, TrendingUp, AlertTriangle, Package } from "lucide-react";
-import type { Job, Worker, Client, Invoice, Contract, InventoryItem, Department } from "@shared/schema";
+import type { Job, Worker, Client, Invoice, RentalContract, InventoryItem, Department } from "@shared/schema";
 
 type Range = "today" | "week" | "month";
 
@@ -33,17 +33,17 @@ export function AdminDashboard() {
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
-  const { data: contracts = [] } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
+  const { data: contracts = [] } = useQuery<RentalContract[]>({ queryKey: ["/api/contracts"] });
   const { data: inventory = [] } = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
   const filteredJobs = jobs.filter(j => inRange(j.scheduledDate, range));
-  const totalRevenue = invoices.filter(i => i.status === "paid").reduce((s, i) => s + parseFloat(i.amount ?? "0"), 0);
-  const outstanding = invoices.filter(i => i.status === "sent" || i.status === "overdue").reduce((s, i) => s + parseFloat(i.amount ?? "0"), 0);
+  const totalRevenue = invoices.filter(i => i.status === "paid").reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
+  const outstanding = invoices.filter(i => i.status === "sent" || i.status === "overdue").reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
   const overdueCount = invoices.filter(i => i.status === "overdue").length;
   const lowStock = inventory.filter(i => i.quantity <= (i.minStockLevel ?? 0));
-  const activeContracts = contracts.filter(c => c.status === "active");
-  const monthlyRecurring = activeContracts.reduce((s, c) => s + parseFloat(c.monthlyValue ?? "0"), 0);
+  const activeContracts = contracts.filter(c => c.isActive === true);
+  const monthlyRecurring = activeContracts.reduce((s, c) => s + parseFloat(c.monthlyPrice ?? "0"), 0);
 
   return (
     <div className="space-y-6">
@@ -133,7 +133,7 @@ export function AdminDashboard() {
                 { label: "Overdue", items: invoices.filter(i=>i.status==="overdue"), color: "bg-red-400" },
                 { label: "Draft", items: invoices.filter(i=>i.status==="draft"), color: "bg-gray-300" },
               ].map(({ label, items, color }) => {
-                const total = items.reduce((s, i) => s + parseFloat(i.amount ?? "0"), 0);
+                const total = items.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
                 return (
                   <div key={label} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

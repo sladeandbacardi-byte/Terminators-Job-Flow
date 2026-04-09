@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, FileText, TrendingUp, DollarSign, Phone, Mail, Calendar } from "lucide-react";
-import type { Client, Contract, Invoice, Job } from "@shared/schema";
+import type { Client, RentalContract, Invoice, Job } from "@shared/schema";
 
 function thisMonth(date: any) {
   if (!date) return false;
@@ -13,13 +13,13 @@ function thisMonth(date: any) {
 
 export function SalesDashboard() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
-  const { data: contracts = [] } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
+  const { data: contracts = [] } = useQuery<RentalContract[]>({ queryKey: ["/api/contracts"] });
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
 
   const activeClients = clients.filter(c => c.status === "active");
   const newClientsThisMonth = clients.filter(c => thisMonth(c.createdAt));
-  const activeContracts = contracts.filter(c => c.status === "active");
+  const activeContracts = contracts.filter(c => c.isActive === true);
   const expiringContracts = contracts.filter(c => {
     if (!c.endDate) return false;
     const end = new Date(c.endDate);
@@ -27,7 +27,7 @@ export function SalesDashboard() {
     const diff = (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
     return diff >= 0 && diff <= 30;
   });
-  const totalMonthlyRevenue = activeContracts.reduce((sum, c) => sum + parseFloat(c.monthlyValue ?? "0"), 0);
+  const totalMonthlyRevenue = activeContracts.reduce((sum, c) => sum + parseFloat(c.monthlyPrice ?? "0"), 0);
   const pendingJobs = jobs.filter(j => j.status === "pending" || j.status === "scheduled");
 
   return (
@@ -111,7 +111,7 @@ export function SalesDashboard() {
                         <p className="text-sm font-medium truncate">{client?.name ?? "Unknown Client"}</p>
                         <p className="text-xs text-gray-400 flex items-center gap-1">
                           <Calendar className="h-3 w-3"/>
-                          R{parseFloat(contract.monthlyValue ?? "0").toLocaleString()}/mo
+                          R{parseFloat(contract.monthlyPrice ?? "0").toLocaleString()}/mo
                           {daysLeft !== null && <span className={daysLeft <= 30 ? "text-orange-500 ml-1" : "ml-1"}> · {daysLeft}d left</span>}
                         </p>
                       </div>
@@ -137,9 +137,9 @@ export function SalesDashboard() {
         <CardContent>
           <div className="grid grid-cols-3 gap-4 mb-4">
             {[
-              { label: "Sent / Outstanding", count: invoices.filter(i=>i.status==="sent").length, amount: invoices.filter(i=>i.status==="sent").reduce((s,i)=>s+parseFloat(i.amount??'0'),0), color: "text-blue-600" },
-              { label: "Paid", count: invoices.filter(i=>i.status==="paid").length, amount: invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+parseFloat(i.amount??'0'),0), color: "text-green-600" },
-              { label: "Overdue", count: invoices.filter(i=>i.status==="overdue").length, amount: invoices.filter(i=>i.status==="overdue").reduce((s,i)=>s+parseFloat(i.amount??'0'),0), color: "text-red-600" },
+              { label: "Sent / Outstanding", count: invoices.filter(i=>i.status==="sent").length, amount: invoices.filter(i=>i.status==="sent").reduce((s,i)=>s+parseFloat(i.total??'0'),0), color: "text-blue-600" },
+              { label: "Paid", count: invoices.filter(i=>i.status==="paid").length, amount: invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+parseFloat(i.total??'0'),0), color: "text-green-600" },
+              { label: "Overdue", count: invoices.filter(i=>i.status==="overdue").length, amount: invoices.filter(i=>i.status==="overdue").reduce((s,i)=>s+parseFloat(i.total??'0'),0), color: "text-red-600" },
             ].map(({ label, count, amount, color }) => (
               <div key={label} className="text-center border rounded-lg p-3">
                 <p className="text-xs text-gray-500">{label}</p>
@@ -158,7 +158,7 @@ export function SalesDashboard() {
                     <p className="text-xs text-gray-400">{client?.name ?? "Unknown"}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">R{parseFloat(inv.amount ?? "0").toLocaleString()}</span>
+                    <span className="text-sm font-semibold">R{parseFloat(inv.total ?? "0").toLocaleString()}</span>
                     <Badge className={inv.status === "paid" ? "bg-green-100 text-green-800" : inv.status === "overdue" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}>
                       {inv.status}
                     </Badge>
