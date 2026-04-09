@@ -16,7 +16,7 @@ export function TerminatorsLogo({ className = "", size = 'md' }: TerminatorsLogo
     <div className={`flex items-center justify-center ${className}`}>
       <img 
         src={logoImage} 
-        alt="The Terminators Healthcare Services" 
+        alt="Terminators Job Flow" 
         className={`${sizeClasses[size]} object-contain`}
         data-testid="terminators-logo"
       />

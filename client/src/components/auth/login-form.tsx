@@ -66,7 +66,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <div className="mx-auto pt-2">
             <TerminatorsLogo size="lg" />
           </div>
-          <CardDescription className="text-gray-600 font-medium">Field Service Management System</CardDescription>
+          <CardDescription className="text-gray-600 font-medium">Terminators Job Flow</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-5">
