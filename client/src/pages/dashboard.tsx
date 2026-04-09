@@ -12,7 +12,13 @@ import QuickActions from "@/components/dashboard/quick-actions";
 import SalesPerformance from "@/components/dashboard/sales-performance";
 import { WorkerJobsSummary } from "@/components/dashboard/worker-jobs-summary";
 import { DepartmentOverview } from "@/components/dashboard/department-overview";
+import { ServiceDashboard } from "@/components/dashboard/service-dashboard";
+import { SalesDashboard } from "@/components/dashboard/sales-dashboard";
+import { AccountsDashboard } from "@/components/dashboard/accounts-dashboard";
+import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 import { TerminatorsLogo } from "@/components/terminators-logo";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors } from "@/lib/dashboardRole";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardMetrics {
@@ -49,9 +55,12 @@ interface RevenueChartData {
 }
 
 export default function Dashboard() {
-  const { toast } = useToast();
+  const { toast, } = useToast();
+  const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today');
+
+  const dashboardRole = getDashboardRole(user ?? {});
   
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['/api/dashboard/metrics'],
@@ -119,9 +128,21 @@ export default function Dashboard() {
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
             {/* Company Logo Header */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <TerminatorsLogo size="lg" className="mx-auto" data-testid="company-logo" />
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between">
+              <TerminatorsLogo size="lg" data-testid="company-logo" />
+              <div className={`px-3 py-1.5 rounded-full text-white text-sm font-medium ${dashboardRoleColors[dashboardRole]}`}>
+                {dashboardRoleLabels[dashboardRole]} View
+              </div>
             </div>
+
+            {/* Role-based dashboard */}
+            {dashboardRole === "service" && <ServiceDashboard />}
+            {dashboardRole === "sales" && <SalesDashboard />}
+            {dashboardRole === "accounts" && <AccountsDashboard />}
+            {dashboardRole === "admin" && <AdminDashboard />}
+
+            {/* Legacy full overview — hidden, kept for reference */}
+            {false && <div className="hidden">
 
             {/* Period Selection and Overview */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -303,6 +324,8 @@ export default function Dashboard() {
 
             {/* Recent Jobs */}
             <RecentJobs />
+            </div>}
+
           </div>
         </main>
       </div>
