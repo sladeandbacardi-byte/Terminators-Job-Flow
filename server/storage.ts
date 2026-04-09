@@ -776,10 +776,10 @@ export class MemStorage implements IStorage {
       // Management Team
       { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-6", role: "Operational Manager" },
       { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", departmentId: "div-5", role: "Sales Administrator" },
-      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: "div-6", role: "Finance and Human Resources Manager" },
+      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: null, role: "Finance and Human Resources Manager" },
       { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-5", role: "Sales Consultant" },
       { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-3", role: "Hygiene Services Coordinator" },
-      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-6", role: "Pest Control Services Coordinator" },
+      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-1", role: "Pest Control Services Coordinator" },
       
       // Pest Control Team
       { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", departmentId: "div-1", role: "PCO" },
