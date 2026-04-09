@@ -1618,9 +1618,19 @@ export class MemStorage implements IStorage {
 
     // Create comprehensive sample invoices
     const sampleInvoices = [
+      // Older paid invoices (last month)
       { clientId: "client-1", status: "paid", issueDate: d(-60), dueDate: d(-30), paymentDate: d(-35), subtotal: "2173.91", taxAmount: "326.09", total: "2500.00", paidAmount: "2500.00", notes: "March contract payment - Pick n Pay" },
       { clientId: "client-2", status: "paid", issueDate: d(-55), dueDate: d(-25), paymentDate: d(-28), subtotal: "1565.22", taxAmount: "234.78", total: "1800.00", paidAmount: "1800.00", notes: "March contract payment - Shoprite" },
       { clientId: "client-4", status: "paid", issueDate: d(-50), dueDate: d(-20), paymentDate: d(-22), subtotal: "3913.04", taxAmount: "586.96", total: "4500.00", paidAmount: "4500.00", notes: "March washroom contract - Boardwalk" },
+      // Current month paid invoices
+      { clientId: "client-11", status: "paid", issueDate: d(-14), dueDate: d(16), paymentDate: d(-5), subtotal: "4521.74", taxAmount: "678.26", total: "5200.00", paidAmount: "5200.00", notes: "April hospital service - Life Mercantile" },
+      { clientId: "client-5", status: "paid", issueDate: d(-12), dueDate: d(18), paymentDate: d(-3), subtotal: "1086.96", taxAmount: "163.04", total: "1250.00", paidAmount: "1250.00", notes: "April pest control - McDonald's Greenacres" },
+      // This week paid invoices
+      { clientId: "client-7", status: "paid", issueDate: d(-6), dueDate: d(24), paymentDate: d(-2), subtotal: "1739.13", taxAmount: "260.87", total: "2000.00", paidAmount: "2000.00", notes: "April sanitary bins - Standard Bank Port Elizabeth" },
+      { clientId: "client-9", status: "paid", issueDate: d(-5), dueDate: d(25), paymentDate: d(-1), subtotal: "2608.70", taxAmount: "391.30", total: "3000.00", paidAmount: "3000.00", notes: "April deep clean - Greenacres Shopping Centre" },
+      // Today paid
+      { clientId: "client-3", status: "paid", issueDate: d(-3), dueDate: d(27), paymentDate: d(0), subtotal: "3478.26", taxAmount: "521.74", total: "4000.00", paidAmount: "4000.00", notes: "April washroom contract - Baywest Mall" },
+      // Outstanding/sent
       { clientId: "client-1", status: "sent", issueDate: d(-15), dueDate: d(15), subtotal: "2173.91", taxAmount: "326.09", total: "2500.00", paidAmount: "0.00", notes: "April contract payment - Pick n Pay" },
       { clientId: "client-2", status: "sent", issueDate: d(-10), dueDate: d(20), subtotal: "1565.22", taxAmount: "234.78", total: "1800.00", paidAmount: "0.00", notes: "April contract payment - Shoprite" },
       { clientId: "client-5", status: "sent", issueDate: d(-8), dueDate: d(22), subtotal: "2782.61", taxAmount: "417.39", total: "3200.00", paidAmount: "0.00", notes: "April pest control rental - McDonald's" },
@@ -1739,6 +1749,27 @@ export class MemStorage implements IStorage {
 
     sampleQuotes.forEach(q => {
       this.quoteSubmissions.set(q.id, q);
+    });
+
+    // Seed current-period purchase orders (expenses)
+    const samplePOs: PurchaseOrder[] = [
+      // Today
+      { id: "po-seed-1", poNumber: "PO-TODAY-001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1850.00", requestDate: d(0), approvalDate: d(0), expectedDeliveryDate: d(3), actualDeliveryDate: null, sentDate: null, notes: "Pesticide restock - daily run", rejectionReason: null, createdAt: d(0), updatedAt: d(0) },
+      { id: "po-seed-2", poNumber: "PO-TODAY-002", supplierId: "supplier-2", requestedById: "user-1", approvedById: null, status: "pending", totalAmount: "640.00", requestDate: d(0), approvalDate: null, expectedDeliveryDate: d(5), actualDeliveryDate: null, sentDate: null, notes: "Sanitary bag restocking", rejectionReason: null, createdAt: d(0), updatedAt: d(0) },
+      // This week
+      { id: "po-seed-3", poNumber: "PO-WEEK-001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "3200.00", requestDate: d(-2), approvalDate: d(-2), sentDate: d(-1), expectedDeliveryDate: d(0), actualDeliveryDate: d(0), notes: "Monthly washroom supplies - soaps & dispensers", rejectionReason: null, createdAt: d(-2), updatedAt: d(0) },
+      { id: "po-seed-4", poNumber: "PO-WEEK-002", supplierId: "supplier-3", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1420.00", requestDate: d(-3), approvalDate: d(-3), expectedDeliveryDate: d(2), actualDeliveryDate: null, sentDate: null, notes: "Deep cleaning chemicals - April stock", rejectionReason: null, createdAt: d(-3), updatedAt: d(-3) },
+      { id: "po-seed-5", poNumber: "PO-WEEK-003", supplierId: "supplier-2", requestedById: "user-1", approvedById: "user-1", status: "sent", totalAmount: "975.00", requestDate: d(-4), approvalDate: d(-4), sentDate: d(-3), expectedDeliveryDate: d(1), actualDeliveryDate: null, notes: "PPE gloves and masks - field staff", rejectionReason: null, createdAt: d(-4), updatedAt: d(-3) },
+      // This month (earlier)
+      { id: "po-seed-6", poNumber: "PO-MONTH-001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "5500.00", requestDate: d(-10), approvalDate: d(-10), sentDate: d(-9), expectedDeliveryDate: d(-7), actualDeliveryDate: d(-7), notes: "Bulk rodenticide order for Q2", rejectionReason: null, createdAt: d(-10), updatedAt: d(-7) },
+      { id: "po-seed-7", poNumber: "PO-MONTH-002", supplierId: "supplier-3", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "2800.00", requestDate: d(-14), approvalDate: d(-13), sentDate: d(-12), expectedDeliveryDate: d(-10), actualDeliveryDate: d(-10), notes: "Washroom paper product replenishment", rejectionReason: null, createdAt: d(-14), updatedAt: d(-10) },
+      { id: "po-seed-8", poNumber: "PO-MONTH-003", supplierId: "supplier-2", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1650.00", requestDate: d(-7), approvalDate: d(-7), expectedDeliveryDate: d(3), actualDeliveryDate: null, sentDate: null, notes: "Vehicle cleaning supplies - fleet", rejectionReason: null, createdAt: d(-7), updatedAt: d(-7) },
+    ];
+
+    samplePOs.forEach(po => {
+      if (!this.purchaseOrders.has(po.id)) {
+        this.purchaseOrders.set(po.id, po);
+      }
     });
   }
 
