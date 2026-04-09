@@ -791,18 +791,6 @@ export class MemStorage implements IStorage {
       // Sanitary Bin Service A Team
       { name: "Donovan", email: "donovan@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
       { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", departmentId: "div-2", role: "Sanitary Bin Technician" },
-      // Sanitary Bin Service B Team
-      { name: "Jackie Roelfse", email: "jackie@terminators.co.za", phone: "+27 41 123 4579", departmentId: "div-2", role: "Supervisor" },
-      { name: "Asanda", email: "asanda@terminators.co.za", phone: "+27 41 123 4581", departmentId: "div-2", role: "Sanitary Bin Technician" },
-      
-      // Washroom Services Team
-      { name: "Zain Abdol", email: "zain@terminators.co.za", phone: "+27 41 123 4582", departmentId: "div-3", role: "Supervisor" },
-      { name: "Siphokazi", email: "siphokazi@terminators.co.za", phone: "+27 41 123 4583", departmentId: "div-3", role: "Washroom Technician" },
-      { name: "Zuki Sandi", email: "zuki@terminators.co.za", phone: "+27 41 123 4584", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Nini", email: "nini@terminators.co.za", phone: "+27 41 123 4586", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Veronica", email: "veronica@terminators.co.za", phone: "+27 41 123 4587", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Margrett", email: "margrett@terminators.co.za", phone: "+27 41 123 4588", departmentId: "div-4", role: "Deep Cleaning Specialist" },
-      { name: "Babalwa", email: "babalwa@terminators.co.za", phone: "+27 41 123 4589", departmentId: "div-4", role: "Deep Cleaning Specialist" }
     ];
 
     workers.forEach((worker, index) => {
