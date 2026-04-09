@@ -16,6 +16,7 @@ import { ServiceDashboard } from "@/components/dashboard/service-dashboard";
 import { SalesDashboard } from "@/components/dashboard/sales-dashboard";
 import { AccountsDashboard } from "@/components/dashboard/accounts-dashboard";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
+import { ManagerDashboard } from "@/components/dashboard/manager-dashboard";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors } from "@/lib/dashboardRole";
@@ -139,6 +140,7 @@ export default function Dashboard() {
             {dashboardRole === "service" && <ServiceDashboard />}
             {dashboardRole === "sales" && <SalesDashboard />}
             {dashboardRole === "accounts" && <AccountsDashboard />}
+            {dashboardRole === "manager" && <ManagerDashboard />}
             {dashboardRole === "admin" && <AdminDashboard />}
 
             {/* Legacy full overview — hidden, kept for reference */}

@@ -12,6 +12,7 @@ import type { Worker } from "@shared/schema";
 
 const roleIcons: Record<string, JSX.Element> = {
   admin: <Shield className="h-3.5 w-3.5" />,
+  manager: <Briefcase className="h-3.5 w-3.5" />,
   sales: <TrendingUp className="h-3.5 w-3.5" />,
   service: <Briefcase className="h-3.5 w-3.5" />,
   accounts: <DollarSign className="h-3.5 w-3.5" />,
@@ -19,6 +20,7 @@ const roleIcons: Record<string, JSX.Element> = {
 
 const roleColors: Record<string, string> = {
   admin: "bg-indigo-100 text-indigo-700",
+  manager: "bg-teal-100 text-teal-700",
   sales: "bg-pink-100 text-pink-700",
   service: "bg-green-100 text-green-700",
   accounts: "bg-amber-100 text-amber-700",
