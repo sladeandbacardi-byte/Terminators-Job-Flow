@@ -1652,6 +1652,94 @@ export class MemStorage implements IStorage {
         sageStatus: null
       } as Invoice);
     });
+
+    // Seed sample quote submissions
+    const sampleQuotes: QuoteSubmission[] = [
+      {
+        id: "quote-1",
+        companyName: "Spar Newton Park",
+        contactPerson: "Johan Myburgh",
+        email: "jmyburgh@spar-np.co.za",
+        phone: "+27 41 365 1234",
+        serviceType: "pest_control",
+        description: "Looking for monthly pest control contract for supermarket. Approximately 800sqm. Kitchen, storage and shopfloor included.",
+        address: "Newton Park Shopping Centre, Port Elizabeth",
+        preferredContactMethod: "phone",
+        status: "new",
+        assignedTo: null,
+        notes: null,
+        submittedAt: d(-1),
+        followUpDate: d(2),
+      },
+      {
+        id: "quote-2",
+        companyName: "Greenacres Medical Centre",
+        contactPerson: "Dr. Sandra Botha",
+        email: "admin@greenacresmed.co.za",
+        phone: "+27 41 374 5678",
+        serviceType: "sanitary_bins",
+        description: "Medical facility requires sanitary bin service for 6 female restrooms. Bi-weekly collection preferred.",
+        address: "Greenacres, Port Elizabeth",
+        preferredContactMethod: "email",
+        status: "contacted",
+        assignedTo: "worker-2",
+        notes: "Spoke with Dr Botha on Monday. Sending quote by Wednesday.",
+        submittedAt: d(-4),
+        followUpDate: d(1),
+      },
+      {
+        id: "quote-3",
+        companyName: "Bay Harbour Hotel",
+        contactPerson: "Thandi Nkosi",
+        email: "t.nkosi@bayharbour.co.za",
+        phone: "+27 41 583 9000",
+        serviceType: "washroom",
+        description: "Full washroom maintenance required for 4-star hotel. 35 guest rooms, 2 conference suites, pool area. Daily service needed.",
+        address: "Marine Drive, Summerstrand, Port Elizabeth",
+        preferredContactMethod: "either",
+        status: "quoted",
+        assignedTo: "worker-2",
+        notes: "Quote sent: R8,500/month for full washroom service. Awaiting sign-off from GM.",
+        submittedAt: d(-7),
+        followUpDate: d(3),
+      },
+      {
+        id: "quote-4",
+        companyName: "Nelson Mandela University",
+        contactPerson: "Facilities Manager",
+        email: "facilities@nmu.ac.za",
+        phone: "+27 41 504 1111",
+        serviceType: "deep_cleaning",
+        description: "Semester-end deep clean of 3 lecture blocks and library. Approximately 4,200sqm. Must be done over year-end break.",
+        address: "University Way, Summerstrand, Port Elizabeth",
+        preferredContactMethod: "email",
+        status: "new",
+        assignedTo: null,
+        notes: null,
+        submittedAt: d(0),
+        followUpDate: d(5),
+      },
+      {
+        id: "quote-5",
+        companyName: "Woolworths Food - Walmer Park",
+        contactPerson: "Store Manager",
+        email: "manager@ww-walmer.co.za",
+        phone: "+27 41 368 2200",
+        serviceType: "pest_control",
+        description: "Existing Woolworths store needing pest control upgrade. Current supplier underperforming. Monthly contract.",
+        address: "Walmer Park Shopping Centre, Port Elizabeth",
+        preferredContactMethod: "phone",
+        status: "contacted",
+        assignedTo: "worker-2",
+        notes: "Very interested — follow up Friday with site visit proposal.",
+        submittedAt: d(-3),
+        followUpDate: d(4),
+      },
+    ];
+
+    sampleQuotes.forEach(q => {
+      this.quoteSubmissions.set(q.id, q);
+    });
   }
 
   // Users
