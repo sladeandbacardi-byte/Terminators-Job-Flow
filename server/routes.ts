@@ -1846,6 +1846,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WhatsApp messaging endpoint
+  app.post("/api/whatsapp/send", async (req, res) => {
+    try {
+      const { to, message } = req.body;
+
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+      if (!phoneNumberId || !accessToken) {
+        return res.status(500).json({ error: "WhatsApp is not configured. Missing API credentials." });
+      }
+
+      if (!to || !message) {
+        return res.status(400).json({ error: "Phone number and message are required." });
+      }
+
+      // Normalise phone number: strip spaces/dashes, ensure it starts with country code
+      const cleaned = to.replace(/[\s\-\(\)]/g, "");
+      const phone = cleaned.startsWith("+") ? cleaned.slice(1) : cleaned;
+
+      const response = await fetch(
+        `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: phone,
+            type: "text",
+            text: { body: message },
+          }),
+        }
+      );
+
+      const data = await response.json() as any;
+
+      if (!response.ok) {
+        console.error("WhatsApp API error:", data);
+        const errMsg = data?.error?.message ?? "Failed to send WhatsApp message";
+        return res.status(response.status).json({ error: errMsg });
+      }
+
+      res.json({ success: true, messageId: data?.messages?.[0]?.id });
+    } catch (error: any) {
+      console.error("WhatsApp send error:", error);
+      res.status(500).json({ error: error.message ?? "Failed to send WhatsApp message" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
