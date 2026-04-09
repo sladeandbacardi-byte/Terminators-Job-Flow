@@ -1898,6 +1898,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WhatsApp template message endpoint
+  app.post("/api/whatsapp/send-template", async (req, res) => {
+    try {
+      const { to, templateName, language = "en", parameters = [] } = req.body;
+
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+      if (!phoneNumberId || !accessToken) {
+        return res.status(500).json({ error: "WhatsApp is not configured. Missing API credentials." });
+      }
+
+      if (!to || !templateName) {
+        return res.status(400).json({ error: "Phone number and template name are required." });
+      }
+
+      const cleaned = to.replace(/[\s\-\(\)]/g, "");
+      const phone = cleaned.startsWith("+") ? cleaned.slice(1) : cleaned;
+
+      const components: any[] = [];
+      if (parameters.length > 0) {
+        components.push({
+          type: "body",
+          parameters: parameters.map((p: string) => ({ type: "text", text: p })),
+        });
+      }
+
+      const response = await fetch(
+        `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: phone,
+            type: "template",
+            template: {
+              name: templateName,
+              language: { code: language },
+              ...(components.length > 0 ? { components } : {}),
+            },
+          }),
+        }
+      );
+
+      const data = await response.json() as any;
+
+      if (!response.ok) {
+        console.error("WhatsApp template API error:", data);
+        const errMsg = data?.error?.message ?? "Failed to send WhatsApp template message";
+        return res.status(response.status).json({ error: errMsg });
+      }
+
+      res.json({ success: true, messageId: data?.messages?.[0]?.id });
+    } catch (error: any) {
+      console.error("WhatsApp template send error:", error);
+      res.status(500).json({ error: error.message ?? "Failed to send WhatsApp template message" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
