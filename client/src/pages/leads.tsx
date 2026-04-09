@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import Sidebar from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -91,6 +93,7 @@ function followUpLabel(date: any) {
 
 export default function Leads() {
   const { toast } = useToast();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNewLead, setShowNewLead] = useState(false);
   const [convertLead, setConvertLead] = useState<QuoteSubmission | null>(null);
   const [notesLead, setNotesLead] = useState<QuoteSubmission | null>(null);
@@ -192,8 +195,25 @@ export default function Leads() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="p-6 space-y-6 max-w-full">
-      {/* Header */}
+    <div className="min-h-screen flex bg-gray-50">
+      <Sidebar />
+
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="relative bg-white w-64 shadow-lg">
+            <Sidebar />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header title="Lead Pipeline" onMobileMenuToggle={() => setIsMobileMenuOpen(true)} />
+
+        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+    <div className="space-y-6 max-w-full">
+      {/* Page header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Lead Pipeline</h1>
@@ -475,6 +495,9 @@ export default function Leads() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+        </main>
+      </div>
     </div>
   );
 }
