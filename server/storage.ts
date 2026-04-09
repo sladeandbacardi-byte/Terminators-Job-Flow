@@ -790,7 +790,6 @@ export class MemStorage implements IStorage {
       
       // Sanitary Bin Service A Team
       { name: "Donovan", email: "donovan@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
-      { name: "Belinda", email: "belinda@terminators.co.za", phone: "+27 41 123 4577", departmentId: "div-2", role: "Sanitary Bin Technician" },
     ];
 
     workers.forEach((worker, index) => {
