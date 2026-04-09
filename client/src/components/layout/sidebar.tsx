@@ -5,7 +5,6 @@ import {
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
   Settings, TrendingUp,
 } from "lucide-react";
-import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
 
@@ -79,10 +78,6 @@ export default function Sidebar() {
 
   return (
     <div className="bg-white shadow-lg w-64 hidden md:flex flex-col" data-testid="sidebar">
-      <div className="p-6 border-b border-gray-200">
-        <TerminatorsLogo size="sm" data-testid="sidebar-logo" />
-      </div>
-
       <nav className="p-4 space-y-4 overflow-y-auto flex-1" data-testid="navigation">
         {/* Dashboard */}
         {quickNavigation.map((item) => {
