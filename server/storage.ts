@@ -771,23 +771,70 @@ export class MemStorage implements IStorage {
     this.departments.set(salesDepartment.id, salesDepartment);
     this.departments.set(adminDepartment.id, adminDepartment);
 
-    // Create workers based on actual organogram
+    // Create workers based on actual organogram (Latest 2026)
     const workers = [
-      // Management Team
-      { name: "Julien Botha", email: "julien@terminators.co.za", phone: "+27 41 123 4567", departmentId: "div-6", role: "Operational Manager" },
-      { name: "Sheryl-Lyn Lee", email: "sheryl@terminators.co.za", phone: "+27 41 123 4568", departmentId: "div-5", role: "Sales Administrator" },
-      { name: "Juli Holtshausen", email: "juli@terminators.co.za", phone: "+27 41 123 4569", departmentId: null, role: "Finance and Human Resources Manager" },
-      { name: "Chane du Toit", email: "chane@terminators.co.za", phone: "+27 41 123 4590", departmentId: "div-5", role: "Sales Consultant" },
-      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 41 123 4570", departmentId: "div-3", role: "Hygiene Services Coordinator" },
-      { name: "Maryka Venter", email: "maryka@terminators.co.za", phone: "+27 41 123 4571", departmentId: "div-1", role: "Pest Control Services Coordinator" },
-      
-      // Pest Control Team
-      { name: "Xolani Ndzotoyi", email: "xolani@terminators.co.za", phone: "+27 41 123 4575", departmentId: "div-1", role: "PCO" },
-      { name: "Leon Coltman", email: "leon@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-1", role: "Assistant" },
-      
-      // Sanitary Bin Service A Team
-      { name: "Donovan", email: "donovan@terminators.co.za", phone: "+27 41 123 4576", departmentId: "div-2", role: "Supervisor" },
+      // Management
+      { name: "Julien Botha",       email: "julien@terminators.co.za",   phone: "+27 82 123 0001", departmentId: "div-6", role: "Managing Member" },
+
+      // Admin / Office
+      { name: "Maryka Venter",      email: "maryka@terminators.co.za",   phone: "+27 82 123 0002", departmentId: null,    role: "Administrator" },
+      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 82 123 0003", departmentId: null,    role: "Administrator" },
+      { name: "Juli Holtshausen",   email: "juli@terminators.co.za",     phone: "+27 82 123 0004", departmentId: null,    role: "Finance & HR Manager" },
+
+      // Sales
+      { name: "Sheryl-Lyn Lee",     email: "sheryl@terminators.co.za",   phone: "+27 82 123 0005", departmentId: "div-5", role: "Admin & Existing Sales" },
+      { name: "Chanè du Toit",      email: "chane@terminators.co.za",    phone: "+27 82 123 0006", departmentId: "div-5", role: "New Sales" },
+
+      // Deep Cleaning — Supervisor
+      { name: "Zukiswa Sandi",      email: "zukiswa@terminators.co.za",  phone: "+27 82 123 0007", departmentId: "div-4", role: "Deep Cleaning Supervisor" },
+
+      // Pest Control (PCO)
+      { name: "Reece Ebrahim",      email: "reece@terminators.co.za",    phone: "+27 82 123 0008", departmentId: "div-1", role: "PCO" },
+      { name: "Garth du Preez",     email: "garth@terminators.co.za",    phone: "+27 82 123 0009", departmentId: "div-1", role: "PCO" },
+      { name: "Mike Meyer",         email: "mike@terminators.co.za",     phone: "+27 82 123 0010", departmentId: "div-1", role: "PCO" },
+      { name: "Xolani Ndzotoyi",    email: "xolani@terminators.co.za",   phone: "+27 82 123 0011", departmentId: "div-1", role: "PCO" },
+
+      // Washroom
+      { name: "Zain Abdol",         email: "zain@terminators.co.za",     phone: "+27 82 123 0012", departmentId: "div-3", role: "Washroom Technician" },
+
+      // Sanitary Bins
+      { name: "Leon Coltman",       email: "leon@terminators.co.za",     phone: "+27 82 123 0013", departmentId: "div-2", role: "Sani Bin Team 1" },
+      { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sani Bin Team 2" },
+
+      // Deep Cleaning — Cleaners
+      { name: "Asanda Xhosana",     email: "asanda@terminators.co.za",   phone: "+27 82 123 0015", departmentId: "div-4", role: "Cleaner" },
+      { name: "Belinda Baliwe",     email: "belinda@terminators.co.za",  phone: "+27 82 123 0016", departmentId: "div-4", role: "Cleaner" },
+      { name: "Babalwa Sandi",      email: "babalwa@terminators.co.za",  phone: "+27 82 123 0017", departmentId: "div-4", role: "Cleaner" },
+      { name: "Nini Madoli",        email: "nini@terminators.co.za",     phone: "+27 82 123 0018", departmentId: "div-4", role: "Cleaner" },
+      { name: "Maryldene Jansen",   email: "maryldene@terminators.co.za",phone: "+27 82 123 0019", departmentId: "div-4", role: "Cleaner" },
+      { name: "Margrett Matika",    email: "margrett@terminators.co.za", phone: "+27 82 123 0020", departmentId: "div-4", role: "Cleaner" },
+      { name: "Veronica Cebisa",    email: "veronica@terminators.co.za", phone: "+27 82 123 0021", departmentId: "div-4", role: "Cleaner" },
+      { name: "Siphokazi Mose",     email: "siphokazi@terminators.co.za",phone: "+27 82 123 0022", departmentId: "div-4", role: "Cleaner" },
+      { name: "Nosipho Somyali",    email: "nosipho@terminators.co.za",  phone: "+27 82 123 0023", departmentId: "div-4", role: "Cleaner" },
     ];
+    // worker-1  = Julien Botha (div-6 / manager)
+    // worker-2  = Maryka Venter (null / admin)
+    // worker-3  = Mariette Koekemoer (null / admin)
+    // worker-4  = Juli Holtshausen (null / accounts)
+    // worker-5  = Sheryl-Lyn Lee (div-5 / sales)
+    // worker-6  = Chanè du Toit (div-5 / sales)
+    // worker-7  = Zukiswa Sandi (div-4 / service)
+    // worker-8  = Reece Ebrahim (div-1 / service)
+    // worker-9  = Garth du Preez (div-1 / service)
+    // worker-10 = Mike Meyer (div-1 / service)
+    // worker-11 = Xolani Ndzotoyi (div-1 / service)
+    // worker-12 = Zain Abdol (div-3 / service)
+    // worker-13 = Leon Coltman (div-2 / service)
+    // worker-14 = Jackie Roelfse (div-2 / service)
+    // worker-15 = Asanda Xhosana (div-4 / service)
+    // worker-16 = Belinda Baliwe (div-4 / service)
+    // worker-17 = Babalwa Sandi (div-4 / service)
+    // worker-18 = Nini Madoli (div-4 / service)
+    // worker-19 = Maryldene Jansen (div-4 / service)
+    // worker-20 = Margrett Matika (div-4 / service)
+    // worker-21 = Veronica Cebisa (div-4 / service)
+    // worker-22 = Siphokazi Mose (div-4 / service)
+    // worker-23 = Nosipho Somyali (div-4 / service)
 
     workers.forEach((worker, index) => {
       const w: Worker = {
@@ -1280,7 +1327,7 @@ export class MemStorage implements IStorage {
       {
         id: "job-1",
         clientId: "client-5",
-        workerId: "worker-7",
+        workerId: "worker-8",
         departmentId: "div-1",
         title: "Monthly Pest Control Inspection",
         description: "Routine monthly pest control inspection and treatment for restaurant kitchen and dining areas",
@@ -1393,7 +1440,7 @@ export class MemStorage implements IStorage {
       {
         id: "job-8",
         clientId: "client-3",
-        workerId: "worker-20",
+        workerId: "worker-12",
         departmentId: "div-3",
         title: "Mall Washroom Maintenance",
         description: "Daily washroom cleaning and supply replenishment",
@@ -1408,7 +1455,7 @@ export class MemStorage implements IStorage {
       {
         id: "job-9",
         clientId: "client-8",
-        workerId: "worker-21",
+        workerId: "worker-12",
         departmentId: "div-3",
         title: "Office Washroom Deep Clean",
         description: "Quarterly deep cleaning of office building washroom facilities",
@@ -1423,7 +1470,7 @@ export class MemStorage implements IStorage {
       {
         id: "job-10",
         clientId: "client-13",
-        workerId: "worker-19",
+        workerId: "worker-12",
         departmentId: "div-3",
         title: "School Washroom Upgrade",
         description: "Installation of new paper towel dispensers and soap dispensers",
@@ -1457,7 +1504,7 @@ export class MemStorage implements IStorage {
       {
         id: "job-12",
         clientId: "client-14",
-        workerId: "worker-24",
+        workerId: "worker-16",
         departmentId: "div-4",
         title: "Factory Floor Deep Clean",
         description: "Industrial deep cleaning of production floor and equipment",
