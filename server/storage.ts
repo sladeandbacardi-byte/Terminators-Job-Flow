@@ -798,7 +798,7 @@ export class MemStorage implements IStorage {
       { name: "Zain Abdol",         email: "zain@terminators.co.za",     phone: "+27 82 123 0012", departmentId: "div-3", role: "Washroom Technician" },
 
       // Sanitary Bins
-      { name: "Leon Coltman",       email: "leon@terminators.co.za",     phone: "+27 82 123 0013", departmentId: "div-2", role: "Sani Bin Team 1" },
+      { name: "Leon Coltman",       email: "leon@terminators.co.za",     phone: "+27 82 123 0013", departmentId: "div-1", role: "Pest Control Assistant" },
       { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sani Bin Team 2" },
 
       // Deep Cleaning — Cleaners
@@ -824,7 +824,7 @@ export class MemStorage implements IStorage {
     // worker-10 = Mike Meyer (div-1 / service)
     // worker-11 = Xolani Ndzotoyi (div-1 / service)
     // worker-12 = Zain Abdol (div-3 / service)
-    // worker-13 = Leon Coltman (div-2 / service)
+    // worker-13 = Leon Coltman (div-1 / service)
     // worker-14 = Jackie Roelfse (div-2 / service)
     // worker-15 = Asanda Xhosana (div-4 / service)
     // worker-16 = Belinda Baliwe (div-4 / service)
