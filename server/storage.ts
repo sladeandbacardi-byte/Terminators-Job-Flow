@@ -764,12 +764,20 @@ export class MemStorage implements IStorage {
       description: "Administration, finance, and human resources"
     };
 
+    const accountsDepartment: Department = {
+      id: "div-7",
+      name: "Accounts",
+      colorCode: "#f59e0b",
+      description: "Finance, accounts, billing and human resources"
+    };
+
     this.departments.set(pestControlDivision.id, pestControlDivision);
     this.departments.set(sanitaryBinDivision.id, sanitaryBinDivision);
     this.departments.set(washroomDivision.id, washroomDivision);
     this.departments.set(deepCleaningDivision.id, deepCleaningDivision);
     this.departments.set(salesDepartment.id, salesDepartment);
     this.departments.set(adminDepartment.id, adminDepartment);
+    this.departments.set(accountsDepartment.id, accountsDepartment);
 
     // Create workers based on actual organogram (Latest 2026)
     const workers = [
@@ -779,7 +787,7 @@ export class MemStorage implements IStorage {
       // Admin / Office
       { name: "Maryka Venter",      email: "maryka@terminators.co.za",   phone: "+27 82 123 0002", departmentId: null,    role: "Pest Control Service Coordinator" },
       { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 82 123 0003", departmentId: null,    role: "Hygiene Services Coordinator" },
-      { name: "Juli Holtshausen",   email: "juli@terminators.co.za",     phone: "+27 82 123 0004", departmentId: null,    role: "Finance & Human Resources Manager" },
+      { name: "Juli Holtshausen",   email: "accounts@terminators.co.za", phone: "+27 82 123 0004", departmentId: "div-7", role: "Finance & Human Resources Manager" },
 
       // Sales
       { name: "Sheryl-Lyn Lee",     email: "sheryl@terminators.co.za",   phone: "+27 82 123 0005", departmentId: "div-5", role: "Admin & Existing Sales" },

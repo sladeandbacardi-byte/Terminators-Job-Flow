@@ -7,6 +7,7 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
   // Department-based routing (most reliable)
   if (dept === "div-5") return "sales";
   if (dept === "div-6") return "manager";
+  if (dept === "div-7") return "accounts";
   if (["div-1", "div-2", "div-3", "div-4"].includes(dept)) return "service";
 
   // Role string fallback
