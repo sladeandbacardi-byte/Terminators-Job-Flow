@@ -84,7 +84,7 @@ export default function Workers() {
       <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Field Workers" />
+        <Header title="Staff" />
 
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           {/* Top bar */}
@@ -219,7 +219,7 @@ export default function Workers() {
           <DialogHeader>
             <DialogTitle>{selectedWorker ? "Edit Worker" : "Add New Worker"}</DialogTitle>
             <DialogDescription>
-              {selectedWorker ? "Update the worker's information below." : "Enter the details for the new field worker."}
+              {selectedWorker ? "Update the staff member's information below." : "Enter the details for the new staff member."}
             </DialogDescription>
           </DialogHeader>
           <WorkerForm

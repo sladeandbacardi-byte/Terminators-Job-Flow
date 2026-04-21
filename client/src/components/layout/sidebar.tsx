@@ -28,7 +28,7 @@ const ALL_CATEGORIES = [
     items: [
       { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "service", "sales"] },
       { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "service"] },
-      { name: "Field Workers",   href: "/workers",         icon: Users,        roles: ["admin", "manager", "service"] },
+      { name: "Staff",           href: "/workers",         icon: Users,        roles: ["admin", "manager", "service"] },
       { name: "Stock Management",href: "/inventory",       icon: Box,          roles: ["admin", "manager", "service"] },
       { name: "Suppliers",       href: "/suppliers",       icon: Building2,    roles: ["admin", "manager", "service"] },
       { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["admin", "manager", "service"] },

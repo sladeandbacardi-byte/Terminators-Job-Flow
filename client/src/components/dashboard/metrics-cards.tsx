@@ -24,7 +24,7 @@ export default function MetricsCards({ data, isLoading }: MetricsCardsProps) {
       color: "primary",
     },
     {
-      title: "Field Workers Active",
+      title: "Staff Active",
       value: data.activeWorkers,
       change: "All on duty",
       changeType: "neutral",
