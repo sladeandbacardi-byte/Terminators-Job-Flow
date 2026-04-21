@@ -800,17 +800,6 @@ export class MemStorage implements IStorage {
       // Sanitary Bins
       { name: "Leon Coltman",       email: "leon@terminators.co.za",     phone: "+27 82 123 0013", departmentId: "div-1", role: "Pest Control Assistant" },
       { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sani Bin Team 2" },
-
-      // Deep Cleaning — Cleaners
-      { name: "Asanda Xhosana",     email: "asanda@terminators.co.za",   phone: "+27 82 123 0015", departmentId: "div-4", role: "Cleaner" },
-      { name: "Belinda Baliwe",     email: "belinda@terminators.co.za",  phone: "+27 82 123 0016", departmentId: "div-4", role: "Cleaner" },
-      { name: "Babalwa Sandi",      email: "babalwa@terminators.co.za",  phone: "+27 82 123 0017", departmentId: "div-4", role: "Cleaner" },
-      { name: "Nini Madoli",        email: "nini@terminators.co.za",     phone: "+27 82 123 0018", departmentId: "div-4", role: "Cleaner" },
-      { name: "Maryldene Jansen",   email: "maryldene@terminators.co.za",phone: "+27 82 123 0019", departmentId: "div-4", role: "Cleaner" },
-      { name: "Margrett Matika",    email: "margrett@terminators.co.za", phone: "+27 82 123 0020", departmentId: "div-4", role: "Cleaner" },
-      { name: "Veronica Cebisa",    email: "veronica@terminators.co.za", phone: "+27 82 123 0021", departmentId: "div-4", role: "Cleaner" },
-      { name: "Siphokazi Mose",     email: "siphokazi@terminators.co.za",phone: "+27 82 123 0022", departmentId: "div-4", role: "Cleaner" },
-      { name: "Nosipho Somyali",    email: "nosipho@terminators.co.za",  phone: "+27 82 123 0023", departmentId: "div-4", role: "Cleaner" },
     ];
     // worker-1  = Julien Botha (div-6 / manager)
     // worker-2  = Maryka Venter (null / admin)
@@ -826,15 +815,6 @@ export class MemStorage implements IStorage {
     // worker-12 = Zain Abdol (div-3 / service)
     // worker-13 = Leon Coltman (div-1 / service)
     // worker-14 = Jackie Roelfse (div-2 / service)
-    // worker-15 = Asanda Xhosana (div-4 / service)
-    // worker-16 = Belinda Baliwe (div-4 / service)
-    // worker-17 = Babalwa Sandi (div-4 / service)
-    // worker-18 = Nini Madoli (div-4 / service)
-    // worker-19 = Maryldene Jansen (div-4 / service)
-    // worker-20 = Margrett Matika (div-4 / service)
-    // worker-21 = Veronica Cebisa (div-4 / service)
-    // worker-22 = Siphokazi Mose (div-4 / service)
-    // worker-23 = Nosipho Somyali (div-4 / service)
 
     workers.forEach((worker, index) => {
       const w: Worker = {
