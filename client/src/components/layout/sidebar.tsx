@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   BarChart3, Calendar, Users, Shield, Box, FileText, Receipt, Mail,
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
-  Settings, TrendingUp,
+  Settings, TrendingUp, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -30,6 +30,7 @@ const ALL_CATEGORIES = [
       { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "service"] },
       { name: "Staff",           href: "/workers",         icon: Users,        roles: ["admin", "manager", "service"] },
       { name: "Stock Management",href: "/inventory",       icon: Box,          roles: ["admin", "manager", "service"] },
+      { name: "Stock Manager Pro",href: "https://stock-manager-pro-sladeandbacardi.replit.app/login", icon: ExternalLink, roles: ["admin", "manager", "service"], external: true },
       { name: "Suppliers",       href: "/suppliers",       icon: Building2,    roles: ["admin", "manager", "service"] },
       { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["admin", "manager", "service"] },
     ],
@@ -107,13 +108,25 @@ export default function Sidebar() {
                 {category.visibleItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location === item.href;
+                  const linkClass = cn(
+                    "flex items-center space-x-3 px-6 py-2 rounded-lg font-medium transition-colors text-sm",
+                    isActive
+                      ? "bg-primary-50 text-primary-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  );
+                  if ((item as any).external) {
+                    return (
+                      <a key={item.name} href={item.href} target="_blank" rel="noopener noreferrer"
+                        className={linkClass}
+                        data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                        <Icon className="h-4 w-4" />
+                        <span>{item.name}</span>
+                      </a>
+                    );
+                  }
                   return (
-                    <Link key={item.name} href={item.href} className={cn(
-                      "flex items-center space-x-3 px-6 py-2 rounded-lg font-medium transition-colors text-sm",
-                      isActive
-                        ? "bg-primary-50 text-primary-700"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    )} data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <Link key={item.name} href={item.href} className={linkClass}
+                      data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}>
                       <Icon className="h-4 w-4" />
                       <span>{item.name}</span>
                     </Link>
