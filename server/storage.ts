@@ -1315,15 +1315,18 @@ export class MemStorage implements IStorage {
     // Create comprehensive sample jobs across all departments
     // Use dates relative to now so today/this week filters always show data
     const now = new Date();
-    const d = (offsetDays: number) => {
-      const dt = new Date(now);
-      dt.setDate(dt.getDate() + offsetDays);
-      dt.setHours(8, 0, 0, 0);
-      return dt;
+    // dt(offsetDays, hour, minute) — sets an exact time so calendar sizing is visible
+    const dt = (offsetDays: number, hour: number, minute: number = 0) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() + offsetDays);
+      d.setHours(hour, minute, 0, 0);
+      return d;
     };
+    // d() is a shorthand alias still used by invoice/lead/PO seed data below
+    const d = (offsetDays: number) => dt(offsetDays, 8);
 
     const sampleJobs = [
-      // Pest Control Jobs
+      // Pest Control Jobs — varied times and durations
       {
         id: "job-1",
         clientId: "client-5",
@@ -1333,11 +1336,12 @@ export class MemStorage implements IStorage {
         description: "Routine monthly pest control inspection and treatment for restaurant kitchen and dining areas",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: d(1),
-        estimatedDuration: 120,
+        scheduledDate: dt(1, 8, 0),
+        scheduledTime: "08:00",
+        estimatedDuration: 120,   // 2 hours
         location: "Greenacres Shopping Centre, Port Elizabeth",
         notes: "Focus on kitchen areas and waste disposal zones",
-        createdAt: d(-5)
+        createdAt: dt(-5, 9)
       },
       {
         id: "job-2",
@@ -1348,11 +1352,12 @@ export class MemStorage implements IStorage {
         description: "Emergency call for rodent infestation in storage area",
         status: "in_progress",
         priority: "high",
-        scheduledDate: d(0),
-        estimatedDuration: 180,
+        scheduledDate: dt(0, 10, 30),
+        scheduledTime: "10:30",
+        estimatedDuration: 180,   // 3 hours
         location: "Newton Park Shopping Centre, Port Elizabeth",
         notes: "Customer reported rodent droppings in storage room",
-        createdAt: d(-1)
+        createdAt: dt(-1, 8)
       },
       {
         id: "job-3",
@@ -1363,13 +1368,13 @@ export class MemStorage implements IStorage {
         description: "Comprehensive pest risk assessment for manufacturing facility",
         status: "completed",
         priority: "high",
-        scheduledDate: d(-3),
-        completedDate: d(-3),
-        estimatedDuration: 240,
+        scheduledDate: dt(-3, 7, 30),
+        scheduledTime: "07:30",
+        estimatedDuration: 240,   // 4 hours
         actualDuration: 210,
         location: "Struandale, Port Elizabeth",
         notes: "Full facility assessment completed. Report submitted.",
-        createdAt: d(-5)
+        createdAt: dt(-5, 9)
       },
       {
         id: "job-4",
@@ -1380,11 +1385,12 @@ export class MemStorage implements IStorage {
         description: "Full kitchen area fumigation and treatment",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: d(3),
-        estimatedDuration: 90,
+        scheduledDate: dt(3, 14, 0),
+        scheduledTime: "14:00",
+        estimatedDuration: 90,    // 1.5 hours
         location: "Summerstrand, Port Elizabeth",
         notes: "After-hours treatment required",
-        createdAt: d(-2)
+        createdAt: dt(-2, 8)
       },
 
       // Sanitary Bin Service Jobs
@@ -1397,11 +1403,12 @@ export class MemStorage implements IStorage {
         description: "Weekly collection and maintenance of sanitary disposal units",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: d(2),
+        scheduledDate: dt(2, 9, 0),
+        scheduledTime: "09:00",
         estimatedDuration: 90,
         location: "Walmer Park Shopping Centre, Port Elizabeth",
         notes: "Service all female restroom facilities",
-        createdAt: d(-3)
+        createdAt: dt(-3, 8)
       },
       {
         id: "job-6",
@@ -1412,11 +1419,12 @@ export class MemStorage implements IStorage {
         description: "Bi-weekly sanitary bin service for hospital facilities",
         status: "in_progress",
         priority: "high",
-        scheduledDate: d(0),
-        estimatedDuration: 150,
+        scheduledDate: dt(0, 8, 0),
+        scheduledTime: "08:00",
+        estimatedDuration: 150,   // 2.5 hours
         location: "Mercantile Hospital Street, Port Elizabeth",
         notes: "Include maternity and general wards",
-        createdAt: d(-2)
+        createdAt: dt(-2, 8)
       },
       {
         id: "job-7",
@@ -1427,13 +1435,13 @@ export class MemStorage implements IStorage {
         description: "Installation and setup of sanitary disposal units for new term",
         status: "completed",
         priority: "medium",
-        scheduledDate: d(-4),
-        completedDate: d(-4),
+        scheduledDate: dt(-4, 7, 0),
+        scheduledTime: "07:00",
         estimatedDuration: 180,
         actualDuration: 150,
         location: "West Hill, Port Elizabeth",
         notes: "20 units installed across girl's facilities. Training provided.",
-        createdAt: d(-6)
+        createdAt: dt(-6, 8)
       },
 
       // Washroom Service Jobs
@@ -1446,11 +1454,12 @@ export class MemStorage implements IStorage {
         description: "Daily washroom cleaning and supply replenishment",
         status: "scheduled",
         priority: "medium",
-        scheduledDate: d(1),
-        estimatedDuration: 240,
+        scheduledDate: dt(1, 13, 0),
+        scheduledTime: "13:00",
+        estimatedDuration: 240,   // 4 hours
         location: "Baywest City, Port Elizabeth",
         notes: "Cover all public washroom facilities in mall",
-        createdAt: d(-2)
+        createdAt: dt(-2, 8)
       },
       {
         id: "job-9",
@@ -1461,11 +1470,12 @@ export class MemStorage implements IStorage {
         description: "Quarterly deep cleaning of office building washroom facilities",
         status: "in_progress",
         priority: "medium",
-        scheduledDate: d(0),
-        estimatedDuration: 180,
+        scheduledDate: dt(0, 14, 0),
+        scheduledTime: "14:00",
+        estimatedDuration: 180,   // 3 hours
         location: "Heugh Road, Walmer, Port Elizabeth",
         notes: "Focus on tile cleaning and grout restoration",
-        createdAt: d(-1)
+        createdAt: dt(-1, 8)
       },
       {
         id: "job-10",
@@ -1476,13 +1486,13 @@ export class MemStorage implements IStorage {
         description: "Installation of new paper towel dispensers and soap dispensers",
         status: "completed",
         priority: "high",
-        scheduledDate: d(-5),
-        completedDate: d(-5),
-        estimatedDuration: 300,
+        scheduledDate: dt(-5, 8, 30),
+        scheduledTime: "08:30",
+        estimatedDuration: 300,   // 5 hours
         actualDuration: 270,
         location: "Mount Pleasant, Port Elizabeth",
         notes: "15 new dispensers installed. Old equipment removed.",
-        createdAt: d(-7)
+        createdAt: dt(-7, 8)
       },
 
       // Deep Cleaning Jobs
@@ -1495,11 +1505,12 @@ export class MemStorage implements IStorage {
         description: "Monthly deep cleaning of casino floor and VIP areas",
         status: "scheduled",
         priority: "high",
-        scheduledDate: d(4),
-        estimatedDuration: 480,
+        scheduledDate: dt(4, 22, 0),
+        scheduledTime: "22:00",
+        estimatedDuration: 480,   // 8 hours (night shift)
         location: "Marine Drive, Summerstrand, Port Elizabeth",
         notes: "Night shift operation. Casino remains operational.",
-        createdAt: d(-3)
+        createdAt: dt(-3, 8)
       },
       {
         id: "job-12",
@@ -1510,11 +1521,12 @@ export class MemStorage implements IStorage {
         description: "Industrial deep cleaning of production floor and equipment",
         status: "in_progress",
         priority: "high",
-        scheduledDate: d(0),
-        estimatedDuration: 360,
+        scheduledDate: dt(0, 7, 0),
+        scheduledTime: "07:00",
+        estimatedDuration: 360,   // 6 hours
         location: "Uitenhage Road, Port Elizabeth",
         notes: "Coordinate with production schedule. Safety protocols required.",
-        createdAt: d(-2)
+        createdAt: dt(-2, 8)
       },
       {
         id: "job-13",
@@ -1525,13 +1537,13 @@ export class MemStorage implements IStorage {
         description: "External and internal window cleaning for 15-story office building",
         status: "completed",
         priority: "medium",
-        scheduledDate: d(-6),
-        completedDate: d(-6),
-        estimatedDuration: 600,
+        scheduledDate: dt(-6, 8, 0),
+        scheduledTime: "08:00",
+        estimatedDuration: 600,   // 10 hours (full day+)
         actualDuration: 540,
         location: "Baywest City, Port Elizabeth",
         notes: "Weather conditions excellent. All floors completed ahead of schedule.",
-        createdAt: d(-8)
+        createdAt: dt(-8, 8)
       }
     ];
 

@@ -255,6 +255,14 @@ export default function Calendar() {
       console.warn(`Invalid scheduled date for job ${job.id}:`, job.scheduledDate);
       return null;
     }
+
+    // Merge scheduledTime ("HH:mm") into the date so events show at the right hour
+    if (job.scheduledTime) {
+      const parts = job.scheduledTime.split(':');
+      if (parts.length >= 2) {
+        scheduledDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+      }
+    }
     
     const endTime = new Date(scheduledDate.getTime() + (job.estimatedDuration || 60) * 60000);
     
@@ -594,124 +602,160 @@ export default function Calendar() {
   };
 
   const renderWeekView = () => {
-    try {
-      const weekStart = startOfWeek(currentDate);
-      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-      const hours = Array.from({ length: 24 }, (_, i) => i);
+    const HOUR_HEIGHT = 64; // px — matches h-16 used in day view
+    const weekStart = startOfWeek(currentDate);
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7); // 7 AM – 5 PM
+    const allHoursArr = Array.from({ length: 24 }, (_, i) => i);
+    const hours = showAllHours ? allHoursArr : businessHours;
+    const hourOffset = showAllHours ? 0 : 7;
+    const totalHeight = hours.length * HOUR_HEIGHT;
 
-      return (
-        <div className="flex flex-col h-full">
-          {/* Week header */}
-          <div className="grid grid-cols-8 border-b bg-gray-50">
-            <div className="p-3 border-r"></div>
-            {weekDays.map(day => (
-              <div key={day.toISOString()} className="p-3 text-center border-r border-gray-200 last:border-r-0">
-                <div className="font-medium">{format(day, 'EEE')}</div>
-                <div className={cn(
-                  "text-lg",
-                  isToday(day) ? "text-blue-600 font-bold" : "text-gray-900"
-                )}>
-                  {format(day, 'd')}
-                </div>
-              </div>
-            ))}
-          </div>
+    // Compute absolutely-positioned, duration-sized events for one day column
+    const getPositionedEventsForDay = (day: Date) => {
+      const dayEvts = filteredEvents.filter(ev => {
+        try {
+          const d = ev.startTime instanceof Date ? ev.startTime : new Date(ev.startTime);
+          return !isNaN(d.getTime()) && isSameDay(d, day);
+        } catch { return false; }
+      });
 
-          {/* Time grid */}
-          <div className="flex-1 overflow-auto">
-            {hours.map(hour => (
-              <div key={hour} className="grid grid-cols-8 border-b border-gray-100">
-                <div className="p-2 text-xs text-gray-500 border-r bg-gray-50 text-right">
-                  {format(new Date().setHours(hour, 0), 'HH:mm')}
-                </div>
-                {weekDays.map(day => {
-                  try {
-                    const dayHourEvents = filteredEvents.filter(event => {
-                      try {
-                        if (!event || !event.startTime || !event.id) {
-                          return false;
-                        }
-                        
-                        // Ensure startTime is a valid Date object
-                        const eventDate = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
-                        if (isNaN(eventDate.getTime())) {
-                          console.warn('Invalid date for event:', event.id);
-                          return false;
-                        }
-                        
-                        return isSameDay(eventDate, day) && eventDate.getHours() === hour;
-                      } catch (error) {
-                        console.warn('Error filtering week events:', error, event?.id);
-                        return false;
-                      }
-                    });
-                    
-                    return (
-                      <div key={`${day.toISOString()}-${hour}`} className="min-h-[60px] p-1 border-r border-gray-100 last:border-r-0 relative"
-                        onDragOver={handleDragOver}
-                        onDragEnter={handleDragEnter}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => {
-                          const dropDate = new Date(day);
-                          dropDate.setHours(hour, 0, 0, 0);
-                          handleDrop(e, dropDate);
-                        }}
-                      >
-                        {dayHourEvents.map(event => {
-                          try {
-                            if (!event || !event.id || !event.startTime || !event.endTime) {
-                              return null;
-                            }
-                            return (
-                              <div
-                                key={event.id}
-                                className="absolute left-1 right-1 top-1 text-xs p-1 rounded cursor-pointer hover:opacity-80 group"
-                                style={{ backgroundColor: (event.color || '#6b7280') + '20', color: event.color || '#6b7280' }}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, event)}
-                                onDragEnd={handleDragEnd}
-                                onClick={() => handleEventClick(event)}
-                              >
-                                <div className="font-medium truncate">{event.title || 'Untitled'}</div>
-                                <div className="text-gray-600 truncate">
-                                  {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                                </div>
-                              </div>
-                            );
-                          } catch (error) {
-                            console.warn('Error rendering week event:', event?.id, error);
-                            return null;
-                          }
-                        }).filter(Boolean)}
-                      </div>
-                    );
-                  } catch (error) {
-                    console.warn('Error rendering week day cell:', error, day);
-                    return (
-                      <div key={`${day.toISOString()}-${hour}`} className="min-h-[60px] p-1 border-r border-gray-100 last:border-r-0 relative">
-                        {/* Empty cell for error case */}
-                      </div>
-                    );
-                  }
-                })}
+      const raw = dayEvts.map(ev => {
+        const startHour = ev.startTime.getHours();
+        const startMin = ev.startTime.getMinutes();
+        if (!showAllHours && (startHour < 7 || startHour >= 17)) return null;
+        const adjustedHour = startHour - hourOffset;
+        const duration =
+          ev.endTime && ev.endTime instanceof Date && !isNaN(ev.endTime.getTime())
+            ? (ev.endTime.getTime() - ev.startTime.getTime()) / 60000
+            : 60;
+        const top = adjustedHour * HOUR_HEIGHT + (startMin * HOUR_HEIGHT / 60);
+        const height = Math.max(duration * HOUR_HEIGHT / 60, 24);
+        if (isNaN(top) || isNaN(height) || top < 0 || adjustedHour < 0) return null;
+        return { ...ev, top, height };
+      }).filter(Boolean) as Array<CalendarEvent & { top: number; height: number }>;
+
+      // Group overlapping events so they sit side-by-side
+      const groups: Array<typeof raw> = [];
+      for (const ev of raw) {
+        let placed = false;
+        for (const g of groups) {
+          const overlaps = g.some(ge => !(ev.top >= ge.top + ge.height || ge.top >= ev.top + ev.height));
+          if (overlaps) { g.push(ev); placed = true; break; }
+        }
+        if (!placed) groups.push([ev]);
+      }
+
+      const final: Array<CalendarEvent & { top: number; height: number; left: string; width: string }> = [];
+      for (const g of groups) {
+        const n = g.length;
+        g.forEach((ev, i) => final.push({ ...ev, left: `${(i * 100) / n}%`, width: `${100 / n}%` }));
+      }
+      return final;
+    };
+
+    return (
+      <div className="flex flex-col h-full">
+        {/* Sticky day-header row */}
+        <div className="grid border-b bg-white sticky top-0 z-10" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+          <div className="border-r" />
+          {weekDays.map(day => (
+            <div
+              key={day.toISOString()}
+              className="p-2 text-center border-r last:border-r-0 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => { setCurrentDate(day); setViewType('day'); }}
+            >
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
+              <div className={cn(
+                "text-xl font-bold w-9 h-9 mx-auto mt-0.5 flex items-center justify-center rounded-full",
+                isToday(day) ? "bg-blue-600 text-white" : "text-gray-900 hover:bg-gray-100"
+              )}>
+                {format(day, 'd')}
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Scrollable time grid */}
+        <div className="flex-1 overflow-auto">
+          <div className="flex" style={{ minHeight: totalHeight + 'px' }}>
+            {/* Time label column */}
+            <div className="w-16 shrink-0 border-r bg-gray-50 select-none">
+              {hours.map(hour => (
+                <div
+                  key={hour}
+                  className="border-b border-gray-100 flex items-start justify-end pr-2 pt-1"
+                  style={{ height: HOUR_HEIGHT + 'px' }}
+                >
+                  <span className="text-xs text-gray-400">{format(new Date().setHours(hour, 0), 'HH:mm')}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Day columns */}
+            {weekDays.map(day => {
+              const posEvts = getPositionedEventsForDay(day);
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={cn("flex-1 relative border-r last:border-r-0", isToday(day) && "bg-blue-50/20")}
+                  style={{ height: totalHeight + 'px' }}
+                >
+                  {/* Horizontal hour grid lines */}
+                  {hours.map((hour, idx) => (
+                    <div
+                      key={hour}
+                      className="absolute w-full border-b border-gray-100"
+                      style={{ top: idx * HOUR_HEIGHT + 'px', height: HOUR_HEIGHT + 'px' }}
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => {
+                        const d = new Date(day);
+                        d.setHours(hour, 0, 0, 0);
+                        handleDrop(e, d);
+                      }}
+                    />
+                  ))}
+
+                  {/* Duration-sized event blocks */}
+                  {posEvts.map(ev => (
+                    <div
+                      key={ev.id}
+                      className="absolute rounded overflow-hidden cursor-pointer border hover:opacity-80 transition-opacity"
+                      style={{
+                        top: ev.top + 'px',
+                        height: ev.height + 'px',
+                        left: `calc(${ev.left} + 2px)`,
+                        width: `calc(${ev.width} - 4px)`,
+                        backgroundColor: (ev.color || '#6b7280') + '25',
+                        borderColor: ev.color || '#6b7280',
+                        borderLeftWidth: '3px',
+                        color: ev.color || '#374151',
+                        minHeight: '24px',
+                      }}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, ev)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => handleEventClick(ev)}
+                    >
+                      <div className="px-1 pt-0.5">
+                        <div className="font-semibold text-xs truncate leading-tight">{ev.title}</div>
+                        {ev.height >= 36 && (
+                          <div className="text-xs opacity-70 truncate leading-tight">
+                            {format(ev.startTime, 'HH:mm')} – {format(ev.endTime, 'HH:mm')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
-      );
-    } catch (error) {
-      console.error('Error in renderWeekView:', error);
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="text-red-600 mb-2">Error loading week view</div>
-            <Button onClick={() => setViewType('month')} variant="outline">
-              Switch to Month View
-            </Button>
-          </div>
-        </div>
-      );
-    }
+      </div>
+    );
   };
 
   const renderDayView = () => {

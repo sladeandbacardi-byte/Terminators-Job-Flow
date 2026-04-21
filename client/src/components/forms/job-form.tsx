@@ -626,18 +626,31 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               name="estimatedDuration"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm">Duration (min)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="60"
-                      {...field}
-                      value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
-                      className="h-8 text-sm"
-                      data-testid="input-duration"
-                    />
-                  </FormControl>
+                  <FormLabel className="text-sm">Duration</FormLabel>
+                  <Select
+                    value={String(field.value || 60)}
+                    onValueChange={(v) => field.onChange(v === "custom" ? 60 : parseInt(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-8 text-sm" data-testid="input-duration">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="30">30 min</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="90">1.5 hours</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="150">2.5 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                      <SelectItem value="240">4 hours</SelectItem>
+                      <SelectItem value="300">5 hours</SelectItem>
+                      <SelectItem value="360">6 hours</SelectItem>
+                      <SelectItem value="480">Full day (8 h)</SelectItem>
+                      <SelectItem value="960">2 days</SelectItem>
+                      <SelectItem value="1440">3 days</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage className="text-xs" />
                 </FormItem>
               )}
