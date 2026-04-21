@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,10 +40,22 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
       name: worker?.name || "",
       email: worker?.email || "",
       phone: worker?.phone || "",
+      role: worker?.role || "",
       departmentId: worker?.departmentId || "",
       isActive: worker?.isActive ?? true,
     },
   });
+
+  useEffect(() => {
+    form.reset({
+      name: worker?.name || "",
+      email: worker?.email || "",
+      phone: worker?.phone || "",
+      role: worker?.role || "",
+      departmentId: worker?.departmentId || "",
+      isActive: worker?.isActive ?? true,
+    });
+  }, [worker]);
 
   const createMutation = useMutation({
     mutationFn: (data: WorkerFormData) => apiRequest('POST', '/api/workers', data),
@@ -112,6 +125,20 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
             )}
           />
 
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Job Title</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g. Pest Control Operator" {...field} data-testid="input-role" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -158,7 +185,7 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Department</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
                   <FormControl>
                     <SelectTrigger data-testid="select-department">
                       <SelectValue placeholder="Select a department" />
