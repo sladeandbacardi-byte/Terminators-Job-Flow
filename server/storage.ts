@@ -785,13 +785,13 @@ export class MemStorage implements IStorage {
       { name: "Julien Botha",       email: "julien@terminators.co.za",   phone: "+27 82 123 0001", departmentId: "div-6", role: "Managing Member" },
 
       // Admin / Office
-      { name: "Maryka Venter",      email: "maryka@terminators.co.za",   phone: "+27 82 123 0002", departmentId: null,    role: "Pest Control Service Coordinator" },
-      { name: "Mariette Koekemoer", email: "mariette@terminators.co.za", phone: "+27 82 123 0003", departmentId: null,    role: "Hygiene Services Coordinator" },
-      { name: "Juli Holtshausen",   email: "accounts@terminators.co.za", phone: "+27 82 123 0004", departmentId: "div-7", role: "Finance & Human Resources Manager" },
+      { name: "Maryka Venter",      email: "service1@terminators.co.za", phone: "+27 82 666 0748", departmentId: null,    role: "Pest Control Service Coordinator" },
+      { name: "Mariette Koekemoer", email: "service@terminators.co.za",  phone: "+27 78 982 6249", departmentId: null,    role: "Hygiene Services Coordinator" },
+      { name: "Juli Holtshausen",   email: "accounts@terminators.co.za", phone: "+27 82 618 9711", departmentId: "div-7", role: "Finance & Human Resources Manager" },
 
       // Sales
-      { name: "Sheryl-Lyn Lee",     email: "sheryl@terminators.co.za",   phone: "+27 82 123 0005", departmentId: "div-5", role: "Admin & Existing Sales" },
-      { name: "Chanè du Toit",      email: "chane@terminators.co.za",    phone: "+27 82 123 0006", departmentId: "div-5", role: "New Sales" },
+      { name: "Sheryl-Lyn Lee",     email: "sales@terminators.co.za",    phone: "+27 82 889 2453", departmentId: "div-5", role: "Admin & Existing Sales" },
+      { name: "Chanè du Toit",      email: "sales2@terminators.co.za",   phone: "+27 82 770 0028", departmentId: "div-5", role: "New Sales" },
 
       // Deep Cleaning — Supervisor
       { name: "Zukiswa Sandi",      email: "zukiswa@terminators.co.za",  phone: "+27 82 123 0007", departmentId: "div-4", role: "Deep Cleaning Supervisor" },
