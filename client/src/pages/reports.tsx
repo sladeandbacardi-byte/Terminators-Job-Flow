@@ -138,6 +138,7 @@ export default function Reports() {
   const [actDept, setActDept] = useState('all');
   const [actWorker, setActWorker] = useState('all');
   const [actStatus, setActStatus] = useState('all');
+  const [actServiceType, setActServiceType] = useState('all');
 
   const actRange = actPreset === 'custom' && actCustomRange?.from && actCustomRange?.to
     ? { from: actCustomRange.from, to: actCustomRange.to }
@@ -211,14 +212,30 @@ export default function Reports() {
   const totalMonthlyRevenue = activeContracts.reduce((s, c) => s + Number(c.monthlyPrice), 0);
 
   // ── Activity report calculations ──────────────────────────────────────────
+  // Unique service types available in the whole job list
+  const availableServiceTypes = useMemo(() => {
+    const types = new Set(jobs.map(j => j.serviceType).filter(Boolean));
+    return Array.from(types).sort();
+  }, [jobs]);
+
+  const serviceTypeLabels: Record<string, string> = {
+    pest_control: 'Pest Control',
+    sanitary_bins: 'Sanitary Bins',
+    washroom: 'Washroom',
+    deep_cleaning: 'Deep Cleaning',
+    general: 'General',
+    scheduled: 'Scheduled',
+  };
+
   const activityJobs = useMemo(() => jobs.filter(j => {
     const d = new Date(j.scheduledDate);
     if (d < actRange.from || d > actRange.to) return false;
     if (actDept !== 'all' && j.departmentId !== actDept) return false;
     if (actWorker !== 'all' && j.workerId !== actWorker) return false;
     if (actStatus !== 'all' && j.status !== actStatus) return false;
+    if (actServiceType !== 'all' && j.serviceType !== actServiceType) return false;
     return true;
-  }), [jobs, actRange, actDept, actWorker, actStatus]);
+  }), [jobs, actRange, actDept, actWorker, actStatus, actServiceType]);
 
   const chartData = useMemo(
     () => buildChartData(activityJobs, actGroupBy, actRange.from, actRange.to),
@@ -288,7 +305,7 @@ export default function Reports() {
               {/* ── Filters row ─────────────────────────────────────────────── */}
               <Card>
                 <CardContent className="pt-5">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
 
                     {/* Date preset */}
                     <div className="col-span-2 md:col-span-1">
@@ -376,6 +393,20 @@ export default function Reports() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Service type / product */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 mb-1 block">Service / Product</label>
+                      <Select value={actServiceType} onValueChange={setActServiceType}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All services</SelectItem>
+                          {availableServiceTypes.map(t => (
+                            <SelectItem key={t} value={t}>{serviceTypeLabels[t] ?? t.replace(/_/g, ' ')}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Active filter summary */}
@@ -386,6 +417,7 @@ export default function Reports() {
                     {actDept !== 'all' && <Badge variant="secondary" className="text-xs">{departments.find(d => d.id === actDept)?.name}</Badge>}
                     {actWorker !== 'all' && <Badge variant="secondary" className="text-xs">{workers.find(w => w.id === actWorker)?.name}</Badge>}
                     {actStatus !== 'all' && <Badge variant="secondary" className="text-xs capitalize">{actStatus.replace('_', ' ')}</Badge>}
+                    {actServiceType !== 'all' && <Badge variant="secondary" className="text-xs">{serviceTypeLabels[actServiceType] ?? actServiceType.replace(/_/g, ' ')}</Badge>}
                   </div>
                 </CardContent>
               </Card>

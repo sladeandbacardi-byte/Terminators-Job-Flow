@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isToday, addWeeks, subWeeks, addMonths, subMonths, startOfDay, endOfDay, addHours } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isToday, addWeeks, subWeeks, addMonths, subMonths, startOfDay, endOfDay, addHours, differenceInCalendarDays, isBefore, isAfter, min, max } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
@@ -602,18 +602,56 @@ export default function Calendar() {
   };
 
   const renderWeekView = () => {
-    const HOUR_HEIGHT = 64; // px — matches h-16 used in day view
+    const HOUR_HEIGHT = 64;
     const weekStart = startOfWeek(currentDate);
+    const weekEnd = addDays(weekStart, 6);
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7); // 7 AM – 5 PM
+    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
     const allHoursArr = Array.from({ length: 24 }, (_, i) => i);
     const hours = showAllHours ? allHoursArr : businessHours;
     const hourOffset = showAllHours ? 0 : 7;
     const totalHeight = hours.length * HOUR_HEIGHT;
 
-    // Compute absolutely-positioned, duration-sized events for one day column
+    // ── Separate multi-day events from timed events ──────────────────────────
+    const isMultiDay = (ev: CalendarEvent) => {
+      if (!ev.endTime || !(ev.endTime instanceof Date) || isNaN(ev.endTime.getTime())) return false;
+      return differenceInCalendarDays(ev.endTime, ev.startTime) >= 1;
+    };
+
+    // Multi-day events that overlap this week
+    const weekMultiDayEvents = filteredEvents.filter(ev => {
+      if (!isMultiDay(ev)) return false;
+      const evStart = startOfDay(ev.startTime);
+      const evEnd = startOfDay(ev.endTime);
+      return !isAfter(evStart, weekEnd) && !isBefore(evEnd, weekStart);
+    });
+
+    // Build rows of non-overlapping multi-day banners (greedy packing)
+    type BannerRow = Array<{ ev: CalendarEvent; startCol: number; endCol: number }>;
+    const bannerRows: BannerRow[] = [];
+    for (const ev of weekMultiDayEvents) {
+      const evStart = startOfDay(ev.startTime);
+      const evEnd = startOfDay(ev.endTime);
+      const startCol = weekDays.findIndex(d => isSameDay(d, max([evStart, weekStart])));
+      const endCol = weekDays.findLastIndex(d => !isAfter(startOfDay(d), evEnd));
+      const sc = startCol === -1 ? 0 : startCol;
+      const ec = endCol === -1 ? 6 : endCol;
+      // Find first row where this event fits
+      let placed = false;
+      for (const row of bannerRows) {
+        const conflicts = row.some(b => !(ec < b.startCol || sc > b.endCol));
+        if (!conflicts) { row.push({ ev, startCol: sc, endCol: ec }); placed = true; break; }
+      }
+      if (!placed) bannerRows.push([{ ev, startCol: sc, endCol: ec }]);
+    }
+
+    const BANNER_ROW_HEIGHT = 24; // px per row
+    const allDayHeight = Math.max(bannerRows.length * BANNER_ROW_HEIGHT + 4, 28); // min 28px
+
+    // ── Timed events (exclude multi-day) per day column ──────────────────────
     const getPositionedEventsForDay = (day: Date) => {
       const dayEvts = filteredEvents.filter(ev => {
+        if (isMultiDay(ev)) return false;
         try {
           const d = ev.startTime instanceof Date ? ev.startTime : new Date(ev.startTime);
           return !isNaN(d.getTime()) && isSameDay(d, day);
@@ -625,17 +663,22 @@ export default function Calendar() {
         const startMin = ev.startTime.getMinutes();
         if (!showAllHours && (startHour < 7 || startHour >= 17)) return null;
         const adjustedHour = startHour - hourOffset;
-        const duration =
+
+        // Clip duration at end of visible hours
+        const rawDuration =
           ev.endTime && ev.endTime instanceof Date && !isNaN(ev.endTime.getTime())
             ? (ev.endTime.getTime() - ev.startTime.getTime()) / 60000
             : 60;
+        const maxDuration = (hours[hours.length - 1] - startHour + 1) * 60 - startMin;
+        const duration = Math.min(rawDuration, maxDuration);
+
         const top = adjustedHour * HOUR_HEIGHT + (startMin * HOUR_HEIGHT / 60);
         const height = Math.max(duration * HOUR_HEIGHT / 60, 24);
         if (isNaN(top) || isNaN(height) || top < 0 || adjustedHour < 0) return null;
-        return { ...ev, top, height };
-      }).filter(Boolean) as Array<CalendarEvent & { top: number; height: number }>;
+        return { ...ev, top, height, clipped: rawDuration > maxDuration };
+      }).filter(Boolean) as Array<CalendarEvent & { top: number; height: number; clipped: boolean }>;
 
-      // Group overlapping events so they sit side-by-side
+      // Group overlapping events side-by-side
       const groups: Array<typeof raw> = [];
       for (const ev of raw) {
         let placed = false;
@@ -645,8 +688,7 @@ export default function Calendar() {
         }
         if (!placed) groups.push([ev]);
       }
-
-      const final: Array<CalendarEvent & { top: number; height: number; left: string; width: string }> = [];
+      const final: Array<CalendarEvent & { top: number; height: number; clipped: boolean; left: string; width: string }> = [];
       for (const g of groups) {
         const n = g.length;
         g.forEach((ev, i) => final.push({ ...ev, left: `${(i * 100) / n}%`, width: `${100 / n}%` }));
@@ -656,37 +698,77 @@ export default function Calendar() {
 
     return (
       <div className="flex flex-col h-full">
-        {/* Sticky day-header row */}
-        <div className="grid border-b bg-white sticky top-0 z-10" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
-          <div className="border-r" />
-          {weekDays.map(day => (
-            <div
-              key={day.toISOString()}
-              className="p-2 text-center border-r last:border-r-0 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => { setCurrentDate(day); setViewType('day'); }}
-            >
-              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
-              <div className={cn(
-                "text-xl font-bold w-9 h-9 mx-auto mt-0.5 flex items-center justify-center rounded-full",
-                isToday(day) ? "bg-blue-600 text-white" : "text-gray-900 hover:bg-gray-100"
-              )}>
-                {format(day, 'd')}
+        {/* ── Sticky header: day names + all-day banner ───────────────────── */}
+        <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
+          {/* Day name row */}
+          <div className="grid" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+            <div className="border-r border-b" />
+            {weekDays.map(day => (
+              <div
+                key={day.toISOString()}
+                className="p-2 text-center border-r border-b last:border-r-0 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => { setCurrentDate(day); setViewType('day'); }}
+              >
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
+                <div className={cn(
+                  "text-xl font-bold w-9 h-9 mx-auto mt-0.5 flex items-center justify-center rounded-full",
+                  isToday(day) ? "bg-blue-600 text-white" : "text-gray-900 hover:bg-gray-100"
+                )}>
+                  {format(day, 'd')}
+                </div>
               </div>
+            ))}
+          </div>
+
+          {/* All-day / multi-day banner row */}
+          <div className="grid" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+            <div className="border-r flex items-center justify-end pr-1" style={{ height: allDayHeight + 'px' }}>
+              <span className="text-xs text-gray-400 select-none">all-day</span>
             </div>
-          ))}
+            {/* Single relative container spanning all 7 columns */}
+            <div className="relative col-span-7 border-b" style={{ height: allDayHeight + 'px' }}>
+              {bannerRows.map((row, rowIdx) =>
+                row.map(({ ev, startCol, endCol }) => {
+                  const colWidth = 100 / 7;
+                  const left = startCol * colWidth;
+                  const width = (endCol - startCol + 1) * colWidth;
+                  const daysTotal = differenceInCalendarDays(ev.endTime, ev.startTime);
+                  const daysLabel = daysTotal > 1 ? ` (${daysTotal}d)` : '';
+                  return (
+                    <div
+                      key={ev.id}
+                      className="absolute rounded cursor-pointer text-white text-xs font-semibold flex items-center px-1.5 truncate hover:opacity-80 transition-opacity"
+                      style={{
+                        top: rowIdx * BANNER_ROW_HEIGHT + 2 + 'px',
+                        height: BANNER_ROW_HEIGHT - 3 + 'px',
+                        left: `calc(${left}% + 2px)`,
+                        width: `calc(${width}% - 4px)`,
+                        backgroundColor: ev.color || '#6b7280',
+                        minWidth: 0,
+                      }}
+                      title={`${ev.title}${daysLabel} — ${format(ev.startTime, 'MMM d')} to ${format(ev.endTime, 'MMM d')}`}
+                      onClick={() => handleEventClick(ev)}
+                    >
+                      {startCol === 0 || !isBefore(startOfDay(ev.startTime), weekStart)
+                        ? <span className="truncate">{ev.title}{daysLabel}</span>
+                        : <span className="truncate opacity-80">↵ {ev.title}{daysLabel}</span>
+                      }
+                      {endCol < 6 && isAfter(startOfDay(ev.endTime), weekEnd) && <span className="ml-auto shrink-0">→</span>}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Scrollable time grid */}
+        {/* ── Scrollable time grid ─────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto">
           <div className="flex" style={{ minHeight: totalHeight + 'px' }}>
             {/* Time label column */}
             <div className="w-16 shrink-0 border-r bg-gray-50 select-none">
               {hours.map(hour => (
-                <div
-                  key={hour}
-                  className="border-b border-gray-100 flex items-start justify-end pr-2 pt-1"
-                  style={{ height: HOUR_HEIGHT + 'px' }}
-                >
+                <div key={hour} className="border-b border-gray-100 flex items-start justify-end pr-2 pt-1" style={{ height: HOUR_HEIGHT + 'px' }}>
                   <span className="text-xs text-gray-400">{format(new Date().setHours(hour, 0), 'HH:mm')}</span>
                 </div>
               ))}
@@ -701,7 +783,6 @@ export default function Calendar() {
                   className={cn("flex-1 relative border-r last:border-r-0", isToday(day) && "bg-blue-50/20")}
                   style={{ height: totalHeight + 'px' }}
                 >
-                  {/* Horizontal hour grid lines */}
                   {hours.map((hour, idx) => (
                     <div
                       key={hour}
@@ -710,15 +791,10 @@ export default function Calendar() {
                       onDragOver={handleDragOver}
                       onDragEnter={handleDragEnter}
                       onDragLeave={handleDragLeave}
-                      onDrop={(e) => {
-                        const d = new Date(day);
-                        d.setHours(hour, 0, 0, 0);
-                        handleDrop(e, d);
-                      }}
+                      onDrop={(e) => { const d = new Date(day); d.setHours(hour, 0, 0, 0); handleDrop(e, d); }}
                     />
                   ))}
 
-                  {/* Duration-sized event blocks */}
                   {posEvts.map(ev => (
                     <div
                       key={ev.id}
@@ -743,7 +819,7 @@ export default function Calendar() {
                         <div className="font-semibold text-xs truncate leading-tight">{ev.title}</div>
                         {ev.height >= 36 && (
                           <div className="text-xs opacity-70 truncate leading-tight">
-                            {format(ev.startTime, 'HH:mm')} – {format(ev.endTime, 'HH:mm')}
+                            {format(ev.startTime, 'HH:mm')} – {ev.clipped ? `${format(hours[hours.length-1]+1 <= 23 ? hours[hours.length-1]+1 : 23, '00')}:00 →` : format(ev.endTime, 'HH:mm')}
                           </div>
                         )}
                       </div>

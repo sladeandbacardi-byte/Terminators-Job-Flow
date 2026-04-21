@@ -1544,14 +1544,54 @@ export class MemStorage implements IStorage {
         location: "Baywest City, Port Elizabeth",
         notes: "Weather conditions excellent. All floors completed ahead of schedule.",
         createdAt: dt(-8, 8)
+      },
+      {
+        id: "job-14",
+        clientId: "client-14",
+        workerId: "worker-16",
+        departmentId: "div-4",
+        title: "Hospital Ward Deep Clean (2-Day)",
+        description: "Full 2-day deep clean of surgical wards and ICU. Sterile protocol required.",
+        status: "scheduled",
+        priority: "high",
+        scheduledDate: dt(2, 7, 0),
+        scheduledTime: "07:00",
+        estimatedDuration: 2880,  // 2 days = 48 hours
+        location: "Provincial Hospital, Port Elizabeth",
+        notes: "Must complete before ward reopens. Security clearance required.",
+        createdAt: dt(-1, 8)
+      },
+      {
+        id: "job-15",
+        clientId: "client-5",
+        workerId: "worker-9",
+        departmentId: "div-1",
+        title: "School Holiday Pest Treatment (3-Day)",
+        description: "Comprehensive 3-day fumigation and pest eradication programme across all school buildings",
+        status: "scheduled",
+        priority: "high",
+        scheduledDate: dt(5, 8, 0),
+        scheduledTime: "08:00",
+        estimatedDuration: 4320,  // 3 days = 72 hours
+        location: "Westering High School, Port Elizabeth",
+        notes: "School on holiday. Full access granted. Report to principal office on arrival.",
+        createdAt: dt(0, 9)
       }
     ];
+
+    // Derive service type from department
+    const deptToServiceType: Record<string, string> = {
+      'div-1': 'pest_control',
+      'div-2': 'sanitary_bins',
+      'div-3': 'washroom',
+      'div-4': 'deep_cleaning',
+    };
 
     // Add all sample jobs
     sampleJobs.forEach(job => {
       this.jobs.set(job.id, {
         ...job,
-        serviceType: "scheduled",
+        serviceType: deptToServiceType[job.departmentId || ''] || 'general',
         scheduledTime: null,
         startTime: null,
         endTime: null,
