@@ -185,6 +185,9 @@ export default function Workers() {
                           <h4 className="font-semibold text-gray-900 truncate" data-testid={`worker-name-${worker.id}`}>
                             {worker.name}
                           </h4>
+                          {worker.role && (
+                            <p className="text-xs text-gray-500 truncate mb-1">{worker.role}</p>
+                          )}
                           <Badge 
                             className={getDepartmentBadgeColor(worker.departmentId)}
                             data-testid={`worker-department-${worker.id}`}

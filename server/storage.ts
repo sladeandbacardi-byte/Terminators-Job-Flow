@@ -789,17 +789,17 @@ export class MemStorage implements IStorage {
       { name: "Zukiswa Sandi",      email: "zukiswa@terminators.co.za",  phone: "+27 82 123 0007", departmentId: "div-4", role: "Deep Cleaning Supervisor" },
 
       // Pest Control (PCO)
-      { name: "Reece Ebrahim",      email: "reece@terminators.co.za",    phone: "+27 82 123 0008", departmentId: "div-1", role: "PCO" },
-      { name: "Garth du Preez",     email: "garth@terminators.co.za",    phone: "+27 82 123 0009", departmentId: "div-1", role: "PCO" },
-      { name: "Mike Meyer",         email: "mike@terminators.co.za",     phone: "+27 82 123 0010", departmentId: "div-1", role: "PCO" },
-      { name: "Xolani Ndzotoyi",    email: "xolani@terminators.co.za",   phone: "+27 82 123 0011", departmentId: "div-1", role: "PCO" },
+      { name: "Reece Ebrahim",      email: "reece@terminators.co.za",    phone: "+27 82 123 0008", departmentId: "div-1", role: "Pest Control Operator" },
+      { name: "Garth du Preez",     email: "garth@terminators.co.za",    phone: "+27 82 123 0009", departmentId: "div-1", role: "Pest Control Operator" },
+      { name: "Mike Meyer",         email: "mike@terminators.co.za",     phone: "+27 82 123 0010", departmentId: "div-1", role: "Pest Control Operator" },
+      { name: "Xolani Ndzotoyi",    email: "xolani@terminators.co.za",   phone: "+27 82 123 0011", departmentId: "div-1", role: "Pest Control Operator" },
 
       // Washroom
       { name: "Zain Abdol",         email: "zain@terminators.co.za",     phone: "+27 82 123 0012", departmentId: "div-3", role: "Washroom Technician" },
 
       // Sanitary Bins
       { name: "Leon Coltman",       email: "leon@terminators.co.za",     phone: "+27 82 123 0013", departmentId: "div-1", role: "Pest Control Assistant" },
-      { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sani Bin Team 2" },
+      { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sanitary Bins Technician" },
     ];
     // worker-1  = Julien Botha (div-6 / manager)
     // worker-2  = Maryka Venter (null / admin)
