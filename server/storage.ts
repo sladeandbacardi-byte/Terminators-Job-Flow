@@ -182,6 +182,10 @@ export interface IStorage {
   createQuoteSubmission(submission: InsertQuoteSubmission): Promise<QuoteSubmission>;
   updateQuoteSubmission(id: string, submission: Partial<InsertQuoteSubmission>): Promise<QuoteSubmission>;
   deleteQuoteSubmission(id: string): Promise<boolean>;
+
+  // Backup & Restore
+  exportBackup(): Promise<Record<string, any>>;
+  restoreBackup(data: Record<string, any>): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -3238,6 +3242,61 @@ export class MemStorage implements IStorage {
   // Activity Logs
   async getActivityLogs(): Promise<any[]> {
     return this.activityLogs;
+  }
+
+  async exportBackup(): Promise<Record<string, any>> {
+    return {
+      exportedAt: new Date().toISOString(),
+      version: "1.0",
+      departments: Array.from(this.departments.values()),
+      workers: Array.from(this.workers.values()),
+      clients: Array.from(this.clients.values()),
+      inventoryItems: Array.from(this.inventoryItems.values()),
+      rentalContracts: Array.from(this.rentalContracts.values()),
+      jobs: Array.from(this.jobs.values()),
+      invoices: Array.from(this.invoices.values()),
+      invoiceItems: Array.from(this.invoiceItems.values()),
+      suppliers: Array.from(this.suppliers.values()),
+      purchaseOrders: Array.from(this.purchaseOrders.values()),
+      purchaseOrderItems: Array.from(this.purchaseOrderItems.values()),
+      calendarEvents: Array.from(this.calendarEvents.values()),
+      customReports: Array.from(this.customReports.values()),
+      quoteSubmissions: Array.from(this.quoteSubmissions.values()),
+      emailTemplates: Array.from(this.emailTemplates.values()),
+      emailLogs: Array.from(this.emailLogs.values()),
+      notifications: Array.from(this.notifications.values()),
+      activityLogs: this.activityLogs,
+      invoiceCounter: this.invoiceCounter,
+      poCounter: this.poCounter,
+    };
+  }
+
+  async restoreBackup(data: Record<string, any>): Promise<void> {
+    const toMap = <T extends { id: string }>(arr: T[]): Map<string, T> => {
+      const m = new Map<string, T>();
+      if (Array.isArray(arr)) arr.forEach(item => m.set(item.id, item));
+      return m;
+    };
+    if (data.departments) this.departments = toMap(data.departments);
+    if (data.workers) this.workers = toMap(data.workers);
+    if (data.clients) this.clients = toMap(data.clients);
+    if (data.inventoryItems) this.inventoryItems = toMap(data.inventoryItems);
+    if (data.rentalContracts) this.rentalContracts = toMap(data.rentalContracts);
+    if (data.jobs) this.jobs = toMap(data.jobs);
+    if (data.invoices) this.invoices = toMap(data.invoices);
+    if (data.invoiceItems) this.invoiceItems = toMap(data.invoiceItems);
+    if (data.suppliers) this.suppliers = toMap(data.suppliers);
+    if (data.purchaseOrders) this.purchaseOrders = toMap(data.purchaseOrders);
+    if (data.purchaseOrderItems) this.purchaseOrderItems = toMap(data.purchaseOrderItems);
+    if (data.calendarEvents) this.calendarEvents = toMap(data.calendarEvents);
+    if (data.customReports) this.customReports = toMap(data.customReports);
+    if (data.quoteSubmissions) this.quoteSubmissions = toMap(data.quoteSubmissions);
+    if (data.emailTemplates) this.emailTemplates = toMap(data.emailTemplates);
+    if (data.emailLogs) this.emailLogs = toMap(data.emailLogs);
+    if (data.notifications) this.notifications = toMap(data.notifications);
+    if (Array.isArray(data.activityLogs)) this.activityLogs = data.activityLogs;
+    if (typeof data.invoiceCounter === "number") this.invoiceCounter = data.invoiceCounter;
+    if (typeof data.poCounter === "number") this.poCounter = data.poCounter;
   }
 }
 

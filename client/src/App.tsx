@@ -24,6 +24,7 @@ import JobCard from "@/pages/job-card";
 import DailyDepartmentCard from "@/pages/daily-department-card";
 import QuoteRequest from "@/pages/quote-request";
 import Leads from "@/pages/leads";
+import Backup from "@/pages/backup";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -63,6 +64,7 @@ function AuthenticatedApp() {
       <Route path="/jobs/:id/card" component={JobCard} />
       <Route path="/daily-department-card" component={DailyDepartmentCard} />
       <Route path="/leads" component={Leads} />
+      <Route path="/backup" component={Backup} />
       <Route component={NotFound} />
     </Switch>
   );

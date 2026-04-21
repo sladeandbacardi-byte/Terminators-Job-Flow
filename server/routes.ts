@@ -1961,6 +1961,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backup & Restore
+  app.get("/api/backup/export", async (req, res) => {
+    try {
+      const data = await storage.exportBackup();
+      const filename = `terminators-backup-${new Date().toISOString().split("T")[0]}.json`;
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message ?? "Failed to export backup" });
+    }
+  });
+
+  app.post("/api/backup/restore", async (req, res) => {
+    try {
+      const data = req.body;
+      if (!data || typeof data !== "object") {
+        return res.status(400).json({ error: "Invalid backup file" });
+      }
+      await storage.restoreBackup(data);
+      res.json({ success: true, message: "Database restored successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message ?? "Failed to restore backup" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
