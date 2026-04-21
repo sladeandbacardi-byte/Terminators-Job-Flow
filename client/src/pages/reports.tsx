@@ -288,13 +288,13 @@ export default function Reports() {
           </div>
 
           <Tabs defaultValue="activity" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="jobs">Job Status</TabsTrigger>
-              <TabsTrigger value="workers">Workers</TabsTrigger>
-              <TabsTrigger value="staff">Staff</TabsTrigger>
-              <TabsTrigger value="contracts">Contracts</TabsTrigger>
+            <TabsList className="flex w-full overflow-x-auto h-auto flex-nowrap">
+              <TabsTrigger value="activity"   className="flex-none px-5 py-2">📊 Activity</TabsTrigger>
+              <TabsTrigger value="overview"   className="flex-none px-5 py-2">Overview</TabsTrigger>
+              <TabsTrigger value="jobs"       className="flex-none px-5 py-2">Job Status</TabsTrigger>
+              <TabsTrigger value="workers"    className="flex-none px-5 py-2">Workers</TabsTrigger>
+              <TabsTrigger value="staff"      className="flex-none px-5 py-2">Staff</TabsTrigger>
+              <TabsTrigger value="contracts"  className="flex-none px-5 py-2">Contracts</TabsTrigger>
             </TabsList>
 
             {/* ═══════════════════════════════════════════════════════════════════
