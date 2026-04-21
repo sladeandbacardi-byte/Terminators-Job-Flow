@@ -304,13 +304,14 @@ export default function Reports() {
 
               {/* ── Filters row ─────────────────────────────────────────────── */}
               <Card>
-                <CardContent className="pt-5">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+                <CardContent className="pt-5 space-y-3">
 
-                    {/* Date preset */}
-                    <div className="col-span-2 md:col-span-1">
+                  {/* ── Row 1: Period + Group By ─────────────────────────────── */}
+                  <div className="flex flex-wrap items-end gap-3">
+                    {/* Period preset */}
+                    <div className="min-w-[160px]">
                       <label className="text-xs font-medium text-gray-500 mb-1 block">Period</label>
-                      <Select value={actPreset} onValueChange={(v) => { setActPreset(v as Preset); }}>
+                      <Select value={actPreset} onValueChange={(v) => setActPreset(v as Preset)}>
                         <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {(['7d','30d','90d','6m','ytd','1y','custom'] as Preset[]).map(p => (
@@ -320,9 +321,9 @@ export default function Reports() {
                       </Select>
                     </div>
 
-                    {/* Custom range picker — shown only when preset = custom */}
+                    {/* Custom range picker */}
                     {actPreset === 'custom' && (
-                      <div className="col-span-2">
+                      <div className="min-w-[220px]">
                         <label className="text-xs font-medium text-gray-500 mb-1 block">Custom Range</label>
                         <Popover>
                           <PopoverTrigger asChild>
@@ -336,7 +337,7 @@ export default function Reports() {
                       </div>
                     )}
 
-                    {/* Group by */}
+                    {/* Group by toggle */}
                     <div>
                       <label className="text-xs font-medium text-gray-500 mb-1 block">Group by</label>
                       <div className="flex rounded-md border overflow-hidden h-9">
@@ -345,13 +346,17 @@ export default function Reports() {
                             key={g}
                             onClick={() => setActGroupBy(g)}
                             className={cn(
-                              "flex-1 text-xs font-medium transition-colors border-r last:border-r-0 capitalize",
+                              "px-3 text-xs font-medium transition-colors border-r last:border-r-0 capitalize",
                               actGroupBy === g ? "bg-primary text-white" : "bg-white hover:bg-gray-50 text-gray-600"
                             )}
                           >{g}</button>
                         ))}
                       </div>
                     </div>
+                  </div>
+
+                  {/* ── Row 2: Data filters ──────────────────────────────────── */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
                     {/* Department */}
                     <div>
@@ -394,13 +399,13 @@ export default function Reports() {
                       </Select>
                     </div>
 
-                    {/* Service type / product */}
+                    {/* Service / Product */}
                     <div>
                       <label className="text-xs font-medium text-gray-500 mb-1 block">Service / Product</label>
                       <Select value={actServiceType} onValueChange={setActServiceType}>
                         <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All services</SelectItem>
+                          <SelectItem value="all">All service types</SelectItem>
                           {availableServiceTypes.map(t => (
                             <SelectItem key={t} value={t}>{serviceTypeLabels[t] ?? t.replace(/_/g, ' ')}</SelectItem>
                           ))}
@@ -409,8 +414,8 @@ export default function Reports() {
                     </div>
                   </div>
 
-                  {/* Active filter summary */}
-                  <div className="flex flex-wrap gap-2 mt-3">
+                  {/* Active filter badges */}
+                  <div className="flex flex-wrap gap-2 pt-1">
                     <Badge variant="outline" className="text-xs">
                       {formatDate(actRange.from)} – {formatDate(actRange.to)}
                     </Badge>
