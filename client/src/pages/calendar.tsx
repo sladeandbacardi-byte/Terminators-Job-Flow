@@ -1637,11 +1637,16 @@ export default function Calendar() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {clients.map(client => (
+                              {clients.filter(c => c.status !== "suspended").map(client => (
                                 <SelectItem key={client.id} value={client.id}>
                                   {client.name}
                                 </SelectItem>
                               ))}
+                              {clients.some(c => c.status === "suspended") && (
+                                <div className="px-2 py-1.5 text-xs text-muted-foreground border-t mt-1">
+                                  {clients.filter(c => c.status === "suspended").length} suspended client(s) hidden
+                                </div>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

@@ -536,6 +536,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contracts", async (req, res) => {
     try {
+      // Block suspended clients
+      if (req.body.clientId) {
+        const client = await storage.getClient(req.body.clientId);
+        if (client && client.status === "suspended") {
+          return res.status(403).json({ error: "Cannot create a contract for a suspended client. Contact Accounts to reinstate the client first." });
+        }
+      }
+
       const data = {
         ...req.body,
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
@@ -611,6 +619,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs", async (req, res) => {
     try {
+      // Block suspended clients
+      if (req.body.clientId) {
+        const client = await storage.getClient(req.body.clientId);
+        if (client && client.status === "suspended") {
+          return res.status(403).json({ error: "Cannot create a job for a suspended client. Contact Accounts to reinstate the client first." });
+        }
+      }
+
       // Convert date strings to Date objects
       const jobData = {
         ...req.body,
