@@ -33,9 +33,13 @@ interface LoginFormProps {
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
-  const { data: workers = [], isLoading: workersLoading } = useQuery<Worker[]>({
+  const LOGIN_USER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4", "worker-5", "worker-6"];
+
+  const { data: allWorkers = [], isLoading: workersLoading } = useQuery<Worker[]>({
     queryKey: ["/api/workers"],
   });
+
+  const workers = allWorkers.filter(w => LOGIN_USER_IDS.includes(w.id));
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {

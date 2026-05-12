@@ -13,7 +13,8 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
   // Role string fallback
   if (role.includes("finance") || role.includes("accounts") || role.includes("accountant")) return "accounts";
   if (role.includes("sales") || role.includes("consultant")) return "sales";
-  if (role.includes("manager") || role.includes("operational") || role.includes("coordinator")) return "manager";
+  if (role.includes("coordinator")) return "service";
+  if (role.includes("manager") || role.includes("operational")) return "manager";
   if (
     role === "pco" ||
     role.includes("technician") ||
