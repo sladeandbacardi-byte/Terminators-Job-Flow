@@ -33,7 +33,7 @@ interface LoginFormProps {
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
-  const LOGIN_USER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4", "worker-5", "worker-6"];
+  const LOGIN_USER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4", "worker-5", "worker-6", "worker-15"];
 
   const { data: allWorkers = [], isLoading: workersLoading } = useQuery<Worker[]>({
     queryKey: ["/api/workers"],
