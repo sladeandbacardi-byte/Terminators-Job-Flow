@@ -30,6 +30,7 @@ const ALL_CATEGORIES = [
       { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "service"] },
       { name: "Field Diaries",   href: "/field-diaries",   icon: Users,        roles: ["admin", "manager", "service", "sales"] },
       { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "service"] },
+      { name: "Clients",         href: "/clients",         icon: Shield,       roles: ["admin", "manager", "service"] },
       { name: "Staff",           href: "/workers",         icon: Users,        roles: ["admin", "manager", "service"] },
       { name: "Stock Management",href: "/inventory",       icon: Box,          roles: ["admin", "manager", "service"] },
       { name: "Stock Manager Pro",href: "https://stock-manager-pro-sladeandbacardi.replit.app/login", icon: ExternalLink, roles: ["admin", "manager", "service"], external: true },
