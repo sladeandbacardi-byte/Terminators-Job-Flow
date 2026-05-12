@@ -26,7 +26,7 @@ const ALL_CATEGORIES = [
     icon: Wrench,
     roles: ["admin", "manager", "service"],
     items: [
-      { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "service", "sales"] },
+      { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "service"] },
       { name: "Field Diaries",   href: "/field-diaries",   icon: Users,        roles: ["admin", "manager", "service", "sales"] },
       { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "service"] },
       { name: "Staff",           href: "/workers",         icon: Users,        roles: ["admin", "manager", "service"] },
