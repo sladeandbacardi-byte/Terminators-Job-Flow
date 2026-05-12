@@ -287,13 +287,20 @@ export default function ClientsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow border-red-100 hover:border-red-300"
+          onClick={() => setStatusFilter(statusFilter === "suspended" ? "all" : "suspended")}
+          title="Click to filter suspended clients"
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Suspended</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-700">Suspended</CardTitle>
             <User className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600" data-testid="stat-suspended">{statusStats.suspended || 0}</div>
+            <p className="text-xs text-red-400 mt-1">
+              {statusFilter === "suspended" ? "Showing suspended ↑ click to clear" : "Click to view"}
+            </p>
           </CardContent>
         </Card>
       </div>
