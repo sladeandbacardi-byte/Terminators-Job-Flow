@@ -25,6 +25,7 @@ import DailyDepartmentCard from "@/pages/daily-department-card";
 import QuoteRequest from "@/pages/quote-request";
 import Leads from "@/pages/leads";
 import Backup from "@/pages/backup";
+import FieldDiaries from "@/pages/field-diaries";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -65,6 +66,7 @@ function AuthenticatedApp() {
       <Route path="/daily-department-card" component={DailyDepartmentCard} />
       <Route path="/leads" component={Leads} />
       <Route path="/backup" component={Backup} />
+      <Route path="/field-diaries" component={FieldDiaries} />
       <Route component={NotFound} />
     </Switch>
   );
