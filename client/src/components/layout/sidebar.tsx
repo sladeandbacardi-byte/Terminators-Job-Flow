@@ -16,6 +16,7 @@ const ALL_CATEGORIES = [
     roles: ["admin", "manager", "sales"],
     items: [
       { name: "Leads",            href: "/leads",     icon: TrendingUp, roles: ["admin", "manager", "sales"] },
+      { name: "Quotes",           href: "/quotes",    icon: FileText,   roles: ["admin", "manager", "sales"] },
       { name: "Clients",          href: "/clients",   icon: Shield,     roles: ["admin", "manager", "sales"] },
       { name: "Rental Contracts", href: "/contracts", icon: FileText,   roles: ["admin", "manager", "sales"] },
       { name: "Email Center",     href: "/emails",    icon: Mail,       roles: ["admin", "manager", "sales"] },

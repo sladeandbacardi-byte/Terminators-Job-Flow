@@ -26,6 +26,7 @@ import QuoteRequest from "@/pages/quote-request";
 import Leads from "@/pages/leads";
 import Backup from "@/pages/backup";
 import FieldDiaries from "@/pages/field-diaries";
+import Quotes from "@/pages/quotes";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -67,6 +68,7 @@ function AuthenticatedApp() {
       <Route path="/leads" component={Leads} />
       <Route path="/backup" component={Backup} />
       <Route path="/field-diaries" component={FieldDiaries} />
+      <Route path="/quotes" component={Quotes} />
       <Route component={NotFound} />
     </Switch>
   );
