@@ -809,9 +809,12 @@ export class MemStorage implements IStorage {
       // Washroom
       { name: "Zain Abdol",         email: "zain@terminators.co.za",     phone: "+27 82 123 0012", departmentId: "div-3", role: "Washroom Technician" },
 
-      // Sanitary Bins
+      // Pest Control
       { name: "Leon Coltman",       email: "leon@terminators.co.za",     phone: "+27 82 123 0013", departmentId: "div-1", role: "Pest Control Assistant" },
+
+      // Sanitary Bins
       { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sanitary Bin Supervisor" },
+      { name: "Sanitary Bin Team 1",email: "",                            phone: "",                departmentId: "div-2", role: "Sanitary Bin Team" },
     ];
     // worker-1  = Julien Botha (div-6 / manager)
     // worker-2  = Maryka Venter (null / admin)
