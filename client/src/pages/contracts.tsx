@@ -14,6 +14,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ExportButton } from "@/components/export-button";
 import { exportContracts } from "@/lib/data-export";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 import type { RentalContract, Client, InventoryItem } from "@shared/schema";
 
 export default function Contracts() {
@@ -21,6 +23,10 @@ export default function Contracts() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingContract, setEditingContract] = useState<RentalContract | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const { user } = useAuth();
+  const role = getDashboardRole(user ?? {});
+  const isSales = role === "sales";
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -150,29 +156,31 @@ export default function Contracts() {
                 variant="outline"
                 size="sm"
               />
-              <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-create-contract">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Contract
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingContract ? "Edit Contract" : "Create New Contract"}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {editingContract ? "Update the rental contract details below." : "Fill in the details to create a new rental contract."}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <ContractForm
-                    contract={editingContract}
-                    onSuccess={handleFormSuccess}
-                    onCancel={() => setIsFormOpen(false)}
-                  />
-                </DialogContent>
-              </Dialog>
+              {!isSales && (
+                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-create-contract">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Contract
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingContract ? "Edit Contract" : "Create New Contract"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {editingContract ? "Update the rental contract details below." : "Fill in the details to create a new rental contract."}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ContractForm
+                      contract={editingContract}
+                      onSuccess={handleFormSuccess}
+                      onCancel={() => setIsFormOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </div>
 
@@ -219,7 +227,7 @@ export default function Contracts() {
                     : "Get started by creating your first rental contract."
                   }
                 </p>
-                {(!searchTerm && statusFilter === "all") && (
+                {(!searchTerm && statusFilter === "all") && !isSales && (
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button className="mt-4" data-testid="button-create-first-contract">
@@ -303,27 +311,29 @@ export default function Contracts() {
                           </p>
                         )}
                         
-                        <div className="flex justify-between pt-4 border-t border-gray-200">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(contract)}
-                            data-testid={`button-edit-contract-${contract.id}`}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(contract)}
-                            className="text-red-600 hover:text-red-700"
-                            data-testid={`button-delete-contract-${contract.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
+                        {!isSales && (
+                          <div className="flex justify-between pt-4 border-t border-gray-200">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(contract)}
+                              data-testid={`button-edit-contract-${contract.id}`}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(contract)}
+                              className="text-red-600 hover:text-red-700"
+                              data-testid={`button-delete-contract-${contract.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

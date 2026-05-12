@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
@@ -80,7 +82,11 @@ export default function ClientsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
+  const { user } = useAuth();
+  const role = getDashboardRole(user ?? {});
+  const isSales = role === "sales";
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -397,14 +403,18 @@ export default function ClientsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => setDeletingClient(client)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
+                        {!isSales && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => setDeletingClient(client)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
