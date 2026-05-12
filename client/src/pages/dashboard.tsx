@@ -17,6 +17,7 @@ import { SalesDashboard } from "@/components/dashboard/sales-dashboard";
 import { AccountsDashboard } from "@/components/dashboard/accounts-dashboard";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 import { ManagerDashboard } from "@/components/dashboard/manager-dashboard";
+import { SuspendedServices } from "@/components/dashboard/suspended-services";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors } from "@/lib/dashboardRole";
@@ -135,6 +136,9 @@ export default function Dashboard() {
                 {dashboardRoleLabels[dashboardRole]} View
               </div>
             </div>
+
+            {/* Suspended services alert — visible to all roles */}
+            <SuspendedServices />
 
             {/* Role-based dashboard */}
             {dashboardRole === "service" && <ServiceDashboard />}

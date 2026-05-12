@@ -38,6 +38,23 @@ const ALL_CATEGORIES = [
     ],
   },
   {
+    name: "Service",
+    icon: Wrench,
+    roles: ["accounts"],
+    items: [
+      { name: "Calendar",        href: "/calendar", icon: Calendar, roles: ["accounts"] },
+      { name: "Job Scheduling",  href: "/jobs",     icon: Calendar, roles: ["accounts"] },
+    ],
+  },
+  {
+    name: "Clients",
+    icon: Shield,
+    roles: ["accounts"],
+    items: [
+      { name: "Clients",         href: "/clients",   icon: Shield,  roles: ["accounts"] },
+    ],
+  },
+  {
     name: "Finance",
     icon: CreditCard,
     roles: ["admin", "manager", "accounts"],

@@ -20,6 +20,8 @@ import {
   User,
   CreditCard,
   Calendar,
+  XCircle,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +88,7 @@ export default function ClientsPage() {
   const { user } = useAuth();
   const role = getDashboardRole(user ?? {});
   const isSales = role === "sales";
+  const isAccounts = role === "accounts";
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -142,6 +145,16 @@ export default function ClientsPage() {
         variant: "destructive" 
       });
     },
+  });
+
+  const suspendMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiRequest("PATCH", `/api/clients/${id}/status`, { status }),
+    onSuccess: (_, { status }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({ description: status === "suspended" ? "Client service suspended." : "Client service reinstated." });
+    },
+    onError: () => toast({ description: "Failed to update client status", variant: "destructive" }),
   });
 
   const filteredClients = clients.filter((client: Client) => {
@@ -217,26 +230,28 @@ export default function ClientsPage() {
             onExportCSV={handleExportCSV}
             entityName="Clients"
           />
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-client">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Client
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
-                <DialogDescription>
-                  Create a new client record with contact and business information.
-                </DialogDescription>
-              </DialogHeader>
-              <ClientForm
-                onSubmit={(data) => createMutation.mutate(data)}
-                onCancel={() => setIsCreateDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          {!isAccounts && (
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-client">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Client
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Add New Client</DialogTitle>
+                  <DialogDescription>
+                    Create a new client record with contact and business information.
+                  </DialogDescription>
+                </DialogHeader>
+                <ClientForm
+                  onSubmit={(data) => createMutation.mutate(data)}
+                  onCancel={() => setIsCreateDialogOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -399,12 +414,55 @@ export default function ClientsPage() {
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingClient(client)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        {!isSales && (
+                        {!isSales && !isAccounts && (
+                          <DropdownMenuItem onClick={() => setEditingClient(client)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {isSales && (
+                          <DropdownMenuItem onClick={() => setEditingClient(client)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {isAccounts && (
                           <>
+                            <DropdownMenuSeparator />
+                            {client.status !== "suspended" ? (
+                              <DropdownMenuItem
+                                onClick={() => suspendMutation.mutate({ id: client.id, status: "suspended" })}
+                                className="text-red-600"
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Suspend Service
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => suspendMutation.mutate({ id: client.id, status: "active" })}
+                                className="text-green-600"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Reinstate Service
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        )}
+                        {!isSales && !isAccounts && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => client.status !== "suspended"
+                                ? suspendMutation.mutate({ id: client.id, status: "suspended" })
+                                : suspendMutation.mutate({ id: client.id, status: "active" })
+                              }
+                              className={client.status === "suspended" ? "text-green-600" : "text-orange-600"}
+                            >
+                              {client.status === "suspended"
+                                ? <><CheckCircle className="mr-2 h-4 w-4" />Reinstate Service</>
+                                : <><XCircle className="mr-2 h-4 w-4" />Suspend Service</>
+                              }
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => setDeletingClient(client)}
