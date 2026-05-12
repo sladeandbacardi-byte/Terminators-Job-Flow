@@ -364,7 +364,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {departments.map((department) => (
+                      {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map((department) => (
                         <SelectItem key={department.id} value={department.id}>
                           {department.name}
                         </SelectItem>

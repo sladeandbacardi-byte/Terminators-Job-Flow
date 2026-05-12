@@ -50,7 +50,7 @@ export default function DailyDepartmentCardPage() {
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map(department => (
+                  {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map(department => (
                     <SelectItem key={department.id} value={department.id}>
                       {department.name}
                     </SelectItem>

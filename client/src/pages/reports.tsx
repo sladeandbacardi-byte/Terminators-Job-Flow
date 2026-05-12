@@ -365,7 +365,7 @@ export default function Reports() {
                         <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All departments</SelectItem>
-                          {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                          {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>

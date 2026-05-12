@@ -310,7 +310,7 @@ export default function ClientsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Departments</SelectItem>
-            {departments.map((department) => (
+            {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map((department) => (
               <SelectItem key={department.id} value={department.id}>
                 {department.name}
               </SelectItem>

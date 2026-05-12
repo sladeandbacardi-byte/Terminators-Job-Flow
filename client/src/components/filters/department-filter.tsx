@@ -103,7 +103,7 @@ export function DepartmentFilter({
             )}
 
             {/* Individual Department Options */}
-            {departments.map((department) => (
+            {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map((department) => (
               <div 
                 key={department.id} 
                 className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded"
