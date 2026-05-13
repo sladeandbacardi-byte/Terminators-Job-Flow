@@ -54,11 +54,13 @@ const newLeadSchema = z.object({
   address: z.string().optional(),
   preferredContactMethod: z.enum(["email", "phone", "either"]).default("phone"),
   notes: z.string().optional(),
+  assignedTo: z.string().optional(),
 });
 
 const convertToJobSchema = z.object({
   clientId: z.string().optional(),
   workerId: z.string().optional(),
+  salespersonId: z.string().optional(),
   departmentId: z.string().min(1, "Department required"),
   scheduledDate: z.string().min(1, "Date required"),
   scheduledTime: z.string().optional(),
@@ -166,6 +168,9 @@ export default function Leads() {
       const scheduledDate = new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`);
       const serviceLabel = SERVICE_LABELS[lead.serviceType] ?? lead.serviceType;
       const clientName = newClientMode && newClientData ? newClientData.name : (clients.find(c => c.id === clientId)?.name ?? "Client");
+      const salespersonName = jobData.salespersonId
+        ? (workers.find(w => w.id === jobData.salespersonId)?.name ?? "")
+        : (lead.assignedTo ? (workers.find(w => w.id === lead.assignedTo)?.name ?? "") : "");
       await apiRequest("POST", "/api/jobs", {
         title: `${serviceLabel} — ${clientName}`,
         clientId,
@@ -178,6 +183,7 @@ export default function Leads() {
         notes: jobData.notes || lead.description || "",
         estimatedValue: jobData.estimatedValue || null,
         priority: "medium",
+        salesperson: salespersonName,
       });
       await apiRequest("PATCH", `/api/quote-submissions/${lead.id}`, { status: "converted" });
     },
@@ -192,9 +198,11 @@ export default function Leads() {
   });
 
   // ── forms ──
+  const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
+
   const newLeadForm = useForm<NewLeadForm>({
     resolver: zodResolver(newLeadSchema),
-    defaultValues: { companyName: "", contactPerson: "", email: "", phone: "", description: "", address: "", preferredContactMethod: "phone", notes: "" },
+    defaultValues: { companyName: "", contactPerson: "", email: "", phone: "", description: "", address: "", preferredContactMethod: "phone", notes: "", assignedTo: "" },
   });
 
   const convertJobForm = useForm<ConvertJobForm>({
@@ -300,6 +308,7 @@ export default function Leads() {
                     <LeadCard
                       key={lead.id}
                       lead={lead}
+                      workers={workers}
                       onAdvance={(status) => advanceLead.mutate({ id: lead.id, status })}
                       onConvert={() => openConvertDialog(lead)}
                       onNotes={() => { setNotesLead(lead); setNotesText(lead.notes ?? ""); }}
@@ -390,7 +399,7 @@ export default function Leads() {
                   </FormItem>
                 )} />
                 <FormField control={newLeadForm.control} name="preferredContactMethod" render={({ field }) => (
-                  <FormItem className="col-span-2">
+                  <FormItem>
                     <FormLabel>Preferred Contact Method</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
@@ -398,6 +407,20 @@ export default function Leads() {
                         <SelectItem value="phone">Phone</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
                         <SelectItem value="either">Either</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+                <FormField control={newLeadForm.control} name="assignedTo" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salesperson <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Assign to salesperson" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="unassigned">— Unassigned —</SelectItem>
+                        {salesWorkers.map(w => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -535,6 +558,21 @@ export default function Leads() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={convertJobForm.control} name="salespersonId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salesperson</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select salesperson" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">— Unassigned —</SelectItem>
+                          {salesWorkers.map(w => (
+                            <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                   <FormField control={convertJobForm.control} name="workerId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assign Worker <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
@@ -626,18 +664,21 @@ export default function Leads() {
 
 function LeadCard({
   lead,
+  workers,
   onAdvance,
   onConvert,
   onNotes,
   onDecline,
 }: {
   lead: QuoteSubmission;
+  workers: Worker[];
   onAdvance: (status: string) => void;
   onConvert: () => void;
   onNotes: () => void;
   onDecline: () => void;
 }) {
   const fu = followUpLabel(lead.followUpDate);
+  const assignedWorker = lead.assignedTo ? workers.find(w => w.id === lead.assignedTo) : null;
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 space-y-2">
       {/* Company + service */}
@@ -653,6 +694,11 @@ function LeadCard({
       <div className="flex flex-col gap-0.5 text-xs text-gray-500">
         <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{lead.phone}</span>
         {lead.address && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /><span className="truncate">{lead.address}</span></span>}
+        {assignedWorker && (
+          <span className="flex items-center gap-1 text-blue-600 font-medium">
+            <Briefcase className="h-3 w-3" />Sales: {assignedWorker.name}
+          </span>
+        )}
       </div>
 
       {/* Description snippet */}

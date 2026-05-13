@@ -310,9 +310,21 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm">Salesperson</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Salesperson name" {...field} value={field.value || ""} className="h-8 text-sm" />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select salesperson" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {workers
+                        .filter(w => w.departmentId === "div-5" && w.isActive !== false)
+                        .map(w => (
+                          <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage className="text-xs" />
                 </FormItem>
               )}

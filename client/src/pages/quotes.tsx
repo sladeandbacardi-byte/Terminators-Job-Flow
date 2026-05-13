@@ -15,7 +15,7 @@ import {
   FileText, Phone, Mail, MapPin, Calendar, User,
   MessageSquare, ChevronDown, ChevronUp, Building2,
 } from "lucide-react";
-import type { QuoteSubmission } from "@shared/schema";
+import type { QuoteSubmission, Worker } from "@shared/schema";
 
 const STATUS_OPTIONS = [
   { value: "new",       label: "New",       class: "bg-blue-100 text-blue-700" },
@@ -42,7 +42,7 @@ function statusConfig(status: string) {
   return STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 }
 
-function QuoteCard({ quote }: { quote: QuoteSubmission }) {
+function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorkers: Worker[] }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(quote.notes ?? "");
   const [editingNotes, setEditingNotes] = useState(false);
@@ -133,6 +133,26 @@ function QuoteCard({ quote }: { quote: QuoteSubmission }) {
           </div>
         )}
 
+        {/* Salesperson */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground shrink-0">Salesperson:</span>
+          <Select
+            value={quote.assignedTo ?? "none"}
+            onValueChange={(val) => updateMutation.mutate({ assignedTo: val === "none" ? null : val } as Partial<QuoteSubmission>)}
+            disabled={updateMutation.isPending}
+          >
+            <SelectTrigger className="h-7 text-xs w-44">
+              <SelectValue placeholder="Unassigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— Unassigned —</SelectItem>
+              {salesWorkers.map(w => (
+                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Dates */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -208,6 +228,9 @@ export default function QuotesPage() {
   const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({
     queryKey: ["/api/quote-submissions"],
   });
+
+  const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
+  const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
   const filtered = quotes.filter(q => {
     const matchStatus = statusFilter === "all" || q.status === statusFilter;
@@ -287,7 +310,7 @@ export default function QuotesPage() {
               <div className="grid gap-4 lg:grid-cols-2">
                 {filtered
                   .sort((a, b) => new Date(b.submittedAt as unknown as string).getTime() - new Date(a.submittedAt as unknown as string).getTime())
-                  .map(q => <QuoteCard key={q.id} quote={q} />)}
+                  .map(q => <QuoteCard key={q.id} quote={q} salesWorkers={salesWorkers} />)}
               </div>
             )}
           </div>
