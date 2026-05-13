@@ -164,7 +164,10 @@ export default function Leads() {
       }
       if (!clientId) throw new Error("No client selected or created");
       const scheduledDate = new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`);
+      const serviceLabel = SERVICE_LABELS[lead.serviceType] ?? lead.serviceType;
+      const clientName = newClientMode && newClientData ? newClientData.name : (clients.find(c => c.id === clientId)?.name ?? "Client");
       await apiRequest("POST", "/api/jobs", {
+        title: `${serviceLabel} — ${clientName}`,
         clientId,
         workerId: jobData.workerId || null,
         departmentId: jobData.departmentId,
