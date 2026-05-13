@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase, CheckCircle2,
-  XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle
+  XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle, UserPlus, ChevronDown
 } from "lucide-react";
 import type { QuoteSubmission, Client, Worker, Department } from "@shared/schema";
 
@@ -57,7 +57,7 @@ const newLeadSchema = z.object({
 });
 
 const convertToJobSchema = z.object({
-  clientId: z.string().min(1, "Select or create a client"),
+  clientId: z.string().optional(),
   workerId: z.string().optional(),
   departmentId: z.string().min(1, "Department required"),
   scheduledDate: z.string().min(1, "Date required"),
@@ -65,6 +65,16 @@ const convertToJobSchema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
   estimatedValue: z.string().optional(),
+});
+
+const newClientSchema = z.object({
+  name: z.string().min(2, "Company name required"),
+  contactPerson: z.string().optional(),
+  email: z.string().email("Valid email required").or(z.literal("")).optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  industry: z.string().optional(),
+  departmentId: z.string().min(1, "Department required"),
 });
 
 type NewLeadForm = z.infer<typeof newLeadSchema>;
@@ -98,6 +108,7 @@ export default function Leads() {
   const [convertLead, setConvertLead] = useState<QuoteSubmission | null>(null);
   const [notesLead, setNotesLead] = useState<QuoteSubmission | null>(null);
   const [notesText, setNotesText] = useState("");
+  const [newClientMode, setNewClientMode] = useState(false);
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
@@ -136,11 +147,25 @@ export default function Leads() {
     },
   });
 
+  const createClient = useMutation({
+    mutationFn: (data: z.infer<typeof newClientSchema>) =>
+      apiRequest("POST", "/api/clients", { ...data, status: "active" }),
+  });
+
   const convertToJob = useMutation({
-    mutationFn: async ({ lead, jobData }: { lead: QuoteSubmission; jobData: ConvertJobForm }) => {
+    mutationFn: async ({ lead, jobData, newClientData }: { lead: QuoteSubmission; jobData: ConvertJobForm; newClientData?: z.infer<typeof newClientSchema> }) => {
+      let clientId = jobData.clientId;
+      // If creating a new client, do that first
+      if (newClientMode && newClientData) {
+        const created = await apiRequest("POST", "/api/clients", { ...newClientData, status: "active" });
+        const json = await created.json();
+        clientId = json.id;
+        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      }
+      if (!clientId) throw new Error("No client selected or created");
       const scheduledDate = new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`);
       await apiRequest("POST", "/api/jobs", {
-        clientId: jobData.clientId,
+        clientId,
         workerId: jobData.workerId || null,
         departmentId: jobData.departmentId,
         serviceType: lead.serviceType,
@@ -174,9 +199,25 @@ export default function Leads() {
     defaultValues: { clientId: "", workerId: "", departmentId: "", scheduledDate: "", scheduledTime: "08:00", address: convertLead?.address || "", notes: "", estimatedValue: "" },
   });
 
+  const newClientForm = useForm<z.infer<typeof newClientSchema>>({
+    resolver: zodResolver(newClientSchema),
+    defaultValues: { name: "", contactPerson: "", email: "", phone: "", address: "", industry: "", departmentId: "" },
+  });
+
   // Reset convert form when lead changes
   const openConvertDialog = (lead: QuoteSubmission) => {
     setConvertLead(lead);
+    setNewClientMode(false);
+    const deptId = deptForService(lead.serviceType, departments);
+    newClientForm.reset({
+      name: lead.companyName || "",
+      contactPerson: lead.contactPerson || "",
+      email: lead.email || "",
+      phone: lead.phone || "",
+      address: lead.address || "",
+      industry: "",
+      departmentId: deptId,
+    });
     convertJobForm.reset({
       clientId: "",
       workerId: "",
@@ -385,22 +426,98 @@ export default function Leads() {
               {convertLead.description && <p><span className="font-medium">Requirements:</span> {convertLead.description}</p>}
             </div>
             <Form {...convertJobForm}>
-              <form onSubmit={convertJobForm.handleSubmit(d => convertToJob.mutate({ lead: convertLead, jobData: d }))} className="space-y-4">
+              <form
+                onSubmit={convertJobForm.handleSubmit(d => {
+                  if (newClientMode) {
+                    newClientForm.handleSubmit(nc => convertToJob.mutate({ lead: convertLead, jobData: d, newClientData: nc }))();
+                  } else {
+                    if (!d.clientId) { convertJobForm.setError("clientId", { message: "Select a client or create a new one" }); return; }
+                    convertToJob.mutate({ lead: convertLead, jobData: d });
+                  }
+                })}
+                className="space-y-4"
+              >
                 <div className="grid grid-cols-2 gap-3">
-                  <FormField control={convertJobForm.control} name="clientId" render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Client <span className="text-gray-400 font-normal">(link to existing client)</span></FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {clients.filter(c => c.status === "active").map(c => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+
+                  {/* ── Client selector / new client toggle ── */}
+                  <div className="col-span-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Client</span>
+                      <button
+                        type="button"
+                        onClick={() => setNewClientMode(v => !v)}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {newClientMode ? (
+                          <><ChevronDown className="h-3.5 w-3.5" /> Use existing client</>
+                        ) : (
+                          <><UserPlus className="h-3.5 w-3.5" /> Create new client</>
+                        )}
+                      </button>
+                    </div>
+
+                    {!newClientMode ? (
+                      <FormField control={convertJobForm.control} name="clientId" render={({ field }) => (
+                        <FormItem>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select existing client" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {clients.filter(c => c.status === "active").map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    ) : (
+                      <div className="border rounded-lg p-3 bg-blue-50 space-y-3">
+                        <p className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                          <UserPlus className="h-3.5 w-3.5" /> New client details
+                        </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <FormField control={newClientForm.control} name="name" render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormLabel className="text-xs">Company / Client Name *</FormLabel>
+                                <FormControl><Input placeholder="e.g. Spar Newton Park" className="h-8 text-sm" {...field} /></FormControl>
+                                <FormMessage className="text-xs" />
+                              </FormItem>
+                            )} />
+                            <FormField control={newClientForm.control} name="contactPerson" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Contact Person</FormLabel>
+                                <FormControl><Input placeholder="Full name" className="h-8 text-sm" {...field} /></FormControl>
+                              </FormItem>
+                            )} />
+                            <FormField control={newClientForm.control} name="phone" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Phone</FormLabel>
+                                <FormControl><Input placeholder="+27 41 ..." className="h-8 text-sm" {...field} /></FormControl>
+                              </FormItem>
+                            )} />
+                            <FormField control={newClientForm.control} name="email" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Email</FormLabel>
+                                <FormControl><Input type="email" placeholder="email@co.za" className="h-8 text-sm" {...field} /></FormControl>
+                                <FormMessage className="text-xs" />
+                              </FormItem>
+                            )} />
+                            <FormField control={newClientForm.control} name="industry" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Industry</FormLabel>
+                                <FormControl><Input placeholder="e.g. Retail" className="h-8 text-sm" {...field} /></FormControl>
+                              </FormItem>
+                            )} />
+                            <FormField control={newClientForm.control} name="address" render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormLabel className="text-xs">Address</FormLabel>
+                                <FormControl><Input placeholder="Street address" className="h-8 text-sm" {...field} /></FormControl>
+                              </FormItem>
+                            )} />
+                          </div>
+                      </div>
+                    )}
+                  </div>
                   <FormField control={convertJobForm.control} name="departmentId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
