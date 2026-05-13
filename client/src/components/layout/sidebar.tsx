@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   BarChart3, Calendar, Users, Shield, Box, FileText, Receipt, Mail,
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
-  Settings, TrendingUp, ExternalLink, Database,
+  Settings, TrendingUp, ExternalLink, Database, ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -68,9 +68,10 @@ const ALL_CATEGORIES = [
     icon: Settings,
     roles: ["admin", "manager"],
     items: [
-      { name: "Reports",        href: "/reports",        icon: BarChart,   roles: ["admin", "manager"] },
-      { name: "Custom Reports", href: "/custom-reports", icon: BarChart3,  roles: ["admin", "manager"] },
-      { name: "Backup & Restore", href: "/backup",       icon: Database,   roles: ["admin"] },
+      { name: "Reports",            href: "/reports",            icon: BarChart,       roles: ["admin", "manager"] },
+      { name: "Custom Reports",    href: "/custom-reports",     icon: BarChart3,      roles: ["admin", "manager"] },
+      { name: "Testing Checklist", href: "/testing-checklist",  icon: ClipboardList,  roles: ["admin", "manager"] },
+      { name: "Backup & Restore",  href: "/backup",             icon: Database,       roles: ["admin"] },
     ],
   },
 ];

@@ -27,6 +27,7 @@ import Leads from "@/pages/leads";
 import Backup from "@/pages/backup";
 import FieldDiaries from "@/pages/field-diaries";
 import Quotes from "@/pages/quotes";
+import TestingChecklist from "@/pages/testing-checklist";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -69,6 +70,7 @@ function AuthenticatedApp() {
       <Route path="/backup" component={Backup} />
       <Route path="/field-diaries" component={FieldDiaries} />
       <Route path="/quotes" component={Quotes} />
+      <Route path="/testing-checklist" component={TestingChecklist} />
       <Route component={NotFound} />
     </Switch>
   );
