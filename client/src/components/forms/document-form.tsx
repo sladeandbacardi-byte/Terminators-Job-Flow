@@ -497,13 +497,12 @@ export default function DocumentForm({
               {fields.map((field, idx) => (
                 <div key={field.id} className="grid grid-cols-12 gap-1.5 items-center bg-gray-50 rounded-lg px-2 py-2">
                   <div className="col-span-5">
-                    {/* Input with datalist for service autocomplete */}
+                    {/* Use register (not watch+setValue) so typing doesn't trigger re-render and lose focus */}
                     <input
                       list={datalistId}
                       placeholder="Type or pick a service..."
                       className="flex h-8 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      value={form.watch(`lineItems.${idx}.description`)}
-                      onChange={e => handleItemChange(idx, "description", e.target.value)}
+                      {...form.register(`lineItems.${idx}.description`)}
                     />
                   </div>
                   <div className="col-span-2">
