@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { format, parseISO } from "date-fns";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
@@ -12,22 +16,46 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import {
   FileText, Phone, Mail, MapPin, Calendar, User,
-  MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase,
+  MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase, UserPlus,
 } from "lucide-react";
-import type { QuoteSubmission, Worker, Client } from "@shared/schema";
+import type { QuoteSubmission, Worker, Client, Department } from "@shared/schema";
+
+// ── schemas ───────────────────────────────────────────────────────────────────
+
+const convertToJobSchema = z.object({
+  clientId:      z.string().optional(),
+  workerId:      z.string().optional(),
+  salespersonId: z.string().optional(),
+  departmentId:  z.string().min(1, "Department required"),
+  scheduledDate: z.string().min(1, "Date required"),
+  scheduledTime: z.string().optional(),
+  address:       z.string().optional(),
+  notes:         z.string().optional(),
+  estimatedValue: z.string().optional(),
+});
+
+const newClientSchema = z.object({
+  name:         z.string().min(2, "Company name required"),
+  contactPerson: z.string().optional(),
+  email:        z.string().email("Valid email required").or(z.literal("")).optional(),
+  phone:        z.string().optional(),
+  address:      z.string().optional(),
+  industry:     z.string().optional(),
+  departmentId: z.string().min(1, "Department required"),
+});
+
+type ConvertJobForm = z.infer<typeof convertToJobSchema>;
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
-// Quotes page only shows entries that have reached the "quoted" stage or beyond.
-// "new" and "contacted" are leads still in the pipeline — they live on the Leads page.
 const STATUS_OPTIONS = [
-  { value: "quoted",    label: "Quoted",    class: "bg-purple-100 text-purple-700" },
-  { value: "converted", label: "Accepted",  class: "bg-green-100 text-green-700" },
-  { value: "declined",  label: "Declined",  class: "bg-red-100 text-red-600" },
+  { value: "quoted",    label: "Quoted",   class: "bg-purple-100 text-purple-700" },
+  { value: "converted", label: "Accepted", class: "bg-green-100 text-green-700" },
+  { value: "declined",  label: "Declined", class: "bg-red-100 text-red-600" },
 ];
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -37,7 +65,6 @@ const SERVICE_LABELS: Record<string, string> = {
   deep_cleaning: "Deep Cleaning",
 };
 
-// Maps quote serviceType → department ID for job creation
 const SERVICE_TO_DEPT: Record<string, string> = {
   pest_control:  "div-1",
   sanitary_bins: "div-2",
@@ -63,33 +90,46 @@ interface QuoteCardProps {
   salesWorkers: Worker[];
   allWorkers: Worker[];
   clients: Client[];
+  departments: Department[];
 }
 
-function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps) {
+function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: QuoteCardProps) {
   const [, navigate] = useLocation();
-  const [expanded, setExpanded] = useState(false);
-  const [notes, setNotes] = useState(quote.notes ?? "");
+  const [expanded, setExpanded]       = useState(false);
+  const [notes, setNotes]             = useState(quote.notes ?? "");
   const [editingNotes, setEditingNotes] = useState(false);
 
   // Decline dialog
-  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineOpen, setDeclineOpen]   = useState(false);
   const [declineReason, setDeclineReason] = useState("");
 
-  // Accept / Convert-to-Job dialog
-  const [acceptOpen, setAcceptOpen] = useState(false);
-  const [jobClientId, setJobClientId] = useState("");
-  const [jobWorkerId, setJobWorkerId] = useState("");
-  const [jobDate, setJobDate] = useState("");
-  const [jobTime, setJobTime] = useState("08:00");
-  const [jobNotes, setJobNotes] = useState("");
+  // Convert-to-job dialog
+  const [acceptOpen, setAcceptOpen]   = useState(false);
+  const [newClientMode, setNewClientMode] = useState(false);
 
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Workers filtered to the matching service department
-  const deptId = SERVICE_TO_DEPT[quote.serviceType] ?? "";
-  const deptWorkers = allWorkers.filter(w => w.departmentId === deptId && w.isActive !== false);
+  const deptId = SERVICE_TO_DEPT[quote.serviceType] ?? departments[0]?.id ?? "";
 
+  // ── Forms ──
+  const convertJobForm = useForm<ConvertJobForm>({
+    resolver: zodResolver(convertToJobSchema),
+    defaultValues: {
+      clientId: "", workerId: "", salespersonId: "", departmentId: deptId,
+      scheduledDate: "", scheduledTime: "08:00",
+      address: quote.address || "", notes: quote.description || "", estimatedValue: "",
+    },
+  });
+
+  const newClientForm = useForm<z.infer<typeof newClientSchema>>({
+    resolver: zodResolver(newClientSchema),
+    defaultValues: {
+      name: "", contactPerson: "", email: "", phone: "",
+      address: "", industry: "", departmentId: deptId,
+    },
+  });
+
+  // ── Mutations ──
   const updateMutation = useMutation({
     mutationFn: (data: Partial<QuoteSubmission>) =>
       apiRequest("PATCH", `/api/quote-submissions/${quote.id}`, data),
@@ -101,68 +141,89 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
   });
 
   const convertMutation = useMutation({
-    mutationFn: async () => {
-      // Resolve clientId — use matched account or auto-create from quote data
-      let resolvedClientId = jobClientId;
-      if (!resolvedClientId) {
-        const newClientRes = await apiRequest("POST", "/api/clients", {
-          name: quote.companyName,
-          contactPerson: quote.contactPerson || undefined,
-          email: quote.email || undefined,
-          phone: quote.phone || undefined,
-          address: quote.address || undefined,
-          status: "active",
-        });
-        if (!newClientRes.ok) throw new Error("Failed to create client account");
-        const newClient = await newClientRes.json();
-        resolvedClientId = newClient.id;
+    mutationFn: async ({ jobData, newClientData }: { jobData: ConvertJobForm; newClientData?: z.infer<typeof newClientSchema> }) => {
+      // Resolve client
+      let clientId = jobData.clientId;
+      if (newClientMode && newClientData) {
+        const res = await apiRequest("POST", "/api/clients", { ...newClientData, status: "active" });
+        if (!res.ok) throw new Error("Failed to create client");
+        const json = await res.json();
+        clientId = json.id;
+        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       }
-      // Create the job using the resolved clientId
+      if (!clientId) throw new Error("No client selected");
+
+      const salespersonWorker = jobData.salespersonId
+        ? allWorkers.find(w => w.id === jobData.salespersonId)
+        : allWorkers.find(w => w.id === quote.assignedTo);
+
+      // Create job
       const jobRes = await apiRequest("POST", "/api/jobs", {
-        title: `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
-        description: quote.description,
-        clientId: resolvedClientId,
-        workerId: jobWorkerId || undefined,
-        departmentId: deptId || "div-1",
-        serviceType: SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
-        status: "scheduled",
-        scheduledDate: new Date(jobDate).toISOString(),
-        scheduledTime: jobTime || undefined,
-        location: quote.address || undefined,
-        notes: jobNotes || undefined,
-        price: quote.quoteAmount || undefined,
-        email: quote.email || undefined,
-        salesperson: quote.assignedTo || undefined,
+        title:          `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
+        description:    quote.description,
+        clientId,
+        workerId:       jobData.workerId || null,
+        departmentId:   jobData.departmentId,
+        serviceType:    quote.serviceType,
+        status:         "scheduled",
+        scheduledDate:  new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`).toISOString(),
+        scheduledTime:  jobData.scheduledTime || "08:00",
+        location:       jobData.address || quote.address || "",
+        notes:          jobData.notes || quote.description || "",
+        price:          jobData.estimatedValue || quote.quoteAmount || null,
+        email:          quote.email || undefined,
+        salesperson:    salespersonWorker?.name ?? "",
+        priority:       "medium",
       });
       if (!jobRes.ok) throw new Error("Failed to create job");
-      // Mark quote as converted
+
+      // Mark quote converted
       await apiRequest("PATCH", `/api/quote-submissions/${quote.id}`, { status: "converted" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: "Job created!", description: "The quote has been converted and the job is now scheduled." });
+      toast({ title: "Job created!", description: "Quote converted — job added to schedule." });
       setAcceptOpen(false);
       navigate("/jobs");
     },
-    onError: () => toast({ title: "Failed to create job", variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed to create job", description: e.message, variant: "destructive" }),
   });
 
+  // ── Handlers ──
   const handleStatusChange = (status: string) => {
     if (status === "declined") {
       setDeclineReason("");
       setDeclineOpen(true);
     } else if (status === "converted") {
-      // Pre-fill client if a name match exists
+      // Try to auto-match existing client
       const match = clients.find(c =>
         c.name.toLowerCase().includes(quote.companyName.toLowerCase()) ||
         quote.companyName.toLowerCase().includes(c.name.toLowerCase())
       );
-      setJobClientId(match?.id ?? "");
-      setJobWorkerId("");
-      setJobDate("");
-      setJobTime("08:00");
-      setJobNotes("");
+      // Pre-fill forms from quote data
+      convertJobForm.reset({
+        clientId:      match?.id ?? "",
+        workerId:      "",
+        salespersonId: quote.assignedTo ?? "",
+        departmentId:  deptId,
+        scheduledDate: "",
+        scheduledTime: "08:00",
+        address:       quote.address || "",
+        notes:         quote.description || "",
+        estimatedValue: quote.quoteAmount ?? "",
+      });
+      newClientForm.reset({
+        name:          quote.companyName,
+        contactPerson: quote.contactPerson || "",
+        email:         quote.email || "",
+        phone:         quote.phone || "",
+        address:       quote.address || "",
+        industry:      "",
+        departmentId:  deptId,
+      });
+      // If no match found, default to create-new mode
+      setNewClientMode(!match);
       setAcceptOpen(true);
     } else {
       updateMutation.mutate({ status });
@@ -175,9 +236,16 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
     setDeclineOpen(false);
   };
 
-  const handleConvertConfirm = () => {
-    if (!jobClientId || !jobDate) return;
-    convertMutation.mutate();
+  const handleConvertSubmit = (jobData: ConvertJobForm) => {
+    if (newClientMode) {
+      newClientForm.handleSubmit(nc => convertMutation.mutate({ jobData, newClientData: nc }))();
+    } else {
+      if (!jobData.clientId) {
+        convertJobForm.setError("clientId", { message: "Select a client or create a new one" });
+        return;
+      }
+      convertMutation.mutate({ jobData });
+    }
   };
 
   const handleSaveNotes = () => {
@@ -209,7 +277,11 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
             <Badge variant="outline" className="text-xs font-medium">
               {SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}
             </Badge>
-            <Select value={quote.status} onValueChange={handleStatusChange} disabled={updateMutation.isPending || convertMutation.isPending}>
+            <Select
+              value={quote.status}
+              onValueChange={handleStatusChange}
+              disabled={updateMutation.isPending || convertMutation.isPending}
+            >
               <SelectTrigger className={`h-7 text-xs font-medium border-0 px-2 rounded-full w-auto ${cfg.class}`}>
                 <SelectValue />
               </SelectTrigger>
@@ -332,7 +404,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
       </CardContent>
     </Card>
 
-    {/* ── Decline reason dialog ── */}
+    {/* ── Decline dialog ── */}
     <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
@@ -372,146 +444,214 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-green-600" />
-            Convert to Job
+            <Briefcase className="h-4 w-4" /> Convert to Job — {quote.companyName}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-1">
-
-          {/* ── Client details from quote (read-only) ── */}
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
-            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Client Details (from quote)</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <div>
-                <p className="text-xs text-blue-500 font-medium">Company</p>
-                <p className="font-semibold text-blue-900">{quote.companyName}</p>
-              </div>
-              <div>
-                <p className="text-xs text-blue-500 font-medium">Contact Person</p>
-                <p className="text-blue-900">{quote.contactPerson || "—"}</p>
-              </div>
-              {quote.email && (
-                <div>
-                  <p className="text-xs text-blue-500 font-medium">Email</p>
-                  <p className="text-blue-900 truncate">{quote.email}</p>
-                </div>
-              )}
-              {quote.phone && (
-                <div>
-                  <p className="text-xs text-blue-500 font-medium">Phone</p>
-                  <p className="text-blue-900">{quote.phone}</p>
-                </div>
-              )}
-              {quote.address && (
-                <div className="col-span-2">
-                  <p className="text-xs text-blue-500 font-medium">Address / Location</p>
-                  <p className="text-blue-900">{quote.address}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-xs text-blue-500 font-medium">Service</p>
-                <p className="text-blue-900 font-medium">{SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</p>
-              </div>
-              {quote.quoteAmount && (
-                <div>
-                  <p className="text-xs text-blue-500 font-medium">Quoted Amount</p>
-                  <p className="text-blue-900 font-semibold">R {parseFloat(quote.quoteAmount).toFixed(2)}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Client account status ── */}
-          {jobClientId && clients.find(c => c.id === jobClientId) ? (
-            <div className="flex items-center justify-between rounded-md border border-green-300 bg-green-50 px-3 py-2">
-              <div className="flex items-center gap-2 text-sm text-green-800">
-                <Building2 className="h-4 w-4 text-green-600 shrink-0" />
-                <span className="font-medium">{clients.find(c => c.id === jobClientId)?.name}</span>
-                <Badge className="text-xs bg-green-100 text-green-700 border-0 font-normal">matched</Badge>
-              </div>
-              <button
-                onClick={() => setJobClientId("")}
-                className="text-xs text-green-600 hover:text-green-800 underline"
-              >
-                Unlink
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              <Building2 className="h-4 w-4 text-amber-500 shrink-0" />
-              <span>No existing account found — a new client account for <strong>{quote.companyName}</strong> will be created automatically.</span>
-            </div>
-          )}
-
-          {/* ── Service person ── */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Assign Service Person <span className="text-red-500">*</span>
-            </label>
-            <Select value={jobWorkerId} onValueChange={setJobWorkerId}>
-              <SelectTrigger className={!jobWorkerId ? "border-red-300" : ""}>
-                <SelectValue placeholder="Select field worker..." />
-              </SelectTrigger>
-              <SelectContent>
-                {(deptWorkers.length > 0 ? deptWorkers : allWorkers.filter(w => w.isActive !== false)).map(w => (
-                  <SelectItem key={w.id} value={w.id}>{w.name} — {w.role ?? "Field Worker"}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {deptWorkers.length > 0 && (
-              <p className="text-xs text-muted-foreground">Showing {SERVICE_LABELS[quote.serviceType]} workers only.</p>
-            )}
-          </div>
-
-          {/* ── Date + Time ── */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Job Date <span className="text-red-500">*</span></label>
-              <Input
-                type="date"
-                value={jobDate}
-                onChange={e => setJobDate(e.target.value)}
-                className={!jobDate ? "border-red-300" : ""}
-                min={new Date().toISOString().split("T")[0]}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Start Time</label>
-              <Input
-                type="time"
-                value={jobTime}
-                onChange={e => setJobTime(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* ── Notes ── */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Additional Notes <span className="text-xs text-gray-400 font-normal">(optional)</span>
-            </label>
-            <Textarea
-              rows={2}
-              placeholder="Any special instructions for the service team..."
-              value={jobNotes}
-              onChange={e => setJobNotes(e.target.value)}
-              className="resize-none text-sm"
-            />
-          </div>
+        {/* Quote summary */}
+        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 space-y-1">
+          <p><span className="font-medium">Service:</span> {SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</p>
+          <p><span className="font-medium">Contact:</span> {quote.contactPerson} · {quote.phone}</p>
+          {quote.description && <p><span className="font-medium">Requirements:</span> {quote.description}</p>}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setAcceptOpen(false)}>Cancel</Button>
-          <Button
-            className="bg-green-600 hover:bg-green-700 text-white"
-            disabled={!jobWorkerId || !jobDate || convertMutation.isPending}
-            onClick={handleConvertConfirm}
+        <Form {...convertJobForm}>
+          <form
+            onSubmit={convertJobForm.handleSubmit(handleConvertSubmit)}
+            className="space-y-4"
           >
-            <Briefcase className="h-4 w-4 mr-1.5" />
-            {convertMutation.isPending ? "Creating Job..." : "Create Job & Schedule"}
-          </Button>
-        </DialogFooter>
+            <div className="grid grid-cols-2 gap-3">
+
+              {/* Client selector / new client toggle */}
+              <div className="col-span-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Client</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewClientMode(v => !v)}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    {newClientMode ? (
+                      <><ChevronDown className="h-3.5 w-3.5" /> Use existing client</>
+                    ) : (
+                      <><UserPlus className="h-3.5 w-3.5" /> Create new client</>
+                    )}
+                  </button>
+                </div>
+
+                {!newClientMode ? (
+                  <FormField control={convertJobForm.control} name="clientId" render={({ field }) => (
+                    <FormItem>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select existing client" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {clients.filter(c => c.status === "active").map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                ) : (
+                  <div className="border rounded-lg p-3 bg-blue-50 space-y-3">
+                    <p className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                      <UserPlus className="h-3.5 w-3.5" /> New client details (pre-filled from quote)
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField control={newClientForm.control} name="name" render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel className="text-xs">Company / Client Name *</FormLabel>
+                          <FormControl><Input placeholder="e.g. Spar Newton Park" className="h-8 text-sm" {...field} /></FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )} />
+                      <FormField control={newClientForm.control} name="contactPerson" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Contact Person</FormLabel>
+                          <FormControl><Input placeholder="Full name" className="h-8 text-sm" {...field} /></FormControl>
+                        </FormItem>
+                      )} />
+                      <FormField control={newClientForm.control} name="phone" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Phone</FormLabel>
+                          <FormControl><Input placeholder="+27 41 ..." className="h-8 text-sm" {...field} /></FormControl>
+                        </FormItem>
+                      )} />
+                      <FormField control={newClientForm.control} name="email" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Email</FormLabel>
+                          <FormControl><Input type="email" placeholder="email@co.za" className="h-8 text-sm" {...field} /></FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )} />
+                      <FormField control={newClientForm.control} name="industry" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Industry</FormLabel>
+                          <FormControl><Input placeholder="e.g. Retail" className="h-8 text-sm" {...field} /></FormControl>
+                        </FormItem>
+                      )} />
+                      <FormField control={newClientForm.control} name="address" render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel className="text-xs">Address</FormLabel>
+                          <FormControl><Input placeholder="Street address" className="h-8 text-sm" {...field} /></FormControl>
+                        </FormItem>
+                      )} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Department */}
+              <FormField control={convertJobForm.control} name="departmentId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Department</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Salesperson */}
+              <FormField control={convertJobForm.control} name="salespersonId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Salesperson</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select salesperson" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">— Unassigned —</SelectItem>
+                      {salesWorkers.map(w => (
+                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Assign Worker */}
+              <FormField control={convertJobForm.control} name="workerId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assign Worker <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {allWorkers.filter(w => w.isActive !== false).map(w => (
+                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Date */}
+              <FormField control={convertJobForm.control} name="scheduledDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Time */}
+              <FormField control={convertJobForm.control} name="scheduledTime" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Time</FormLabel>
+                  <FormControl><Input type="time" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Address */}
+              <FormField control={convertJobForm.control} name="address" render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Job Address</FormLabel>
+                  <FormControl><Input placeholder="Site address" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Estimated value */}
+              <FormField control={convertJobForm.control} name="estimatedValue" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estimated Value (R)</FormLabel>
+                  <FormControl><Input type="number" placeholder="0.00" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Notes */}
+              <FormField control={convertJobForm.control} name="notes" render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Job Notes</FormLabel>
+                  <FormControl><Textarea rows={2} {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setAcceptOpen(false)}>Cancel</Button>
+              <Button
+                type="submit"
+                disabled={convertMutation.isPending}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Briefcase className="h-4 w-4 mr-1" />
+                {convertMutation.isPending ? "Creating Job..." : "Create Job & Mark Won"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
     </>
@@ -522,22 +662,20 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
 
 export default function QuotesPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter]   = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
 
-  const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({
-    queryKey: ["/api/quote-submissions"],
-  });
-  const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+  const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
+  const { data: workers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
+  const { data: clients = [] }     = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
-  // Only show entries that have reached the quoting stage
   const QUOTE_STATUSES = ["quoted", "converted", "declined"];
   const filtered = quotes.filter(q => {
     if (!QUOTE_STATUSES.includes(q.status)) return false;
-    const matchStatus = statusFilter === "all" || q.status === statusFilter;
+    const matchStatus  = statusFilter  === "all" || q.status      === statusFilter;
     const matchService = serviceFilter === "all" || q.serviceType === serviceFilter;
     return matchStatus && matchService;
   });
@@ -621,6 +759,7 @@ export default function QuotesPage() {
                       salesWorkers={salesWorkers}
                       allWorkers={workers}
                       clients={clients}
+                      departments={departments}
                     />
                   ))}
               </div>
