@@ -199,21 +199,20 @@ export default function Dashboard() {
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
             {/* Company Logo Header — Logo | Job Flow | Role Panel */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-6">
-              {/* LEFT: logo */}
-              <div className="shrink-0">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              {/* TOP: logo + title */}
+              <div className="flex items-center gap-4 mb-4">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
+                <div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
+                </div>
               </div>
 
-              {/* MIDDLE: branding */}
-              <div className="flex-1 flex flex-col items-center justify-center text-center">
-                <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
-                <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
-              </div>
+              {/* BOTTOM: role-specific performance panels */}
+              <div className="border-t border-gray-100 pt-3">
 
-              {/* RIGHT: role-specific performance panel */}
-              <div className={`shrink-0 min-w-[260px] ${(dashboardRole === "manager" || dashboardRole === "admin") ? "flex-1" : "max-w-[420px]"}`}>
-                {/* SALES — per-rep quote / won / lost */}
+                {/* SALES */}
                 {dashboardRole === "sales" && (
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales Performance</p>
@@ -239,17 +238,15 @@ export default function Dashboard() {
                           </div>
                         );
                       })}
-                      {salesReps.length === 0 && (
-                        <p className="text-xs text-gray-400 italic">No sales reps yet.</p>
-                      )}
+                      {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
                     </div>
                   </div>
                 )}
 
-                {/* MANAGER / ADMIN — sales reps + full business overview KPIs */}
+                {/* MANAGER / ADMIN */}
                 {(dashboardRole === "manager" || dashboardRole === "admin") && (
                   <div className="space-y-3">
-                    {/* Row 1: Sales reps */}
+                    {/* Sales reps row */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Reps</p>
@@ -274,8 +271,7 @@ export default function Dashboard() {
                         {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
                       </div>
                     </div>
-
-                    {/* Row 2: Business KPIs */}
+                    {/* Business KPIs row */}
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Business Overview</p>
                       <div className="flex gap-2 flex-wrap">
@@ -317,7 +313,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* ACCOUNTS — debtors, sales this month, % collected */}
+                {/* ACCOUNTS */}
                 {dashboardRole === "accounts" && (
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Accounts Overview</p>
@@ -341,7 +337,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* SERVICE — jobs completed + invoices sent this month */}
+                {/* SERVICE */}
                 {dashboardRole === "service" && (
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">This Month</p>
@@ -359,6 +355,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
+
               </div>
             </div>
 
