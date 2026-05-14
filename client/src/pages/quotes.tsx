@@ -21,7 +21,7 @@ import type { QuoteSubmission, Worker } from "@shared/schema";
 // "new" and "contacted" are leads still in the pipeline — they live on the Leads page.
 const STATUS_OPTIONS = [
   { value: "quoted",    label: "Quoted",    class: "bg-purple-100 text-purple-700" },
-  { value: "converted", label: "Won",       class: "bg-green-100 text-green-700" },
+  { value: "converted", label: "Accepted",  class: "bg-green-100 text-green-700" },
   { value: "declined",  label: "Declined",  class: "bg-red-100 text-red-600" },
 ];
 
