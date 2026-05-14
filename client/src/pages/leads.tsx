@@ -39,7 +39,7 @@ const PIPELINE: { status: LeadStatus; label: string; color: string; dotColor: st
   { status: "new",       label: "New Leads",  color: "bg-blue-50 border-blue-200",   dotColor: "bg-blue-500"   },
   { status: "contacted", label: "Contacted",  color: "bg-amber-50 border-amber-200", dotColor: "bg-amber-400"  },
   { status: "quoted",    label: "Quoted",     color: "bg-purple-50 border-purple-200", dotColor: "bg-purple-500" },
-  { status: "converted", label: "Won",        color: "bg-green-50 border-green-200", dotColor: "bg-green-500"  },
+  { status: "converted", label: "Accepted",   color: "bg-green-50 border-green-200", dotColor: "bg-green-500"  },
   { status: "declined",  label: "Lost",       color: "bg-gray-50 border-gray-200",   dotColor: "bg-gray-400"   },
 ];
 
@@ -639,7 +639,7 @@ export default function Leads() {
                   <Button type="button" variant="outline" onClick={() => setConvertLead(null)}>Cancel</Button>
                   <Button type="submit" disabled={convertToJob.isPending} className="bg-green-600 hover:bg-green-700">
                     <Briefcase className="h-4 w-4 mr-1" />
-                    {convertToJob.isPending ? "Creating Job..." : "Create Job & Mark Won"}
+                    {convertToJob.isPending ? "Creating Job..." : "Create Job & Mark Accepted"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -790,7 +790,7 @@ function LeadCard({
         )}
         {lead.status === "converted" && (
           <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> Won — job created
+            <CheckCircle2 className="h-3 w-3" /> Accepted — job created
           </span>
         )}
         {lead.status === "declined" && (
