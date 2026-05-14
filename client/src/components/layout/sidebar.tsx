@@ -77,7 +77,7 @@ const ALL_CATEGORIES = [
 ];
 
 const quickNavigation = [
-  { name: "Terminators Job Flow", href: "/", icon: BarChart3 },
+  { name: "Dashboard", href: "/", icon: BarChart3 },
 ];
 
 export default function Sidebar() {

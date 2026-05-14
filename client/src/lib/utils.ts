@@ -23,6 +23,7 @@ export function formatDate(date: Date | string, options?: Intl.DateTimeFormatOpt
 
 export function formatDateTime(date: Date | string): string {
   return formatDate(date, {
+    weekday: 'long',
     year: 'numeric',
     month: 'short',
     day: 'numeric',
