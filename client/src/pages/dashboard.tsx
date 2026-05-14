@@ -207,7 +207,7 @@ export default function Dashboard() {
 
               {/* MIDDLE: branding */}
               <div className="flex-1 flex flex-col items-center justify-center text-center">
-                <p className="text-lg font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
+                <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
                 <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
               </div>
 
