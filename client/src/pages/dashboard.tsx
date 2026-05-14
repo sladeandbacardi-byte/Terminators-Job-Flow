@@ -22,6 +22,7 @@ import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors } from "@/lib/dashboardRole";
 import { useToast } from "@/hooks/use-toast";
+import type { Worker, QuoteSubmission } from "@shared/schema";
 
 interface DashboardMetrics {
   activeJobs: number;
@@ -63,7 +64,22 @@ export default function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today');
 
   const dashboardRole = getDashboardRole(user ?? {});
-  
+
+  const { data: salesWorkers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
+  const { data: allQuotes = [] } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
+
+  // Sales rep totals — only div-5 (Sales dept) workers
+  const salesReps = salesWorkers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
+  const salesRepStats = salesReps.map(rep => {
+    const repQuotes = allQuotes.filter(q => q.assignedTo === rep.id);
+    const totalQuoted = repQuotes.reduce((s, q) => s + (parseFloat(q.quoteAmount ?? "0") || 0), 0);
+    const won = repQuotes.filter(q => q.status === "converted").length;
+    const wonValue = repQuotes
+      .filter(q => q.status === "converted")
+      .reduce((s, q) => s + (parseFloat(q.quoteAmount ?? "0") || 0), 0);
+    return { rep, total: repQuotes.length, totalQuoted, won, wonValue };
+  }).filter(s => s.total > 0);
+
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['/api/dashboard/metrics'],
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -122,19 +138,45 @@ export default function Dashboard() {
       )}
       
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Terminators Job Flow" 
+        <Header
+          title=""
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
+          badge={`${dashboardRoleLabels[dashboardRole]} View`}
+          badgeColor={dashboardRoleColors[dashboardRole]}
+          tagline="Let's see how it goes"
         />
-        
+
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
             {/* Company Logo Header */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-6">
               <TerminatorsLogo size="lg" data-testid="company-logo" />
-              <div className={`px-3 py-1.5 rounded-full text-white text-sm font-medium ${dashboardRoleColors[dashboardRole]}`}>
-                {dashboardRoleLabels[dashboardRole]} View
-              </div>
+              {/* Sales rep quote / sales totals */}
+              {salesRepStats.length > 0 && (
+                <div className="flex-1 overflow-x-auto">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales Rep Performance</p>
+                  <div className="flex gap-3 flex-wrap">
+                    {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue }) => {
+                      const firstName = rep.name.split(" ")[0];
+                      return (
+                        <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[130px]">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-xs text-gray-500">
+                              <span className="font-medium text-purple-600">{total}</span> quote{total !== 1 ? "s" : ""}
+                              {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              <span className="font-medium text-green-600">{won}</span> won
+                              {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Suspended services alert — visible to all roles */}

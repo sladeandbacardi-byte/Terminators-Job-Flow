@@ -15,9 +15,12 @@ import { useLocation } from "wouter";
 interface HeaderProps {
   title: string;
   onMobileMenuToggle?: () => void;
+  badge?: string;
+  badgeColor?: string;
+  tagline?: string;
 }
 
-export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
+export default function Header({ title, onMobileMenuToggle, badge, badgeColor, tagline }: HeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const { user, logout, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -42,21 +45,32 @@ export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4" data-testid="header">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button 
+          <button
             className="lg:hidden p-2 text-gray-600 hover:text-gray-900"
             onClick={onMobileMenuToggle}
             data-testid="mobile-menu-toggle"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900" data-testid="page-title">{title}</h2>
+          {badge ? (
+            <div className="flex items-center gap-3">
+              <span className={`px-3 py-1.5 rounded-full text-white text-sm font-semibold ${badgeColor ?? "bg-gray-600"}`}>
+                {badge}
+              </span>
+              {tagline && (
+                <span className="text-sm text-gray-500 italic hidden sm:block">{tagline}</span>
+              )}
+            </div>
+          ) : (
+            <h2 className="text-2xl font-bold text-gray-900" data-testid="page-title">{title}</h2>
+          )}
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600" data-testid="current-time">
             <span>{formatDateTime(currentTime)} SAST</span>
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors cursor-pointer" data-testid="user-menu-trigger">
