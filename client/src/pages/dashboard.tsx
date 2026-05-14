@@ -260,11 +260,10 @@ export default function Dashboard() {
                           return (
                             <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
                               <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                <span className="text-purple-600 font-medium">{total}</span> ·{" "}
-                                <span className="text-green-600 font-medium">{won}W</span> ·{" "}
-                                <span className="text-red-500 font-medium">{lost}L</span>
-                              </p>
+                              <div className="mt-0.5 space-y-0.5">
+                                <p className="text-xs text-gray-400"><span className="text-purple-600 font-medium">{total}</span> quoted</p>
+                                <p className="text-xs text-gray-400"><span className="text-green-600 font-medium">{won}</span> won · <span className="text-red-500 font-medium">{lost}</span> lost</p>
+                              </div>
                             </div>
                           );
                         })}
