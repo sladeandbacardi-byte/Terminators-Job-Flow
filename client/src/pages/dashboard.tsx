@@ -243,11 +243,12 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* MANAGER / ADMIN */}
+                {/* MANAGER / ADMIN — Sales | Service | Finance on one line */}
                 {(dashboardRole === "manager" || dashboardRole === "admin") && (
-                  <div className="space-y-3">
-                    {/* Sales reps row */}
-                    <div>
+                  <div className="flex gap-6 flex-wrap">
+
+                    {/* Sales */}
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1.5">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales</p>
                         <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
@@ -270,9 +271,13 @@ export default function Dashboard() {
                         {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
                       </div>
                     </div>
-                    {/* Business KPIs row */}
-                    <div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Business Overview</p>
+
+                    {/* Divider */}
+                    <div className="w-px bg-gray-200 self-stretch" />
+
+                    {/* Service */}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Service</p>
                       <div className="flex gap-2 flex-wrap">
                         <div className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
                           <p className="text-xs text-gray-500">Active Jobs</p>
@@ -282,6 +287,26 @@ export default function Dashboard() {
                           <p className="text-xs text-gray-500">Workers</p>
                           <p className="text-base font-bold text-teal-600">{metrics?.activeWorkers ?? "—"}</p>
                         </div>
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Jobs Done</p>
+                          <p className="text-base font-bold text-purple-600">{jobsCompletedThisMonth}</p>
+                          <p className="text-xs text-gray-400">this month</p>
+                        </div>
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Invoiced</p>
+                          <p className="text-base font-bold text-indigo-600">{invoicesSentThisMonth}</p>
+                          <p className="text-xs text-gray-400">this month</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-px bg-gray-200 self-stretch" />
+
+                    {/* Finance */}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Finance</p>
+                      <div className="flex gap-2 flex-wrap">
                         <div className="bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
                           <p className="text-xs text-gray-500">Revenue</p>
                           <p className="text-base font-bold text-green-600">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
@@ -297,18 +322,9 @@ export default function Dashboard() {
                           <p className="text-base font-bold text-amber-600">{metrics?.expiringContracts ?? "—"}</p>
                           <p className="text-xs text-gray-400">contracts</p>
                         </div>
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Jobs Done</p>
-                          <p className="text-base font-bold text-purple-600">{jobsCompletedThisMonth}</p>
-                          <p className="text-xs text-gray-400">this month</p>
-                        </div>
-                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Invoiced</p>
-                          <p className="text-base font-bold text-indigo-600">{invoicesSentThisMonth}</p>
-                          <p className="text-xs text-gray-400">this month</p>
-                        </div>
                       </div>
                     </div>
+
                   </div>
                 )}
 
