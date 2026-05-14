@@ -102,11 +102,26 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
 
   const convertMutation = useMutation({
     mutationFn: async () => {
-      // Create the job
+      // Resolve clientId — use matched account or auto-create from quote data
+      let resolvedClientId = jobClientId;
+      if (!resolvedClientId) {
+        const newClientRes = await apiRequest("POST", "/api/clients", {
+          name: quote.companyName,
+          contactPerson: quote.contactPerson || undefined,
+          email: quote.email || undefined,
+          phone: quote.phone || undefined,
+          address: quote.address || undefined,
+          status: "active",
+        });
+        if (!newClientRes.ok) throw new Error("Failed to create client account");
+        const newClient = await newClientRes.json();
+        resolvedClientId = newClient.id;
+      }
+      // Create the job using the resolved clientId
       const jobRes = await apiRequest("POST", "/api/jobs", {
         title: `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
         description: quote.description,
-        clientId: jobClientId,
+        clientId: resolvedClientId,
         workerId: jobWorkerId || undefined,
         departmentId: deptId || "div-1",
         serviceType: SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
@@ -116,6 +131,8 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
         location: quote.address || undefined,
         notes: jobNotes || undefined,
         price: quote.quoteAmount || undefined,
+        email: quote.email || undefined,
+        salesperson: quote.assignedTo || undefined,
       });
       if (!jobRes.ok) throw new Error("Failed to create job");
       // Mark quote as converted
@@ -405,43 +422,27 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
             </div>
           </div>
 
-          {/* ── Client account (auto-matched or manual pick) ── */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Link to Client Account <span className="text-red-500">*</span>
-            </label>
-            {jobClientId && clients.find(c => c.id === jobClientId) ? (
-              <div className="flex items-center justify-between rounded-md border border-green-300 bg-green-50 px-3 py-2">
-                <div className="flex items-center gap-2 text-sm text-green-800">
-                  <Building2 className="h-4 w-4 text-green-600 shrink-0" />
-                  <span className="font-medium">{clients.find(c => c.id === jobClientId)?.name}</span>
-                  <span className="text-xs text-green-500">(auto-matched)</span>
-                </div>
-                <button
-                  onClick={() => setJobClientId("")}
-                  className="text-xs text-green-600 hover:text-green-800 underline"
-                >
-                  Change
-                </button>
+          {/* ── Client account status ── */}
+          {jobClientId && clients.find(c => c.id === jobClientId) ? (
+            <div className="flex items-center justify-between rounded-md border border-green-300 bg-green-50 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm text-green-800">
+                <Building2 className="h-4 w-4 text-green-600 shrink-0" />
+                <span className="font-medium">{clients.find(c => c.id === jobClientId)?.name}</span>
+                <Badge className="text-xs bg-green-100 text-green-700 border-0 font-normal">matched</Badge>
               </div>
-            ) : (
-              <>
-                <Select value={jobClientId} onValueChange={setJobClientId}>
-                  <SelectTrigger className={!jobClientId ? "border-amber-400" : ""}>
-                    <SelectValue placeholder="Select the matching client account..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.filter(c => c.status !== "suspended").map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-amber-600">
-                  No exact match found for "{quote.companyName}". Select the right account or create one first.
-                </p>
-              </>
-            )}
-          </div>
+              <button
+                onClick={() => setJobClientId("")}
+                className="text-xs text-green-600 hover:text-green-800 underline"
+              >
+                Unlink
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <Building2 className="h-4 w-4 text-amber-500 shrink-0" />
+              <span>No existing account found — a new client account for <strong>{quote.companyName}</strong> will be created automatically.</span>
+            </div>
+          )}
 
           {/* ── Service person ── */}
           <div className="space-y-1.5">
@@ -504,7 +505,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
           <Button variant="outline" onClick={() => setAcceptOpen(false)}>Cancel</Button>
           <Button
             className="bg-green-600 hover:bg-green-700 text-white"
-            disabled={!jobClientId || !jobWorkerId || !jobDate || convertMutation.isPending}
+            disabled={!jobWorkerId || !jobDate || convertMutation.isPending}
             onClick={handleConvertConfirm}
           >
             <Briefcase className="h-4 w-4 mr-1.5" />
