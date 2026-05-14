@@ -110,6 +110,7 @@ export default function Leads() {
   // ── mutations ──
   const createLead = useMutation({
     mutationFn: (data: DocumentFormValues) => apiRequest("POST", "/api/quote-submissions", {
+      status: "new",
       companyName: data.companyName,
       contactPerson: data.contactPerson,
       email: data.email,

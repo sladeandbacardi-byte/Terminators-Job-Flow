@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import type { QuoteSubmission, Worker } from "@shared/schema";
 
+// Quotes page only shows entries that have reached the "quoted" stage or beyond.
+// "new" and "contacted" are leads still in the pipeline — they live on the Leads page.
 const STATUS_OPTIONS = [
-  { value: "new",       label: "New",       class: "bg-blue-100 text-blue-700" },
-  { value: "contacted", label: "Contacted", class: "bg-yellow-100 text-yellow-700" },
   { value: "quoted",    label: "Quoted",    class: "bg-purple-100 text-purple-700" },
-  { value: "converted", label: "Converted", class: "bg-green-100 text-green-700" },
+  { value: "converted", label: "Won",       class: "bg-green-100 text-green-700" },
   { value: "declined",  label: "Declined",  class: "bg-red-100 text-red-600" },
 ];
 
@@ -232,7 +232,10 @@ export default function QuotesPage() {
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
+  // Only show entries that have reached the quoting stage — "new" and "contacted" stay on the Leads page
+  const QUOTE_STATUSES = ["quoted", "converted", "declined"];
   const filtered = quotes.filter(q => {
+    if (!QUOTE_STATUSES.includes(q.status)) return false;
     const matchStatus = statusFilter === "all" || q.status === statusFilter;
     const matchService = serviceFilter === "all" || q.serviceType === serviceFilter;
     return matchStatus && matchService;
