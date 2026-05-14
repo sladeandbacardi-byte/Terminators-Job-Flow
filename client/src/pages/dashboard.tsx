@@ -212,18 +212,11 @@ export default function Dashboard() {
               </div>
 
               {/* RIGHT: role-specific performance panel */}
-              <div className="shrink-0 min-w-[260px] max-w-[420px]">
+              <div className={`shrink-0 min-w-[260px] ${(dashboardRole === "manager" || dashboardRole === "admin") ? "flex-1" : "max-w-[420px]"}`}>
                 {/* SALES — per-rep quote / won / lost */}
-                {(dashboardRole === "sales" || dashboardRole === "manager" || dashboardRole === "admin") && (
+                {dashboardRole === "sales" && (
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Performance</p>
-                      {(dashboardRole === "manager" || dashboardRole === "admin") && (
-                        <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
-                          <UserPlus className="h-3 w-3" /> Add Rep
-                        </Button>
-                      )}
-                    </div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales Performance</p>
                     <div className="flex gap-3 flex-wrap">
                       {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
                         const firstName = rep.name.split(" ")[0];
@@ -249,6 +242,77 @@ export default function Dashboard() {
                       {salesReps.length === 0 && (
                         <p className="text-xs text-gray-400 italic">No sales reps yet.</p>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* MANAGER / ADMIN — sales reps + full business overview KPIs */}
+                {(dashboardRole === "manager" || dashboardRole === "admin") && (
+                  <div className="space-y-3">
+                    {/* Row 1: Sales reps */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Reps</p>
+                        <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
+                          <UserPlus className="h-3 w-3" /> Add Rep
+                        </Button>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {salesRepStats.map(({ rep, total, won, lost }) => {
+                          const firstName = rep.name.split(" ")[0];
+                          return (
+                            <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
+                              <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                <span className="text-purple-600 font-medium">{total}</span> ·{" "}
+                                <span className="text-green-600 font-medium">{won}W</span> ·{" "}
+                                <span className="text-red-500 font-medium">{lost}L</span>
+                              </p>
+                            </div>
+                          );
+                        })}
+                        {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
+                      </div>
+                    </div>
+
+                    {/* Row 2: Business KPIs */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Business Overview</p>
+                      <div className="flex gap-2 flex-wrap">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Active Jobs</p>
+                          <p className="text-base font-bold text-blue-600">{metrics?.activeJobs ?? "—"}</p>
+                        </div>
+                        <div className="bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Workers</p>
+                          <p className="text-base font-bold text-teal-600">{metrics?.activeWorkers ?? "—"}</p>
+                        </div>
+                        <div className="bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
+                          <p className="text-xs text-gray-500">Revenue</p>
+                          <p className="text-base font-bold text-green-600">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          <p className="text-xs text-gray-400">this month</p>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
+                          <p className="text-xs text-gray-500">Debtors</p>
+                          <p className="text-base font-bold text-red-600">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          <p className="text-xs text-gray-400">outstanding</p>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Expiring</p>
+                          <p className="text-base font-bold text-amber-600">{metrics?.expiringContracts ?? "—"}</p>
+                          <p className="text-xs text-gray-400">contracts</p>
+                        </div>
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Jobs Done</p>
+                          <p className="text-base font-bold text-purple-600">{jobsCompletedThisMonth}</p>
+                          <p className="text-xs text-gray-400">this month</p>
+                        </div>
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
+                          <p className="text-xs text-gray-500">Invoiced</p>
+                          <p className="text-base font-bold text-indigo-600">{invoicesSentThisMonth}</p>
+                          <p className="text-xs text-gray-400">this month</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
