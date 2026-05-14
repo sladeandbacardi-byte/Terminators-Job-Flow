@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
@@ -22,6 +22,12 @@ import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors } from "@/lib/dashboardRole";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { UserPlus } from "lucide-react";
 import type { Worker, QuoteSubmission } from "@shared/schema";
 
 interface DashboardMetrics {
@@ -58,10 +64,12 @@ interface RevenueChartData {
 }
 
 export default function Dashboard() {
-  const { toast, } = useToast();
+  const { toast } = useToast();
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today');
+  const [showAddRep, setShowAddRep] = useState(false);
+  const [newRep, setNewRep] = useState({ name: "", email: "", phone: "", role: "Sales Consultant" });
 
   const dashboardRole = getDashboardRole(user ?? {});
 
@@ -77,7 +85,23 @@ export default function Dashboard() {
     const wonValue = repQuotes
       .filter(q => q.status === "converted")
       .reduce((s, q) => s + (parseFloat(q.quoteAmount ?? "0") || 0), 0);
-    return { rep, total: repQuotes.length, totalQuoted, won, wonValue };
+    const lost = repQuotes.filter(q => q.status === "declined").length;
+    return { rep, total: repQuotes.length, totalQuoted, won, wonValue, lost };
+  });
+
+  const addSalesRep = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/workers", {
+      ...newRep,
+      departmentId: "div-5",
+      isActive: true,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workers"] });
+      setShowAddRep(false);
+      setNewRep({ name: "", email: "", phone: "", role: "Sales Consultant" });
+      toast({ title: "Sales rep added", description: `${newRep.name} has been added to the sales team.` });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to add sales rep.", variant: "destructive" }),
   });
 
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
@@ -152,31 +176,40 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-6">
               <TerminatorsLogo size="lg" data-testid="company-logo" />
               {/* Sales rep quote / sales totals */}
-              {salesReps.length > 0 && (
-                <div className="flex-1 overflow-x-auto">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales Rep Performance</p>
-                  <div className="flex gap-3 flex-wrap">
-                    {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue }) => {
-                      const firstName = rep.name.split(" ")[0];
-                      return (
-                        <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[130px]">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
-                          <div className="mt-1 space-y-0.5">
-                            <p className="text-xs text-gray-500">
-                              <span className="font-medium text-purple-600">{total}</span> quote{total !== 1 ? "s" : ""}
-                              {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              <span className="font-medium text-green-600">{won}</span> won
-                              {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              <div className="flex-1 overflow-x-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Rep Performance</p>
+                  <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
+                    <UserPlus className="h-3 w-3" /> Add Rep
+                  </Button>
                 </div>
-              )}
+                <div className="flex gap-3 flex-wrap">
+                  {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
+                    const firstName = rep.name.split(" ")[0];
+                    return (
+                      <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[130px]">
+                        <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
+                        <div className="mt-1 space-y-0.5">
+                          <p className="text-xs text-gray-500">
+                            <span className="font-medium text-purple-600">{total}</span> quote{total !== 1 ? "s" : ""}
+                            {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            <span className="font-medium text-green-600">{won}</span> won
+                            {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            <span className="font-medium text-red-500">{lost}</span> lost
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {salesReps.length === 0 && (
+                    <p className="text-xs text-gray-400 italic">No sales reps yet — add one to get started.</p>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Suspended services alert — visible to all roles */}
@@ -379,6 +412,63 @@ export default function Dashboard() {
       </div>
       
       <MobileNavigation />
+
+      {/* Add Sales Rep Dialog */}
+      <Dialog open={showAddRep} onOpenChange={setShowAddRep}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Sales Rep</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="rep-name">Full Name</Label>
+              <Input
+                id="rep-name"
+                placeholder="e.g. Jane Smith"
+                value={newRep.name}
+                onChange={e => setNewRep(r => ({ ...r, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rep-email">Email</Label>
+              <Input
+                id="rep-email"
+                type="email"
+                placeholder="jane@company.com"
+                value={newRep.email}
+                onChange={e => setNewRep(r => ({ ...r, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rep-phone">Phone</Label>
+              <Input
+                id="rep-phone"
+                placeholder="0821234567"
+                value={newRep.phone}
+                onChange={e => setNewRep(r => ({ ...r, phone: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rep-role">Role / Title</Label>
+              <Input
+                id="rep-role"
+                placeholder="Sales Consultant"
+                value={newRep.role}
+                onChange={e => setNewRep(r => ({ ...r, role: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowAddRep(false)}>Cancel</Button>
+            <Button
+              disabled={!newRep.name.trim() || addSalesRep.isPending}
+              onClick={() => addSalesRep.mutate()}
+            >
+              {addSalesRep.isPending ? "Adding…" : "Add Rep"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
