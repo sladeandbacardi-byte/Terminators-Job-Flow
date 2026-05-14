@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase, CheckCircle2,
   XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle, UserPlus, ChevronDown,
-  Send,
+  Send, Search, X,
 } from "lucide-react";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
@@ -101,6 +101,11 @@ export default function Leads() {
   const [notesText, setNotesText] = useState("");
   const [newClientMode, setNewClientMode] = useState(false);
   const [quotePreview, setQuotePreview] = useState(false);
+
+  // Filters
+  const [search, setSearch]             = useState("");
+  const [serviceFilter, setServiceFilter] = useState("all");
+  const [salespersonFilter, setSalespersonFilter] = useState("all");
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
@@ -258,10 +263,27 @@ export default function Leads() {
     });
   };
 
+  // Only show leads (new/contacted) — quoted+ live on Quotes page
+  const LEAD_STATUSES = ["new", "contacted", "quoted", "converted", "declined"];
+
+  const filteredLeads = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return leads.filter(l => {
+      if (!LEAD_STATUSES.includes(l.status)) return false;
+      if (q && !l.companyName.toLowerCase().includes(q) && !l.contactPerson.toLowerCase().includes(q)) return false;
+      if (serviceFilter !== "all" && l.serviceType !== serviceFilter) return false;
+      if (salespersonFilter !== "all" && l.assignedTo !== salespersonFilter) return false;
+      return true;
+    });
+  }, [leads, search, serviceFilter, salespersonFilter]);
+
   const totals = PIPELINE.reduce((acc, col) => {
-    acc[col.status] = leads.filter(l => l.status === col.status).length;
+    acc[col.status] = filteredLeads.filter(l => l.status === col.status).length;
     return acc;
   }, {} as Record<string, number>);
+
+  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all";
+  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); };
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -303,13 +325,73 @@ export default function Leads() {
         ))}
       </div>
 
+      {/* ── Filters ── */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search company or contact..."
+            className="pl-8 h-8 text-sm"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Service type */}
+        <Select value={serviceFilter} onValueChange={setServiceFilter}>
+          <SelectTrigger className="h-8 text-sm w-40">
+            <SelectValue placeholder="All Services" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Services</SelectItem>
+            {Object.entries(SERVICE_LABELS).map(([v, l]) => (
+              <SelectItem key={v} value={v}>{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Salesperson */}
+        <Select value={salespersonFilter} onValueChange={setSalespersonFilter}>
+          <SelectTrigger className="h-8 text-sm w-44">
+            <SelectValue placeholder="All Salespersons" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Salespersons</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {workers.filter(w => w.departmentId === "div-5" && w.isActive !== false).map(w => (
+              <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Clear filters */}
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded border border-red-200 hover:border-red-300 bg-red-50"
+          >
+            <X className="h-3 w-3" /> Clear filters
+          </button>
+        )}
+
+        <span className="text-xs text-gray-400 ml-auto">
+          {filteredLeads.length} lead{filteredLeads.length !== 1 ? "s" : ""}{hasFilters ? " (filtered)" : ""}
+        </span>
+      </div>
+
       {/* Kanban columns */}
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">Loading pipeline...</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-start">
           {PIPELINE.map(col => {
-            const colLeads = leads.filter(l => l.status === col.status)
+            const colLeads = filteredLeads.filter(l => l.status === col.status)
               .sort((a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime());
             return (
               <div key={col.status} className={`rounded-xl border ${col.color} p-3 min-h-[200px]`}>
