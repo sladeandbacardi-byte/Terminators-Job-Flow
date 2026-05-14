@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -46,6 +47,8 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(quote.notes ?? "");
   const [editingNotes, setEditingNotes] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -59,7 +62,21 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
   });
 
-  const handleStatusChange = (status: string) => updateMutation.mutate({ status });
+  const handleStatusChange = (status: string) => {
+    if (status === "declined") {
+      setDeclineReason("");
+      setDeclineOpen(true);
+    } else {
+      updateMutation.mutate({ status });
+    }
+  };
+
+  const handleDeclineConfirm = () => {
+    if (!declineReason.trim()) return;
+    updateMutation.mutate({ status: "declined", notes: declineReason.trim() });
+    setDeclineOpen(false);
+  };
+
   const handleSaveNotes = () => {
     updateMutation.mutate({ notes });
     setEditingNotes(false);
@@ -68,6 +85,7 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
   const cfg = statusConfig(quote.status);
 
   return (
+    <>
     <Card className="border hover:shadow-md transition-shadow">
       <CardHeader className="pb-2 pt-4 px-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -217,6 +235,42 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
         )}
       </CardContent>
     </Card>
+
+    {/* ── Decline reason dialog ── */}
+    <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Reason for Declining</DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Please enter why this quote was declined. This will be saved as a note.
+          </p>
+          <Textarea
+            autoFocus
+            rows={3}
+            placeholder="e.g. Price too high, went with competitor..."
+            value={declineReason}
+            onChange={e => setDeclineReason(e.target.value)}
+            className="resize-none"
+          />
+          {declineReason.trim() === "" && (
+            <p className="text-xs text-red-500">A reason is required before declining.</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDeclineOpen(false)}>Cancel</Button>
+          <Button
+            variant="destructive"
+            disabled={!declineReason.trim() || updateMutation.isPending}
+            onClick={handleDeclineConfirm}
+          >
+            {updateMutation.isPending ? "Saving..." : "Confirm Decline"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
 
