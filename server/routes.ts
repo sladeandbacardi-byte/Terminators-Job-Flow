@@ -1864,6 +1864,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send a quote to a lead via email
+  app.post("/api/quote-submissions/:id/send-quote", async (req, res) => {
+    try {
+      const lead = await storage.getQuoteSubmission(req.params.id);
+      if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+      const { amount, validityDays = 30, message } = req.body;
+      if (!amount) return res.status(400).json({ error: "Quote amount is required" });
+
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + Number(validityDays));
+      const validUntilStr = validUntil.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+
+      const SERVICE_LABELS: Record<string, string> = {
+        pest_control: "Pest Control",
+        sanitary_bins: "Sanitary Bins / Hygiene Services",
+        washroom: "Washroom Services",
+        deep_cleaning: "Deep Cleaning Services",
+      };
+
+      const serviceLabel = SERVICE_LABELS[lead.serviceType] ?? lead.serviceType;
+      const amountNum = parseFloat(amount);
+      const vatAmt = amountNum * 0.15;
+      const totalAmt = amountNum + vatAmt;
+
+      const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>
+  body { font-family: Arial, sans-serif; color: #1a1a1a; margin: 0; padding: 0; background: #f4f4f4; }
+  .wrap { max-width: 620px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+  .header { background: #16a34a; padding: 28px 32px; }
+  .header h1 { color: #fff; margin: 0; font-size: 22px; }
+  .header p { color: rgba(255,255,255,0.85); margin: 4px 0 0; font-size: 14px; }
+  .body { padding: 28px 32px; }
+  .section { margin-bottom: 20px; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 4px; }
+  .value { font-size: 15px; color: #111; }
+  table.pricing { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.pricing td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+  table.pricing .total-row td { font-weight: bold; font-size: 16px; background: #f0fdf4; color: #15803d; }
+  .validity { background: #fefce8; border: 1px solid #fde047; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #713f12; margin-top: 16px; }
+  .message-box { background: #f8fafc; border-left: 3px solid #16a34a; padding: 14px 16px; font-size: 14px; color: #374151; margin-bottom: 20px; border-radius: 0 6px 6px 0; }
+  .footer { background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 18px 32px; font-size: 12px; color: #6b7280; }
+</style></head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>The Terminators — Service Quotation</h1>
+    <p>Quote prepared for ${lead.companyName}</p>
+  </div>
+  <div class="body">
+    <p style="font-size:15px;color:#374151">Dear ${lead.contactPerson},</p>
+    <p style="font-size:14px;color:#4b5563">Thank you for your interest in our services. Please find your quotation below.</p>
+
+    ${message ? `<div class="message-box">${message}</div>` : ""}
+
+    <div class="section">
+      <div class="label">Service Required</div>
+      <div class="value" style="font-weight:600">${serviceLabel}</div>
+    </div>
+
+    ${lead.description ? `<div class="section">
+      <div class="label">Scope of Work</div>
+      <div class="value" style="font-size:14px;color:#4b5563">${lead.description}</div>
+    </div>` : ""}
+
+    ${lead.address ? `<div class="section">
+      <div class="label">Service Address</div>
+      <div class="value">${lead.address}</div>
+    </div>` : ""}
+
+    <div class="section">
+      <div class="label">Pricing</div>
+      <table class="pricing">
+        <tr><td>${serviceLabel}</td><td style="text-align:right">R ${amountNum.toFixed(2)}</td></tr>
+        <tr><td style="color:#6b7280">VAT (15%)</td><td style="text-align:right;color:#6b7280">R ${vatAmt.toFixed(2)}</td></tr>
+        <tr class="total-row"><td>Total (incl. VAT)</td><td style="text-align:right">R ${totalAmt.toFixed(2)}</td></tr>
+      </table>
+    </div>
+
+    <div class="validity">⏳ This quotation is valid until <strong>${validUntilStr}</strong>. To accept this quote, please reply to this email or contact us directly.</div>
+  </div>
+  <div class="footer">
+    The Terminators Pest Control &amp; Hygiene Services<br>
+    Tel: 041 123 4567 | info@theterminators.co.za<br>
+    <em>All prices are subject to site inspection. VAT reg. no. included on invoice.</em>
+  </div>
+</div>
+</body></html>`;
+
+      await sendEmail({
+        to: lead.email,
+        from: "quotes@theterminators.co.za",
+        subject: `Quotation for ${serviceLabel} — ${lead.companyName}`,
+        html,
+        text: `Dear ${lead.contactPerson},\n\nPlease find your quotation for ${serviceLabel}.\n\nAmount (excl. VAT): R ${amountNum.toFixed(2)}\nVAT (15%): R ${vatAmt.toFixed(2)}\nTotal (incl. VAT): R ${totalAmt.toFixed(2)}\n\nValid until: ${validUntilStr}\n\n${message ?? ""}\n\nThank you,\nThe Terminators`,
+      });
+
+      const updated = await storage.updateQuoteSubmission(lead.id, {
+        status: "quoted",
+        quoteAmount: amount,
+        quoteSentAt: new Date(),
+      } as any);
+
+      res.json({ success: true, lead: updated });
+    } catch (error) {
+      console.error("Send quote error:", error);
+      res.status(500).json({ error: "Failed to send quote" });
+    }
+  });
+
   app.delete("/api/quote-submissions/:id", async (req, res) => {
     try {
       const deleted = await storage.deleteQuoteSubmission(req.params.id);

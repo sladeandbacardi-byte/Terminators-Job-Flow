@@ -17,7 +17,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase, CheckCircle2,
-  XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle, UserPlus, ChevronDown
+  XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle, UserPlus, ChevronDown,
+  Send, DollarSign, Eye,
 } from "lucide-react";
 import type { QuoteSubmission, Client, Worker, Department } from "@shared/schema";
 
@@ -56,6 +57,13 @@ const newLeadSchema = z.object({
   notes: z.string().optional(),
   assignedTo: z.string().optional(),
 });
+
+const sendQuoteSchema = z.object({
+  amount: z.string().min(1, "Quote amount is required"),
+  validityDays: z.string().default("30"),
+  message: z.string().optional(),
+});
+type SendQuoteForm = z.infer<typeof sendQuoteSchema>;
 
 const convertToJobSchema = z.object({
   clientId: z.string().optional(),
@@ -108,9 +116,11 @@ export default function Leads() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNewLead, setShowNewLead] = useState(false);
   const [convertLead, setConvertLead] = useState<QuoteSubmission | null>(null);
+  const [quoteLead, setQuoteLead] = useState<QuoteSubmission | null>(null);
   const [notesLead, setNotesLead] = useState<QuoteSubmission | null>(null);
   const [notesText, setNotesText] = useState("");
   const [newClientMode, setNewClientMode] = useState(false);
+  const [quotePreview, setQuotePreview] = useState(false);
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
@@ -197,12 +207,36 @@ export default function Leads() {
     onError: () => toast({ title: "Error", description: "Failed to convert lead to job.", variant: "destructive" }),
   });
 
+  const sendQuote = useMutation({
+    mutationFn: async (data: SendQuoteForm) => {
+      if (!quoteLead) throw new Error("No lead selected");
+      const res = await apiRequest("POST", `/api/quote-submissions/${quoteLead.id}/send-quote`, {
+        amount: data.amount,
+        validityDays: parseInt(data.validityDays || "30"),
+        message: data.message,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      setQuoteLead(null);
+      sendQuoteForm.reset();
+      toast({ title: "Quote sent!", description: "Quote emailed to client — lead moved to Quoted." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to send quote.", variant: "destructive" }),
+  });
+
   // ── forms ──
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
   const newLeadForm = useForm<NewLeadForm>({
     resolver: zodResolver(newLeadSchema),
     defaultValues: { companyName: "", contactPerson: "", email: "", phone: "", description: "", address: "", preferredContactMethod: "phone", notes: "", assignedTo: "" },
+  });
+
+  const sendQuoteForm = useForm<SendQuoteForm>({
+    resolver: zodResolver(sendQuoteSchema),
+    defaultValues: { amount: "", validityDays: "30", message: "" },
   });
 
   const convertJobForm = useForm<ConvertJobForm>({
@@ -311,6 +345,7 @@ export default function Leads() {
                       workers={workers}
                       onAdvance={(status) => advanceLead.mutate({ id: lead.id, status })}
                       onConvert={() => openConvertDialog(lead)}
+                      onQuote={() => { setQuoteLead(lead); sendQuoteForm.reset(); setQuotePreview(false); }}
                       onNotes={() => { setNotesLead(lead); setNotesText(lead.notes ?? ""); }}
                       onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
                     />
@@ -636,6 +671,111 @@ export default function Leads() {
         </Dialog>
       )}
 
+      {/* ── Send Quote dialog ── */}
+      {quoteLead && (
+        <Dialog open={!!quoteLead} onOpenChange={() => { setQuoteLead(null); setQuotePreview(false); sendQuoteForm.reset(); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Send Quote — {quoteLead.companyName}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+              {/* ── Left: form ── */}
+              <div className="space-y-4">
+                <Form {...sendQuoteForm}>
+                  <form id="send-quote-form" onSubmit={sendQuoteForm.handleSubmit(d => sendQuote.mutate(d))} className="space-y-4">
+                    <FormField control={sendQuoteForm.control} name="amount" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quote Amount (excl. VAT) <span className="text-red-500">*</span></FormLabel>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">R</span>
+                          <FormControl>
+                            <Input type="number" min="0" step="0.01" placeholder="0.00" className="pl-7" {...field} />
+                          </FormControl>
+                        </div>
+                        <FormMessage />
+                        {field.value && (
+                          <p className="text-xs text-muted-foreground">
+                            + VAT (15%): R {(parseFloat(field.value) * 0.15).toFixed(2)} = <strong className="text-green-700">R {(parseFloat(field.value) * 1.15).toFixed(2)} total</strong>
+                          </p>
+                        )}
+                      </FormItem>
+                    )} />
+
+                    <FormField control={sendQuoteForm.control} name="validityDays" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valid for (days)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="7">7 days</SelectItem>
+                            <SelectItem value="14">14 days</SelectItem>
+                            <SelectItem value="30">30 days</SelectItem>
+                            <SelectItem value="60">60 days</SelectItem>
+                            <SelectItem value="90">90 days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={sendQuoteForm.control} name="message" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Personal message <span className="text-muted-foreground font-normal text-xs">(optional)</span></FormLabel>
+                        <FormControl>
+                          <Textarea rows={3} placeholder="Add a personal note to the client..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </form>
+                </Form>
+              </div>
+
+              {/* ── Right: quote preview ── */}
+              <div className="bg-gray-50 rounded-lg border p-4 space-y-3 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quote Preview</p>
+                <div className="bg-green-600 text-white rounded-md px-4 py-3">
+                  <p className="font-bold text-base">The Terminators</p>
+                  <p className="text-green-100 text-xs">Service Quotation for {quoteLead.companyName}</p>
+                </div>
+                <div className="space-y-2 text-gray-700">
+                  <div><span className="text-xs text-gray-400 uppercase">To</span><br /><strong>{quoteLead.contactPerson}</strong> · {quoteLead.email}</div>
+                  <div><span className="text-xs text-gray-400 uppercase">Service</span><br /><strong>{SERVICE_LABELS[quoteLead.serviceType] ?? quoteLead.serviceType}</strong></div>
+                  {quoteLead.description && <div><span className="text-xs text-gray-400 uppercase">Scope</span><br /><span className="text-xs text-gray-600 line-clamp-2">{quoteLead.description}</span></div>}
+                  {quoteLead.address && <div><span className="text-xs text-gray-400 uppercase">Address</span><br /><span className="text-xs">{quoteLead.address}</span></div>}
+                  <div className="border-t pt-2 space-y-1">
+                    {sendQuoteForm.watch("amount") ? (
+                      <>
+                        <div className="flex justify-between text-xs"><span>Amount (excl. VAT)</span><span>R {parseFloat(sendQuoteForm.watch("amount") || "0").toFixed(2)}</span></div>
+                        <div className="flex justify-between text-xs text-gray-400"><span>VAT 15%</span><span>R {(parseFloat(sendQuoteForm.watch("amount") || "0") * 0.15).toFixed(2)}</span></div>
+                        <div className="flex justify-between font-bold text-green-700 border-t pt-1"><span>Total</span><span>R {(parseFloat(sendQuoteForm.watch("amount") || "0") * 1.15).toFixed(2)}</span></div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Enter amount to see pricing</p>
+                    )}
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-yellow-800">
+                    ⏳ Valid for {sendQuoteForm.watch("validityDays") || "30"} days from today
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => { setQuoteLead(null); sendQuoteForm.reset(); }}>Cancel</Button>
+              <Button type="submit" form="send-quote-form" disabled={sendQuote.isPending} className="bg-green-600 hover:bg-green-700">
+                <Send className="h-4 w-4 mr-2" />
+                {sendQuote.isPending ? "Sending..." : `Send Quote to ${quoteLead.contactPerson}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* ── Notes dialog ── */}
       {notesLead && (
         <Dialog open={!!notesLead} onOpenChange={() => setNotesLead(null)}>
@@ -667,6 +807,7 @@ function LeadCard({
   workers,
   onAdvance,
   onConvert,
+  onQuote,
   onNotes,
   onDecline,
 }: {
@@ -674,6 +815,7 @@ function LeadCard({
   workers: Worker[];
   onAdvance: (status: string) => void;
   onConvert: () => void;
+  onQuote: () => void;
   onNotes: () => void;
   onDecline: () => void;
 }) {
@@ -729,9 +871,14 @@ function LeadCard({
           </Button>
         )}
         {lead.status === "contacted" && (
-          <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={() => onAdvance("quoted")}>
-            <FileText className="h-3 w-3 mr-0.5" /> Send Quote
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-green-300 text-green-700 hover:bg-green-50" onClick={onQuote}>
+            <Send className="h-3 w-3 mr-0.5" /> Send Quote
           </Button>
+        )}
+        {lead.status === "quoted" && lead.quoteAmount && (
+          <span className="text-xs text-purple-600 font-medium flex items-center gap-1">
+            <FileText className="h-3 w-3" /> R {parseFloat(lead.quoteAmount).toFixed(2)} quoted
+          </span>
         )}
         {lead.status === "quoted" && (
           <Button size="sm" className="text-xs h-6 px-2 bg-green-600 hover:bg-green-700 text-white" onClick={onConvert}>

@@ -518,6 +518,8 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   status: varchar("status").notNull().default("new"), // new, contacted, quoted, converted, declined
   assignedTo: varchar("assigned_to"), // Worker ID who handles this quote
   notes: text("notes"), // Internal notes about the quote
+  quoteAmount: text("quote_amount"), // Quoted price sent to client
+  quoteSentAt: timestamp("quote_sent_at"), // When the quote email was sent
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
   followUpDate: timestamp("follow_up_date"),
 });
