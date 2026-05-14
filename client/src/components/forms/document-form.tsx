@@ -1,4 +1,5 @@
 import { useForm, useFieldArray } from "react-hook-form";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -176,6 +177,20 @@ export default function DocumentForm({
     form.setValue(`lineItems.${idx}.total`, (qty * price).toFixed(2));
     recalc(form.getValues("lineItems"));
   };
+
+  // On mount, recalculate totals from any pre-filled line items (e.g. from a lead/quote)
+  useEffect(() => {
+    const items = form.getValues("lineItems");
+    if (items.some(i => parseFloat(i.unitPrice) > 0)) {
+      items.forEach((item, idx) => {
+        const qty   = parseFloat(item.quantity)  || 0;
+        const price = parseFloat(item.unitPrice) || 0;
+        form.setValue(`lineItems.${idx}.total`, (qty * price).toFixed(2));
+      });
+      recalc(form.getValues("lineItems"));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Single top-level watch for row totals display (uncontrolled inputs don't need per-item watches)
   const watchedItems = form.watch("lineItems");
