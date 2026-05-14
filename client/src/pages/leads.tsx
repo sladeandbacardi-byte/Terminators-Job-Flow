@@ -237,11 +237,20 @@ export default function Leads() {
     defaultValues: { name: "", contactPerson: "", email: "", phone: "", address: "", industry: "", departmentId: "" },
   });
 
-  // Reset convert form when lead changes
+  // Reset convert form when lead changes — auto-match client by name
   const openConvertDialog = (lead: QuoteSubmission) => {
     setConvertLead(lead);
-    setNewClientMode(false);
     const deptId = deptForService(lead.serviceType, departments);
+
+    // Try to find a matching client account by company name
+    const match = clients.find(c =>
+      c.name.toLowerCase().includes(lead.companyName.toLowerCase()) ||
+      lead.companyName.toLowerCase().includes(c.name.toLowerCase())
+    );
+
+    // If no match, default straight to "create new client" mode with fields pre-filled
+    setNewClientMode(!match);
+
     newClientForm.reset({
       name: lead.companyName || "",
       contactPerson: lead.contactPerson || "",
@@ -252,14 +261,15 @@ export default function Leads() {
       departmentId: deptId,
     });
     convertJobForm.reset({
-      clientId: "",
+      clientId: match?.id ?? "",
       workerId: "",
-      departmentId: deptForService(lead.serviceType, departments),
+      salespersonId: lead.assignedTo ?? "",
+      departmentId: deptId,
       scheduledDate: "",
       scheduledTime: "08:00",
       address: lead.address || "",
       notes: lead.description || "",
-      estimatedValue: "",
+      estimatedValue: lead.quoteAmount ?? "",
     });
   };
 
