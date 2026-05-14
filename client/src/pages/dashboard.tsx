@@ -248,7 +248,7 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     {/* Sales reps row */}
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 mb-1.5">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales</p>
                         <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
                           <UserPlus className="h-3 w-3" /> Add Rep
