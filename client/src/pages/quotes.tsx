@@ -352,62 +352,118 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
 
     {/* ── Convert to Job dialog ── */}
     <Dialog open={acceptOpen} onOpenChange={setAcceptOpen}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-green-600" />
-            Convert to Job — {quote.companyName}
+            Convert to Job
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          {/* Summary banner */}
-          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
-            <span className="font-medium">{SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</span>
-            {quote.quoteAmount && <span className="ml-2 text-green-600 font-semibold">R {parseFloat(quote.quoteAmount).toFixed(2)}</span>}
-            {quote.address && <p className="text-xs text-green-600 mt-0.5">{quote.address}</p>}
+        <div className="space-y-4 py-1">
+
+          {/* ── Client details from quote (read-only) ── */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Client Details (from quote)</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <div>
+                <p className="text-xs text-blue-500 font-medium">Company</p>
+                <p className="font-semibold text-blue-900">{quote.companyName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-500 font-medium">Contact Person</p>
+                <p className="text-blue-900">{quote.contactPerson || "—"}</p>
+              </div>
+              {quote.email && (
+                <div>
+                  <p className="text-xs text-blue-500 font-medium">Email</p>
+                  <p className="text-blue-900 truncate">{quote.email}</p>
+                </div>
+              )}
+              {quote.phone && (
+                <div>
+                  <p className="text-xs text-blue-500 font-medium">Phone</p>
+                  <p className="text-blue-900">{quote.phone}</p>
+                </div>
+              )}
+              {quote.address && (
+                <div className="col-span-2">
+                  <p className="text-xs text-blue-500 font-medium">Address / Location</p>
+                  <p className="text-blue-900">{quote.address}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-blue-500 font-medium">Service</p>
+                <p className="text-blue-900 font-medium">{SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</p>
+              </div>
+              {quote.quoteAmount && (
+                <div>
+                  <p className="text-xs text-blue-500 font-medium">Quoted Amount</p>
+                  <p className="text-blue-900 font-semibold">R {parseFloat(quote.quoteAmount).toFixed(2)}</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Client selector */}
+          {/* ── Client account (auto-matched or manual pick) ── */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Client Account <span className="text-red-500">*</span></label>
-            <Select value={jobClientId} onValueChange={setJobClientId}>
-              <SelectTrigger className={!jobClientId ? "border-red-300" : ""}>
-                <SelectValue placeholder="Select client account..." />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.filter(c => c.status !== "suspended").map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!jobClientId && (
-              <p className="text-xs text-amber-600">Select the client account this job belongs to.</p>
+            <label className="text-sm font-medium">
+              Link to Client Account <span className="text-red-500">*</span>
+            </label>
+            {jobClientId && clients.find(c => c.id === jobClientId) ? (
+              <div className="flex items-center justify-between rounded-md border border-green-300 bg-green-50 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm text-green-800">
+                  <Building2 className="h-4 w-4 text-green-600 shrink-0" />
+                  <span className="font-medium">{clients.find(c => c.id === jobClientId)?.name}</span>
+                  <span className="text-xs text-green-500">(auto-matched)</span>
+                </div>
+                <button
+                  onClick={() => setJobClientId("")}
+                  className="text-xs text-green-600 hover:text-green-800 underline"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <>
+                <Select value={jobClientId} onValueChange={setJobClientId}>
+                  <SelectTrigger className={!jobClientId ? "border-amber-400" : ""}>
+                    <SelectValue placeholder="Select the matching client account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.filter(c => c.status !== "suspended").map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-amber-600">
+                  No exact match found for "{quote.companyName}". Select the right account or create one first.
+                </p>
+              </>
             )}
           </div>
 
-          {/* Service person */}
+          {/* ── Service person ── */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Assign Service Person <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium">
+              Assign Service Person <span className="text-red-500">*</span>
+            </label>
             <Select value={jobWorkerId} onValueChange={setJobWorkerId}>
               <SelectTrigger className={!jobWorkerId ? "border-red-300" : ""}>
                 <SelectValue placeholder="Select field worker..." />
               </SelectTrigger>
               <SelectContent>
-                {deptWorkers.length > 0 ? (
-                  deptWorkers.map(w => (
-                    <SelectItem key={w.id} value={w.id}>{w.name} — {w.role ?? "Field Worker"}</SelectItem>
-                  ))
-                ) : (
-                  allWorkers.filter(w => w.isActive !== false).map(w => (
-                    <SelectItem key={w.id} value={w.id}>{w.name} — {w.role ?? "Worker"}</SelectItem>
-                  ))
-                )}
+                {(deptWorkers.length > 0 ? deptWorkers : allWorkers.filter(w => w.isActive !== false)).map(w => (
+                  <SelectItem key={w.id} value={w.id}>{w.name} — {w.role ?? "Field Worker"}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {deptWorkers.length > 0 && (
+              <p className="text-xs text-muted-foreground">Showing {SERVICE_LABELS[quote.serviceType]} workers only.</p>
+            )}
           </div>
 
-          {/* Date + Time */}
+          {/* ── Date + Time ── */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Job Date <span className="text-red-500">*</span></label>
@@ -429,9 +485,11 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps)
             </div>
           </div>
 
-          {/* Notes */}
+          {/* ── Notes ── */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Additional Notes <span className="text-xs text-gray-400 font-normal">(optional)</span></label>
+            <label className="text-sm font-medium">
+              Additional Notes <span className="text-xs text-gray-400 font-normal">(optional)</span>
+            </label>
             <Textarea
               rows={2}
               placeholder="Any special instructions for the service team..."
