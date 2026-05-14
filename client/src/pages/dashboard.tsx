@@ -78,7 +78,7 @@ export default function Dashboard() {
       .filter(q => q.status === "converted")
       .reduce((s, q) => s + (parseFloat(q.quoteAmount ?? "0") || 0), 0);
     return { rep, total: repQuotes.length, totalQuoted, won, wonValue };
-  }).filter(s => s.total > 0);
+  });
 
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['/api/dashboard/metrics'],
@@ -152,7 +152,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-6">
               <TerminatorsLogo size="lg" data-testid="company-logo" />
               {/* Sales rep quote / sales totals */}
-              {salesRepStats.length > 0 && (
+              {salesReps.length > 0 && (
                 <div className="flex-1 overflow-x-auto">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales Rep Performance</p>
                   <div className="flex gap-3 flex-wrap">
