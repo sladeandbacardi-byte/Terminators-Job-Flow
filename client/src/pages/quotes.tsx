@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { format, parseISO } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -7,6 +8,7 @@ import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -14,9 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   FileText, Phone, Mail, MapPin, Calendar, User,
-  MessageSquare, ChevronDown, ChevronUp, Building2,
+  MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase,
 } from "lucide-react";
-import type { QuoteSubmission, Worker } from "@shared/schema";
+import type { QuoteSubmission, Worker, Client } from "@shared/schema";
+
+// ── constants ─────────────────────────────────────────────────────────────────
 
 // Quotes page only shows entries that have reached the "quoted" stage or beyond.
 // "new" and "contacted" are leads still in the pipeline — they live on the Leads page.
@@ -33,24 +37,58 @@ const SERVICE_LABELS: Record<string, string> = {
   deep_cleaning: "Deep Cleaning",
 };
 
+// Maps quote serviceType → department ID for job creation
+const SERVICE_TO_DEPT: Record<string, string> = {
+  pest_control:  "div-1",
+  sanitary_bins: "div-2",
+  washroom:      "div-3",
+  deep_cleaning: "div-4",
+};
+
 const CONTACT_LABELS: Record<string, string> = {
-  email:  "Email",
-  phone:  "Phone",
-  either: "Either",
+  email:    "Email",
+  phone:    "Phone",
+  whatsapp: "WhatsApp",
+  either:   "Either",
 };
 
 function statusConfig(status: string) {
   return STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 }
 
-function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorkers: Worker[] }) {
+// ── QuoteCard ─────────────────────────────────────────────────────────────────
+
+interface QuoteCardProps {
+  quote: QuoteSubmission;
+  salesWorkers: Worker[];
+  allWorkers: Worker[];
+  clients: Client[];
+}
+
+function QuoteCard({ quote, salesWorkers, allWorkers, clients }: QuoteCardProps) {
+  const [, navigate] = useLocation();
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(quote.notes ?? "");
   const [editingNotes, setEditingNotes] = useState(false);
+
+  // Decline dialog
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+
+  // Accept / Convert-to-Job dialog
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [jobClientId, setJobClientId] = useState("");
+  const [jobWorkerId, setJobWorkerId] = useState("");
+  const [jobDate, setJobDate] = useState("");
+  const [jobTime, setJobTime] = useState("08:00");
+  const [jobNotes, setJobNotes] = useState("");
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Workers filtered to the matching service department
+  const deptId = SERVICE_TO_DEPT[quote.serviceType] ?? "";
+  const deptWorkers = allWorkers.filter(w => w.departmentId === deptId && w.isActive !== false);
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<QuoteSubmission>) =>
@@ -62,10 +100,53 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
   });
 
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      // Create the job
+      const jobRes = await apiRequest("POST", "/api/jobs", {
+        title: `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
+        description: quote.description,
+        clientId: jobClientId,
+        workerId: jobWorkerId || undefined,
+        departmentId: deptId || "div-1",
+        serviceType: SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
+        status: "scheduled",
+        scheduledDate: new Date(jobDate).toISOString(),
+        scheduledTime: jobTime || undefined,
+        location: quote.address || undefined,
+        notes: jobNotes || undefined,
+        price: quote.quoteAmount || undefined,
+      });
+      if (!jobRes.ok) throw new Error("Failed to create job");
+      // Mark quote as converted
+      await apiRequest("PATCH", `/api/quote-submissions/${quote.id}`, { status: "converted" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      toast({ title: "Job created!", description: "The quote has been converted and the job is now scheduled." });
+      setAcceptOpen(false);
+      navigate("/jobs");
+    },
+    onError: () => toast({ title: "Failed to create job", variant: "destructive" }),
+  });
+
   const handleStatusChange = (status: string) => {
     if (status === "declined") {
       setDeclineReason("");
       setDeclineOpen(true);
+    } else if (status === "converted") {
+      // Pre-fill client if a name match exists
+      const match = clients.find(c =>
+        c.name.toLowerCase().includes(quote.companyName.toLowerCase()) ||
+        quote.companyName.toLowerCase().includes(c.name.toLowerCase())
+      );
+      setJobClientId(match?.id ?? "");
+      setJobWorkerId("");
+      setJobDate("");
+      setJobTime("08:00");
+      setJobNotes("");
+      setAcceptOpen(true);
     } else {
       updateMutation.mutate({ status });
     }
@@ -75,6 +156,11 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
     if (!declineReason.trim()) return;
     updateMutation.mutate({ status: "declined", notes: declineReason.trim() });
     setDeclineOpen(false);
+  };
+
+  const handleConvertConfirm = () => {
+    if (!jobClientId || !jobDate) return;
+    convertMutation.mutate();
   };
 
   const handleSaveNotes = () => {
@@ -106,7 +192,7 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
             <Badge variant="outline" className="text-xs font-medium">
               {SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}
             </Badge>
-            <Select value={quote.status} onValueChange={handleStatusChange} disabled={updateMutation.isPending}>
+            <Select value={quote.status} onValueChange={handleStatusChange} disabled={updateMutation.isPending || convertMutation.isPending}>
               <SelectTrigger className={`h-7 text-xs font-medium border-0 px-2 rounded-full w-auto ${cfg.class}`}>
                 <SelectValue />
               </SelectTrigger>
@@ -123,7 +209,7 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
       </CardHeader>
 
       <CardContent className="px-4 pb-4 space-y-3">
-        {/* Contact details row */}
+        {/* Contact details */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
           {quote.email && (
             <a href={`mailto:${quote.email}`} className="flex items-center gap-1.5 hover:text-primary">
@@ -185,7 +271,7 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
           )}
         </div>
 
-        {/* Expand/collapse for description + notes */}
+        {/* Expand / collapse */}
         <button
           onClick={() => setExpanded(e => !e)}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary font-medium"
@@ -196,13 +282,10 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
 
         {expanded && (
           <div className="space-y-3 pt-1 border-t">
-            {/* Description */}
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1">Request Description</p>
               <p className="text-sm text-gray-700 bg-gray-50 rounded p-3 leading-relaxed">{quote.description}</p>
             </div>
-
-            {/* Internal notes */}
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1">Internal Notes</p>
               {editingNotes ? (
@@ -214,12 +297,8 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
                     className="text-sm min-h-[80px]"
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={handleSaveNotes} disabled={updateMutation.isPending}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setNotes(quote.notes ?? ""); setEditingNotes(false); }}>
-                      Cancel
-                    </Button>
+                    <Button size="sm" onClick={handleSaveNotes} disabled={updateMutation.isPending}>Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setNotes(quote.notes ?? ""); setEditingNotes(false); }}>Cancel</Button>
                   </div>
                 </div>
               ) : (
@@ -270,9 +349,117 @@ function QuoteCard({ quote, salesWorkers }: { quote: QuoteSubmission; salesWorke
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </>
+
+    {/* ── Convert to Job dialog ── */}
+    <Dialog open={acceptOpen} onOpenChange={setAcceptOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-green-600" />
+            Convert to Job — {quote.companyName}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Summary banner */}
+          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
+            <span className="font-medium">{SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</span>
+            {quote.quoteAmount && <span className="ml-2 text-green-600 font-semibold">R {parseFloat(quote.quoteAmount).toFixed(2)}</span>}
+            {quote.address && <p className="text-xs text-green-600 mt-0.5">{quote.address}</p>}
+          </div>
+
+          {/* Client selector */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Client Account <span className="text-red-500">*</span></label>
+            <Select value={jobClientId} onValueChange={setJobClientId}>
+              <SelectTrigger className={!jobClientId ? "border-red-300" : ""}>
+                <SelectValue placeholder="Select client account..." />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.filter(c => c.status !== "suspended").map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!jobClientId && (
+              <p className="text-xs text-amber-600">Select the client account this job belongs to.</p>
+            )}
+          </div>
+
+          {/* Service person */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Assign Service Person <span className="text-red-500">*</span></label>
+            <Select value={jobWorkerId} onValueChange={setJobWorkerId}>
+              <SelectTrigger className={!jobWorkerId ? "border-red-300" : ""}>
+                <SelectValue placeholder="Select field worker..." />
+              </SelectTrigger>
+              <SelectContent>
+                {deptWorkers.length > 0 ? (
+                  deptWorkers.map(w => (
+                    <SelectItem key={w.id} value={w.id}>{w.name} — {w.role ?? "Field Worker"}</SelectItem>
+                  ))
+                ) : (
+                  allWorkers.filter(w => w.isActive !== false).map(w => (
+                    <SelectItem key={w.id} value={w.id}>{w.name} — {w.role ?? "Worker"}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Date + Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Job Date <span className="text-red-500">*</span></label>
+              <Input
+                type="date"
+                value={jobDate}
+                onChange={e => setJobDate(e.target.value)}
+                className={!jobDate ? "border-red-300" : ""}
+                min={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Start Time</label>
+              <Input
+                type="time"
+                value={jobTime}
+                onChange={e => setJobTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Additional Notes <span className="text-xs text-gray-400 font-normal">(optional)</span></label>
+            <Textarea
+              rows={2}
+              placeholder="Any special instructions for the service team..."
+              value={jobNotes}
+              onChange={e => setJobNotes(e.target.value)}
+              className="resize-none text-sm"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setAcceptOpen(false)}>Cancel</Button>
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={!jobClientId || !jobWorkerId || !jobDate || convertMutation.isPending}
+            onClick={handleConvertConfirm}
+          >
+            <Briefcase className="h-4 w-4 mr-1.5" />
+            {convertMutation.isPending ? "Creating Job..." : "Create Job & Schedule"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
+
+// ── QuotesPage ────────────────────────────────────────────────────────────────
 
 export default function QuotesPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -282,11 +469,12 @@ export default function QuotesPage() {
   const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({
     queryKey: ["/api/quote-submissions"],
   });
-
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
-  // Only show entries that have reached the quoting stage — "new" and "contacted" stay on the Leads page
+  // Only show entries that have reached the quoting stage
   const QUOTE_STATUSES = ["quoted", "converted", "declined"];
   const filtered = quotes.filter(q => {
     if (!QUOTE_STATUSES.includes(q.status)) return false;
@@ -319,7 +507,7 @@ export default function QuotesPage() {
                 </p>
               </div>
               <div className="text-sm text-muted-foreground">
-                <strong>{quotes.length}</strong> total · <strong>{countByStatus("new")}</strong> new · <strong>{countByStatus("converted")}</strong> converted
+                <strong>{filtered.length}</strong> shown · <strong>{countByStatus("quoted")}</strong> pending · <strong>{countByStatus("converted")}</strong> accepted
               </div>
             </div>
 
@@ -367,7 +555,15 @@ export default function QuotesPage() {
               <div className="grid gap-4 lg:grid-cols-2">
                 {filtered
                   .sort((a, b) => new Date(b.submittedAt as unknown as string).getTime() - new Date(a.submittedAt as unknown as string).getTime())
-                  .map(q => <QuoteCard key={q.id} quote={q} salesWorkers={salesWorkers} />)}
+                  .map(q => (
+                    <QuoteCard
+                      key={q.id}
+                      quote={q}
+                      salesWorkers={salesWorkers}
+                      allWorkers={workers}
+                      clients={clients}
+                    />
+                  ))}
               </div>
             )}
           </div>
