@@ -179,9 +179,11 @@ export default function Dashboard() {
               <div className="flex-1 overflow-x-auto">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Rep Performance</p>
-                  <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
-                    <UserPlus className="h-3 w-3" /> Add Rep
-                  </Button>
+                  {(dashboardRole === "manager" || dashboardRole === "admin") && (
+                    <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
+                      <UserPlus className="h-3 w-3" /> Add Rep
+                    </Button>
+                  )}
                 </div>
                 <div className="flex gap-3 flex-wrap">
                   {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
