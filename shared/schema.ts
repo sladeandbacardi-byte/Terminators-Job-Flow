@@ -519,6 +519,7 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   assignedTo: varchar("assigned_to"), // Worker ID who handles this quote
   notes: text("notes"), // Internal notes about the quote
   quoteAmount: text("quote_amount"), // Quoted price sent to client
+  lineItemsJson: text("line_items_json"), // JSON array of line items from the lead form
   quoteSentAt: timestamp("quote_sent_at"), // When the quote email was sent
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
   followUpDate: timestamp("follow_up_date"),

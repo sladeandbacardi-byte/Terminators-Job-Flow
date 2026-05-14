@@ -121,7 +121,7 @@ export default function Leads() {
       preferredContactMethod: data.preferredContactMethod || "phone",
       notes: data.notes,
       assignedTo: data.assignedTo && data.assignedTo !== "unassigned" ? data.assignedTo : null,
-      lineItems: JSON.stringify(data.lineItems),
+      lineItemsJson: JSON.stringify(data.lineItems),
       quoteAmount: data.totalAmount,
     }),
     onSuccess: () => {
@@ -571,6 +571,13 @@ export default function Leads() {
                 address: quoteLead.address ?? undefined,
                 serviceType: quoteLead.serviceType,
               }}
+              defaultValues={(() => {
+                try {
+                  const items = quoteLead.lineItemsJson ? JSON.parse(quoteLead.lineItemsJson) : null;
+                  if (items && items.length > 0) return { lineItems: items };
+                } catch {}
+                return undefined;
+              })()}
               isPending={sendQuote.isPending}
               submitLabel={`Send Quote to ${quoteLead.contactPerson}`}
               onSubmit={d => sendQuote.mutate(d)}
