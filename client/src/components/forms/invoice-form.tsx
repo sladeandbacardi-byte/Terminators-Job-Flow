@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import DocumentForm, { type DocumentFormValues } from "@/components/forms/document-form";
+import DocumentForm from "@/components/forms/document-form";
+import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { Invoice, Client, InvoiceItem } from "@shared/schema";
 
 interface InvoiceFormProps {

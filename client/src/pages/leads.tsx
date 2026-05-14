@@ -20,7 +20,8 @@ import {
   XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle, UserPlus, ChevronDown,
   Send,
 } from "lucide-react";
-import DocumentForm, { type DocumentFormValues } from "@/components/forms/document-form";
+import DocumentForm from "@/components/forms/document-form";
+import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { QuoteSubmission, Client, Worker, Department } from "@shared/schema";
 
 // ─── types ───────────────────────────────────────────────────────────────────

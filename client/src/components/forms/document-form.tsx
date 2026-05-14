@@ -1,6 +1,5 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +11,7 @@ import { Plus, Trash2, FileText, Receipt, Briefcase, CalendarIcon } from "lucide
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Worker, Client } from "@shared/schema";
+import { documentFormSchema, type DocumentFormValues, type DocType } from "./document-form-schema";
 
 // ── service catalogue ─────────────────────────────────────────────────────────
 
@@ -69,50 +69,7 @@ const SERVICE_CATALOGUE = [
   ]},
 ];
 
-// ── schemas ───────────────────────────────────────────────────────────────────
-
-export const lineItemSchema = z.object({
-  description: z.string().min(1, "Description required"),
-  quantity: z.string().min(1, "Required"),
-  unitPrice: z.string().min(1, "Required"),
-  total: z.string(),
-});
-
-export const documentFormSchema = z.object({
-  // Client info (lead / quote)
-  companyName: z.string().optional(),
-  contactPerson: z.string().optional(),
-  email: z.string().optional(),
-  phone: z.string().optional(),
-  // Split address fields
-  streetNumber: z.string().optional(),
-  streetName: z.string().optional(),
-  area: z.string().optional(),
-  town: z.string().optional(),
-  serviceType: z.string().optional(),
-  preferredContactMethod: z.string().optional(),
-  assignedTo: z.string().optional(),
-  // Quote specific
-  validityDays: z.string().optional(),
-  // Invoice specific
-  clientId: z.string().optional(),
-  status: z.string().optional(),
-  issueDate: z.date().optional(),
-  dueDate: z.date().optional(),
-  terms: z.string().optional(),
-  // Line items + totals
-  lineItems: z.array(lineItemSchema).min(1, "Add at least one item"),
-  subtotal: z.string().default("0.00"),
-  vatAmount: z.string().default("0.00"),
-  totalAmount: z.string().default("0.00"),
-  notes: z.string().optional(),
-});
-
-export type DocumentFormValues = z.infer<typeof documentFormSchema>;
-
 // ── types ─────────────────────────────────────────────────────────────────────
-
-export type DocType = "lead" | "quote" | "invoice";
 
 interface DocumentFormProps {
   docType: DocType;
@@ -208,16 +165,20 @@ export default function DocumentForm({
     form.setValue("totalAmount", (sub + vat).toFixed(2));
   };
 
-  const handleItemChange = (idx: number, key: "description" | "quantity" | "unitPrice", val: string) => {
-    const items = form.getValues("lineItems").map((it, i) => {
-      if (i !== idx) return it;
-      const updated = { ...it, [key]: val };
-      updated.total = ((parseFloat(updated.quantity) || 0) * (parseFloat(updated.unitPrice) || 0)).toFixed(2);
-      return updated;
-    });
-    form.setValue("lineItems", items);
-    recalc(items);
+  // Recalc a single row's total then update grand totals.
+  // Called from register's onChange — does NOT setValue on the whole array,
+  // so qty/price inputs keep focus across re-renders.
+  const recalcRow = (idx: number, key: "quantity" | "unitPrice", val: string) => {
+    const items = form.getValues("lineItems");
+    const item  = items[idx];
+    const qty   = key === "quantity"   ? parseFloat(val) || 0 : parseFloat(item.quantity)  || 0;
+    const price = key === "unitPrice"  ? parseFloat(val) || 0 : parseFloat(item.unitPrice) || 0;
+    form.setValue(`lineItems.${idx}.total`, (qty * price).toFixed(2));
+    recalc(form.getValues("lineItems"));
   };
+
+  // Single top-level watch for row totals display (uncontrolled inputs don't need per-item watches)
+  const watchedItems = form.watch("lineItems");
 
   // Unique datalist id to avoid collisions if multiple DocumentForms exist
   const datalistId = `svc-list-${docType}`;
@@ -509,8 +470,9 @@ export default function DocumentForm({
                     <Input
                       type="number" min="0" step="0.01"
                       className="h-8 text-sm text-center bg-white"
-                      value={form.watch(`lineItems.${idx}.quantity`)}
-                      onChange={e => handleItemChange(idx, "quantity", e.target.value)}
+                      {...form.register(`lineItems.${idx}.quantity`, {
+                        onChange: e => recalcRow(idx, "quantity", e.target.value),
+                      })}
                     />
                   </div>
                   <div className="col-span-2 relative">
@@ -518,12 +480,13 @@ export default function DocumentForm({
                     <Input
                       type="number" min="0" step="0.01"
                       className="h-8 text-sm pl-5 bg-white"
-                      value={form.watch(`lineItems.${idx}.unitPrice`)}
-                      onChange={e => handleItemChange(idx, "unitPrice", e.target.value)}
+                      {...form.register(`lineItems.${idx}.unitPrice`, {
+                        onChange: e => recalcRow(idx, "unitPrice", e.target.value),
+                      })}
                     />
                   </div>
                   <div className="col-span-2 flex items-center justify-end pr-1 text-sm font-medium text-gray-700">
-                    R {parseFloat(form.watch(`lineItems.${idx}.total`) || "0").toFixed(2)}
+                    R {parseFloat(watchedItems[idx]?.total || "0").toFixed(2)}
                   </div>
                   <div className="col-span-1 flex justify-center">
                     <Button type="button" variant="ghost" size="sm"
