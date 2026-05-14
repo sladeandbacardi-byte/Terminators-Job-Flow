@@ -215,7 +215,7 @@ export default function Dashboard() {
                 {/* SALES */}
                 {dashboardRole === "sales" && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales Performance</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales</p>
                     <div className="flex gap-3 flex-wrap">
                       {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
                         const firstName = rep.name.split(" ")[0];
@@ -249,7 +249,7 @@ export default function Dashboard() {
                     {/* Sales reps row */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Reps</p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales</p>
                         <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
                           <UserPlus className="h-3 w-3" /> Add Rep
                         </Button>
@@ -316,7 +316,7 @@ export default function Dashboard() {
                 {/* ACCOUNTS */}
                 {dashboardRole === "accounts" && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Accounts Overview</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Finance</p>
                     <div className="flex gap-3 flex-wrap">
                       <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 min-w-[110px]">
                         <p className="text-xs text-gray-500 mb-0.5">Debtors</p>
@@ -340,7 +340,7 @@ export default function Dashboard() {
                 {/* SERVICE */}
                 {dashboardRole === "service" && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">This Month</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Service</p>
                     <div className="flex gap-3 flex-wrap">
                       <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 min-w-[120px]">
                         <p className="text-xs text-gray-500 mb-0.5">Jobs Completed</p>
