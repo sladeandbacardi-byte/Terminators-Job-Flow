@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
-import type { Worker, QuoteSubmission } from "@shared/schema";
+import type { Worker, QuoteSubmission, Invoice, Job } from "@shared/schema";
 
 interface DashboardMetrics {
   activeJobs: number;
@@ -75,6 +75,8 @@ export default function Dashboard() {
 
   const { data: salesWorkers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: allQuotes = [] } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
+  const { data: allInvoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: allJobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
 
   // Sales rep totals — only div-5 (Sales dept) workers
   const salesReps = salesWorkers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
@@ -88,6 +90,30 @@ export default function Dashboard() {
     const lost = repQuotes.filter(q => q.status === "declined").length;
     return { rep, total: repQuotes.length, totalQuoted, won, wonValue, lost };
   });
+
+  // Accounts panel stats
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const debtors = allInvoices
+    .filter(i => i.status === "sent" || i.status === "overdue")
+    .reduce((s, i) => s + (parseFloat(String(i.total)) - parseFloat(String(i.paidAmount ?? "0"))), 0);
+  const salesThisMonth = allInvoices
+    .filter(i => new Date(i.issueDate) >= monthStart)
+    .reduce((s, i) => s + parseFloat(String(i.total)), 0);
+  const paidThisMonth = allInvoices
+    .filter(i => new Date(i.issueDate) >= monthStart && (i.status === "paid"))
+    .reduce((s, i) => s + parseFloat(String(i.total)), 0);
+  const collectedPct = salesThisMonth > 0 ? Math.round((paidThisMonth / salesThisMonth) * 100) : 0;
+
+  // Service panel stats
+  const jobsCompletedThisMonth = allJobs.filter(j => {
+    const d = j.scheduledDate ? new Date(j.scheduledDate) : null;
+    return j.status === "completed" && d && d >= monthStart;
+  }).length;
+  const invoicesSentThisMonth = allInvoices.filter(i => {
+    const d = new Date(i.issueDate);
+    return d >= monthStart && (i.status === "sent" || i.status === "paid");
+  }).length;
 
   const addSalesRep = useMutation({
     mutationFn: () => apiRequest("POST", "/api/workers", {
@@ -172,45 +198,103 @@ export default function Dashboard() {
 
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
-            {/* Company Logo Header */}
+            {/* Company Logo Header — Logo | Job Flow | Role Panel */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-6">
-              <TerminatorsLogo size="lg" data-testid="company-logo" />
-              {/* Sales rep quote / sales totals */}
-              <div className="flex-1 overflow-x-auto">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Rep Performance</p>
-                  {(dashboardRole === "manager" || dashboardRole === "admin") && (
-                    <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
-                      <UserPlus className="h-3 w-3" /> Add Rep
-                    </Button>
-                  )}
-                </div>
-                <div className="flex gap-3 flex-wrap">
-                  {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
-                    const firstName = rep.name.split(" ")[0];
-                    return (
-                      <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[130px]">
-                        <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
-                        <div className="mt-1 space-y-0.5">
-                          <p className="text-xs text-gray-500">
-                            <span className="font-medium text-purple-600">{total}</span> quote{total !== 1 ? "s" : ""}
-                            {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            <span className="font-medium text-green-600">{won}</span> won
-                            {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            <span className="font-medium text-red-500">{lost}</span> lost
-                          </p>
-                        </div>
+              {/* LEFT: logo */}
+              <div className="shrink-0">
+                <TerminatorsLogo size="lg" data-testid="company-logo" />
+              </div>
+
+              {/* MIDDLE: branding */}
+              <div className="flex-1 flex flex-col items-center justify-center text-center">
+                <p className="text-lg font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
+                <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
+              </div>
+
+              {/* RIGHT: role-specific performance panel */}
+              <div className="shrink-0 min-w-[260px] max-w-[420px]">
+                {/* SALES — per-rep quote / won / lost */}
+                {(dashboardRole === "sales" || dashboardRole === "manager" || dashboardRole === "admin") && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales Performance</p>
+                      {(dashboardRole === "manager" || dashboardRole === "admin") && (
+                        <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
+                          <UserPlus className="h-3 w-3" /> Add Rep
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-3 flex-wrap">
+                      {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
+                        const firstName = rep.name.split(" ")[0];
+                        return (
+                          <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[120px]">
+                            <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
+                            <div className="mt-1 space-y-0.5">
+                              <p className="text-xs text-gray-500">
+                                <span className="font-medium text-purple-600">{total}</span> quote{total !== 1 ? "s" : ""}
+                                {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                <span className="font-medium text-green-600">{won}</span> won
+                                {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                <span className="font-medium text-red-500">{lost}</span> lost
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {salesReps.length === 0 && (
+                        <p className="text-xs text-gray-400 italic">No sales reps yet.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ACCOUNTS — debtors, sales this month, % collected */}
+                {dashboardRole === "accounts" && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Accounts Overview</p>
+                    <div className="flex gap-3 flex-wrap">
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 min-w-[110px]">
+                        <p className="text-xs text-gray-500 mb-0.5">Debtors</p>
+                        <p className="text-sm font-bold text-red-600">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <p className="text-xs text-gray-400">outstanding</p>
                       </div>
-                    );
-                  })}
-                  {salesReps.length === 0 && (
-                    <p className="text-xs text-gray-400 italic">No sales reps yet — add one to get started.</p>
-                  )}
-                </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 min-w-[110px]">
+                        <p className="text-xs text-gray-500 mb-0.5">Sales (month)</p>
+                        <p className="text-sm font-bold text-blue-600">R{salesThisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <p className="text-xs text-gray-400">invoiced</p>
+                      </div>
+                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 min-w-[90px]">
+                        <p className="text-xs text-gray-500 mb-0.5">Collected</p>
+                        <p className="text-sm font-bold text-green-600">{collectedPct}%</p>
+                        <p className="text-xs text-gray-400">of month sales</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SERVICE — jobs completed + invoices sent this month */}
+                {dashboardRole === "service" && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">This Month</p>
+                    <div className="flex gap-3 flex-wrap">
+                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 min-w-[120px]">
+                        <p className="text-xs text-gray-500 mb-0.5">Jobs Completed</p>
+                        <p className="text-2xl font-bold text-green-600">{jobsCompletedThisMonth}</p>
+                        <p className="text-xs text-gray-400">this month</p>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 min-w-[120px]">
+                        <p className="text-xs text-gray-500 mb-0.5">Invoices Sent</p>
+                        <p className="text-2xl font-bold text-blue-600">{invoicesSentThisMonth}</p>
+                        <p className="text-xs text-gray-400">this month</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
