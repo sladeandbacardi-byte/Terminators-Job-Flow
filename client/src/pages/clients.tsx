@@ -22,6 +22,7 @@ import {
   Calendar,
   XCircle,
   CheckCircle,
+  Circle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,7 +153,8 @@ export default function ClientsPage() {
       apiRequest("PATCH", `/api/clients/${id}/status`, { status }),
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      toast({ description: status === "suspended" ? "Client service suspended." : "Client service reinstated." });
+      const msg = status === "suspended" ? "Client suspended." : status === "inactive" ? "Client set to inactive." : "Client set to active.";
+      toast({ description: msg });
     },
     onError: () => toast({ description: "Failed to update client status", variant: "destructive" }),
   });
@@ -433,10 +435,31 @@ export default function ClientsPage() {
                             Edit
                           </DropdownMenuItem>
                         )}
-                        {isAccounts && (
+                        {!isSales && (
                           <>
                             <DropdownMenuSeparator />
-                            {client.status !== "suspended" ? (
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1">
+                              Change Status
+                            </DropdownMenuLabel>
+                            {client.status !== "active" && (
+                              <DropdownMenuItem
+                                onClick={() => suspendMutation.mutate({ id: client.id, status: "active" })}
+                                className="text-green-600"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Set Active
+                              </DropdownMenuItem>
+                            )}
+                            {client.status !== "inactive" && (
+                              <DropdownMenuItem
+                                onClick={() => suspendMutation.mutate({ id: client.id, status: "inactive" })}
+                                className="text-gray-600"
+                              >
+                                <Circle className="mr-2 h-4 w-4" />
+                                Set Inactive
+                              </DropdownMenuItem>
+                            )}
+                            {client.status !== "suspended" && (
                               <DropdownMenuItem
                                 onClick={() => suspendMutation.mutate({ id: client.id, status: "suspended" })}
                                 className="text-red-600"
@@ -444,32 +467,11 @@ export default function ClientsPage() {
                                 <XCircle className="mr-2 h-4 w-4" />
                                 Suspend Service
                               </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() => suspendMutation.mutate({ id: client.id, status: "active" })}
-                                className="text-green-600"
-                              >
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Reinstate Service
-                              </DropdownMenuItem>
                             )}
                           </>
                         )}
                         {!isSales && !isAccounts && (
                           <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => client.status !== "suspended"
-                                ? suspendMutation.mutate({ id: client.id, status: "suspended" })
-                                : suspendMutation.mutate({ id: client.id, status: "active" })
-                              }
-                              className={client.status === "suspended" ? "text-green-600" : "text-orange-600"}
-                            >
-                              {client.status === "suspended"
-                                ? <><CheckCircle className="mr-2 h-4 w-4" />Reinstate Service</>
-                                : <><XCircle className="mr-2 h-4 w-4" />Suspend Service</>
-                              }
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => setDeletingClient(client)}
