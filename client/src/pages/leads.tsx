@@ -18,8 +18,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase, CheckCircle2,
   XCircle, FileText, ArrowRight, Calendar, User, Building2, AlertCircle, UserPlus, ChevronDown,
-  Send, DollarSign, Eye,
+  Send,
 } from "lucide-react";
+import DocumentForm, { type DocumentFormValues } from "@/components/forms/document-form";
 import type { QuoteSubmission, Client, Worker, Department } from "@shared/schema";
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -43,27 +44,6 @@ const PIPELINE: { status: LeadStatus; label: string; color: string; dotColor: st
 
 // ─── schema ──────────────────────────────────────────────────────────────────
 
-const newLeadSchema = z.object({
-  companyName: z.string().min(2, "Company name required"),
-  contactPerson: z.string().min(2, "Contact person required"),
-  email: z.string().email("Valid email required"),
-  phone: z.string().min(8, "Phone number required"),
-  serviceType: z.enum(["pest_control", "sanitary_bins", "washroom", "deep_cleaning"], {
-    required_error: "Service type required",
-  }),
-  description: z.string().min(5, "Brief description required"),
-  address: z.string().optional(),
-  preferredContactMethod: z.enum(["email", "phone", "either"]).default("phone"),
-  notes: z.string().optional(),
-  assignedTo: z.string().optional(),
-});
-
-const sendQuoteSchema = z.object({
-  amount: z.string().min(1, "Quote amount is required"),
-  validityDays: z.string().default("30"),
-  message: z.string().optional(),
-});
-type SendQuoteForm = z.infer<typeof sendQuoteSchema>;
 
 const convertToJobSchema = z.object({
   clientId: z.string().optional(),
@@ -87,7 +67,6 @@ const newClientSchema = z.object({
   departmentId: z.string().min(1, "Department required"),
 });
 
-type NewLeadForm = z.infer<typeof newLeadSchema>;
 type ConvertJobForm = z.infer<typeof convertToJobSchema>;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -129,11 +108,23 @@ export default function Leads() {
 
   // ── mutations ──
   const createLead = useMutation({
-    mutationFn: (data: NewLeadForm) => apiRequest("POST", "/api/quote-submissions", data),
+    mutationFn: (data: DocumentFormValues) => apiRequest("POST", "/api/quote-submissions", {
+      companyName: data.companyName,
+      contactPerson: data.contactPerson,
+      email: data.email,
+      phone: data.phone,
+      serviceType: data.serviceType || "pest_control",
+      description: data.lineItems.map(i => `${i.description} (x${i.quantity})`).join("; ") || "See line items",
+      address: data.address,
+      preferredContactMethod: data.preferredContactMethod || "phone",
+      notes: data.notes,
+      assignedTo: data.assignedTo && data.assignedTo !== "unassigned" ? data.assignedTo : null,
+      lineItems: JSON.stringify(data.lineItems),
+      quoteAmount: data.totalAmount,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       setShowNewLead(false);
-      newLeadForm.reset();
       toast({ title: "Lead created", description: "New lead added to the pipeline." });
     },
     onError: () => toast({ title: "Error", description: "Failed to create lead.", variant: "destructive" }),
@@ -208,19 +199,19 @@ export default function Leads() {
   });
 
   const sendQuote = useMutation({
-    mutationFn: async (data: SendQuoteForm) => {
+    mutationFn: async (data: DocumentFormValues) => {
       if (!quoteLead) throw new Error("No lead selected");
       const res = await apiRequest("POST", `/api/quote-submissions/${quoteLead.id}/send-quote`, {
-        amount: data.amount,
+        amount: data.totalAmount,
         validityDays: parseInt(data.validityDays || "30"),
-        message: data.message,
+        message: data.notes,
+        lineItems: JSON.stringify(data.lineItems),
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       setQuoteLead(null);
-      sendQuoteForm.reset();
       toast({ title: "Quote sent!", description: "Quote emailed to client — lead moved to Quoted." });
     },
     onError: () => toast({ title: "Error", description: "Failed to send quote.", variant: "destructive" }),
@@ -228,16 +219,6 @@ export default function Leads() {
 
   // ── forms ──
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
-
-  const newLeadForm = useForm<NewLeadForm>({
-    resolver: zodResolver(newLeadSchema),
-    defaultValues: { companyName: "", contactPerson: "", email: "", phone: "", description: "", address: "", preferredContactMethod: "phone", notes: "", assignedTo: "" },
-  });
-
-  const sendQuoteForm = useForm<SendQuoteForm>({
-    resolver: zodResolver(sendQuoteSchema),
-    defaultValues: { amount: "", validityDays: "30", message: "" },
-  });
 
   const convertJobForm = useForm<ConvertJobForm>({
     resolver: zodResolver(convertToJobSchema),
@@ -345,7 +326,7 @@ export default function Leads() {
                       workers={workers}
                       onAdvance={(status) => advanceLead.mutate({ id: lead.id, status })}
                       onConvert={() => openConvertDialog(lead)}
-                      onQuote={() => { setQuoteLead(lead); sendQuoteForm.reset(); setQuotePreview(false); }}
+                      onQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
                       onNotes={() => { setNotesLead(lead); setNotesText(lead.notes ?? ""); }}
                       onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
                     />
@@ -362,113 +343,14 @@ export default function Leads() {
 
       {/* ── New Lead dialog ── */}
       <Dialog open={showNewLead} onOpenChange={setShowNewLead}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Plus className="h-4 w-4" /> New Lead</DialogTitle>
-          </DialogHeader>
-          <Form {...newLeadForm}>
-            <form onSubmit={newLeadForm.handleSubmit(d => createLead.mutate(d))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={newLeadForm.control} name="companyName" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Company / Client Name</FormLabel>
-                    <FormControl><Input placeholder="e.g. Spar Newton Park" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="contactPerson" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
-                    <FormControl><Input placeholder="Full name" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl><Input placeholder="+27 41 ..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl><Input type="email" placeholder="email@company.co.za" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="serviceType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Service Required</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="pest_control">Pest Control</SelectItem>
-                        <SelectItem value="sanitary_bins">Sanitary Bins</SelectItem>
-                        <SelectItem value="washroom">Washroom</SelectItem>
-                        <SelectItem value="deep_cleaning">Deep Cleaning</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="address" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Address <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
-                    <FormControl><Input placeholder="Site address" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="description" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Description / Requirements</FormLabel>
-                    <FormControl><Textarea rows={3} placeholder="What does the client need?" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="notes" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Internal Notes <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
-                    <FormControl><Textarea rows={2} placeholder="How did this lead come in? Any context..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="preferredContactMethod" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Preferred Contact Method</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="either">Either</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-                <FormField control={newLeadForm.control} name="assignedTo" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Salesperson <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Assign to salesperson" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="unassigned">— Unassigned —</SelectItem>
-                        {salesWorkers.map(w => (
-                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowNewLead(false)}>Cancel</Button>
-                <Button type="submit" disabled={createLead.isPending}>
-                  {createLead.isPending ? "Creating..." : "Create Lead"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DocumentForm
+            docType="lead"
+            salesWorkers={salesWorkers}
+            isPending={createLead.isPending}
+            onSubmit={d => createLead.mutate(d)}
+            onCancel={() => setShowNewLead(false)}
+          />
         </DialogContent>
       </Dialog>
 
@@ -673,105 +555,23 @@ export default function Leads() {
 
       {/* ── Send Quote dialog ── */}
       {quoteLead && (
-        <Dialog open={!!quoteLead} onOpenChange={() => { setQuoteLead(null); setQuotePreview(false); sendQuoteForm.reset(); }}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Send Quote — {quoteLead.companyName}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-              {/* ── Left: form ── */}
-              <div className="space-y-4">
-                <Form {...sendQuoteForm}>
-                  <form id="send-quote-form" onSubmit={sendQuoteForm.handleSubmit(d => sendQuote.mutate(d))} className="space-y-4">
-                    <FormField control={sendQuoteForm.control} name="amount" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quote Amount (excl. VAT) <span className="text-red-500">*</span></FormLabel>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">R</span>
-                          <FormControl>
-                            <Input type="number" min="0" step="0.01" placeholder="0.00" className="pl-7" {...field} />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                        {field.value && (
-                          <p className="text-xs text-muted-foreground">
-                            + VAT (15%): R {(parseFloat(field.value) * 0.15).toFixed(2)} = <strong className="text-green-700">R {(parseFloat(field.value) * 1.15).toFixed(2)} total</strong>
-                          </p>
-                        )}
-                      </FormItem>
-                    )} />
-
-                    <FormField control={sendQuoteForm.control} name="validityDays" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Valid for (days)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="7">7 days</SelectItem>
-                            <SelectItem value="14">14 days</SelectItem>
-                            <SelectItem value="30">30 days</SelectItem>
-                            <SelectItem value="60">60 days</SelectItem>
-                            <SelectItem value="90">90 days</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-
-                    <FormField control={sendQuoteForm.control} name="message" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Personal message <span className="text-muted-foreground font-normal text-xs">(optional)</span></FormLabel>
-                        <FormControl>
-                          <Textarea rows={3} placeholder="Add a personal note to the client..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  </form>
-                </Form>
-              </div>
-
-              {/* ── Right: quote preview ── */}
-              <div className="bg-gray-50 rounded-lg border p-4 space-y-3 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quote Preview</p>
-                <div className="bg-green-600 text-white rounded-md px-4 py-3">
-                  <p className="font-bold text-base">The Terminators</p>
-                  <p className="text-green-100 text-xs">Service Quotation for {quoteLead.companyName}</p>
-                </div>
-                <div className="space-y-2 text-gray-700">
-                  <div><span className="text-xs text-gray-400 uppercase">To</span><br /><strong>{quoteLead.contactPerson}</strong> · {quoteLead.email}</div>
-                  <div><span className="text-xs text-gray-400 uppercase">Service</span><br /><strong>{SERVICE_LABELS[quoteLead.serviceType] ?? quoteLead.serviceType}</strong></div>
-                  {quoteLead.description && <div><span className="text-xs text-gray-400 uppercase">Scope</span><br /><span className="text-xs text-gray-600 line-clamp-2">{quoteLead.description}</span></div>}
-                  {quoteLead.address && <div><span className="text-xs text-gray-400 uppercase">Address</span><br /><span className="text-xs">{quoteLead.address}</span></div>}
-                  <div className="border-t pt-2 space-y-1">
-                    {sendQuoteForm.watch("amount") ? (
-                      <>
-                        <div className="flex justify-between text-xs"><span>Amount (excl. VAT)</span><span>R {parseFloat(sendQuoteForm.watch("amount") || "0").toFixed(2)}</span></div>
-                        <div className="flex justify-between text-xs text-gray-400"><span>VAT 15%</span><span>R {(parseFloat(sendQuoteForm.watch("amount") || "0") * 0.15).toFixed(2)}</span></div>
-                        <div className="flex justify-between font-bold text-green-700 border-t pt-1"><span>Total</span><span>R {(parseFloat(sendQuoteForm.watch("amount") || "0") * 1.15).toFixed(2)}</span></div>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-400 italic">Enter amount to see pricing</p>
-                    )}
-                  </div>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-yellow-800">
-                    ⏳ Valid for {sendQuoteForm.watch("validityDays") || "30"} days from today
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => { setQuoteLead(null); sendQuoteForm.reset(); }}>Cancel</Button>
-              <Button type="submit" form="send-quote-form" disabled={sendQuote.isPending} className="bg-green-600 hover:bg-green-700">
-                <Send className="h-4 w-4 mr-2" />
-                {sendQuote.isPending ? "Sending..." : `Send Quote to ${quoteLead.contactPerson}`}
-              </Button>
-            </DialogFooter>
+        <Dialog open={!!quoteLead} onOpenChange={() => { setQuoteLead(null); setQuotePreview(false); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+            <DocumentForm
+              docType="quote"
+              clientInfo={{
+                companyName: quoteLead.companyName,
+                contactPerson: quoteLead.contactPerson,
+                email: quoteLead.email,
+                phone: quoteLead.phone,
+                address: quoteLead.address ?? undefined,
+                serviceType: quoteLead.serviceType,
+              }}
+              isPending={sendQuote.isPending}
+              submitLabel={`Send Quote to ${quoteLead.contactPerson}`}
+              onSubmit={d => sendQuote.mutate(d)}
+              onCancel={() => { setQuoteLead(null); setQuotePreview(false); }}
+            />
           </DialogContent>
         </Dialog>
       )}
