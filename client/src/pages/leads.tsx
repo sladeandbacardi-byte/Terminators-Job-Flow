@@ -115,7 +115,7 @@ export default function Leads() {
       phone: data.phone,
       serviceType: data.serviceType || "pest_control",
       description: data.lineItems.map(i => `${i.description} (x${i.quantity})`).join("; ") || "See line items",
-      address: data.address,
+      address: [data.streetNumber, data.streetName, data.area, data.town].filter(Boolean).join(", "),
       preferredContactMethod: data.preferredContactMethod || "phone",
       notes: data.notes,
       assignedTo: data.assignedTo && data.assignedTo !== "unassigned" ? data.assignedTo : null,
@@ -344,6 +344,7 @@ export default function Leads() {
       {/* ── New Lead dialog ── */}
       <Dialog open={showNewLead} onOpenChange={setShowNewLead}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogTitle className="sr-only">New Lead</DialogTitle>
           <DocumentForm
             docType="lead"
             salesWorkers={salesWorkers}
@@ -557,6 +558,7 @@ export default function Leads() {
       {quoteLead && (
         <Dialog open={!!quoteLead} onOpenChange={() => { setQuoteLead(null); setQuotePreview(false); }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+            <DialogTitle className="sr-only">Send Quote</DialogTitle>
             <DocumentForm
               docType="quote"
               clientInfo={{

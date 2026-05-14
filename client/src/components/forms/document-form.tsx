@@ -13,7 +13,63 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Worker, Client } from "@shared/schema";
 
-// ── schemas ──────────────────────────────────────────────────────────────────
+// ── service catalogue ─────────────────────────────────────────────────────────
+
+const SERVICE_CATALOGUE = [
+  { group: "Pest Control", items: [
+    "General Pest Control Treatment",
+    "Termite (White Ant) Treatment",
+    "Fumigation",
+    "Rodent Control",
+    "Cockroach Treatment",
+    "Ant Treatment",
+    "Fly Control",
+    "Mosquito Treatment",
+    "Bird Control / Proofing",
+    "Bed Bug Treatment",
+    "Flea Treatment",
+  ]},
+  { group: "Sanitary Bins", items: [
+    "Sanitary Bin Supply & Monthly Collection",
+    "Sanitary Bin Quarterly Service",
+    "Sanitary Bin Rental",
+    "Nappy Disposal Service",
+    "Medical Waste Disposal",
+  ]},
+  { group: "Washroom", items: [
+    "Washroom Hygiene Monthly Service",
+    "Air Freshener / Deodoriser Service",
+    "Liquid Soap Dispenser Service",
+    "Hand Sanitizer Dispenser Service",
+    "Hand Dryer Maintenance",
+    "Toilet Roll / Paper Dispenser Service",
+    "Urinal Hygiene Service",
+    "Feminine Hygiene Bag Service",
+  ]},
+  { group: "Deep Cleaning", items: [
+    "Deep Cleaning Service",
+    "Office Deep Clean",
+    "Industrial / Factory Deep Clean",
+    "Kitchen / Canteen Deep Clean",
+    "Carpet Cleaning",
+    "Upholstery Cleaning",
+    "Window & Glass Cleaning",
+    "High-Pressure Cleaning",
+    "Post-Construction Clean",
+  ]},
+  { group: "General / Other", items: [
+    "Site Inspection",
+    "Consultation / Survey",
+    "Call-out Fee",
+    "After-Hours Service",
+    "Emergency Response",
+    "Training & Awareness",
+    "Certificate of Treatment",
+    "Annual Contract Service",
+  ]},
+];
+
+// ── schemas ───────────────────────────────────────────────────────────────────
 
 export const lineItemSchema = z.object({
   description: z.string().min(1, "Description required"),
@@ -23,20 +79,28 @@ export const lineItemSchema = z.object({
 });
 
 export const documentFormSchema = z.object({
+  // Client info (lead / quote)
   companyName: z.string().optional(),
   contactPerson: z.string().optional(),
   email: z.string().optional(),
   phone: z.string().optional(),
-  address: z.string().optional(),
+  // Split address fields
+  streetNumber: z.string().optional(),
+  streetName: z.string().optional(),
+  area: z.string().optional(),
+  town: z.string().optional(),
   serviceType: z.string().optional(),
   preferredContactMethod: z.string().optional(),
   assignedTo: z.string().optional(),
+  // Quote specific
   validityDays: z.string().optional(),
+  // Invoice specific
   clientId: z.string().optional(),
   status: z.string().optional(),
   issueDate: z.date().optional(),
   dueDate: z.date().optional(),
   terms: z.string().optional(),
+  // Line items + totals
   lineItems: z.array(lineItemSchema).min(1, "Add at least one item"),
   subtotal: z.string().default("0.00"),
   vatAmount: z.string().default("0.00"),
@@ -77,7 +141,7 @@ const DOC_CONFIG = {
   invoice: { label: "INVOICE", color: "text-green-700",  bg: "bg-green-50",  border: "border-green-200",  btnClass: "bg-green-600 hover:bg-green-700",   icon: Receipt   },
 };
 
-const SERVICE_LABELS: Record<string, string> = {
+const DEPT_SERVICE_LABELS: Record<string, string> = {
   pest_control:  "Pest Control",
   sanitary_bins: "Sanitary Bins",
   washroom:      "Washroom",
@@ -112,7 +176,10 @@ export default function DocumentForm({
       contactPerson: clientInfo?.contactPerson ?? "",
       email: clientInfo?.email ?? "",
       phone: clientInfo?.phone ?? "",
-      address: clientInfo?.address ?? "",
+      streetNumber: "",
+      streetName: "",
+      area: "",
+      town: "",
       serviceType: clientInfo?.serviceType ?? "",
       preferredContactMethod: "phone",
       assignedTo: "",
@@ -152,8 +219,18 @@ export default function DocumentForm({
     recalc(items);
   };
 
+  // Unique datalist id to avoid collisions if multiple DocumentForms exist
+  const datalistId = `svc-list-${docType}`;
+
   return (
     <Form {...form}>
+      {/* Service suggestion datalist */}
+      <datalist id={datalistId}>
+        {SERVICE_CATALOGUE.flatMap(g => g.items).map(s => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+
       <form onSubmit={form.handleSubmit(onSubmit)}>
 
         {/* ── document header banner ── */}
@@ -176,7 +253,7 @@ export default function DocumentForm({
                 </SelectTrigger>
                 <SelectContent>
                   {["draft","sent","paid","overdue","cancelled"].map(s => (
-                    <SelectItem key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase()+s.slice(1)}</SelectItem>
+                    <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -269,17 +346,21 @@ export default function DocumentForm({
               </div>
 
             ) : clientInfo ? (
+              /* Read-only client summary (quote pre-filled from lead) */
               <div className="bg-gray-50 rounded-lg p-3 grid grid-cols-2 gap-y-2 gap-x-4 text-sm border border-gray-100">
                 <div><span className="text-xs text-gray-400 block">Business</span><strong>{clientInfo.companyName}</strong></div>
                 <div><span className="text-xs text-gray-400 block">Contact</span>{clientInfo.contactPerson}</div>
                 <div><span className="text-xs text-gray-400 block">Email</span>{clientInfo.email}</div>
                 <div><span className="text-xs text-gray-400 block">Phone</span>{clientInfo.phone}</div>
                 {clientInfo.address && <div className="col-span-2"><span className="text-xs text-gray-400 block">Address</span>{clientInfo.address}</div>}
-                <div className="col-span-2"><span className="text-xs text-gray-400 block">Service</span>{SERVICE_LABELS[clientInfo.serviceType] ?? clientInfo.serviceType}</div>
+                <div className="col-span-2"><span className="text-xs text-gray-400 block">Service</span>{DEPT_SERVICE_LABELS[clientInfo.serviceType] ?? clientInfo.serviceType}</div>
               </div>
 
             ) : (
+              /* Editable client fields (new lead) */
               <div className="grid grid-cols-2 gap-3">
+
+                {/* Business name */}
                 <FormField control={form.control} name="companyName" render={({ field }) => (
                   <FormItem className="col-span-2">
                     <FormLabel>Business / Company Name <span className="text-red-500">*</span></FormLabel>
@@ -288,6 +369,7 @@ export default function DocumentForm({
                   </FormItem>
                 )} />
 
+                {/* Contact + Phone */}
                 <FormField control={form.control} name="contactPerson" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contact Person <span className="text-red-500">*</span></FormLabel>
@@ -295,7 +377,6 @@ export default function DocumentForm({
                     <FormMessage />
                   </FormItem>
                 )} />
-
                 <FormField control={form.control} name="phone" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Phone <span className="text-red-500">*</span></FormLabel>
@@ -304,6 +385,7 @@ export default function DocumentForm({
                   </FormItem>
                 )} />
 
+                {/* Email + Preferred contact */}
                 <FormField control={form.control} name="email" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Email <span className="text-red-500">*</span></FormLabel>
@@ -311,50 +393,76 @@ export default function DocumentForm({
                     <FormMessage />
                   </FormItem>
                 )} />
-
-                <FormField control={form.control} name="serviceType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Service Required <span className="text-red-500">*</span></FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="pest_control">Pest Control</SelectItem>
-                        <SelectItem value="sanitary_bins">Sanitary Bins</SelectItem>
-                        <SelectItem value="washroom">Washroom</SelectItem>
-                        <SelectItem value="deep_cleaning">Deep Cleaning</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Address <span className="text-xs text-gray-400 font-normal">(optional)</span></FormLabel>
-                    <FormControl><Input placeholder="Service site address" {...field} /></FormControl>
-                  </FormItem>
-                )} />
-
                 <FormField control={form.control} name="preferredContactMethod" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Preferred Contact</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="either">Either</SelectItem>
+                        <SelectItem value="phone">📞 Phone Call</SelectItem>
+                        <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+                        <SelectItem value="email">✉️ Email</SelectItem>
+                        <SelectItem value="either">Any / Either</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
                 )} />
 
+                {/* Service type */}
+                <FormField control={form.control} name="serviceType" render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Service Department <span className="text-red-500">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select service department" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="pest_control">🐛 Pest Control</SelectItem>
+                        <SelectItem value="sanitary_bins">🗑️ Sanitary Bins</SelectItem>
+                        <SelectItem value="washroom">🚿 Washroom</SelectItem>
+                        <SelectItem value="deep_cleaning">🧹 Deep Cleaning</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                {/* ── ADDRESS — 4 separate boxes ── */}
+                <div className="col-span-2">
+                  <p className="text-sm font-medium mb-2">Service Address <span className="text-xs text-gray-400 font-normal">(optional)</span></p>
+                  <div className="grid grid-cols-4 gap-2">
+                    <FormField control={form.control} name="streetNumber" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-gray-500">Street No.</FormLabel>
+                        <FormControl><Input placeholder="12" className="h-8 text-sm" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="streetName" render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel className="text-xs text-gray-500">Street Name</FormLabel>
+                        <FormControl><Input placeholder="Main Road" className="h-8 text-sm" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="area" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-gray-500">Area / Suburb</FormLabel>
+                        <FormControl><Input placeholder="Humewood" className="h-8 text-sm" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="town" render={({ field }) => (
+                      <FormItem className="col-span-4">
+                        <FormLabel className="text-xs text-gray-500">Town / City</FormLabel>
+                        <FormControl><Input placeholder="Port Elizabeth" className="h-8 text-sm" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                  </div>
+                </div>
+
+                {/* Salesperson */}
                 {salesWorkers.length > 0 && (
                   <FormField control={form.control} name="assignedTo" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Salesperson</FormLabel>
+                    <FormItem className="col-span-2">
+                      <FormLabel>Assigned Salesperson</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder="— Unassigned —" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="unassigned">— Unassigned —</SelectItem>
                           {salesWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
@@ -378,7 +486,7 @@ export default function DocumentForm({
             </div>
 
             <div className="grid grid-cols-12 gap-1.5 px-2 mb-1 text-xs text-gray-400 font-medium">
-              <span className="col-span-5">Description</span>
+              <span className="col-span-5">Service / Description</span>
               <span className="col-span-2 text-center">Qty</span>
               <span className="col-span-2 text-right">Unit Price</span>
               <span className="col-span-2 text-right">Total</span>
@@ -389,9 +497,11 @@ export default function DocumentForm({
               {fields.map((field, idx) => (
                 <div key={field.id} className="grid grid-cols-12 gap-1.5 items-center bg-gray-50 rounded-lg px-2 py-2">
                   <div className="col-span-5">
-                    <Input
-                      placeholder="Service description"
-                      className="h-8 text-sm bg-white"
+                    {/* Input with datalist for service autocomplete */}
+                    <input
+                      list={datalistId}
+                      placeholder="Type or pick a service..."
+                      className="flex h-8 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       value={form.watch(`lineItems.${idx}.description`)}
                       onChange={e => handleItemChange(idx, "description", e.target.value)}
                     />
