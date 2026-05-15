@@ -204,13 +204,12 @@ export default function Dashboard() {
               {/* TOP: logo + title */}
               <div className="flex items-center gap-4 px-4 pt-4 pb-3">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
-                <div className="flex items-center gap-3">
-                  <div>
-                    <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
-                  </div>
-                  <img src={jobFlowLogo} alt="Job Flow" className="h-14 w-auto object-contain" />
+                <div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
                 </div>
+                <div className="flex-1" />
+                <img src={jobFlowLogo} alt="Job Flow" className="h-24 w-auto object-contain" />
               </div>
 
               {/* Performance panels */}
