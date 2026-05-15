@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import type { Worker, QuoteSubmission, Invoice, Job } from "@shared/schema";
+import jobFlowLogo from "@assets/ChatGPT_Image_May_15,_2026,_03_37_30_PM_1778852274464.png";
 
 interface DashboardMetrics {
   activeJobs: number;
@@ -203,9 +204,12 @@ export default function Dashboard() {
               {/* TOP: logo + title */}
               <div className="flex items-center gap-4 px-4 pt-4 pb-3">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
-                <div>
-                  <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
+                  </div>
+                  <img src={jobFlowLogo} alt="Job Flow" className="h-14 w-auto object-contain" />
                 </div>
               </div>
 
