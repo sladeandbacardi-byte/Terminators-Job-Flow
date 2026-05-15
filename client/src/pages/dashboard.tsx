@@ -198,10 +198,10 @@ export default function Dashboard() {
 
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
-            {/* Company Logo Header — Logo | Job Flow | Role Panel */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            {/* Unified card: Logo + Panels + Role Dashboard */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
               {/* TOP: logo + title */}
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-4 px-4 pt-4 pb-3">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
                 <div>
                   <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
@@ -209,8 +209,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* BOTTOM: role-specific performance panels */}
-              <div className="border-t border-gray-100 pt-3">
+              {/* Performance panels */}
+              <div className="border-t border-gray-100 px-4 py-3">
 
                 {/* SALES */}
                 {dashboardRole === "sales" && (
@@ -372,17 +372,21 @@ export default function Dashboard() {
                 )}
 
               </div>
+
+              {/* Suspended services alert */}
+              <div className="px-4">
+                <SuspendedServices />
+              </div>
+
+              {/* Role-based dashboard content */}
+              <div className="border-t border-gray-100 px-4 py-4">
+                {dashboardRole === "service" && <ServiceDashboard />}
+                {dashboardRole === "sales" && <SalesDashboard />}
+                {dashboardRole === "accounts" && <AccountsDashboard />}
+                {dashboardRole === "manager" && <ManagerDashboard />}
+                {dashboardRole === "admin" && <AdminDashboard />}
+              </div>
             </div>
-
-            {/* Suspended services alert — visible to all roles */}
-            <SuspendedServices />
-
-            {/* Role-based dashboard */}
-            {dashboardRole === "service" && <ServiceDashboard />}
-            {dashboardRole === "sales" && <SalesDashboard />}
-            {dashboardRole === "accounts" && <AccountsDashboard />}
-            {dashboardRole === "manager" && <ManagerDashboard />}
-            {dashboardRole === "admin" && <AdminDashboard />}
 
             {/* Legacy full overview — hidden, kept for reference */}
             {false && <div className="hidden">
