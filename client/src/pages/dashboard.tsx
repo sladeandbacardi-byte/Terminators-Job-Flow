@@ -200,16 +200,18 @@ export default function Dashboard() {
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
             {/* Unified card: Logo + Panels + Role Dashboard */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-              {/* TOP: logo + title */}
-              <div className="flex items-center gap-4 px-4 pt-4 pb-3">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+              {/* Job Flow image — top right corner */}
+              <img src={jobFlowLogo} alt="Job Flow" className="absolute top-0 right-0 h-28 w-auto object-contain opacity-90 pointer-events-none" />
+
+              {/* TOP: business logo left, Job Flow text right */}
+              <div className="flex items-center px-4 pt-4 pb-3 pr-32">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
-                <div>
+                <div className="flex-1" />
+                <div className="text-right">
                   <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
                   <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
                 </div>
-                <div className="flex-1" />
-                <img src={jobFlowLogo} alt="Job Flow" className="h-24 w-auto object-contain" />
               </div>
 
               {/* Performance panels */}
