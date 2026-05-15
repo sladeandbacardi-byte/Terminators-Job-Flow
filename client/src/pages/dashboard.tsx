@@ -204,13 +204,9 @@ export default function Dashboard() {
               {/* Job Flow image — top right corner */}
               <img src={jobFlowLogo} alt="Job Flow" className="absolute top-0 right-0 h-28 w-auto object-contain opacity-90 pointer-events-none" />
 
-              {/* TOP: business logo left, Job Flow text centre */}
+              {/* TOP: business logo */}
               <div className="flex items-center px-4 pt-4 pb-3">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
-                <div className="flex-1 flex flex-col items-center text-center">
-                  <p className="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Field Service Management</p>
-                </div>
               </div>
 
               {/* Performance panels */}
