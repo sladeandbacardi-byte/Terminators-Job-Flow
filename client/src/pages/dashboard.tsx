@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import type { Worker, QuoteSubmission, Invoice, Job } from "@shared/schema";
-import jobFlowLogo from "@assets/ChatGPT_Image_May_15,_2026,_03_37_30_PM_1778852274464.png";
+import jobFlowLogo from "@assets/ChatGPT_Image_May_16,_2026,_04_38_50_PM_(4)_1778942394020.png";
 
 interface DashboardMetrics {
   activeJobs: number;
