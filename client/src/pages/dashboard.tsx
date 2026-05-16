@@ -199,9 +199,9 @@ export default function Dashboard() {
             {/* Unified card: Logo + Panels + Role Dashboard */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
               {/* TOP: business logo + role badge */}
-              <div className="flex items-center gap-3 px-4 pt-2 pb-3">
-                <TerminatorsLogo size="lg" data-testid="company-logo" />
-                <span className={`px-3 py-1.5 rounded-full text-white text-sm font-semibold ${dashboardRoleColors[dashboardRole]}`}>
+              <div className="flex items-center gap-4 px-4 pt-3 pb-3">
+                <TerminatorsLogo size="md" data-testid="company-logo" />
+                <span className={`px-4 py-2 rounded-full text-white text-base font-bold shadow-sm ${dashboardRoleColors[dashboardRole]}`}>
                   {dashboardRoleLabels[dashboardRole]} View
                 </span>
               </div>
