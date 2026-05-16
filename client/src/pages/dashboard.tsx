@@ -198,11 +198,6 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* Unified card: Logo + Panels + Role Dashboard */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
-              {/* Job Flow image — top centre */}
-              <div className="flex justify-center pt-4 pb-1">
-                <img src={jobFlowLogo} alt="Job Flow" className="h-20 w-auto object-contain opacity-95 pointer-events-none" />
-              </div>
-
               {/* TOP: business logo + role badge */}
               <div className="flex items-center gap-3 px-4 pt-2 pb-3">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />

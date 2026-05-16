@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
+import jobFlowLogo from "@assets/ChatGPT_Image_May_16,_2026,_04_38_50_PM_(4)_1778942394020.png";
 
 interface HeaderProps {
   title: string;
@@ -45,6 +46,7 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4" data-testid="header">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
+          <img src={jobFlowLogo} alt="Job Flow" className="h-10 w-auto object-contain pointer-events-none hidden sm:block" />
           <button
             className="lg:hidden p-2 text-gray-600 hover:text-gray-900"
             onClick={onMobileMenuToggle}
