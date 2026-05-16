@@ -54,21 +54,17 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
           >
             <Menu className="h-5 w-5" />
           </button>
-          {badge ? (
-            <div className="flex items-center gap-3">
-              <span className={`px-3 py-1.5 rounded-full text-white text-sm font-semibold ${badgeColor ?? "bg-gray-600"}`}>
-                {badge}
-              </span>
-              {tagline && (
-                <span className="text-sm text-gray-500 italic hidden sm:block">{tagline}</span>
-              )}
-            </div>
-          ) : (
+          {title && (
             <h2 className="text-2xl font-bold text-gray-900" data-testid="page-title">{title}</h2>
           )}
         </div>
 
         <div className="flex items-center space-x-4">
+          {badge && (
+            <span className={`px-3 py-1.5 rounded-full text-white text-sm font-semibold ${badgeColor ?? "bg-gray-600"}`}>
+              {badge}
+            </span>
+          )}
           <div className="text-sm text-gray-600" data-testid="current-time">
             <span>{formatDateTime(currentTime)} SAST</span>
           </div>
