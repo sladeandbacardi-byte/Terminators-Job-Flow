@@ -66,11 +66,6 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
           )}
         </div>
 
-        <div className="flex-1 flex flex-col items-center text-center pointer-events-none select-none">
-          <p className="text-lg font-bold text-gray-800 tracking-tight leading-tight">Job Flow</p>
-          <p className="text-xs text-gray-400">Field Service Management</p>
-        </div>
-
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600" data-testid="current-time">
             <span>{formatDateTime(currentTime)} SAST</span>

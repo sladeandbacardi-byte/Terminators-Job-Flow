@@ -192,21 +192,23 @@ export default function Dashboard() {
         <Header
           title=""
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-          badge={`${dashboardRoleLabels[dashboardRole]} View`}
-          badgeColor={dashboardRoleColors[dashboardRole]}
-          tagline="Let's see how it goes"
         />
 
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
             {/* Unified card: Logo + Panels + Role Dashboard */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
-              {/* Job Flow image — top right corner */}
-              <img src={jobFlowLogo} alt="Job Flow" className="absolute top-0 right-0 h-28 w-auto object-contain opacity-90 pointer-events-none" />
+              {/* Job Flow image — top centre */}
+              <div className="flex justify-center pt-4 pb-1">
+                <img src={jobFlowLogo} alt="Job Flow" className="h-20 w-auto object-contain opacity-95 pointer-events-none" />
+              </div>
 
-              {/* TOP: business logo */}
-              <div className="flex items-center px-4 pt-4 pb-3">
+              {/* TOP: business logo + role badge */}
+              <div className="flex items-center gap-3 px-4 pt-2 pb-3">
                 <TerminatorsLogo size="lg" data-testid="company-logo" />
+                <span className={`px-3 py-1.5 rounded-full text-white text-sm font-semibold ${dashboardRoleColors[dashboardRole]}`}>
+                  {dashboardRoleLabels[dashboardRole]} View
+                </span>
               </div>
 
               {/* Performance panels */}
