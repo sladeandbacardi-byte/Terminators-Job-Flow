@@ -197,130 +197,119 @@ export default function Dashboard() {
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
             {/* Unified card: Logo + Panels + Role Dashboard */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
-              {/* TOP: business logo + role badge */}
-              <div className="flex items-center justify-between px-4 pt-3 pb-3">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+
+              {/* TOP ROW: Terminators logo left · role badge + slogan right */}
+              <div className="flex items-center justify-between px-4 pt-2.5 pb-2">
                 <TerminatorsLogo size="sm" data-testid="company-logo" />
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`px-4 py-1.5 rounded-full text-white text-sm font-bold shadow-sm ${dashboardRoleColors[dashboardRole]}`}>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${dashboardRoleColors[dashboardRole]}`}>
                     {dashboardRoleLabels[dashboardRole]} View
                   </span>
-                  <span className="text-xs text-gray-400 italic">Let's see how it goes</span>
+                  <span className="text-[11px] text-gray-400 italic">Let's see how it goes</span>
                 </div>
               </div>
 
-              {/* Performance panels */}
-              <div className="border-t border-gray-100 px-4 py-3">
+              {/* STATS ROW */}
+              <div className="border-t border-gray-100 px-4 py-2">
 
-                {/* SALES */}
+                {/* SALES role */}
                 {dashboardRole === "sales" && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sales</p>
-                    <div className="flex gap-3 flex-wrap">
-                      {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
-                        const firstName = rep.name.split(" ")[0];
-                        return (
-                          <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[120px]">
-                            <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
-                            <div className="mt-1 space-y-0.5">
-                              <p className="text-xs text-gray-500">
-                                <span className="font-medium text-purple-600">{total}</span> quote{total !== 1 ? "s" : ""}
-                                {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                <span className="font-medium text-green-600">{won}</span> won
-                                {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                <span className="font-medium text-red-500">{lost}</span> lost
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
-                    </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
+                      const firstName = rep.name.split(" ")[0];
+                      return (
+                        <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+                          <p className="text-xs font-semibold text-gray-800">{firstName}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            <span className="text-purple-600 font-medium">{total}</span> quoted
+                            {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            <span className="text-green-600 font-medium">{won}</span> won
+                            {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
+                            <span className="mx-1 text-gray-300">·</span>
+                            <span className="text-red-500 font-medium">{lost}</span> lost
+                          </p>
+                        </div>
+                      );
+                    })}
+                    {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
                   </div>
                 )}
 
-                {/* MANAGER / ADMIN — Sales | Service | Finance on one line */}
+                {/* MANAGER / ADMIN: Sales | Service | Finance in one row */}
                 {(dashboardRole === "manager" || dashboardRole === "admin") && (
-                  <div className="flex gap-6 flex-wrap">
+                  <div className="flex items-start gap-0 overflow-x-auto">
 
                     {/* Sales */}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sales</p>
-                        <Button size="sm" variant="outline" className="text-xs h-6 px-2 gap-1" onClick={() => setShowAddRep(true)}>
-                          <UserPlus className="h-3 w-3" /> Add Rep
-                        </Button>
+                    <div className="flex-shrink-0 pr-4">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sales</p>
+                        <button
+                          onClick={() => setShowAddRep(true)}
+                          className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 hover:border-gray-300 transition-colors"
+                        >
+                          <UserPlus className="h-2.5 w-2.5" /> Add
+                        </button>
                       </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {salesRepStats.map(({ rep, total, won, lost }) => {
-                          const firstName = rep.name.split(" ")[0];
-                          return (
-                            <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
-                              <p className="text-xs font-semibold text-gray-800 truncate">{firstName}</p>
-                              <div className="mt-0.5 space-y-0.5">
-                                <p className="text-xs text-gray-400"><span className="text-purple-600 font-medium">{total}</span> quoted</p>
-                                <p className="text-xs text-gray-400"><span className="text-green-600 font-medium">{won}</span> won · <span className="text-red-500 font-medium">{lost}</span> lost</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {salesRepStats.map(({ rep, total, won, lost }) => (
+                          <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1">
+                            <p className="text-[11px] font-semibold text-gray-700">{rep.name.split(" ")[0]}</p>
+                            <p className="text-[10px] text-gray-400 leading-tight">
+                              <span className="text-purple-600 font-medium">{total}</span> q ·{" "}
+                              <span className="text-green-600 font-medium">{won}</span> w ·{" "}
+                              <span className="text-red-500 font-medium">{lost}</span> l
+                            </p>
+                          </div>
+                        ))}
+                        {salesReps.length === 0 && <p className="text-[10px] text-gray-400 italic">None</p>}
                       </div>
                     </div>
 
-                    {/* Divider */}
-                    <div className="w-px bg-gray-200 self-stretch" />
+                    <div className="w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
 
                     {/* Service */}
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Service</p>
-                      <div className="flex gap-2 flex-wrap">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Active Jobs</p>
-                          <p className="text-base font-bold text-blue-600">{metrics?.activeJobs ?? "—"}</p>
+                    <div className="flex-shrink-0 px-4">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Service</p>
+                      <div className="flex gap-1.5">
+                        <div className="bg-blue-50 border border-blue-100 rounded-md px-2 py-1 text-center min-w-[52px]">
+                          <p className="text-sm font-bold text-blue-600 leading-tight">{metrics?.activeJobs ?? "—"}</p>
+                          <p className="text-[10px] text-gray-400">active</p>
                         </div>
-                        <div className="bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Workers</p>
-                          <p className="text-base font-bold text-teal-600">{metrics?.activeWorkers ?? "—"}</p>
+                        <div className="bg-teal-50 border border-teal-100 rounded-md px-2 py-1 text-center min-w-[52px]">
+                          <p className="text-sm font-bold text-teal-600 leading-tight">{metrics?.activeWorkers ?? "—"}</p>
+                          <p className="text-[10px] text-gray-400">workers</p>
                         </div>
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Jobs Done</p>
-                          <p className="text-base font-bold text-purple-600">{jobsCompletedThisMonth}</p>
-                          <p className="text-xs text-gray-400">this month</p>
+                        <div className="bg-purple-50 border border-purple-100 rounded-md px-2 py-1 text-center min-w-[52px]">
+                          <p className="text-sm font-bold text-purple-600 leading-tight">{jobsCompletedThisMonth}</p>
+                          <p className="text-[10px] text-gray-400">done</p>
                         </div>
-                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Invoiced</p>
-                          <p className="text-base font-bold text-indigo-600">{invoicesSentThisMonth}</p>
-                          <p className="text-xs text-gray-400">this month</p>
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1 text-center min-w-[52px]">
+                          <p className="text-sm font-bold text-indigo-600 leading-tight">{invoicesSentThisMonth}</p>
+                          <p className="text-[10px] text-gray-400">invoiced</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Divider */}
-                    <div className="w-px bg-gray-200 self-stretch" />
+                    <div className="w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
 
                     {/* Finance */}
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Finance</p>
-                      <div className="flex gap-2 flex-wrap">
-                        <div className="bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
-                          <p className="text-xs text-gray-500">Revenue</p>
-                          <p className="text-base font-bold text-green-600">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          <p className="text-xs text-gray-400">this month</p>
+                    <div className="flex-shrink-0 pl-4">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance</p>
+                      <div className="flex gap-1.5">
+                        <div className="bg-green-50 border border-green-100 rounded-md px-2 py-1 text-center min-w-[64px]">
+                          <p className="text-sm font-bold text-green-600 leading-tight">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          <p className="text-[10px] text-gray-400">revenue</p>
                         </div>
-                        <div className="bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 min-w-[100px]">
-                          <p className="text-xs text-gray-500">Debtors</p>
-                          <p className="text-base font-bold text-red-600">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          <p className="text-xs text-gray-400">outstanding</p>
+                        <div className="bg-red-50 border border-red-100 rounded-md px-2 py-1 text-center min-w-[64px]">
+                          <p className="text-sm font-bold text-red-600 leading-tight">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          <p className="text-[10px] text-gray-400">debtors</p>
                         </div>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 min-w-[80px]">
-                          <p className="text-xs text-gray-500">Expiring</p>
-                          <p className="text-base font-bold text-amber-600">{metrics?.expiringContracts ?? "—"}</p>
-                          <p className="text-xs text-gray-400">contracts</p>
+                        <div className="bg-amber-50 border border-amber-100 rounded-md px-2 py-1 text-center min-w-[48px]">
+                          <p className="text-sm font-bold text-amber-600 leading-tight">{metrics?.expiringContracts ?? "—"}</p>
+                          <p className="text-[10px] text-gray-400">expiring</p>
                         </div>
                       </div>
                     </div>
@@ -328,45 +317,39 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* ACCOUNTS */}
+                {/* ACCOUNTS role */}
                 {dashboardRole === "accounts" && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Finance</p>
-                    <div className="flex gap-3 flex-wrap">
-                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 min-w-[110px]">
-                        <p className="text-xs text-gray-500 mb-0.5">Debtors</p>
-                        <p className="text-sm font-bold text-red-600">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                        <p className="text-xs text-gray-400">outstanding</p>
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 min-w-[110px]">
-                        <p className="text-xs text-gray-500 mb-0.5">Sales (month)</p>
-                        <p className="text-sm font-bold text-blue-600">R{salesThisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                        <p className="text-xs text-gray-400">invoiced</p>
-                      </div>
-                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 min-w-[90px]">
-                        <p className="text-xs text-gray-500 mb-0.5">Collected</p>
-                        <p className="text-sm font-bold text-green-600">{collectedPct}%</p>
-                        <p className="text-xs text-gray-400">of month sales</p>
-                      </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <div className="bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5 min-w-[100px]">
+                      <p className="text-[10px] text-gray-500">Debtors</p>
+                      <p className="text-sm font-bold text-red-600">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[10px] text-gray-400">outstanding</p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5 min-w-[100px]">
+                      <p className="text-[10px] text-gray-500">Sales</p>
+                      <p className="text-sm font-bold text-blue-600">R{salesThisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[10px] text-gray-400">this month</p>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 rounded-md px-2.5 py-1.5 min-w-[80px]">
+                      <p className="text-[10px] text-gray-500">Collected</p>
+                      <p className="text-sm font-bold text-green-600">{collectedPct}%</p>
+                      <p className="text-[10px] text-gray-400">of sales</p>
                     </div>
                   </div>
                 )}
 
-                {/* SERVICE */}
+                {/* SERVICE role */}
                 {dashboardRole === "service" && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Service</p>
-                    <div className="flex gap-3 flex-wrap">
-                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 min-w-[120px]">
-                        <p className="text-xs text-gray-500 mb-0.5">Jobs Completed</p>
-                        <p className="text-2xl font-bold text-green-600">{jobsCompletedThisMonth}</p>
-                        <p className="text-xs text-gray-400">this month</p>
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 min-w-[120px]">
-                        <p className="text-xs text-gray-500 mb-0.5">Invoices Sent</p>
-                        <p className="text-2xl font-bold text-blue-600">{invoicesSentThisMonth}</p>
-                        <p className="text-xs text-gray-400">this month</p>
-                      </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <div className="bg-green-50 border border-green-100 rounded-md px-2.5 py-1.5 min-w-[90px]">
+                      <p className="text-[10px] text-gray-500">Jobs Done</p>
+                      <p className="text-lg font-bold text-green-600">{jobsCompletedThisMonth}</p>
+                      <p className="text-[10px] text-gray-400">this month</p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5 min-w-[90px]">
+                      <p className="text-[10px] text-gray-500">Invoiced</p>
+                      <p className="text-lg font-bold text-blue-600">{invoicesSentThisMonth}</p>
+                      <p className="text-[10px] text-gray-400">this month</p>
                     </div>
                   </div>
                 )}
