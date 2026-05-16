@@ -14,23 +14,17 @@ import { useLocation } from "wouter";
 import jobFlowLogo from "@assets/ChatGPT_Image_May_16,_2026,_04_38_50_PM_(4)_1778942394020.png";
 
 interface HeaderProps {
-  title: string;
+  title?: string;
   onMobileMenuToggle?: () => void;
-  badge?: string;
-  badgeColor?: string;
-  tagline?: string;
 }
 
-export default function Header({ title, onMobileMenuToggle, badge, badgeColor, tagline }: HeaderProps) {
+export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -43,10 +37,16 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
   const userRole = user?.role || "User";
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4" data-testid="header">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <img src={jobFlowLogo} alt="Job Flow" className="h-[38px] sm:h-[52px] w-auto object-contain pointer-events-none pl-1" />
+    <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-3" data-testid="header">
+      <div className="flex items-center justify-between h-[52px]">
+
+        {/* LEFT — Job Flow logo + optional page title */}
+        <div className="flex items-center gap-3">
+          <img
+            src={jobFlowLogo}
+            alt="Job Flow"
+            className="h-[38px] sm:h-[52px] w-auto object-contain pointer-events-none pl-1 flex-shrink-0"
+          />
           <button
             className="lg:hidden p-2 text-gray-600 hover:text-gray-900"
             onClick={onMobileMenuToggle}
@@ -55,30 +55,29 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
             <Menu className="h-5 w-5" />
           </button>
           {title && (
-            <h2 className="text-2xl font-bold text-gray-900" data-testid="page-title">{title}</h2>
+            <span className="hidden sm:block text-sm font-medium text-gray-500 border-l border-gray-200 pl-3" data-testid="page-title">
+              {title}
+            </span>
           )}
         </div>
 
-        <div className="flex items-center space-x-4">
-          {badge && (
-            <span className={`px-3 py-1.5 rounded-full text-white text-sm font-semibold ${badgeColor ?? "bg-gray-600"}`}>
-              {badge}
-            </span>
-          )}
-          <div className="text-sm text-gray-600" data-testid="current-time">
-            <span>{formatDateTime(currentTime)} SAST</span>
-          </div>
+        {/* RIGHT — date/time + user profile */}
+        <div className="flex items-center gap-4">
+          <span className="hidden md:block text-sm text-gray-500" data-testid="current-time">
+            {formatDateTime(currentTime)} SAST
+          </span>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors cursor-pointer" data-testid="user-menu-trigger">
-                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center" data-testid="user-avatar">
-                  <span className="text-white text-sm font-medium">
-                    {getInitials(userName)}
-                  </span>
+              <button
+                className="flex items-center gap-2 hover:bg-gray-100 rounded-lg p-2 transition-colors cursor-pointer"
+                data-testid="user-menu-trigger"
+              >
+                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0" data-testid="user-avatar">
+                  <span className="text-white text-sm font-medium">{getInitials(userName)}</span>
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium text-gray-900" data-testid="user-name">{userName}</p>
+                  <p className="text-sm font-medium text-gray-900 leading-tight" data-testid="user-name">{userName}</p>
                   <p className="text-xs text-gray-500" data-testid="user-role">{userRole}</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-500 hidden md:block" />
@@ -104,6 +103,7 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
       </div>
     </header>
   );
