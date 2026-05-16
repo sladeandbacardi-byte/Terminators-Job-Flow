@@ -46,7 +46,7 @@ export default function Header({ title, onMobileMenuToggle, badge, badgeColor, t
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4" data-testid="header">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <img src={jobFlowLogo} alt="Job Flow" className="h-16 w-auto object-contain pointer-events-none hidden sm:block" />
+          <img src={jobFlowLogo} alt="Job Flow" className="h-[38px] sm:h-[52px] w-auto object-contain pointer-events-none pl-1" />
           <button
             className="lg:hidden p-2 text-gray-600 hover:text-gray-900"
             onClick={onMobileMenuToggle}

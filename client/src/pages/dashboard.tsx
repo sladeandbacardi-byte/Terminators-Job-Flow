@@ -200,7 +200,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
               {/* TOP: business logo + role badge */}
               <div className="flex items-center justify-between px-4 pt-3 pb-3">
-                <TerminatorsLogo size="md" data-testid="company-logo" />
+                <TerminatorsLogo size="sm" data-testid="company-logo" />
                 <div className="flex flex-col items-end gap-1">
                   <span className={`px-4 py-1.5 rounded-full text-white text-sm font-bold shadow-sm ${dashboardRoleColors[dashboardRole]}`}>
                     {dashboardRoleLabels[dashboardRole]} View
