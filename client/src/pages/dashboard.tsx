@@ -200,18 +200,18 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
               {/* TOP ROW: Terminators logo left · role badge + slogan right */}
-              <div className="flex items-center justify-between px-4 pt-2.5 pb-2">
+              <div className="flex items-center justify-between px-4 pt-3 pb-2.5">
                 <TerminatorsLogo size="sm" data-testid="company-logo" />
                 <div className="flex flex-col items-end gap-0.5">
                   <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${dashboardRoleColors[dashboardRole]}`}>
                     {dashboardRoleLabels[dashboardRole]} View
                   </span>
-                  <span className="text-[11px] text-gray-400 italic">Let's see how it goes</span>
+                  <span className="text-[11px] text-gray-400 italic hidden sm:block">Let's see how it goes</span>
                 </div>
               </div>
 
               {/* STATS ROW */}
-              <div className="border-t border-gray-100 px-4 py-2">
+              <div className="border-t border-gray-100 px-4 pt-3 pb-2.5">
 
                 {/* SALES role */}
                 {dashboardRole === "sales" && (
@@ -238,12 +238,12 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* MANAGER / ADMIN: Sales | Service | Finance in one row */}
+                {/* MANAGER / ADMIN: Sales | Service | Finance */}
                 {(dashboardRole === "manager" || dashboardRole === "admin") && (
-                  <div className="flex items-start gap-0 overflow-x-auto">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-0">
 
                     {/* Sales */}
-                    <div className="flex-shrink-0 pr-4">
+                    <div className="sm:flex-shrink-0 sm:pr-4">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sales</p>
                         <button
@@ -268,12 +268,14 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
+                    {/* Vertical divider (desktop) / Horizontal divider (mobile) */}
+                    <div className="hidden sm:block w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
+                    <div className="sm:hidden h-px bg-gray-100 w-full" />
 
                     {/* Service */}
-                    <div className="flex-shrink-0 px-4">
+                    <div className="sm:flex-shrink-0 sm:px-4">
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Service</p>
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 flex-wrap">
                         <div className="bg-blue-50 border border-blue-100 rounded-md px-2 py-1 text-center min-w-[52px]">
                           <p className="text-sm font-bold text-blue-600 leading-tight">{metrics?.activeJobs ?? "—"}</p>
                           <p className="text-[10px] text-gray-400">active</p>
@@ -293,12 +295,14 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
+                    {/* Vertical divider (desktop) / Horizontal divider (mobile) */}
+                    <div className="hidden sm:block w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
+                    <div className="sm:hidden h-px bg-gray-100 w-full" />
 
                     {/* Finance */}
-                    <div className="flex-shrink-0 pl-4">
+                    <div className="sm:flex-shrink-0 sm:pl-4">
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance</p>
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 flex-wrap">
                         <div className="bg-green-50 border border-green-100 rounded-md px-2 py-1 text-center min-w-[64px]">
                           <p className="text-sm font-bold text-green-600 leading-tight">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                           <p className="text-[10px] text-gray-400">revenue</p>
