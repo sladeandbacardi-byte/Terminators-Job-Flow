@@ -126,7 +126,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             </div>
           )}
 
-          <Button onClick={handleLogin} className="w-full bg-green-600 hover:bg-green-700"
+          <Button onClick={handleLogin} className="w-full bg-[#1a3a8f] hover:bg-[#142d72] text-white"
             disabled={loginMutation.isPending || !selectedUserId} data-testid="button-login">
             {loginMutation.isPending ? "Signing in..." : "Sign In"}
           </Button>
