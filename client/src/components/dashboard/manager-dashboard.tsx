@@ -141,11 +141,8 @@ export function ManagerDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Operations Manager Dashboard</h2>
-          <p className="text-gray-500 text-sm">Jobs, revenue and profit performance over time</p>
-        </div>
+      {/* Range toggle */}
+      <div className="flex justify-end">
         <div className="flex gap-1">
           {RANGE_OPTIONS.map(opt => (
             <Button key={opt.value} size="sm" variant={range === opt.value ? "default" : "outline"}
@@ -154,31 +151,6 @@ export function ManagerDashboard() {
             </Button>
           ))}
         </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Jobs Completed", value: totalJobsDone, sub: `last ${range} days`, icon: CheckCircle, color: "bg-green-50 text-green-600" },
-          { label: "Revenue", value: fmt(totalRevenue), sub: `last ${range} days`, icon: Briefcase, color: "bg-blue-50 text-blue-600" },
-          { label: "Gross Profit", value: fmt(totalProfit), sub: `${totalRevenue > 0 ? Math.round((totalProfit/totalRevenue)*100) : 0}% margin`, icon: CalendarDays, color: totalProfit >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600" },
-          { label: "Unassigned Jobs", value: unassignedJobs.length, sub: "need a worker", icon: ClipboardList, color: unassignedJobs.length > 0 ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-400" },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{label}</p>
-                  <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
-                  <p className="text-xs text-gray-400 mt-1">{sub}</p>
-                </div>
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       {/* Alerts */}

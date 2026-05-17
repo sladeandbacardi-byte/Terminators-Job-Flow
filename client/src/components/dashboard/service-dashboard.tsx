@@ -73,12 +73,8 @@ export function ServiceDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Service Dashboard</h2>
-          <p className="text-gray-500 text-sm">Jobs, schedules and field team overview</p>
-        </div>
+      {/* Range toggle */}
+      <div className="flex justify-end">
         <div className="flex gap-1">
           {(["today","week","month"] as Range[]).map(r => (
             <Button key={r} size="sm" variant={range === r ? "default" : "outline"}
@@ -87,30 +83,6 @@ export function ServiceDashboard() {
             </Button>
           ))}
         </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Jobs", value: filtered.length, icon: Briefcase, color: "bg-blue-50 text-blue-600" },
-          { label: "Completed", value: completed, icon: CheckCircle, color: "bg-green-50 text-green-600" },
-          { label: "In Progress", value: inProgress, icon: Clock, color: "bg-orange-50 text-orange-600" },
-          { label: "Pending", value: pending, icon: AlertCircle, color: "bg-yellow-50 text-yellow-600" },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{label}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-                </div>
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

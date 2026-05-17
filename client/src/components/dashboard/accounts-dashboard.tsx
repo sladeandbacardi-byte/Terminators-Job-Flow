@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, ShoppingCart, Building2 } from "lucide-react";
+import { TrendingUp, TrendingDown, ShoppingCart, Building2, CheckCircle } from "lucide-react";
 import type { Client, RentalContract, Invoice, PurchaseOrder, Supplier } from "@shared/schema";
 
 export function AccountsDashboard() {
@@ -53,39 +53,6 @@ export function AccountsDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Accounts Dashboard</h2>
-        <p className="text-gray-500 text-sm">Revenue, debtors, creditors and financial overview</p>
-      </div>
-
-      {/* Summary cards — Debtors */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Debtors (Money Owed to Us)</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: "Total Invoiced", value: `R${totalRevenue.toLocaleString()}`, sub: `${invoices.length} invoices`, icon: DollarSign, color: "bg-blue-50 text-blue-600" },
-            { label: "Collected (Paid)", value: `R${totalPaid.toLocaleString()}`, sub: `${collectionRate}% collection rate`, icon: CheckCircle, color: "bg-green-50 text-green-600" },
-            { label: "Outstanding", value: `R${totalOutstanding.toLocaleString()}`, sub: `${outstanding.length} invoices`, icon: Clock, color: "bg-amber-50 text-amber-600" },
-            { label: "Overdue", value: `R${totalOverdue.toLocaleString()}`, sub: `${overdue.length} invoices`, icon: AlertTriangle, color: "bg-red-50 text-red-600" },
-          ].map(({ label, value, sub, icon: Icon, color }) => (
-            <Card key={label}>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">{label}</p>
-                    <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
-                    <p className="text-xs text-gray-400 mt-1">{sub}</p>
-                  </div>
-                  <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
       {/* Summary cards — Creditors */}
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Creditors (Money We Owe)</h3>

@@ -111,12 +111,8 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header with range toggle */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Owner Dashboard</h2>
-          <p className="text-gray-500 text-sm">Full business overview — P&L, operations and staff</p>
-        </div>
+      {/* Range toggle */}
+      <div className="flex justify-end">
         <div className="flex gap-1">
           {(["today","week","month"] as Range[]).map(r => (
             <Button key={r} size="sm" variant={range === r ? "default" : "outline"}
@@ -224,31 +220,6 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
       )}
-
-      {/* Operations summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Active Staff", value: workers.filter(w=>w.isActive!==false).length, sub: `${departments.length} departments`, icon: Users, color: "bg-indigo-50 text-indigo-600" },
-          { label: "Jobs This Period", value: filteredJobs.length, sub: `${filteredJobs.filter(j=>j.status==="completed").length} completed`, icon: Briefcase, color: "bg-green-50 text-green-600" },
-          { label: "Monthly Recurring", value: fmt(monthlyRecurring), sub: `${activeContracts.length} active contracts`, icon: TrendingUp, color: "bg-blue-50 text-blue-600" },
-          { label: "All-time Paid", value: fmt(allTimePaid), sub: `${invoices.filter(i=>i.status==="paid").length} invoices`, icon: FileText, color: "bg-emerald-50 text-emerald-600" },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{label}</p>
-                  <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
-                  <p className="text-xs text-gray-400 mt-1">{sub}</p>
-                </div>
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${color}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
 
       {/* Alerts */}
       {(overdueCount > 0 || lowStock.length > 0) && (
