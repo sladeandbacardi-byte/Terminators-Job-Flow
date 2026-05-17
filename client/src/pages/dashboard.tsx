@@ -3,15 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
-import MetricsCards from "@/components/dashboard/metrics-cards";
-import DepartmentPerformance from "@/components/dashboard/department-performance";
-import NotificationsPanel from "@/components/dashboard/notifications";
-import RecentJobs from "@/components/dashboard/recent-jobs";
-import TodaysSchedule from "@/components/dashboard/schedule";
-import QuickActions from "@/components/dashboard/quick-actions";
-import SalesPerformance from "@/components/dashboard/sales-performance";
-import { WorkerJobsSummary } from "@/components/dashboard/worker-jobs-summary";
-import { DepartmentOverview } from "@/components/dashboard/department-overview";
 import { ServiceDashboard } from "@/components/dashboard/service-dashboard";
 import { SalesDashboard } from "@/components/dashboard/sales-dashboard";
 import { AccountsDashboard } from "@/components/dashboard/accounts-dashboard";
@@ -20,7 +11,7 @@ import { ManagerDashboard } from "@/components/dashboard/manager-dashboard";
 import { SuspendedServices } from "@/components/dashboard/suspended-services";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
-import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors } from "@/lib/dashboardRole";
+import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors, type DashboardRole } from "@/lib/dashboardRole";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -29,46 +20,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import type { Worker, QuoteSubmission, Invoice, Job } from "@shared/schema";
-import jobFlowLogo from "@assets/ChatGPT_Image_May_16,_2026,_04_38_50_PM_(4)_1778942394020.png";
 
 interface DashboardMetrics {
   activeJobs: number;
   activeWorkers: number;
   expiringContracts: number;
   monthlyRevenue: number;
-  departments: Array<{
-    department: {
-      id: string;
-      name: string;
-      colorCode: string;
-    };
-    activeWorkers: number;
-    jobsToday: number;
-    completed: number;
-    inProgress: number;
-    pending: number;
-  }>;
 }
 
-interface DashboardAnalytics {
-  customers: { count: number; new: number };
-  jobs: { total: number; completed: number; inProgress: number; pending: number };
-  revenue: { total: number; invoiced: number; paid: number };
-  contracts: { active: number; expiring: number };
-  inventory: { totalItems: number; lowStock: number; criticalStock: number };
-}
+const rolePageTitles: Record<DashboardRole, string> = {
+  admin:    "Managing Member Dashboard",
+  manager:  "Service Manager Dashboard",
+  sales:    "Sales Dashboard",
+  service:  "Service Dashboard",
+  accounts: "Finance Dashboard",
+};
 
-interface RevenueChartData {
-  date: string;
-  revenue: number;
-  jobs: number;
-}
+const roleSubtitles: Record<DashboardRole, string> = {
+  admin:    "Full business overview — sales, service, and finance",
+  manager:  "Operations, jobs, staff workload and performance",
+  sales:    "Leads, quotes, pipeline and client activity",
+  service:  "Scheduled jobs, field team and department workload",
+  accounts: "Invoices, debtors, creditors and recurring revenue",
+};
 
 export default function Dashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today');
   const [showAddRep, setShowAddRep] = useState(false);
   const [newRep, setNewRep] = useState({ name: "", email: "", phone: "", role: "Sales Consultant" });
 
@@ -79,7 +58,12 @@ export default function Dashboard() {
   const { data: allInvoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: allJobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
 
-  // Sales rep totals — only div-5 (Sales dept) workers
+  const { data: metrics } = useQuery<DashboardMetrics>({
+    queryKey: ["/api/dashboard/metrics"],
+    refetchInterval: 30000,
+  });
+
+  // Sales rep stats — div-5 only
   const salesReps = salesWorkers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
   const salesRepStats = salesReps.map(rep => {
     const repQuotes = allQuotes.filter(q => q.assignedTo === rep.id);
@@ -92,7 +76,7 @@ export default function Dashboard() {
     return { rep, total: repQuotes.length, totalQuoted, won, wonValue, lost };
   });
 
-  // Accounts panel stats
+  // Finance stats
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const debtors = allInvoices
@@ -102,11 +86,11 @@ export default function Dashboard() {
     .filter(i => new Date(i.issueDate) >= monthStart)
     .reduce((s, i) => s + parseFloat(String(i.total)), 0);
   const paidThisMonth = allInvoices
-    .filter(i => new Date(i.issueDate) >= monthStart && (i.status === "paid"))
+    .filter(i => new Date(i.issueDate) >= monthStart && i.status === "paid")
     .reduce((s, i) => s + parseFloat(String(i.total)), 0);
   const collectedPct = salesThisMonth > 0 ? Math.round((paidThisMonth / salesThisMonth) * 100) : 0;
 
-  // Service panel stats
+  // Service stats
   const jobsCompletedThisMonth = allJobs.filter(j => {
     const d = j.scheduledDate ? new Date(j.scheduledDate) : null;
     return j.status === "completed" && d && d >= monthStart;
@@ -131,54 +115,10 @@ export default function Dashboard() {
     onError: () => toast({ title: "Error", description: "Failed to add sales rep.", variant: "destructive" }),
   });
 
-  const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
-    queryKey: ['/api/dashboard/metrics'],
-    refetchInterval: 30000, // Refresh every 30 seconds
-  });
-
-  const { data: analytics, isLoading: analyticsLoading } = useQuery<DashboardAnalytics>({
-    queryKey: ['/api/dashboard/analytics', selectedPeriod],
-    refetchInterval: 30000,
-  });
-
-  const { data: revenueChart } = useQuery<RevenueChartData[]>({
-    queryKey: ['/api/dashboard/revenue-chart', 'daily', 7],
-    refetchInterval: 30000,
-  });
-
-  const handleCreateJob = () => {
-    toast({
-      title: "Create Job",
-      description: "Job creation feature coming soon!",
-    });
-  };
-
-  const handleAssignWorker = () => {
-    toast({
-      title: "Assign Worker", 
-      description: "Worker assignment feature coming soon!",
-    });
-  };
-
-  const handleManageInventory = () => {
-    toast({
-      title: "Manage Inventory",
-      description: "Inventory management feature coming soon!",
-    });
-  };
-
-  const handleGenerateReport = () => {
-    toast({
-      title: "Generate Report",
-      description: "Report generation feature coming soon!",
-    });
-  };
-
   return (
     <div className="min-h-screen flex bg-gray-50" data-testid="dashboard-page">
       <Sidebar />
-      
-      {/* Mobile Sidebar Overlay */}
+
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
@@ -187,62 +127,62 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
-          title=""
+          title={rolePageTitles[dashboardRole]}
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
-          <div className="space-y-6">
-            {/* Unified card: Logo + Panels + Role Dashboard */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+          <div className="space-y-6 max-w-screen-xl mx-auto">
 
-              {/* TOP ROW: Terminators logo left · role badge + slogan right */}
+            {/* ── Company identity strip ─────────────────────────── */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+
+              {/* Logo row */}
               <div className="flex items-center justify-between px-4 pt-3 pb-2.5">
                 <TerminatorsLogo size="sm" data-testid="company-logo" />
                 <div className="flex flex-col items-end gap-0.5">
                   <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${dashboardRoleColors[dashboardRole]}`}>
                     {dashboardRoleLabels[dashboardRole]} View
                   </span>
-                  <span className="text-[11px] text-gray-400 italic hidden sm:block">Let's see how it goes</span>
+                  <span className="text-[11px] text-gray-400 italic hidden sm:block">
+                    {roleSubtitles[dashboardRole]}
+                  </span>
                 </div>
               </div>
 
-              {/* STATS ROW */}
-              <div className="border-t border-gray-100 px-4 pt-3 pb-2.5">
+              {/* Stats strip */}
+              <div className="border-t border-gray-100 px-4 pt-3 pb-3">
 
                 {/* SALES role */}
                 {dashboardRole === "sales" && (
                   <div className="flex gap-2 flex-wrap">
-                    {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => {
-                      const firstName = rep.name.split(" ")[0];
-                      return (
-                        <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
-                          <p className="text-xs font-semibold text-gray-800">{firstName}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            <span className="text-purple-600 font-medium">{total}</span> quoted
-                            {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            <span className="text-green-600 font-medium">{won}</span> won
-                            {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
-                            <span className="mx-1 text-gray-300">·</span>
-                            <span className="text-red-500 font-medium">{lost}</span> lost
-                          </p>
-                        </div>
-                      );
-                    })}
+                    {salesRepStats.map(({ rep, total, totalQuoted, won, wonValue, lost }) => (
+                      <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+                        <p className="text-xs font-semibold text-gray-800">{rep.name.split(" ")[0]}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          <span className="text-purple-600 font-medium">{total}</span> quoted
+                          {totalQuoted > 0 && <span className="text-gray-400"> · R{totalQuoted.toLocaleString()}</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          <span className="text-green-600 font-medium">{won}</span> won
+                          {wonValue > 0 && <span className="text-gray-400"> · R{wonValue.toLocaleString()}</span>}
+                          <span className="mx-1 text-gray-300">·</span>
+                          <span className="text-red-500 font-medium">{lost}</span> lost
+                        </p>
+                      </div>
+                    ))}
                     {salesReps.length === 0 && <p className="text-xs text-gray-400 italic">No sales reps yet.</p>}
                   </div>
                 )}
 
-                {/* MANAGER / ADMIN: Sales | Service | Finance */}
+                {/* MANAGER / ADMIN: three-column strip */}
                 {(dashboardRole === "manager" || dashboardRole === "admin") && (
                   <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-0">
 
-                    {/* Sales */}
+                    {/* Sales column */}
                     <div className="sm:flex-shrink-0 sm:pr-4">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sales Department</p>
@@ -268,53 +208,44 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Vertical divider (desktop) / Horizontal divider (mobile) */}
-                    <div className="hidden sm:block w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
+                    <div className="hidden sm:block w-px bg-gray-200 self-stretch flex-shrink-0" />
                     <div className="sm:hidden h-px bg-gray-100 w-full" />
 
-                    {/* Service */}
+                    {/* Service column */}
                     <div className="sm:flex-shrink-0 sm:px-4">
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Service Department</p>
                       <div className="flex gap-1.5 flex-wrap">
-                        <div className="bg-blue-50 border border-blue-100 rounded-md px-2 py-1 text-center min-w-[52px]">
-                          <p className="text-sm font-bold text-blue-600 leading-tight">{metrics?.activeJobs ?? "—"}</p>
-                          <p className="text-[10px] text-gray-400">active</p>
-                        </div>
-                        <div className="bg-teal-50 border border-teal-100 rounded-md px-2 py-1 text-center min-w-[52px]">
-                          <p className="text-sm font-bold text-teal-600 leading-tight">{metrics?.activeWorkers ?? "—"}</p>
-                          <p className="text-[10px] text-gray-400">workers</p>
-                        </div>
-                        <div className="bg-purple-50 border border-purple-100 rounded-md px-2 py-1 text-center min-w-[52px]">
-                          <p className="text-sm font-bold text-purple-600 leading-tight">{jobsCompletedThisMonth}</p>
-                          <p className="text-[10px] text-gray-400">done</p>
-                        </div>
-                        <div className="bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1 text-center min-w-[52px]">
-                          <p className="text-sm font-bold text-indigo-600 leading-tight">{invoicesSentThisMonth}</p>
-                          <p className="text-[10px] text-gray-400">invoiced</p>
-                        </div>
+                        {[
+                          { label: "active jobs",  value: metrics?.activeJobs ?? "—",    cls: "bg-blue-50 border-blue-100", val: "text-blue-600" },
+                          { label: "workers",      value: metrics?.activeWorkers ?? "—",  cls: "bg-teal-50 border-teal-100", val: "text-teal-600" },
+                          { label: "done / month", value: jobsCompletedThisMonth,         cls: "bg-purple-50 border-purple-100", val: "text-purple-600" },
+                          { label: "invoiced",     value: invoicesSentThisMonth,           cls: "bg-indigo-50 border-indigo-100", val: "text-indigo-600" },
+                        ].map(({ label, value, cls, val }) => (
+                          <div key={label} className={`border rounded-md px-2 py-1 text-center min-w-[52px] ${cls}`}>
+                            <p className={`text-sm font-bold leading-tight ${val}`}>{value}</p>
+                            <p className="text-[10px] text-gray-400">{label}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
-                    {/* Vertical divider (desktop) / Horizontal divider (mobile) */}
-                    <div className="hidden sm:block w-px bg-gray-200 self-stretch mx-0 flex-shrink-0" />
+                    <div className="hidden sm:block w-px bg-gray-200 self-stretch flex-shrink-0" />
                     <div className="sm:hidden h-px bg-gray-100 w-full" />
 
-                    {/* Finance */}
+                    {/* Finance column */}
                     <div className="sm:flex-shrink-0 sm:pl-4">
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance Department</p>
                       <div className="flex gap-1.5 flex-wrap">
-                        <div className="bg-green-50 border border-green-100 rounded-md px-2 py-1 text-center min-w-[64px]">
-                          <p className="text-sm font-bold text-green-600 leading-tight">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          <p className="text-[10px] text-gray-400">revenue</p>
-                        </div>
-                        <div className="bg-red-50 border border-red-100 rounded-md px-2 py-1 text-center min-w-[64px]">
-                          <p className="text-sm font-bold text-red-600 leading-tight">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          <p className="text-[10px] text-gray-400">debtors</p>
-                        </div>
-                        <div className="bg-amber-50 border border-amber-100 rounded-md px-2 py-1 text-center min-w-[48px]">
-                          <p className="text-sm font-bold text-amber-600 leading-tight">{metrics?.expiringContracts ?? "—"}</p>
-                          <p className="text-[10px] text-gray-400">expiring</p>
-                        </div>
+                        {[
+                          { label: "revenue",   value: `R${(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, cls: "bg-green-50 border-green-100", val: "text-green-600", minW: "min-w-[72px]" },
+                          { label: "debtors",   value: `R${debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,                          cls: "bg-red-50 border-red-100",   val: "text-red-600",   minW: "min-w-[72px]" },
+                          { label: "expiring",  value: metrics?.expiringContracts ?? "—",                                                              cls: "bg-amber-50 border-amber-100", val: "text-amber-600", minW: "min-w-[52px]" },
+                        ].map(({ label, value, cls, val, minW }) => (
+                          <div key={label} className={`border rounded-md px-2 py-1 text-center ${minW} ${cls}`}>
+                            <p className={`text-sm font-bold leading-tight ${val}`}>{value}</p>
+                            <p className="text-[10px] text-gray-400">{label}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -324,304 +255,94 @@ export default function Dashboard() {
                 {/* ACCOUNTS role */}
                 {dashboardRole === "accounts" && (
                   <div className="flex gap-2 flex-wrap">
-                    <div className="bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5 min-w-[100px]">
-                      <p className="text-[10px] text-gray-500">Debtors</p>
-                      <p className="text-sm font-bold text-red-600">R{debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                      <p className="text-[10px] text-gray-400">outstanding</p>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5 min-w-[100px]">
-                      <p className="text-[10px] text-gray-500">Sales</p>
-                      <p className="text-sm font-bold text-blue-600">R{salesThisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                      <p className="text-[10px] text-gray-400">this month</p>
-                    </div>
-                    <div className="bg-green-50 border border-green-100 rounded-md px-2.5 py-1.5 min-w-[80px]">
-                      <p className="text-[10px] text-gray-500">Collected</p>
-                      <p className="text-sm font-bold text-green-600">{collectedPct}%</p>
-                      <p className="text-[10px] text-gray-400">of sales</p>
-                    </div>
+                    {[
+                      { label: "Debtors",   sub: "outstanding",  value: `R${debtors.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,          cls: "bg-red-50 border-red-100",   val: "text-red-600" },
+                      { label: "Sales",     sub: "this month",   value: `R${salesThisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,    cls: "bg-blue-50 border-blue-100", val: "text-blue-600" },
+                      { label: "Collected", sub: "of sales",     value: `${collectedPct}%`,                                                              cls: "bg-green-50 border-green-100", val: "text-green-600" },
+                    ].map(({ label, sub, value, cls, val }) => (
+                      <div key={label} className={`border rounded-md px-2.5 py-1.5 min-w-[90px] ${cls}`}>
+                        <p className="text-[10px] text-gray-500">{label}</p>
+                        <p className={`text-sm font-bold ${val}`}>{value}</p>
+                        <p className="text-[10px] text-gray-400">{sub}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
 
                 {/* SERVICE role */}
                 {dashboardRole === "service" && (
                   <div className="flex gap-2 flex-wrap">
-                    <div className="bg-green-50 border border-green-100 rounded-md px-2.5 py-1.5 min-w-[90px]">
-                      <p className="text-[10px] text-gray-500">Jobs Done</p>
-                      <p className="text-lg font-bold text-green-600">{jobsCompletedThisMonth}</p>
-                      <p className="text-[10px] text-gray-400">this month</p>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5 min-w-[90px]">
-                      <p className="text-[10px] text-gray-500">Invoiced</p>
-                      <p className="text-lg font-bold text-blue-600">{invoicesSentThisMonth}</p>
-                      <p className="text-[10px] text-gray-400">this month</p>
-                    </div>
+                    {[
+                      { label: "Jobs Done",  sub: "this month", value: jobsCompletedThisMonth, cls: "bg-green-50 border-green-100", val: "text-green-600" },
+                      { label: "Invoiced",   sub: "this month", value: invoicesSentThisMonth,  cls: "bg-blue-50 border-blue-100",  val: "text-blue-600"  },
+                      { label: "Active Jobs", sub: "right now", value: metrics?.activeJobs ?? "—", cls: "bg-orange-50 border-orange-100", val: "text-orange-600" },
+                    ].map(({ label, sub, value, cls, val }) => (
+                      <div key={label} className={`border rounded-md px-2.5 py-1.5 min-w-[90px] ${cls}`}>
+                        <p className="text-[10px] text-gray-500">{label}</p>
+                        <p className={`text-lg font-bold ${val}`}>{value}</p>
+                        <p className="text-[10px] text-gray-400">{sub}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
 
               </div>
 
-              {/* Suspended services alert */}
-              <div className="px-4">
-                <SuspendedServices />
-              </div>
-
-              {/* Role-based dashboard content */}
-              <div className="border-t border-gray-100 px-4 py-4">
-                {dashboardRole === "service" && <ServiceDashboard />}
-                {dashboardRole === "sales" && <SalesDashboard />}
-                {dashboardRole === "accounts" && <AccountsDashboard />}
-                {dashboardRole === "manager" && <ManagerDashboard />}
-                {dashboardRole === "admin" && <AdminDashboard />}
-              </div>
             </div>
+            {/* ── End company strip ──────────────────────────────── */}
 
-            {/* Legacy full overview — hidden, kept for reference */}
-            {false && <div className="hidden">
+            {/* Suspended services — its own standalone alert card */}
+            <SuspendedServices />
 
-            {/* Period Selection and Overview */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Business Overview</h2>
-                <p className="text-gray-600">Track your business performance and key metrics</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Time Period:</label>
-                <select
-                  value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(e.target.value as 'today' | 'week' | 'month')}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  data-testid="period-selector"
-                >
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Department Overview - New comprehensive filtering */}
-            <DepartmentOverview className="mb-6" />
-
-            {/* Enhanced Analytics Cards */}
-            {analytics && !analyticsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Customers Card */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Customers</p>
-                      <p className="text-3xl font-bold text-gray-900">{analytics.customers.count}</p>
-                      {analytics.customers.new > 0 && (
-                        <p className="text-sm text-green-600">+{analytics.customers.new} new {selectedPeriod === 'today' ? 'today' : `this ${selectedPeriod}`}</p>
-                      )}
-                    </div>
-                    <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Jobs Card */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Jobs {selectedPeriod === 'today' ? 'Today' : `This ${selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)}`}</p>
-                      <p className="text-3xl font-bold text-gray-900">{analytics.jobs.total}</p>
-                      <div className="flex gap-4 mt-2 text-xs">
-                        <span className="text-green-600">{analytics.jobs.completed} completed</span>
-                        <span className="text-yellow-600">{analytics.jobs.inProgress} in progress</span>
-                        <span className="text-gray-500">{analytics.jobs.pending} pending</span>
-                      </div>
-                    </div>
-                    <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Revenue Card */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Revenue {selectedPeriod === 'today' ? 'Today' : `This ${selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)}`}</p>
-                      <p className="text-3xl font-bold text-gray-900">R{analytics.revenue.total.toLocaleString()}</p>
-                      <div className="flex gap-4 mt-2 text-xs">
-                        <span className="text-blue-600">R{analytics.revenue.invoiced.toLocaleString()} invoiced</span>
-                        <span className="text-green-600">R{analytics.revenue.paid.toLocaleString()} paid</span>
-                      </div>
-                    </div>
-                    <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                      <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Inventory Card */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Inventory Status</p>
-                      <p className="text-3xl font-bold text-gray-900">{analytics.inventory.totalItems}</p>
-                      <div className="flex gap-4 mt-2 text-xs">
-                        {analytics.inventory.criticalStock > 0 && (
-                          <span className="text-red-600">{analytics.inventory.criticalStock} critical</span>
-                        )}
-                        {analytics.inventory.lowStock > 0 && (
-                          <span className="text-yellow-600">{analytics.inventory.lowStock} low stock</span>
-                        )}
-                        {analytics.inventory.criticalStock === 0 && analytics.inventory.lowStock === 0 && (
-                          <span className="text-green-600">All items in stock</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                    <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Revenue Chart */}
-            {revenueChart && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trend (Last 7 Days)</h3>
-                <div className="h-64 flex items-end justify-between space-x-2">
-                  {revenueChart.map((data, index) => {
-                    const maxRevenue = Math.max(...revenueChart.map(d => d.revenue));
-                    const height = maxRevenue > 0 ? (data.revenue / maxRevenue) * 200 : 0;
-                    return (
-                      <div key={index} className="flex flex-col items-center flex-1">
-                        <div className="mb-2 text-center">
-                          <div className="text-xs font-medium text-gray-900">R{data.revenue.toLocaleString()}</div>
-                          <div className="text-xs text-gray-500">{data.jobs} jobs</div>
-                        </div>
-                        <div 
-                          className="bg-blue-500 rounded-t w-full min-h-[20px] transition-all"
-                          style={{ height: `${Math.max(height, 20)}px` }}
-                        />
-                        <div className="text-xs text-gray-500 mt-2 text-center">
-                          {new Date(data.date).toLocaleDateString('en-US', { weekday: 'short' })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Worker Jobs Summary */}
-            <WorkerJobsSummary />
-
-            {/* Sales Performance Dashboard */}
-            <SalesPerformance className="mb-6" />
-
-            {/* Department Performance and Quick Actions */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2">
-                <DepartmentPerformance
-                  departments={metrics?.departments || []}
-                  isLoading={isLoading}
-                />
-              </div>
-              <QuickActions
-                onCreateJob={handleCreateJob}
-                onAssignWorker={handleAssignWorker}
-                onManageInventory={handleManageInventory}
-                onGenerateReport={handleGenerateReport}
-              />
-            </div>
-
-            {/* Notifications and Schedule */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <NotificationsPanel />
-              <TodaysSchedule />
-            </div>
-
-            {/* Recent Jobs */}
-            <RecentJobs />
-            </div>}
+            {/* ── Role-specific dashboard sections ──────────────── */}
+            {dashboardRole === "service"  && <ServiceDashboard />}
+            {dashboardRole === "sales"    && <SalesDashboard />}
+            {dashboardRole === "accounts" && <AccountsDashboard />}
+            {dashboardRole === "manager"  && <ManagerDashboard />}
+            {dashboardRole === "admin"    && <AdminDashboard />}
 
           </div>
         </main>
       </div>
-      
+
       <MobileNavigation />
 
-      {/* Add Sales Rep Dialog */}
+      {/* Add Sales Rep dialog */}
       <Dialog open={showAddRep} onOpenChange={setShowAddRep}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Add Sales Rep</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label htmlFor="rep-name">Full Name</Label>
-              <Input
-                id="rep-name"
-                placeholder="e.g. Jane Smith"
-                value={newRep.name}
-                onChange={e => setNewRep(r => ({ ...r, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="rep-email">Email</Label>
-              <Input
-                id="rep-email"
-                type="email"
-                placeholder="jane@company.com"
-                value={newRep.email}
-                onChange={e => setNewRep(r => ({ ...r, email: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="rep-phone">Phone</Label>
-              <Input
-                id="rep-phone"
-                placeholder="0821234567"
-                value={newRep.phone}
-                onChange={e => setNewRep(r => ({ ...r, phone: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="rep-role">Role / Title</Label>
-              <Input
-                id="rep-role"
-                placeholder="Sales Consultant"
-                value={newRep.role}
-                onChange={e => setNewRep(r => ({ ...r, role: e.target.value }))}
-              />
-            </div>
+            {[
+              { id: "rep-name",  label: "Name",  placeholder: "Full name",     key: "name"  as const },
+              { id: "rep-email", label: "Email", placeholder: "Email address", key: "email" as const },
+              { id: "rep-phone", label: "Phone", placeholder: "Phone number",  key: "phone" as const },
+            ].map(({ id, label, placeholder, key }) => (
+              <div key={id}>
+                <Label htmlFor={id}>{label}</Label>
+                <Input
+                  id={id}
+                  placeholder={placeholder}
+                  value={newRep[key]}
+                  onChange={e => setNewRep(p => ({ ...p, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
           </div>
-          <DialogFooter className="gap-2">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddRep(false)}>Cancel</Button>
             <Button
-              disabled={!newRep.name.trim() || addSalesRep.isPending}
               onClick={() => addSalesRep.mutate()}
+              disabled={addSalesRep.isPending || !newRep.name}
+              className="bg-[#1a3a8f] hover:bg-[#142d72] text-white"
             >
               {addSalesRep.isPending ? "Adding…" : "Add Rep"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
