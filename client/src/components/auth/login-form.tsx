@@ -66,12 +66,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
       <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="space-y-3 text-center pb-4">
-          <div className="mx-auto pt-2 flex justify-center">
+        <CardHeader className="space-y-2 text-center pt-6 pb-3">
+          <div className="flex justify-center">
             <img
               src={jobFlowFullLogo}
               alt="Job Flow – Field Service Management"
-              className="h-24 w-auto object-contain"
+              className="w-[220px] sm:w-[260px] h-auto object-contain"
             />
           </div>
         </CardHeader>

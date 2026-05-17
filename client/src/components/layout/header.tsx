@@ -45,7 +45,7 @@ export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
           <img
             src={jobFlowLogo}
             alt="Job Flow"
-            className="h-[38px] sm:h-[52px] w-auto object-contain pointer-events-none pl-1 flex-shrink-0"
+            className="h-[38px] sm:h-[52px] w-auto object-contain pointer-events-none flex-shrink-0"
           />
           <button
             className="lg:hidden p-2 text-gray-600 hover:text-gray-900"
