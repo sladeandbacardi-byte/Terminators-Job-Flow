@@ -9,7 +9,12 @@ import {
   insertJobInventoryItemSchema, insertSupplierSchema,
   insertPurchaseOrderSchema, insertPurchaseOrderItemSchema,
   insertCalendarEventSchema, insertCustomReportSchema,
-  insertQuoteSubmissionSchema
+  insertQuoteSubmissionSchema,
+  insertVehicleSchema,
+  insertVehicleAssignmentSchema,
+  insertKmLogSchema,
+  insertFuelFillupSchema,
+  insertVehicleInspectionSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -2127,6 +2132,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(500).json({ error: error.message ?? "Failed to restore backup" });
     }
+  });
+
+  // ── FLEET ROUTES ─────────────────────────────────────────────────────────
+
+  app.get("/api/fleet/vehicles", async (req, res) => {
+    try { res.json(await storage.getVehicles()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/fleet/vehicles/:id", async (req, res) => {
+    const v = await storage.getVehicle(req.params.id);
+    if (!v) return res.status(404).json({ error: "Vehicle not found" });
+    res.json(v);
+  });
+
+  app.post("/api/fleet/vehicles", async (req, res) => {
+    try {
+      const data = insertVehicleSchema.parse(req.body);
+      const vehicle = await storage.createVehicle(data);
+      res.status(201).json(vehicle);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.patch("/api/fleet/vehicles/:id", async (req, res) => {
+    try {
+      const data = insertVehicleSchema.partial().parse(req.body);
+      const vehicle = await storage.updateVehicle(req.params.id, data);
+      res.json(vehicle);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.delete("/api/fleet/vehicles/:id", async (req, res) => {
+    const ok = await storage.deleteVehicle(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Vehicle not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/fleet/assignments", async (req, res) => {
+    try {
+      const { workerId, vehicleId } = req.query;
+      if (workerId) {
+        const a = await storage.getActiveAssignmentForWorker(workerId as string);
+        return res.json(a ? [a] : []);
+      }
+      if (vehicleId) return res.json(await storage.getAssignmentsForVehicle(vehicleId as string));
+      res.json(await storage.getVehicleAssignments());
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/fleet/assignments", async (req, res) => {
+    try {
+      const data = insertVehicleAssignmentSchema.parse(req.body);
+      const a = await storage.createVehicleAssignment(data);
+      res.status(201).json(a);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.patch("/api/fleet/assignments/:id", async (req, res) => {
+    try {
+      const data = insertVehicleAssignmentSchema.partial().parse(req.body);
+      const a = await storage.updateVehicleAssignment(req.params.id, data);
+      res.json(a);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.get("/api/fleet/km-logs", async (req, res) => {
+    try {
+      const { workerId, vehicleId } = req.query;
+      if (workerId) return res.json(await storage.getKmLogsByWorker(workerId as string));
+      if (vehicleId) return res.json(await storage.getKmLogsByVehicle(vehicleId as string));
+      res.json(await storage.getKmLogs());
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/fleet/km-logs", async (req, res) => {
+    try {
+      const body = {
+        ...req.body,
+        logDate: req.body.logDate ? new Date(req.body.logDate) : new Date(),
+      };
+      const data = insertKmLogSchema.parse(body);
+      const log = await storage.createKmLog(data);
+      res.status(201).json(log);
+    } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
+  });
+
+  app.delete("/api/fleet/km-logs/:id", async (req, res) => {
+    const ok = await storage.deleteKmLog(req.params.id);
+    if (!ok) return res.status(404).json({ error: "KM log not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/fleet/fuel-fillups", async (req, res) => {
+    try {
+      const { workerId, vehicleId } = req.query;
+      if (workerId) return res.json(await storage.getFuelFillupsByWorker(workerId as string));
+      if (vehicleId) return res.json(await storage.getFuelFillupsByVehicle(vehicleId as string));
+      res.json(await storage.getFuelFillups());
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/fleet/fuel-fillups", async (req, res) => {
+    try {
+      const body = {
+        ...req.body,
+        fillDate: req.body.fillDate ? new Date(req.body.fillDate) : new Date(),
+      };
+      const data = insertFuelFillupSchema.parse(body);
+      const fillup = await storage.createFuelFillup(data);
+      res.status(201).json(fillup);
+    } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
+  });
+
+  app.delete("/api/fleet/fuel-fillups/:id", async (req, res) => {
+    const ok = await storage.deleteFuelFillup(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Fuel fillup not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/fleet/inspections", async (req, res) => {
+    try {
+      const { workerId, vehicleId, result } = req.query;
+      if (workerId) return res.json(await storage.getVehicleInspectionsByWorker(workerId as string));
+      if (vehicleId) return res.json(await storage.getVehicleInspectionsByVehicle(vehicleId as string));
+      if (result === "fail") return res.json(await storage.getFailedInspections());
+      res.json(await storage.getVehicleInspections());
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/fleet/inspections", async (req, res) => {
+    try {
+      const body = {
+        ...req.body,
+        inspectionDate: req.body.inspectionDate ? new Date(req.body.inspectionDate) : new Date(),
+      };
+      const data = insertVehicleInspectionSchema.parse(body);
+      const inspection = await storage.createVehicleInspection(data);
+
+      // Send fail alert email if any items failed
+      if (inspection.overallResult === "fail") {
+        try {
+          const items = inspection.itemsJson ? JSON.parse(inspection.itemsJson) : [];
+          const failedItems = items.filter((i: any) => i.result === "fail");
+          const failList = failedItems.map((i: any) => `• ${i.name}${i.comments ? ": " + i.comments : ""}`).join("\n");
+          await sendEmail({
+            to: "admin@terminators.co.za",
+            subject: `⚠️ FLEET FAIL ALERT — Vehicle ${inspection.vehicleId} — ${new Date().toLocaleDateString("en-ZA")}`,
+            html: `<h2 style="color:#dc2626">Vehicle Inspection — FAIL</h2>
+<p><strong>Vehicle ID:</strong> ${inspection.vehicleId}</p>
+<p><strong>Driver:</strong> ${inspection.workerId}</p>
+<p><strong>Date:</strong> ${new Date(inspection.inspectionDate).toLocaleString("en-ZA")}</p>
+<h3>Failed Items:</h3>
+<ul>${failedItems.map((i: any) => `<li><strong>${i.name}</strong>${i.comments ? ": " + i.comments : ""}</li>`).join("")}</ul>
+${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p>` : ""}
+<p style="color:#6b7280;font-size:12px">Sent automatically by The Terminators Fleet System</p>`,
+            text: `VEHICLE INSPECTION — FAIL\n\nVehicle: ${inspection.vehicleId}\nDriver: ${inspection.workerId}\nDate: ${new Date(inspection.inspectionDate).toLocaleString("en-ZA")}\n\nFailed items:\n${failList}\n\n${inspection.comments ? "Comments: " + inspection.comments : ""}`,
+          });
+          await storage.updateVehicleInspection(inspection.id, { failAlertSent: true } as any);
+        } catch (emailErr) {
+          console.error("Failed to send inspection fail alert:", emailErr);
+        }
+      }
+
+      res.status(201).json(inspection);
+    } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
+  });
+
+  app.delete("/api/fleet/inspections/:id", async (req, res) => {
+    const ok = await storage.deleteVehicleInspection(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Inspection not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/fleet/dashboard", async (req, res) => {
+    try {
+      const { workerId } = req.query;
+      const data = await storage.getFleetDashboardData(workerId as string | undefined);
+      res.json(data);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   const httpServer = createServer(app);

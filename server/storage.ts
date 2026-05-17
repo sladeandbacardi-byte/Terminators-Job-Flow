@@ -18,7 +18,12 @@ import {
   type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type CalendarEvent, type InsertCalendarEvent,
   type CustomReport, type InsertCustomReport,
-  type QuoteSubmission, type InsertQuoteSubmission
+  type QuoteSubmission, type InsertQuoteSubmission,
+  type Vehicle, type InsertVehicle,
+  type VehicleAssignment, type InsertVehicleAssignment,
+  type KmLog, type InsertKmLog,
+  type FuelFillup, type InsertFuelFillup,
+  type VehicleInspection, type InsertVehicleInspection,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -186,6 +191,49 @@ export interface IStorage {
   updateQuoteSubmission(id: string, submission: Partial<InsertQuoteSubmission>): Promise<QuoteSubmission>;
   deleteQuoteSubmission(id: string): Promise<boolean>;
 
+  // Fleet — Vehicles
+  getVehicles(): Promise<Vehicle[]>;
+  getVehicle(id: string): Promise<Vehicle | undefined>;
+  getActiveVehicles(): Promise<Vehicle[]>;
+  createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
+  updateVehicle(id: string, vehicle: Partial<InsertVehicle>): Promise<Vehicle>;
+  deleteVehicle(id: string): Promise<boolean>;
+
+  // Fleet — Assignments
+  getVehicleAssignments(): Promise<VehicleAssignment[]>;
+  getActiveAssignmentForWorker(workerId: string): Promise<VehicleAssignment | undefined>;
+  getAssignmentsForVehicle(vehicleId: string): Promise<VehicleAssignment[]>;
+  createVehicleAssignment(a: InsertVehicleAssignment): Promise<VehicleAssignment>;
+  updateVehicleAssignment(id: string, a: Partial<InsertVehicleAssignment>): Promise<VehicleAssignment>;
+
+  // Fleet — KM Logs
+  getKmLogs(): Promise<KmLog[]>;
+  getKmLogsByWorker(workerId: string): Promise<KmLog[]>;
+  getKmLogsByVehicle(vehicleId: string): Promise<KmLog[]>;
+  getKmLogsByDateRange(start: Date, end: Date): Promise<KmLog[]>;
+  createKmLog(log: InsertKmLog): Promise<KmLog>;
+  deleteKmLog(id: string): Promise<boolean>;
+
+  // Fleet — Fuel Fill-ups
+  getFuelFillups(): Promise<FuelFillup[]>;
+  getFuelFillupsByWorker(workerId: string): Promise<FuelFillup[]>;
+  getFuelFillupsByVehicle(vehicleId: string): Promise<FuelFillup[]>;
+  getFuelFillupsByDateRange(start: Date, end: Date): Promise<FuelFillup[]>;
+  createFuelFillup(f: InsertFuelFillup): Promise<FuelFillup>;
+  deleteFuelFillup(id: string): Promise<boolean>;
+
+  // Fleet — Inspections
+  getVehicleInspections(): Promise<VehicleInspection[]>;
+  getVehicleInspectionsByWorker(workerId: string): Promise<VehicleInspection[]>;
+  getVehicleInspectionsByVehicle(vehicleId: string): Promise<VehicleInspection[]>;
+  getFailedInspections(): Promise<VehicleInspection[]>;
+  createVehicleInspection(i: InsertVehicleInspection): Promise<VehicleInspection>;
+  updateVehicleInspection(id: string, i: Partial<InsertVehicleInspection>): Promise<VehicleInspection>;
+  deleteVehicleInspection(id: string): Promise<boolean>;
+
+  // Fleet — Dashboard
+  getFleetDashboardData(workerId?: string): Promise<any>;
+
   // Backup & Restore
   exportBackup(): Promise<Record<string, any>>;
   restoreBackup(data: Record<string, any>): Promise<void>;
@@ -211,6 +259,11 @@ export class MemStorage implements IStorage {
   private calendarEvents: Map<string, CalendarEvent> = new Map();
   private customReports: Map<string, CustomReport> = new Map();
   private quoteSubmissions: Map<string, QuoteSubmission> = new Map();
+  private vehicles: Map<string, Vehicle> = new Map();
+  private vehicleAssignments: Map<string, VehicleAssignment> = new Map();
+  private kmLogs: Map<string, KmLog> = new Map();
+  private fuelFillups: Map<string, FuelFillup> = new Map();
+  private vehicleInspections: Map<string, VehicleInspection> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 9;
@@ -221,6 +274,7 @@ export class MemStorage implements IStorage {
   constructor() {
     this.initializeData();
     this.createExampleData();
+    this.initializeFleetData();
   }
 
   private async createExampleData() {
@@ -3311,6 +3365,245 @@ export class MemStorage implements IStorage {
   // Activity Logs
   async getActivityLogs(): Promise<any[]> {
     return this.activityLogs;
+  }
+
+  private initializeFleetData() {
+    const td = (daysAgo: number, hour = 8) => {
+      const d = new Date(); d.setDate(d.getDate() - daysAgo); d.setHours(hour, 0, 0, 0); return d;
+    };
+
+    const vehiclesData: Vehicle[] = [
+      { id: "vehicle-1", name: "Toyota HiAce Van (Pest Control)", registration: "GA 12-34 FP", make: "Toyota", model: "HiAce", year: "2021", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2024-01-10") },
+      { id: "vehicle-2", name: "Toyota HiLux (Washroom)", registration: "GA 56-78 FP", make: "Toyota", model: "HiLux", year: "2022", departmentId: "div-3", isActive: true, notes: null, createdAt: new Date("2024-02-15") },
+      { id: "vehicle-3", name: "Ford Transit (Sanitary Bins)", registration: "GA 90-12 FP", make: "Ford", model: "Transit", year: "2020", departmentId: "div-2", isActive: true, notes: null, createdAt: new Date("2024-03-01") },
+      { id: "vehicle-4", name: "VW Caddy (Deep Cleaning)", registration: "GA 34-56 FP", make: "Volkswagen", model: "Caddy", year: "2023", departmentId: "div-4", isActive: true, notes: null, createdAt: new Date("2024-01-20") },
+      { id: "vehicle-5", name: "Toyota Corolla (Management)", registration: "GA 78-90 FP", make: "Toyota", model: "Corolla", year: "2022", departmentId: "div-6", isActive: true, notes: null, createdAt: new Date("2024-01-05") },
+    ];
+    vehiclesData.forEach(v => this.vehicles.set(v.id, v));
+
+    const assignmentsData: VehicleAssignment[] = [
+      { id: "assign-1", vehicleId: "vehicle-5", workerId: "worker-1", isActive: true, notes: null, assignedAt: new Date("2024-01-10") },
+      { id: "assign-2", vehicleId: "vehicle-1", workerId: "worker-3", isActive: true, notes: null, assignedAt: new Date("2024-02-01") },
+      { id: "assign-3", vehicleId: "vehicle-3", workerId: "worker-4", isActive: true, notes: null, assignedAt: new Date("2024-02-15") },
+      { id: "assign-4", vehicleId: "vehicle-2", workerId: "worker-5", isActive: true, notes: null, assignedAt: new Date("2024-03-01") },
+      { id: "assign-5", vehicleId: "vehicle-4", workerId: "worker-6", isActive: true, notes: null, assignedAt: new Date("2024-03-10") },
+    ];
+    assignmentsData.forEach(a => this.vehicleAssignments.set(a.id, a));
+
+    const kmLogsData: KmLog[] = [
+      { id: "km-1", vehicleId: "vehicle-5", workerId: "worker-1", logDate: td(1), startOdometer: 62450, endOdometer: 62530, totalKm: 80, businessKm: 80, privateKm: 0, notes: "Client visits Sandton", createdAt: td(1) },
+      { id: "km-2", vehicleId: "vehicle-1", workerId: "worker-3", logDate: td(2), startOdometer: 85420, endOdometer: 85570, totalKm: 150, businessKm: 140, privateKm: 10, notes: "Pest treatment routes", createdAt: td(2) },
+      { id: "km-3", vehicleId: "vehicle-2", workerId: "worker-5", logDate: td(2), startOdometer: 41200, endOdometer: 41380, totalKm: 180, businessKm: 180, privateKm: 0, notes: "Washroom servicing", createdAt: td(2) },
+      { id: "km-4", vehicleId: "vehicle-3", workerId: "worker-4", logDate: td(3), startOdometer: 73100, endOdometer: 73240, totalKm: 140, businessKm: 130, privateKm: 10, notes: null, createdAt: td(3) },
+      { id: "km-5", vehicleId: "vehicle-4", workerId: "worker-6", logDate: td(5), startOdometer: 28450, endOdometer: 28590, totalKm: 140, businessKm: 140, privateKm: 0, notes: "Deep cleaning routes", createdAt: td(5) },
+      { id: "km-6", vehicleId: "vehicle-1", workerId: "worker-3", logDate: td(7), startOdometer: 85220, endOdometer: 85420, totalKm: 200, businessKm: 185, privateKm: 15, notes: "Weekly routes", createdAt: td(7) },
+      { id: "km-7", vehicleId: "vehicle-5", workerId: "worker-1", logDate: td(8), startOdometer: 62350, endOdometer: 62450, totalKm: 100, businessKm: 100, privateKm: 0, notes: "Head office visits", createdAt: td(8) },
+      { id: "km-8", vehicleId: "vehicle-2", workerId: "worker-5", logDate: td(10), startOdometer: 41000, endOdometer: 41200, totalKm: 200, businessKm: 200, privateKm: 0, notes: null, createdAt: td(10) },
+    ];
+    kmLogsData.forEach(l => this.kmLogs.set(l.id, l));
+
+    const fuelData: FuelFillup[] = [
+      { id: "fuel-1", vehicleId: "vehicle-1", workerId: "worker-3", fillDate: td(3), odometer: 85570, litres: "55.80", cost: "1477.62", fuelStation: "Engen Fourways", receiptPhoto: null, notes: null, createdAt: td(3) },
+      { id: "fuel-2", vehicleId: "vehicle-2", workerId: "worker-5", fillDate: td(4), odometer: 41380, litres: "62.30", cost: "1649.95", fuelStation: "BP Sandton", receiptPhoto: null, notes: null, createdAt: td(4) },
+      { id: "fuel-3", vehicleId: "vehicle-5", workerId: "worker-1", fillDate: td(5), odometer: 62450, litres: "40.10", cost: "1062.65", fuelStation: "Shell Rosebank", receiptPhoto: null, notes: null, createdAt: td(5) },
+      { id: "fuel-4", vehicleId: "vehicle-3", workerId: "worker-4", fillDate: td(7), odometer: 73240, litres: "58.40", cost: "1547.16", fuelStation: "Engen Midrand", receiptPhoto: null, notes: null, createdAt: td(7) },
+      { id: "fuel-5", vehicleId: "vehicle-4", workerId: "worker-6", fillDate: td(9), odometer: 28590, litres: "44.20", cost: "1170.90", fuelStation: "Total Boksburg", receiptPhoto: null, notes: null, createdAt: td(9) },
+      { id: "fuel-6", vehicleId: "vehicle-1", workerId: "worker-3", fillDate: td(14), odometer: 85220, litres: "51.60", cost: "1366.86", fuelStation: "BP Fourways", receiptPhoto: null, notes: null, createdAt: td(14) },
+    ];
+    fuelData.forEach(f => this.fuelFillups.set(f.id, f));
+
+    const passItems = JSON.stringify([
+      { name: "Tyres (condition & pressure)", result: "pass" },
+      { name: "Front lights", result: "pass" },
+      { name: "Rear lights & indicators", result: "pass" },
+      { name: "Brakes", result: "pass" },
+      { name: "Engine oil", result: "pass" },
+      { name: "Coolant / water level", result: "pass" },
+      { name: "Windscreen (no cracks)", result: "pass" },
+      { name: "Wipers", result: "pass" },
+      { name: "Mirrors", result: "pass" },
+      { name: "Seat belts", result: "pass" },
+      { name: "Fire extinguisher", result: "pass" },
+      { name: "First aid kit", result: "pass" },
+      { name: "Equipment secured", result: "pass" },
+      { name: "Vehicle cleanliness", result: "pass" },
+      { name: "Licence disc valid", result: "pass" },
+      { name: "Driver's licence in possession", result: "pass" },
+    ]);
+    const failItems = JSON.stringify([
+      { name: "Tyres (condition & pressure)", result: "pass" },
+      { name: "Front lights", result: "pass" },
+      { name: "Rear lights & indicators", result: "fail", comments: "Left rear indicator not working" },
+      { name: "Brakes", result: "fail", comments: "Squeaking when braking hard" },
+      { name: "Engine oil", result: "pass" },
+      { name: "Coolant / water level", result: "pass" },
+      { name: "Windscreen (no cracks)", result: "pass" },
+      { name: "Wipers", result: "pass" },
+      { name: "Mirrors", result: "pass" },
+      { name: "Seat belts", result: "pass" },
+      { name: "Fire extinguisher", result: "pass" },
+      { name: "First aid kit", result: "pass" },
+      { name: "Equipment secured", result: "pass" },
+      { name: "Vehicle cleanliness", result: "pass" },
+      { name: "Licence disc valid", result: "pass" },
+      { name: "Driver's licence in possession", result: "pass" },
+    ]);
+    const inspectionsData: VehicleInspection[] = [
+      { id: "insp-1", vehicleId: "vehicle-5", workerId: "worker-1", inspectionDate: td(1), overallResult: "pass", itemsJson: passItems, comments: "All good.", photoUrl: null, failAlertSent: false, createdAt: td(1) },
+      { id: "insp-2", vehicleId: "vehicle-1", workerId: "worker-3", inspectionDate: td(3), overallResult: "fail", itemsJson: failItems, comments: "Brakes and indicator need attention.", photoUrl: null, failAlertSent: true, createdAt: td(3) },
+      { id: "insp-3", vehicleId: "vehicle-2", workerId: "worker-5", inspectionDate: td(5), overallResult: "pass", itemsJson: passItems, comments: null, photoUrl: null, failAlertSent: false, createdAt: td(5) },
+      { id: "insp-4", vehicleId: "vehicle-3", workerId: "worker-4", inspectionDate: td(7), overallResult: "pass", itemsJson: passItems, comments: "Vehicle in good condition.", photoUrl: null, failAlertSent: false, createdAt: td(7) },
+    ];
+    inspectionsData.forEach(i => this.vehicleInspections.set(i.id, i));
+  }
+
+  // Fleet — Vehicles
+  async getVehicles(): Promise<Vehicle[]> {
+    return Array.from(this.vehicles.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async getVehicle(id: string): Promise<Vehicle | undefined> {
+    return this.vehicles.get(id);
+  }
+  async getActiveVehicles(): Promise<Vehicle[]> {
+    return Array.from(this.vehicles.values()).filter(v => v.isActive).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
+    const id = randomUUID();
+    const newVehicle: Vehicle = { ...vehicle, id, createdAt: new Date() };
+    this.vehicles.set(id, newVehicle);
+    return newVehicle;
+  }
+  async updateVehicle(id: string, vehicle: Partial<InsertVehicle>): Promise<Vehicle> {
+    const existing = this.vehicles.get(id);
+    if (!existing) throw new Error("Vehicle not found");
+    const updated = { ...existing, ...vehicle };
+    this.vehicles.set(id, updated);
+    return updated;
+  }
+  async deleteVehicle(id: string): Promise<boolean> {
+    return this.vehicles.delete(id);
+  }
+
+  // Fleet — Assignments
+  async getVehicleAssignments(): Promise<VehicleAssignment[]> {
+    return Array.from(this.vehicleAssignments.values());
+  }
+  async getActiveAssignmentForWorker(workerId: string): Promise<VehicleAssignment | undefined> {
+    return Array.from(this.vehicleAssignments.values()).find(a => a.workerId === workerId && a.isActive);
+  }
+  async getAssignmentsForVehicle(vehicleId: string): Promise<VehicleAssignment[]> {
+    return Array.from(this.vehicleAssignments.values()).filter(a => a.vehicleId === vehicleId);
+  }
+  async createVehicleAssignment(a: InsertVehicleAssignment): Promise<VehicleAssignment> {
+    const id = randomUUID();
+    const newA: VehicleAssignment = { ...a, id, assignedAt: new Date() };
+    this.vehicleAssignments.set(id, newA);
+    return newA;
+  }
+  async updateVehicleAssignment(id: string, a: Partial<InsertVehicleAssignment>): Promise<VehicleAssignment> {
+    const existing = this.vehicleAssignments.get(id);
+    if (!existing) throw new Error("Assignment not found");
+    const updated = { ...existing, ...a };
+    this.vehicleAssignments.set(id, updated);
+    return updated;
+  }
+
+  // Fleet — KM Logs
+  async getKmLogs(): Promise<KmLog[]> {
+    return Array.from(this.kmLogs.values()).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
+  }
+  async getKmLogsByWorker(workerId: string): Promise<KmLog[]> {
+    return Array.from(this.kmLogs.values()).filter(l => l.workerId === workerId).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
+  }
+  async getKmLogsByVehicle(vehicleId: string): Promise<KmLog[]> {
+    return Array.from(this.kmLogs.values()).filter(l => l.vehicleId === vehicleId).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
+  }
+  async getKmLogsByDateRange(start: Date, end: Date): Promise<KmLog[]> {
+    return Array.from(this.kmLogs.values()).filter(l => l.logDate >= start && l.logDate <= end).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
+  }
+  async createKmLog(log: InsertKmLog): Promise<KmLog> {
+    const id = randomUUID();
+    const newLog: KmLog = { ...log, id, createdAt: new Date() };
+    this.kmLogs.set(id, newLog);
+    return newLog;
+  }
+  async deleteKmLog(id: string): Promise<boolean> {
+    return this.kmLogs.delete(id);
+  }
+
+  // Fleet — Fuel Fill-ups
+  async getFuelFillups(): Promise<FuelFillup[]> {
+    return Array.from(this.fuelFillups.values()).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
+  }
+  async getFuelFillupsByWorker(workerId: string): Promise<FuelFillup[]> {
+    return Array.from(this.fuelFillups.values()).filter(f => f.workerId === workerId).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
+  }
+  async getFuelFillupsByVehicle(vehicleId: string): Promise<FuelFillup[]> {
+    return Array.from(this.fuelFillups.values()).filter(f => f.vehicleId === vehicleId).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
+  }
+  async getFuelFillupsByDateRange(start: Date, end: Date): Promise<FuelFillup[]> {
+    return Array.from(this.fuelFillups.values()).filter(f => f.fillDate >= start && f.fillDate <= end).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
+  }
+  async createFuelFillup(f: InsertFuelFillup): Promise<FuelFillup> {
+    const id = randomUUID();
+    const newFillup: FuelFillup = { ...f, id, createdAt: new Date() };
+    this.fuelFillups.set(id, newFillup);
+    return newFillup;
+  }
+  async deleteFuelFillup(id: string): Promise<boolean> {
+    return this.fuelFillups.delete(id);
+  }
+
+  // Fleet — Inspections
+  async getVehicleInspections(): Promise<VehicleInspection[]> {
+    return Array.from(this.vehicleInspections.values()).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
+  }
+  async getVehicleInspectionsByWorker(workerId: string): Promise<VehicleInspection[]> {
+    return Array.from(this.vehicleInspections.values()).filter(i => i.workerId === workerId).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
+  }
+  async getVehicleInspectionsByVehicle(vehicleId: string): Promise<VehicleInspection[]> {
+    return Array.from(this.vehicleInspections.values()).filter(i => i.vehicleId === vehicleId).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
+  }
+  async getFailedInspections(): Promise<VehicleInspection[]> {
+    return Array.from(this.vehicleInspections.values()).filter(i => i.overallResult === "fail").sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
+  }
+  async createVehicleInspection(i: InsertVehicleInspection): Promise<VehicleInspection> {
+    const id = randomUUID();
+    const newInspection: VehicleInspection = { ...i, id, failAlertSent: false, createdAt: new Date() };
+    this.vehicleInspections.set(id, newInspection);
+    return newInspection;
+  }
+  async updateVehicleInspection(id: string, i: Partial<InsertVehicleInspection>): Promise<VehicleInspection> {
+    const existing = this.vehicleInspections.get(id);
+    if (!existing) throw new Error("Inspection not found");
+    const updated = { ...existing, ...i };
+    this.vehicleInspections.set(id, updated);
+    return updated;
+  }
+  async deleteVehicleInspection(id: string): Promise<boolean> {
+    return this.vehicleInspections.delete(id);
+  }
+
+  async getFleetDashboardData(workerId?: string): Promise<any> {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const allKmLogs = workerId ? await this.getKmLogsByWorker(workerId) : await this.getKmLogs();
+    const allFuel = workerId ? await this.getFuelFillupsByWorker(workerId) : await this.getFuelFillups();
+    const allInspections = workerId ? await this.getVehicleInspectionsByWorker(workerId) : await this.getVehicleInspections();
+    const allVehicles = await this.getActiveVehicles();
+    const kmThisMonth = allKmLogs.filter(l => l.logDate >= monthStart).reduce((s, l) => s + l.totalKm, 0);
+    const fuelCostThisMonth = allFuel.filter(f => f.fillDate >= monthStart).reduce((s, f) => s + parseFloat(String(f.cost)), 0);
+    const failedInspections = allInspections.filter(i => i.overallResult === "fail");
+    return {
+      activeVehicles: allVehicles.length,
+      kmThisMonth,
+      fuelCostThisMonth,
+      failedInspectionsCount: failedInspections.length,
+      recentKmLogs: allKmLogs.slice(0, 5),
+      recentFuel: allFuel.slice(0, 5),
+      recentInspections: allInspections.slice(0, 5),
+      failedInspections,
+    };
   }
 
   async exportBackup(): Promise<Record<string, any>> {

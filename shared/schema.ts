@@ -543,3 +543,85 @@ export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).
 
 export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;
 export type QuoteSubmission = typeof quoteSubmissions.$inferSelect;
+
+// ─── FLEET MODULE ──────────────────────────────────────────────────────────
+
+export const vehicles = pgTable("vehicles", {
+  id: varchar("id").primaryKey(),
+  name: text("name").notNull(),
+  registration: text("registration").notNull(),
+  make: text("make"),
+  model: text("model"),
+  year: text("year"),
+  departmentId: varchar("department_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const vehicleAssignments = pgTable("vehicle_assignments", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  assignedAt: timestamp("assigned_at").notNull().default(sql`now()`),
+});
+
+export const kmLogs = pgTable("km_logs", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  logDate: timestamp("log_date").notNull(),
+  startOdometer: integer("start_odometer").notNull(),
+  endOdometer: integer("end_odometer").notNull(),
+  totalKm: integer("total_km").notNull(),
+  businessKm: integer("business_km").notNull().default(0),
+  privateKm: integer("private_km").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const fuelFillups = pgTable("fuel_fillups", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  fillDate: timestamp("fill_date").notNull(),
+  odometer: integer("odometer"),
+  litres: decimal("litres", { precision: 8, scale: 2 }).notNull(),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  fuelStation: text("fuel_station"),
+  receiptPhoto: text("receipt_photo"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const vehicleInspections = pgTable("vehicle_inspections", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  inspectionDate: timestamp("inspection_date").notNull(),
+  overallResult: text("overall_result").notNull().default("pass"),
+  itemsJson: text("items_json"),
+  comments: text("comments"),
+  photoUrl: text("photo_url"),
+  failAlertSent: boolean("fail_alert_sent").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
+export const insertVehicleAssignmentSchema = createInsertSchema(vehicleAssignments).omit({ id: true, assignedAt: true });
+export const insertKmLogSchema = createInsertSchema(kmLogs).omit({ id: true, createdAt: true });
+export const insertFuelFillupSchema = createInsertSchema(fuelFillups).omit({ id: true, createdAt: true });
+export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections).omit({ id: true, createdAt: true, failAlertSent: true });
+
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
+export type InsertVehicleAssignment = z.infer<typeof insertVehicleAssignmentSchema>;
+export type VehicleAssignment = typeof vehicleAssignments.$inferSelect;
+export type InsertKmLog = z.infer<typeof insertKmLogSchema>;
+export type KmLog = typeof kmLogs.$inferSelect;
+export type InsertFuelFillup = z.infer<typeof insertFuelFillupSchema>;
+export type FuelFillup = typeof fuelFillups.$inferSelect;
+export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
+export type VehicleInspection = typeof vehicleInspections.$inferSelect;

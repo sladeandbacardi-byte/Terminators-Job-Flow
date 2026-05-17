@@ -28,6 +28,10 @@ import Backup from "@/pages/backup";
 import FieldDiaries from "@/pages/field-diaries";
 import Quotes from "@/pages/quotes";
 import TestingChecklist from "@/pages/testing-checklist";
+import Fleet from "@/pages/fleet";
+import FleetKmLog from "@/pages/fleet-km-log";
+import FleetInspection from "@/pages/fleet-inspection";
+import FleetFuel from "@/pages/fleet-fuel";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -71,6 +75,10 @@ function AuthenticatedApp() {
       <Route path="/field-diaries" component={FieldDiaries} />
       <Route path="/quotes" component={Quotes} />
       <Route path="/testing-checklist" component={TestingChecklist} />
+      <Route path="/fleet" component={Fleet} />
+      <Route path="/fleet/km-log" component={FleetKmLog} />
+      <Route path="/fleet/inspection" component={FleetInspection} />
+      <Route path="/fleet/fuel" component={FleetFuel} />
       <Route component={NotFound} />
     </Switch>
   );

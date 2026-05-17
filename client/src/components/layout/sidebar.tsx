@@ -4,6 +4,7 @@ import {
   BarChart3, Calendar, Users, Shield, Box, FileText, Receipt, Mail,
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
   Settings, TrendingUp, ExternalLink, Database, ClipboardList, Briefcase,
+  Truck, Gauge, Fuel, ClipboardCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -88,6 +89,19 @@ const ALL_CATEGORIES = [
       { name: "Custom Reports",    href: "/custom-reports",    icon: BarChart3,     roles: ["admin", "manager"] },
       { name: "Testing Checklist", href: "/testing-checklist", icon: ClipboardList, roles: ["admin", "manager", "coordinator"] },
       { name: "Backup & Restore",  href: "/backup",            icon: Database,      roles: ["admin"] },
+    ],
+  },
+
+  // ── FLEET ─────────────────────────────────────────────────────────────────
+  {
+    name: "Fleet",
+    icon: Truck,
+    roles: ["admin", "manager", "coordinator", "service", "accounts", "sales"],
+    items: [
+      { name: "Fleet Dashboard",    href: "/fleet",            icon: Truck,         roles: ["admin", "manager", "coordinator"] },
+      { name: "Log KMs",            href: "/fleet/km-log",     icon: Gauge,         roles: ["admin", "manager", "coordinator", "service"] },
+      { name: "Vehicle Inspection", href: "/fleet/inspection", icon: ClipboardCheck, roles: ["admin", "manager", "coordinator", "service"] },
+      { name: "Fuel Fill-up",       href: "/fleet/fuel",       icon: Fuel,          roles: ["admin", "manager", "coordinator", "service"] },
     ],
   },
 ];
