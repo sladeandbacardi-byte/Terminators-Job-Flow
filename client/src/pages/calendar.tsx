@@ -1334,7 +1334,7 @@ export default function Calendar() {
               <div className="hidden lg:flex items-center gap-2.5 flex-wrap bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
                 <span className="text-xs text-gray-500 font-medium shrink-0">Legend:</span>
                 {[
-                  { label: 'Scheduled', color: '#f97316' },
+                  { label: 'Scheduled / To Do', color: '#f97316' },
                   { label: 'In Progress', color: '#3b82f6' },
                   { label: 'Completed', color: '#22c55e' },
                   { label: 'Cancelled', color: '#ef4444' },
