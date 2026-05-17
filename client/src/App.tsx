@@ -30,7 +30,7 @@ import Quotes from "@/pages/quotes";
 import TestingChecklist from "@/pages/testing-checklist";
 
 function AuthenticatedApp() {
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
 
   if (isLoading) {
     return (
@@ -44,7 +44,7 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <LoginForm onSuccess={login} />;
+    return <LoginForm onSuccess={login} onDemoLogin={loginDemo} />;
   }
 
   return (
@@ -78,7 +78,7 @@ function AuthenticatedApp() {
 
 function App() {
   const [location] = useLocation();
-  
+
   // Public routes that don't require authentication
   if (location === '/quote-request') {
     return (
@@ -90,7 +90,7 @@ function App() {
       </QueryClientProvider>
     );
   }
-  
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

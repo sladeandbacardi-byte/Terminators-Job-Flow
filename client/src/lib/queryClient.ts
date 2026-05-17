@@ -1,4 +1,33 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+
+// Endpoints / patterns blocked in demo mode
+const DEMO_BLOCKED: { method: string; pattern?: RegExp }[] = [
+  { method: "DELETE" },
+  { method: "POST", pattern: /\/api\/emails\// },
+  { method: "POST", pattern: /\/send/ },
+  { method: "POST", pattern: /\/email/ },
+];
+
+function isDemoMode(): boolean {
+  return localStorage.getItem("demo_mode") === "true";
+}
+
+function checkDemoBlock(method: string, url: string): void {
+  if (!isDemoMode()) return;
+  const upper = method.toUpperCase();
+  for (const rule of DEMO_BLOCKED) {
+    if (rule.method !== upper) continue;
+    if (!rule.pattern || rule.pattern.test(url)) {
+      toast({
+        title: "Demo Mode",
+        description: "This action is disabled in Demo Mode.",
+        variant: "destructive",
+      });
+      throw new Error("This action is disabled in Demo Mode.");
+    }
+  }
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -22,13 +51,16 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Block destructive actions in demo mode
+  checkDemoBlock(method, url);
+
   const token = localStorage.getItem('authToken');
   const headers: Record<string, string> = {};
-  
+
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  
+
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -52,7 +84,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const token = localStorage.getItem('authToken');
     const headers: Record<string, string> = {};
-    
+
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }

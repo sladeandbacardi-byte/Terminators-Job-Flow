@@ -1,13 +1,16 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { AdminUser } from '@shared/schema';
+import type { DemoProfile } from '@/lib/demoProfiles';
 
 interface AuthContextType {
   user: AdminUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isDemoMode: boolean;
   login: (token: string, user: AdminUser) => void;
+  loginDemo: (profile: DemoProfile) => void;
   logout: () => Promise<void>;
 }
 
@@ -29,35 +32,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
+    const demoFlag = localStorage.getItem('demo_mode') === 'true';
 
     if (storedToken && storedUser) {
       try {
         const userData = JSON.parse(storedUser);
         setToken(storedToken);
         setUser(userData);
+        setIsDemoMode(demoFlag);
       } catch (error) {
         console.error('Error parsing stored user data:', error);
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('demo_mode');
       }
     }
-    
+
     setIsLoading(false);
   }, []);
 
   const login = (newToken: string, userData: AdminUser) => {
     setToken(newToken);
     setUser(userData);
+    setIsDemoMode(false);
     localStorage.setItem('auth_token', newToken);
     localStorage.setItem('auth_user', JSON.stringify(userData));
+    localStorage.removeItem('demo_mode');
+  };
+
+  const loginDemo = (profile: DemoProfile) => {
+    const fakeToken = `demo-token-${profile.key}-${Date.now()}`;
+    const fakeUser = profile.user as unknown as AdminUser;
+    setToken(fakeToken);
+    setUser(fakeUser);
+    setIsDemoMode(true);
+    localStorage.setItem('auth_token', fakeToken);
+    localStorage.setItem('auth_user', JSON.stringify(fakeUser));
+    localStorage.setItem('demo_mode', 'true');
   };
 
   const logout = async () => {
-    if (token) {
+    if (token && !isDemoMode) {
       try {
         await fetch('/api/auth/logout', {
           method: 'POST',
@@ -73,8 +93,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setToken(null);
     setUser(null);
+    setIsDemoMode(false);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('demo_mode');
   };
 
   const value: AuthContextType = {
@@ -82,7 +104,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     token,
     isAuthenticated: !!token && !!user,
     isLoading,
+    isDemoMode,
     login,
+    loginDemo,
     logout,
   };
 

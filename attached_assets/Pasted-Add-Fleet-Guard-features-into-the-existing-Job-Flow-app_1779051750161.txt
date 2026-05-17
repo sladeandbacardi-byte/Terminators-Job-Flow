@@ -1,0 +1,139 @@
+Add Fleet Guard features into the existing Job Flow app as a new module called Fleet.
+
+Goal:
+Make Job Flow the main app staff use. Add fleet checks, KM logs, fuel fill-ups, inspection alerts, and weekly summaries inside Job Flow.
+
+Create a new main menu item called Fleet.
+
+Fleet module sections:
+Log KMs
+Vehicle Inspection
+Fuel Fill-up
+Fleet Dashboard / Reports
+
+Technician flow:
+When staff log into Job Flow, show their assigned vehicle.
+Allow staff to log starting odometer, ending odometer, business kilometers, private kilometers, and notes.
+Allow staff to submit vehicle inspections.
+Allow staff to log fuel fill-ups.
+
+Every submission must automatically save:
+Driver/user name
+Vehicle name
+Registration number
+Date
+Time
+
+Vehicle inspections:
+The inspection form must use pass/fail items.
+
+If all items pass:
+Do not send an immediate email.
+
+If any item fails:
+Immediately send an admin email alert.
+
+The fail email must include:
+Driver name
+Vehicle name
+Registration number
+Date and time
+Failed items
+Comments
+Photo or photo link if uploaded
+
+Weekly summary email:
+Send one weekly email summary to admin.
+
+The weekly summary must include, grouped by driver and vehicle:
+Driver name
+Vehicle name
+Registration number
+Total kilometers
+Business kilometers
+Private kilometers
+Number of fuel fill-ups
+Fuel litres
+Fuel cost
+Inspections completed
+Failed inspections
+Inspection notes
+
+Email rules:
+There must be two separate email systems.
+
+System 1:
+Immediate fail alert.
+Send instantly.
+Only send when an inspection has a fail.
+Do not send if all inspection items pass.
+
+System 2:
+Weekly fleet summary.
+Send once per week.
+Include KM logs, fuel logs, and inspections.
+
+Admin dashboard:
+Allow managers/admins to view all vehicles.
+Allow managers/admins to view vehicle history.
+Allow managers/admins to view driver history.
+Allow filtering by date range, vehicle, and driver.
+Show failed inspections.
+Show fuel logs.
+Show KM logs.
+Allow export of reports if possible.
+
+Database tables:
+vehicles
+vehicle_assignments
+km_logs
+fuel_fillups
+vehicle_inspections
+inspection_items
+inspection_fail_alerts
+weekly_fleet_summaries
+
+Vehicle fields:
+Vehicle name
+Registration number
+Department if needed
+Active/inactive status
+
+KM log fields:
+Driver ID
+Vehicle ID
+Date/time
+Starting odometer
+Ending odometer
+Total kilometers
+Business kilometers
+Private kilometers
+Notes
+
+Fuel log fields:
+Driver ID
+Vehicle ID
+Date/time
+Odometer
+Litres
+Cost
+Fuel station
+Receipt/photo upload
+Notes
+
+Inspection fields:
+Driver ID
+Vehicle ID
+Date/time
+Pass/fail result
+Failed items
+Comments
+Photos
+
+Permissions:
+Technicians can only create and view their own entries.
+Managers/admins can view all fleet data and access dashboard and reports.
+
+Keep styling and design consistent with the existing Job Flow app.
+Do not remove any current Job Flow functionality.
+Add Fleet as a new integrated module.
