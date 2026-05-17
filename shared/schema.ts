@@ -75,6 +75,7 @@ export const rentalContracts = pgTable("rental_contracts", {
   lastPriceIncrease: timestamp("last_price_increase"),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  contractNumber: text("contract_number"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -121,6 +122,8 @@ export const jobs = pgTable("jobs", {
   recurrenceDay: text("recurrence_day"),
   recurrenceCount: integer("recurrence_count"),
   recurrenceYears: integer("recurrence_years"),
+  jobNumber: text("job_number"),
+  linkedQuoteId: varchar("linked_quote_id"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
@@ -143,6 +146,8 @@ export const invoices = pgTable("invoices", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
   sageInvoiceId: varchar("sage_invoice_id"), // Store Sage invoice ID for integration
   sageStatus: varchar("sage_status"), // Store Sage invoice status
+  linkedJobId: varchar("linked_job_id"),
+  linkedQuoteId: varchar("linked_quote_id"),
 });
 
 export const invoiceItems = pgTable("invoice_items", {
@@ -252,12 +257,14 @@ export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit
 export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({
   id: true,
   createdAt: true,
+  contractNumber: true,
 });
 
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  jobNumber: true,
 });
 
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
@@ -523,11 +530,13 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   quoteSentAt: timestamp("quote_sent_at"), // When the quote email was sent
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
   followUpDate: timestamp("follow_up_date"),
+  quoteNumber: text("quote_number"),
 });
 
 export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).omit({
   id: true,
   submittedAt: true,
+  quoteNumber: true,
 });
 
 export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;

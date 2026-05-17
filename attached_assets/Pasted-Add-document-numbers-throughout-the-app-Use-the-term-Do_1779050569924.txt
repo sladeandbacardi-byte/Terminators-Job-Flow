@@ -1,0 +1,88 @@
+Add document numbers throughout the app.
+
+Use the term “Document Number” as the general system label.
+
+Every important record should have a unique document number based on its type.
+
+Use these formats:
+
+Quotes:
+QT-YYYY-0001
+
+Jobs:
+JOB-YYYY-0001
+
+Invoices:
+INV-YYYY-0001
+
+Purchase Orders:
+PO-YYYY-0001
+
+Rental Contracts:
+RC-YYYY-0001
+
+Field Diaries:
+FD-YYYY-0001
+
+Vehicle Checks:
+VC-YYYY-0001
+
+Examples:
+QT-2026-0001
+JOB-2026-0001
+INV-2026-0001
+PO-2026-0001
+RC-2026-0001
+FD-2026-0001
+VC-2026-0001
+
+Rules:
+1. Document numbers must be automatically generated when a new record is created.
+2. Document numbers must never change after creation.
+3. Document numbers must be unique within each document type.
+4. Each document type should have its own sequence.
+5. The sequence should reset each year.
+6. Show the document number on list pages, detail pages, dashboards, reports and exports.
+7. Add search support so users can search by document number.
+8. When one document is created from another, keep the link between them.
+
+Example workflow:
+Quote QT-2026-0004 is accepted.
+A job is created:
+JOB-2026-0021
+The job should show:
+Linked Quote: QT-2026-0004
+
+If the job is invoiced:
+Invoice INV-2026-0015
+The invoice should show:
+Linked Job: JOB-2026-0021
+Linked Quote: QT-2026-0004
+
+9. Service Coordinator users can view linked quote document numbers and read-only quote details from job pages.
+10. Finance/Admin users can search invoices, jobs and quotes by document number.
+11. Sales users can search quotes and clients by document number.
+12. Managing Member users can search all document numbers.
+
+Display examples:
+
+Quote card:
+Nelson Mandela University
+QT-2026-0004 • Deep Cleaning
+
+Job detail:
+Document Number: JOB-2026-0021
+Linked Quote: QT-2026-0004
+
+Invoice detail:
+Document Number: INV-2026-0015
+Linked Job: JOB-2026-0021
+Linked Quote: QT-2026-0004
+
+Purchase Order detail:
+Document Number: PO-2026-0007
+Supplier: Paper Products SA
+
+Field Diary detail:
+Document Number: FD-2026-0034
+Linked Job: JOB-2026-0021

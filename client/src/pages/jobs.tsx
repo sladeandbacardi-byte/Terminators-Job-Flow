@@ -12,7 +12,7 @@ import { Calendar, Search, Plus, Filter, Download, Printer, Edit } from "lucide-
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
-import type { Job } from "@shared/schema";
+import type { Job, QuoteSubmission } from "@shared/schema";
 import { Link } from "wouter";
 
 export default function Jobs() {
@@ -26,10 +26,17 @@ export default function Jobs() {
     queryKey: ['/api/jobs'],
   });
 
+  const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({
+    queryKey: ['/api/quote-submissions'],
+  });
+
+  const quoteMap = new Map(quoteSubmissions.map(q => [q.id, q]));
+
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = searchTerm === "" || 
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      job.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.jobNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || job.status === statusFilter;
     
@@ -67,7 +74,7 @@ export default function Jobs() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search jobs by title or location..."
+                placeholder="Search jobs by title, document number or location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -167,9 +174,25 @@ export default function Jobs() {
                   {filteredJobs.map((job) => (
                     <div key={job.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid={`job-item-${job.id}`}>
                       <div className="flex justify-between items-start mb-3">
-                        <h4 className="font-semibold text-gray-900" data-testid={`job-title-${job.id}`}>
-                          {job.title}
-                        </h4>
+                        <div>
+                          {(job.jobNumber || (job.linkedQuoteId && quoteMap.get(job.linkedQuoteId)?.quoteNumber)) && (
+                            <div className="flex items-center gap-1.5 mb-1">
+                              {job.jobNumber && (
+                                <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                                  {job.jobNumber}
+                                </span>
+                              )}
+                              {job.linkedQuoteId && quoteMap.get(job.linkedQuoteId)?.quoteNumber && (
+                                <span className="text-xs font-mono text-purple-700 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">
+                                  Linked Quote: {quoteMap.get(job.linkedQuoteId)!.quoteNumber}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <h4 className="font-semibold text-gray-900" data-testid={`job-title-${job.id}`}>
+                            {job.title}
+                          </h4>
+                        </div>
                         <div className="flex items-center gap-2">
                           <Badge 
                             variant={getStatusBadgeVariant(job.status)}

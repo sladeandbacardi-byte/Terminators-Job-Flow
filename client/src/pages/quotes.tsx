@@ -174,6 +174,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
         email:          quote.email || undefined,
         salesperson:    salespersonWorker?.name ?? "",
         priority:       "medium",
+        linkedQuoteId:  quote.id,
       });
       if (!jobRes.ok) throw new Error("Failed to create job");
 
@@ -265,7 +266,14 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
               <Building2 className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-base leading-tight truncate">{quote.companyName}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-base leading-tight truncate">{quote.companyName}</p>
+                {quote.quoteNumber && (
+                  <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shrink-0">
+                    {quote.quoteNumber}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-sm text-muted-foreground">
                 <User className="h-3.5 w-3.5 shrink-0" />
                 <span>{quote.contactPerson}</span>

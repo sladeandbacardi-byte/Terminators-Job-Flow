@@ -92,6 +92,9 @@ export interface IStorage {
   updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   deleteInvoice(id: string): Promise<boolean>;
   generateInvoiceNumber(): Promise<string>;
+  generateJobNumber(): Promise<string>;
+  generateContractNumber(): Promise<string>;
+  generateQuoteNumber(): Promise<string>;
 
   // Invoice Items
   getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
@@ -210,7 +213,10 @@ export class MemStorage implements IStorage {
   private quoteSubmissions: Map<string, QuoteSubmission> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
-  private poCounter: number = 1;
+  private poCounter: number = 9;
+  private jobCounter: number = 16;
+  private contractCounter: number = 7;
+  private quoteCounter: number = 6;
 
   constructor() {
     this.initializeData();
@@ -1584,8 +1590,11 @@ export class MemStorage implements IStorage {
 
     // Add all sample jobs
     sampleJobs.forEach(job => {
+      const jobIdx = parseInt(job.id.split('-')[1]) || 0;
       this.jobs.set(job.id, {
         ...job,
+        jobNumber: `JOB-2026-${String(jobIdx).padStart(4, '0')}`,
+        linkedQuoteId: null,
         serviceType: deptToServiceType[job.departmentId || ''] || 'general',
         scheduledTime: null,
         startTime: null,
@@ -1687,8 +1696,10 @@ export class MemStorage implements IStorage {
     ];
 
     rentalContracts.forEach(rc => {
+      const rcIdx = parseInt(rc.id.split('-')[1]) || 0;
       this.rentalContracts.set(rc.id, {
         ...rc,
+        contractNumber: `RC-2026-${String(rcIdx).padStart(4, '0')}`,
         lastPriceIncrease: null,
         createdAt: new Date()
       } as RentalContract);
@@ -1826,22 +1837,23 @@ export class MemStorage implements IStorage {
     ];
 
     sampleQuotes.forEach(q => {
-      this.quoteSubmissions.set(q.id, q);
+      const qi = parseInt(q.id.split('-')[1]) || 0;
+      this.quoteSubmissions.set(q.id, { ...q, quoteNumber: `QT-2026-${String(qi).padStart(4, '0')}` });
     });
 
     // Seed current-period purchase orders (expenses)
     const samplePOs: PurchaseOrder[] = [
       // Today
-      { id: "po-seed-1", poNumber: "PO-TODAY-001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1850.00", requestDate: d(0), approvalDate: d(0), expectedDeliveryDate: d(3), actualDeliveryDate: null, sentDate: null, notes: "Pesticide restock - daily run", rejectionReason: null, createdAt: d(0), updatedAt: d(0) },
-      { id: "po-seed-2", poNumber: "PO-TODAY-002", supplierId: "supplier-2", requestedById: "user-1", approvedById: null, status: "pending", totalAmount: "640.00", requestDate: d(0), approvalDate: null, expectedDeliveryDate: d(5), actualDeliveryDate: null, sentDate: null, notes: "Sanitary bag restocking", rejectionReason: null, createdAt: d(0), updatedAt: d(0) },
+      { id: "po-seed-1", poNumber: "PO-2026-0001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1850.00", requestDate: d(0), approvalDate: d(0), expectedDeliveryDate: d(3), actualDeliveryDate: null, sentDate: null, notes: "Pesticide restock - daily run", rejectionReason: null, createdAt: d(0), updatedAt: d(0) },
+      { id: "po-seed-2", poNumber: "PO-2026-0002", supplierId: "supplier-2", requestedById: "user-1", approvedById: null, status: "pending", totalAmount: "640.00", requestDate: d(0), approvalDate: null, expectedDeliveryDate: d(5), actualDeliveryDate: null, sentDate: null, notes: "Sanitary bag restocking", rejectionReason: null, createdAt: d(0), updatedAt: d(0) },
       // This week
-      { id: "po-seed-3", poNumber: "PO-WEEK-001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "3200.00", requestDate: d(-2), approvalDate: d(-2), sentDate: d(-1), expectedDeliveryDate: d(0), actualDeliveryDate: d(0), notes: "Monthly washroom supplies - soaps & dispensers", rejectionReason: null, createdAt: d(-2), updatedAt: d(0) },
-      { id: "po-seed-4", poNumber: "PO-WEEK-002", supplierId: "supplier-3", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1420.00", requestDate: d(-3), approvalDate: d(-3), expectedDeliveryDate: d(2), actualDeliveryDate: null, sentDate: null, notes: "Deep cleaning chemicals - April stock", rejectionReason: null, createdAt: d(-3), updatedAt: d(-3) },
-      { id: "po-seed-5", poNumber: "PO-WEEK-003", supplierId: "supplier-2", requestedById: "user-1", approvedById: "user-1", status: "sent", totalAmount: "975.00", requestDate: d(-4), approvalDate: d(-4), sentDate: d(-3), expectedDeliveryDate: d(1), actualDeliveryDate: null, notes: "PPE gloves and masks - field staff", rejectionReason: null, createdAt: d(-4), updatedAt: d(-3) },
+      { id: "po-seed-3", poNumber: "PO-2026-0003", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "3200.00", requestDate: d(-2), approvalDate: d(-2), sentDate: d(-1), expectedDeliveryDate: d(0), actualDeliveryDate: d(0), notes: "Monthly washroom supplies - soaps & dispensers", rejectionReason: null, createdAt: d(-2), updatedAt: d(0) },
+      { id: "po-seed-4", poNumber: "PO-2026-0004", supplierId: "supplier-3", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1420.00", requestDate: d(-3), approvalDate: d(-3), expectedDeliveryDate: d(2), actualDeliveryDate: null, sentDate: null, notes: "Deep cleaning chemicals - April stock", rejectionReason: null, createdAt: d(-3), updatedAt: d(-3) },
+      { id: "po-seed-5", poNumber: "PO-2026-0005", supplierId: "supplier-2", requestedById: "user-1", approvedById: "user-1", status: "sent", totalAmount: "975.00", requestDate: d(-4), approvalDate: d(-4), sentDate: d(-3), expectedDeliveryDate: d(1), actualDeliveryDate: null, notes: "PPE gloves and masks - field staff", rejectionReason: null, createdAt: d(-4), updatedAt: d(-3) },
       // This month (earlier)
-      { id: "po-seed-6", poNumber: "PO-MONTH-001", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "5500.00", requestDate: d(-10), approvalDate: d(-10), sentDate: d(-9), expectedDeliveryDate: d(-7), actualDeliveryDate: d(-7), notes: "Bulk rodenticide order for Q2", rejectionReason: null, createdAt: d(-10), updatedAt: d(-7) },
-      { id: "po-seed-7", poNumber: "PO-MONTH-002", supplierId: "supplier-3", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "2800.00", requestDate: d(-14), approvalDate: d(-13), sentDate: d(-12), expectedDeliveryDate: d(-10), actualDeliveryDate: d(-10), notes: "Washroom paper product replenishment", rejectionReason: null, createdAt: d(-14), updatedAt: d(-10) },
-      { id: "po-seed-8", poNumber: "PO-MONTH-003", supplierId: "supplier-2", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1650.00", requestDate: d(-7), approvalDate: d(-7), expectedDeliveryDate: d(3), actualDeliveryDate: null, sentDate: null, notes: "Vehicle cleaning supplies - fleet", rejectionReason: null, createdAt: d(-7), updatedAt: d(-7) },
+      { id: "po-seed-6", poNumber: "PO-2026-0006", supplierId: "supplier-1", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "5500.00", requestDate: d(-10), approvalDate: d(-10), sentDate: d(-9), expectedDeliveryDate: d(-7), actualDeliveryDate: d(-7), notes: "Bulk rodenticide order for Q2", rejectionReason: null, createdAt: d(-10), updatedAt: d(-7) },
+      { id: "po-seed-7", poNumber: "PO-2026-0007", supplierId: "supplier-3", requestedById: "user-1", approvedById: "user-1", status: "received", totalAmount: "2800.00", requestDate: d(-14), approvalDate: d(-13), sentDate: d(-12), expectedDeliveryDate: d(-10), actualDeliveryDate: d(-10), notes: "Washroom paper product replenishment", rejectionReason: null, createdAt: d(-14), updatedAt: d(-10) },
+      { id: "po-seed-8", poNumber: "PO-2026-0008", supplierId: "supplier-2", requestedById: "user-1", approvedById: "user-1", status: "approved", totalAmount: "1650.00", requestDate: d(-7), approvalDate: d(-7), expectedDeliveryDate: d(3), actualDeliveryDate: null, sentDate: null, notes: "Vehicle cleaning supplies - fleet", rejectionReason: null, createdAt: d(-7), updatedAt: d(-7) },
     ];
 
     samplePOs.forEach(po => {
@@ -2269,9 +2281,11 @@ export class MemStorage implements IStorage {
 
   async createRentalContract(insertContract: InsertRentalContract): Promise<RentalContract> {
     const id = randomUUID();
+    const contractNumber = await this.generateContractNumber();
     const contract: RentalContract = { 
       ...insertContract, 
       id, 
+      contractNumber,
       createdAt: new Date(),
       isActive: insertContract.isActive ?? true,
       notes: insertContract.notes || null,
@@ -2406,9 +2420,12 @@ export class MemStorage implements IStorage {
   async createJob(insertJob: InsertJob): Promise<Job> {
     const id = randomUUID();
     const now = new Date();
+    const jobNumber = await this.generateJobNumber();
     const job: Job = { 
       ...insertJob, 
       id, 
+      jobNumber,
+      linkedQuoteId: (insertJob as any).linkedQuoteId || null,
       createdAt: now, 
       updatedAt: now,
       notes: insertJob.notes || null,
@@ -2527,6 +2544,27 @@ export class MemStorage implements IStorage {
     const number = String(this.invoiceCounter).padStart(4, '0');
     this.invoiceCounter++;
     return `INV-${year}-${number}`;
+  }
+
+  async generateJobNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const number = String(this.jobCounter).padStart(4, '0');
+    this.jobCounter++;
+    return `JOB-${year}-${number}`;
+  }
+
+  async generateContractNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const number = String(this.contractCounter).padStart(4, '0');
+    this.contractCounter++;
+    return `RC-${year}-${number}`;
+  }
+
+  async generateQuoteNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const number = String(this.quoteCounter).padStart(4, '0');
+    this.quoteCounter++;
+    return `QT-${year}-${number}`;
   }
 
   async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
@@ -2798,7 +2836,8 @@ export class MemStorage implements IStorage {
 
   async createPurchaseOrder(insertPO: InsertPurchaseOrder): Promise<PurchaseOrder> {
     const id = randomUUID();
-    const poNumber = insertPO.poNumber || `PO-2024-${String(this.poCounter++).padStart(3, '0')}`;
+    const year = new Date().getFullYear();
+    const poNumber = insertPO.poNumber || `PO-${year}-${String(this.poCounter++).padStart(4, '0')}`;
     const po: PurchaseOrder = { 
       ...insertPO, 
       id, 
@@ -3219,9 +3258,11 @@ export class MemStorage implements IStorage {
 
   async createQuoteSubmission(submission: InsertQuoteSubmission): Promise<QuoteSubmission> {
     const id = randomUUID();
+    const quoteNumber = await this.generateQuoteNumber();
     const newSubmission: QuoteSubmission = {
       ...submission,
       id,
+      quoteNumber,
       submittedAt: new Date(),
     };
     this.quoteSubmissions.set(id, newSubmission);
@@ -3270,6 +3311,9 @@ export class MemStorage implements IStorage {
       activityLogs: this.activityLogs,
       invoiceCounter: this.invoiceCounter,
       poCounter: this.poCounter,
+      jobCounter: this.jobCounter,
+      contractCounter: this.contractCounter,
+      quoteCounter: this.quoteCounter,
     };
   }
 
@@ -3299,6 +3343,9 @@ export class MemStorage implements IStorage {
     if (Array.isArray(data.activityLogs)) this.activityLogs = data.activityLogs;
     if (typeof data.invoiceCounter === "number") this.invoiceCounter = data.invoiceCounter;
     if (typeof data.poCounter === "number") this.poCounter = data.poCounter;
+    if (typeof data.jobCounter === "number") this.jobCounter = data.jobCounter;
+    if (typeof data.contractCounter === "number") this.contractCounter = data.contractCounter;
+    if (typeof data.quoteCounter === "number") this.quoteCounter = data.quoteCounter;
   }
 }
 

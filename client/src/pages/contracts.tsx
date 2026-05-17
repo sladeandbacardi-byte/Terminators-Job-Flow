@@ -67,7 +67,8 @@ export default function Contracts() {
     
     const matchesSearch = searchTerm === "" || 
       client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      item?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contract.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || 
       (statusFilter === "active" && contract.isActive) ||
@@ -255,6 +256,11 @@ export default function Contracts() {
                       <div key={contract.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors" data-testid={`contract-${contract.id}`}>
                         <div className="flex justify-between items-start mb-4">
                           <div>
+                            {contract.contractNumber && (
+                              <span className="inline-block text-xs font-mono font-medium text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded mb-1">
+                                {contract.contractNumber}
+                              </span>
+                            )}
                             <h4 className="font-semibold text-gray-900 text-lg" data-testid={`contract-client-${contract.id}`}>
                               {getClientName(contract.clientId)}
                             </h4>
