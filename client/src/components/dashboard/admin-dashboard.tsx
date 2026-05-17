@@ -130,7 +130,7 @@ export function AdminDashboard() {
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Sales — {rangeLabel}</p>
+                <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Revenue — {rangeLabel}</p>
                 <p className="text-3xl font-bold text-green-800 mt-1">{fmt(totalSales)}</p>
                 <div className="text-xs text-gray-500 mt-1 space-y-0.5">
                   <p>Invoices paid: {fmt(sales)}</p>
@@ -201,7 +201,7 @@ export function AdminDashboard() {
           <CardContent>
             <div className="space-y-3">
               {[
-                { label: "Sales", value: totalSales, max: Math.max(totalSales, expenses), color: "bg-green-500", textColor: "text-green-700" },
+                { label: "Revenue", value: totalSales, max: Math.max(totalSales, expenses), color: "bg-green-500", textColor: "text-green-700" },
                 { label: "Expenses", value: expenses, max: Math.max(totalSales, expenses), color: "bg-red-400", textColor: "text-red-700" },
                 { label: "Profit", value: grossProfit, max: Math.max(totalSales, expenses), color: grossProfit >= 0 ? "bg-emerald-500" : "bg-orange-400", textColor: grossProfit >= 0 ? "text-emerald-700" : "text-orange-700" },
               ].map(({ label, value, max, color, textColor }) => (
