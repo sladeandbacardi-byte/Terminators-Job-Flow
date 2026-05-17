@@ -625,3 +625,47 @@ export type InsertFuelFillup = z.infer<typeof insertFuelFillupSchema>;
 export type FuelFillup = typeof fuelFillups.$inferSelect;
 export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
 export type VehicleInspection = typeof vehicleInspections.$inferSelect;
+
+// ─── FLEET MAINTENANCE ──────────────────────────────────────────────────────
+
+export const vehicleIssues = pgTable("vehicle_issues", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  reportedAt: timestamp("reported_at").notNull(),
+  category: text("category").notNull(), // tyres, engine, brakes, electrical, body, lights, fluids, windscreen, other
+  description: text("description").notNull(),
+  urgency: text("urgency").notNull().default("medium"), // low, medium, high, not_safe
+  status: text("status").notNull().default("open"), // open, in_progress, booked, completed, not_required
+  photoUrl: text("photo_url"),
+  managerNotes: text("manager_notes"),
+  resolvedAt: timestamp("resolved_at"),
+  serviceRecordId: varchar("service_record_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const serviceRecords = pgTable("service_records", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  serviceDate: timestamp("service_date").notNull(),
+  odometer: integer("odometer").notNull(),
+  serviceProvider: text("service_provider").notNull(),
+  workDone: text("work_done").notNull(),
+  issuesFixed: text("issues_fixed"),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  invoiceNumber: text("invoice_number"),
+  invoiceUrl: text("invoice_url"),
+  notes: text("notes"),
+  nextServiceDate: timestamp("next_service_date"),
+  nextServiceOdometer: integer("next_service_odometer"),
+  createdByWorkerId: varchar("created_by_worker_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertVehicleIssueSchema = createInsertSchema(vehicleIssues).omit({ id: true, createdAt: true });
+export const insertServiceRecordSchema = createInsertSchema(serviceRecords).omit({ id: true, createdAt: true });
+
+export type InsertVehicleIssue = z.infer<typeof insertVehicleIssueSchema>;
+export type VehicleIssue = typeof vehicleIssues.$inferSelect;
+export type InsertServiceRecord = z.infer<typeof insertServiceRecordSchema>;
+export type ServiceRecord = typeof serviceRecords.$inferSelect;

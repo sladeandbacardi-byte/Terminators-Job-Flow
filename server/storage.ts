@@ -24,6 +24,8 @@ import {
   type KmLog, type InsertKmLog,
   type FuelFillup, type InsertFuelFillup,
   type VehicleInspection, type InsertVehicleInspection,
+  type VehicleIssue, type InsertVehicleIssue,
+  type ServiceRecord, type InsertServiceRecord,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -234,6 +236,26 @@ export interface IStorage {
   // Fleet — Dashboard
   getFleetDashboardData(workerId?: string): Promise<any>;
 
+  // Fleet Maintenance — Issues
+  getVehicleIssues(): Promise<VehicleIssue[]>;
+  getVehicleIssue(id: string): Promise<VehicleIssue | undefined>;
+  getVehicleIssuesByVehicle(vehicleId: string): Promise<VehicleIssue[]>;
+  getVehicleIssuesByWorker(workerId: string): Promise<VehicleIssue[]>;
+  getOpenVehicleIssues(): Promise<VehicleIssue[]>;
+  getNotSafeVehicleIssues(): Promise<VehicleIssue[]>;
+  createVehicleIssue(issue: InsertVehicleIssue): Promise<VehicleIssue>;
+  updateVehicleIssue(id: string, issue: Partial<InsertVehicleIssue> & { managerNotes?: string }): Promise<VehicleIssue>;
+  deleteVehicleIssue(id: string): Promise<boolean>;
+
+  // Fleet Maintenance — Service Records
+  getServiceRecords(): Promise<ServiceRecord[]>;
+  getServiceRecord(id: string): Promise<ServiceRecord | undefined>;
+  getServiceRecordsByVehicle(vehicleId: string): Promise<ServiceRecord[]>;
+  createServiceRecord(record: InsertServiceRecord): Promise<ServiceRecord>;
+  updateServiceRecord(id: string, record: Partial<InsertServiceRecord>): Promise<ServiceRecord>;
+  deleteServiceRecord(id: string): Promise<boolean>;
+  getMaintenanceDashboardData(): Promise<any>;
+
   // Backup & Restore
   exportBackup(): Promise<Record<string, any>>;
   restoreBackup(data: Record<string, any>): Promise<void>;
@@ -264,6 +286,8 @@ export class MemStorage implements IStorage {
   private kmLogs: Map<string, KmLog> = new Map();
   private fuelFillups: Map<string, FuelFillup> = new Map();
   private vehicleInspections: Map<string, VehicleInspection> = new Map();
+  private vehicleIssues: Map<string, VehicleIssue> = new Map();
+  private serviceRecords: Map<string, ServiceRecord> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 9;
@@ -3455,6 +3479,27 @@ export class MemStorage implements IStorage {
       { id: "insp-4", vehicleId: "vehicle-3", workerId: "worker-4", inspectionDate: td(7), overallResult: "pass", itemsJson: passItems, comments: "Vehicle in good condition.", photoUrl: null, failAlertSent: false, createdAt: td(7) },
     ];
     inspectionsData.forEach(i => this.vehicleInspections.set(i.id, i));
+
+    // — Vehicle Issues seed data —
+    const tdf = (daysAhead: number) => { const d = new Date(); d.setDate(d.getDate() + daysAhead); d.setHours(8, 0, 0, 0); return d; };
+    const issuesData: VehicleIssue[] = [
+      { id: "issue-1", vehicleId: "vehicle-1", workerId: "worker-3", reportedAt: td(3), category: "brakes", description: "Grinding noise when braking at speed. Gets worse after highway driving.", urgency: "high", status: "open", photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(3) },
+      { id: "issue-2", vehicleId: "vehicle-1", workerId: "worker-3", reportedAt: td(5), category: "tyres", description: "Front left tyre has a visible sidewall bulge. Risk of blowout at highway speeds.", urgency: "not_safe", status: "booked", photoUrl: null, managerNotes: "Booked at Kyalami Tyres for Friday 9am. Do not drive on highway.", resolvedAt: null, serviceRecordId: null, createdAt: td(5) },
+      { id: "issue-3", vehicleId: "vehicle-2", workerId: "worker-5", reportedAt: td(2), category: "electrical", description: "Red battery warning light appeared on dashboard. Checked connections — all fine.", urgency: "medium", status: "in_progress", photoUrl: null, managerNotes: "Diagnostics being done. May be alternator.", resolvedAt: null, serviceRecordId: null, createdAt: td(2) },
+      { id: "issue-4", vehicleId: "vehicle-3", workerId: "worker-4", reportedAt: td(7), category: "body", description: "Large scratch on passenger door from parking incident at client site.", urgency: "low", status: "open", photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(7) },
+      { id: "issue-5", vehicleId: "vehicle-4", workerId: "worker-6", reportedAt: td(14), category: "engine", description: "Engine stuttering at startup, took 3 attempts to start.", urgency: "medium", status: "completed", photoUrl: null, managerNotes: "Fixed — spark plugs replaced during service.", resolvedAt: td(10), serviceRecordId: "sr-4", createdAt: td(14) },
+      { id: "issue-6", vehicleId: "vehicle-5", workerId: "worker-1", reportedAt: td(1), category: "other", description: "Driver side windscreen wiper leaving streaks — visibility poor in rain.", urgency: "low", status: "open", photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(1) },
+    ];
+    issuesData.forEach(i => this.vehicleIssues.set(i.id, i));
+
+    // — Service Records seed data —
+    const serviceData: ServiceRecord[] = [
+      { id: "sr-1", vehicleId: "vehicle-1", serviceDate: td(180), odometer: 84200, serviceProvider: "Kyalami Motors", workDone: "Full 85,000km service. Oil change, oil filter, air filter, cabin filter, spark plugs. Brake pads front and rear replaced.", issuesFixed: "Brake squealing resolved", cost: "8500.00", invoiceNumber: "KM-2025-0441", invoiceUrl: null, notes: null, nextServiceDate: tdf(5), nextServiceOdometer: 95000, createdByWorkerId: "worker-1", createdAt: td(180) },
+      { id: "sr-2", vehicleId: "vehicle-2", serviceDate: td(90), odometer: 40200, serviceProvider: "Toyota Midrand", workDone: "60,000km service. Transmission fluid, brake fluid, coolant flush. All filters replaced. Tyre rotation and alignment.", issuesFixed: null, cost: "6200.00", invoiceNumber: "TM-2026-0118", invoiceUrl: null, notes: "Next service at 75,000km or 6 months", nextServiceDate: tdf(90), nextServiceOdometer: 75000, createdByWorkerId: "worker-1", createdAt: td(90) },
+      { id: "sr-3", vehicleId: "vehicle-3", serviceDate: td(120), odometer: 72100, serviceProvider: "Ford Fourways", workDone: "Transmission fluid change, general inspection, wiper blades replaced, tyre rotation.", issuesFixed: null, cost: "3800.00", invoiceNumber: "FF-2025-0889", invoiceUrl: null, notes: null, nextServiceDate: tdf(30), nextServiceOdometer: 85000, createdByWorkerId: "worker-1", createdAt: td(120) },
+      { id: "sr-4", vehicleId: "vehicle-4", serviceDate: td(10), odometer: 28300, serviceProvider: "Autozone Service Centre", workDone: "30,000km service. Spark plugs replaced, oil change, belts checked. Engine startup issue diagnosed and resolved.", issuesFixed: "Engine stuttering at startup fixed — spark plugs replaced", cost: "4500.00", invoiceNumber: "AZ-2026-0342", invoiceUrl: null, notes: null, nextServiceDate: tdf(180), nextServiceOdometer: 43000, createdByWorkerId: "worker-1", createdAt: td(10) },
+    ];
+    serviceData.forEach(r => this.serviceRecords.set(r.id, r));
   }
 
   // Fleet — Vehicles
@@ -3603,6 +3648,121 @@ export class MemStorage implements IStorage {
       recentFuel: allFuel.slice(0, 5),
       recentInspections: allInspections.slice(0, 5),
       failedInspections,
+    };
+  }
+
+  // Fleet Maintenance — Issues
+  async getVehicleIssues(): Promise<VehicleIssue[]> {
+    return Array.from(this.vehicleIssues.values()).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+  }
+  async getVehicleIssue(id: string): Promise<VehicleIssue | undefined> {
+    return this.vehicleIssues.get(id);
+  }
+  async getVehicleIssuesByVehicle(vehicleId: string): Promise<VehicleIssue[]> {
+    return Array.from(this.vehicleIssues.values()).filter(i => i.vehicleId === vehicleId).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+  }
+  async getVehicleIssuesByWorker(workerId: string): Promise<VehicleIssue[]> {
+    return Array.from(this.vehicleIssues.values()).filter(i => i.workerId === workerId).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+  }
+  async getOpenVehicleIssues(): Promise<VehicleIssue[]> {
+    return Array.from(this.vehicleIssues.values()).filter(i => !["completed", "not_required"].includes(i.status)).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+  }
+  async getNotSafeVehicleIssues(): Promise<VehicleIssue[]> {
+    return Array.from(this.vehicleIssues.values()).filter(i => i.urgency === "not_safe" && !["completed", "not_required"].includes(i.status));
+  }
+  async createVehicleIssue(issue: InsertVehicleIssue): Promise<VehicleIssue> {
+    const id = randomUUID();
+    const newIssue: VehicleIssue = { ...issue, id, photoUrl: issue.photoUrl ?? null, managerNotes: issue.managerNotes ?? null, resolvedAt: issue.resolvedAt ?? null, serviceRecordId: issue.serviceRecordId ?? null, createdAt: new Date() };
+    this.vehicleIssues.set(id, newIssue);
+    return newIssue;
+  }
+  async updateVehicleIssue(id: string, issue: Partial<InsertVehicleIssue> & { managerNotes?: string }): Promise<VehicleIssue> {
+    const existing = this.vehicleIssues.get(id);
+    if (!existing) throw new Error("Issue not found");
+    const updated: VehicleIssue = { ...existing, ...issue };
+    if (issue.status === "completed" && !existing.resolvedAt) updated.resolvedAt = new Date();
+    this.vehicleIssues.set(id, updated);
+    return updated;
+  }
+  async deleteVehicleIssue(id: string): Promise<boolean> {
+    return this.vehicleIssues.delete(id);
+  }
+
+  // Fleet Maintenance — Service Records
+  async getServiceRecords(): Promise<ServiceRecord[]> {
+    return Array.from(this.serviceRecords.values()).sort((a, b) => b.serviceDate.getTime() - a.serviceDate.getTime());
+  }
+  async getServiceRecord(id: string): Promise<ServiceRecord | undefined> {
+    return this.serviceRecords.get(id);
+  }
+  async getServiceRecordsByVehicle(vehicleId: string): Promise<ServiceRecord[]> {
+    return Array.from(this.serviceRecords.values()).filter(r => r.vehicleId === vehicleId).sort((a, b) => b.serviceDate.getTime() - a.serviceDate.getTime());
+  }
+  async createServiceRecord(record: InsertServiceRecord): Promise<ServiceRecord> {
+    const id = randomUUID();
+    const newRec: ServiceRecord = {
+      ...record, id,
+      issuesFixed: record.issuesFixed ?? null, cost: record.cost ?? null, invoiceNumber: record.invoiceNumber ?? null,
+      invoiceUrl: record.invoiceUrl ?? null, notes: record.notes ?? null, nextServiceDate: record.nextServiceDate ?? null,
+      nextServiceOdometer: record.nextServiceOdometer ?? null, createdByWorkerId: record.createdByWorkerId ?? null,
+      createdAt: new Date(),
+    };
+    this.serviceRecords.set(id, newRec);
+    return newRec;
+  }
+  async updateServiceRecord(id: string, record: Partial<InsertServiceRecord>): Promise<ServiceRecord> {
+    const existing = this.serviceRecords.get(id);
+    if (!existing) throw new Error("Service record not found");
+    const updated = { ...existing, ...record };
+    this.serviceRecords.set(id, updated);
+    return updated;
+  }
+  async deleteServiceRecord(id: string): Promise<boolean> {
+    return this.serviceRecords.delete(id);
+  }
+
+  async getMaintenanceDashboardData(): Promise<any> {
+    const allVehicles = Array.from(this.vehicles.values()).filter(v => v.isActive);
+    const allIssues = Array.from(this.vehicleIssues.values());
+    const allServiceRecords = Array.from(this.serviceRecords.values());
+    const allKmLogs = Array.from(this.kmLogs.values());
+    const now = new Date();
+
+    const openIssues = allIssues.filter(i => !["completed", "not_required"].includes(i.status));
+    const notSafeIssues = openIssues.filter(i => i.urgency === "not_safe");
+
+    const latestServiceByVehicle: Record<string, ServiceRecord | null> = {};
+    const latestOdoByVehicle: Record<string, number | null> = {};
+    for (const v of allVehicles) {
+      const recs = allServiceRecords.filter(r => r.vehicleId === v.id).sort((a, b) => b.serviceDate.getTime() - a.serviceDate.getTime());
+      latestServiceByVehicle[v.id] = recs[0] ?? null;
+      const logs = allKmLogs.filter(l => l.vehicleId === v.id).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
+      latestOdoByVehicle[v.id] = logs[0]?.endOdometer ?? null;
+    }
+
+    const overdueVehicles = allVehicles.filter(v => {
+      const sr = latestServiceByVehicle[v.id]; if (!sr) return false;
+      if (sr.nextServiceDate && sr.nextServiceDate < now) return true;
+      if (sr.nextServiceOdometer && latestOdoByVehicle[v.id] && latestOdoByVehicle[v.id]! >= sr.nextServiceOdometer) return true;
+      return false;
+    });
+
+    const dueSoonVehicles = allVehicles.filter(v => {
+      if (overdueVehicles.find(ov => ov.id === v.id)) return false;
+      const sr = latestServiceByVehicle[v.id]; if (!sr) return false;
+      const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      if (sr.nextServiceDate && sr.nextServiceDate <= in30 && sr.nextServiceDate >= now) return true;
+      if (sr.nextServiceOdometer && latestOdoByVehicle[v.id] && sr.nextServiceOdometer - latestOdoByVehicle[v.id]! <= 1000 && sr.nextServiceOdometer - latestOdoByVehicle[v.id]! > 0) return true;
+      return false;
+    });
+
+    const totalServiceCost = allServiceRecords.reduce((s, r) => s + parseFloat(String(r.cost || "0")), 0);
+
+    return {
+      openIssuesCount: openIssues.length, notSafeCount: notSafeIssues.length,
+      overdueCount: overdueVehicles.length, dueSoonCount: dueSoonVehicles.length,
+      totalServiceCost, recentServices: allServiceRecords.slice(0, 5),
+      vehiclesWithIssues: allVehicles.filter(v => openIssues.some(i => i.vehicleId === v.id)).length,
     };
   }
 

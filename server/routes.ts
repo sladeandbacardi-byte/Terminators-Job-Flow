@@ -15,6 +15,8 @@ import {
   insertKmLogSchema,
   insertFuelFillupSchema,
   insertVehicleInspectionSchema,
+  insertVehicleIssueSchema,
+  insertServiceRecordSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -2310,6 +2312,113 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const data = await storage.getFleetDashboardData(workerId as string | undefined);
       res.json(data);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── FLEET MAINTENANCE — ISSUES ──────────────────────────────────────────────
+  app.get("/api/fleet/issues", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { vehicleId, workerId, status, urgency } = req.query as Record<string, string>;
+      let issues = await storage.getVehicleIssues();
+      if (vehicleId) issues = issues.filter(i => i.vehicleId === vehicleId);
+      if (workerId) issues = issues.filter(i => i.workerId === workerId);
+      if (status) issues = issues.filter(i => i.status === status);
+      if (urgency) issues = issues.filter(i => i.urgency === urgency);
+      res.json(issues);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/fleet/issues/open", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getOpenVehicleIssues()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/fleet/issues/not-safe", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getNotSafeVehicleIssues()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/fleet/issues/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const issue = await storage.getVehicleIssue(req.params.id);
+      if (!issue) return res.status(404).json({ error: "Issue not found" });
+      res.json(issue);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/api/fleet/issues", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const body = req.body;
+      if (body.reportedAt) body.reportedAt = new Date(body.reportedAt);
+      const parsed = insertVehicleIssueSchema.safeParse(body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors });
+      const issue = await storage.createVehicleIssue(parsed.data);
+      res.status(201).json(issue);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.patch("/api/fleet/issues/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const issue = await storage.updateVehicleIssue(req.params.id, req.body);
+      res.json(issue);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete("/api/fleet/issues/:id", requireAuth, async (_req, res) => {
+    try {
+      await storage.deleteVehicleIssue((_req as any).params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── FLEET MAINTENANCE — SERVICE RECORDS ─────────────────────────────────────
+  app.get("/api/fleet/service-records", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { vehicleId } = req.query as Record<string, string>;
+      if (vehicleId) return res.json(await storage.getServiceRecordsByVehicle(vehicleId));
+      res.json(await storage.getServiceRecords());
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/fleet/service-records/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const rec = await storage.getServiceRecord(req.params.id);
+      if (!rec) return res.status(404).json({ error: "Service record not found" });
+      res.json(rec);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/api/fleet/service-records", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const body = req.body;
+      if (body.serviceDate) body.serviceDate = new Date(body.serviceDate);
+      if (body.nextServiceDate) body.nextServiceDate = new Date(body.nextServiceDate);
+      const parsed = insertServiceRecordSchema.safeParse(body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors });
+      const rec = await storage.createServiceRecord(parsed.data);
+      res.status(201).json(rec);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.patch("/api/fleet/service-records/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const body = req.body;
+      if (body.serviceDate) body.serviceDate = new Date(body.serviceDate);
+      if (body.nextServiceDate) body.nextServiceDate = new Date(body.nextServiceDate);
+      const rec = await storage.updateServiceRecord(req.params.id, body);
+      res.json(rec);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete("/api/fleet/service-records/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteServiceRecord(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/fleet/maintenance-dashboard", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getMaintenanceDashboardData()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
   const httpServer = createServer(app);
