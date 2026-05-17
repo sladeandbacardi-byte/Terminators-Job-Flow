@@ -21,22 +21,41 @@ import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Phone, Mail, MapPin, Calendar, User,
   MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase, UserPlus,
+  Package, AlertCircle, RefreshCw, ClipboardList,
 } from "lucide-react";
 import type { QuoteSubmission, Worker, Client, Department } from "@shared/schema";
 
 // ── schemas ───────────────────────────────────────────────────────────────────
 
 const convertToJobSchema = z.object({
-  clientId:      z.string().optional(),
-  workerId:      z.string().optional(),
-  salespersonId: z.string().optional(),
-  departmentId:  z.string().min(1, "Department required"),
-  scheduledDate: z.string().min(1, "Date required"),
-  scheduledTime: z.string().optional(),
-  address:       z.string().optional(),
-  notes:         z.string().optional(),
-  estimatedValue: z.string().optional(),
+  clientId:            z.string().optional(),
+  workerId:            z.string().optional(),
+  salespersonId:       z.string().optional(),
+  departmentId:        z.string().min(1, "Department required"),
+  scheduledDate:       z.string().min(1, "Date required"),
+  scheduledTime:       z.string().optional(),
+  address:             z.string().optional(),
+  notes:               z.string().optional(),
+  estimatedValue:      z.string().optional(),
+  frequency:           z.string().optional(),
+  specialInstructions: z.string().optional(),
 });
+
+const FREQUENCY_OPTIONS = [
+  { value: "once_off",    label: "Once-off" },
+  { value: "weekly",      label: "Weekly" },
+  { value: "fortnightly", label: "Fortnightly" },
+  { value: "monthly",     label: "Monthly" },
+  { value: "bi_monthly",  label: "Every 2 Months" },
+  { value: "quarterly",   label: "Quarterly" },
+  { value: "biannual",    label: "Every 6 Months" },
+  { value: "annual",      label: "Annually" },
+];
+
+function parseLineItems(json: string | null | undefined): Array<{ description: string; qty?: number; unit?: string }> {
+  if (!json) return [];
+  try { return JSON.parse(json); } catch { return []; }
+}
 
 const newClientSchema = z.object({
   name:         z.string().min(2, "Company name required"),
@@ -157,24 +176,49 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
         ? allWorkers.find(w => w.id === jobData.salespersonId)
         : allWorkers.find(w => w.id === quote.assignedTo);
 
+      // Build rich description from quote details
+      const lineItems = parseLineItems(quote.lineItemsJson);
+      const descParts: string[] = [];
+      if (quote.description) descParts.push(quote.description);
+      if (lineItems.length) {
+        descParts.push(
+          `\nProducts / Items Required:\n${lineItems.map(li =>
+            `• ${li.description}${li.qty ? ` — qty: ${li.qty}${li.unit ? ' ' + li.unit : ''}` : ''}`
+          ).join('\n')}`
+        );
+      }
+      const fullDescription = descParts.join('\n').trim();
+
+      // Build notes with contact person
+      const notesParts: string[] = [];
+      notesParts.push(`Contact: ${quote.contactPerson}${quote.phone ? ' · ' + quote.phone : ''}${quote.email ? ' · ' + quote.email : ''}`);
+      if (jobData.notes?.trim()) notesParts.push(jobData.notes.trim());
+      const fullNotes = notesParts.filter(Boolean).join('\n');
+
+      const freqLabel = FREQUENCY_OPTIONS.find(f => f.value === jobData.frequency)?.label;
+
       // Create job
       const jobRes = await apiRequest("POST", "/api/jobs", {
-        title:          `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
-        description:    quote.description,
+        title:               `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
+        description:         fullDescription,
         clientId,
-        workerId:       jobData.workerId || null,
-        departmentId:   jobData.departmentId,
-        serviceType:    quote.serviceType,
-        status:         "scheduled",
-        scheduledDate:  new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`).toISOString(),
-        scheduledTime:  jobData.scheduledTime || "08:00",
-        location:       jobData.address || quote.address || "",
-        notes:          jobData.notes || quote.description || "",
-        price:          jobData.estimatedValue || quote.quoteAmount || null,
-        email:          quote.email || undefined,
-        salesperson:    salespersonWorker?.name ?? "",
-        priority:       "medium",
-        linkedQuoteId:  quote.id,
+        workerId:            jobData.workerId || null,
+        departmentId:        jobData.departmentId,
+        serviceType:         quote.serviceType,
+        status:              "scheduled",
+        scheduledDate:       new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`).toISOString(),
+        scheduledTime:       jobData.scheduledTime || "08:00",
+        location:            jobData.address || quote.address || "",
+        notes:               fullNotes,
+        price:               jobData.estimatedValue || quote.quoteAmount || null,
+        email:               quote.email || undefined,
+        salesperson:         salespersonWorker?.name ?? "",
+        priority:            "medium",
+        linkedQuoteId:       quote.id,
+        specialInstructions: jobData.specialInstructions || undefined,
+        isRecurring:         !!(jobData.frequency && jobData.frequency !== "once_off"),
+        recurringPattern:    freqLabel && jobData.frequency !== "once_off" ? freqLabel : undefined,
+        service:             SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
       });
       if (!jobRes.ok) throw new Error("Failed to create job");
 
@@ -204,15 +248,17 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
       );
       // Pre-fill forms from quote data
       convertJobForm.reset({
-        clientId:      match?.id ?? "",
-        workerId:      "",
-        salespersonId: quote.assignedTo ?? "",
-        departmentId:  deptId,
-        scheduledDate: "",
-        scheduledTime: "08:00",
-        address:       quote.address || "",
-        notes:         quote.description || "",
-        estimatedValue: quote.quoteAmount ?? "",
+        clientId:            match?.id ?? "",
+        workerId:            "",
+        salespersonId:       quote.assignedTo ?? "",
+        departmentId:        deptId,
+        scheduledDate:       "",
+        scheduledTime:       "08:00",
+        address:             quote.address || "",
+        notes:               "",
+        estimatedValue:      quote.quoteAmount ?? "",
+        frequency:           (quote as any).frequency || "",
+        specialInstructions: (quote as any).specialInstructions || "",
       });
       newClientForm.reset({
         name:          quote.companyName,
@@ -456,11 +502,90 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
           </DialogTitle>
         </DialogHeader>
 
-        {/* Quote summary */}
-        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 space-y-1">
-          <p><span className="font-medium">Service:</span> {SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</p>
-          <p><span className="font-medium">Contact:</span> {quote.contactPerson} · {quote.phone}</p>
-          {quote.description && <p><span className="font-medium">Requirements:</span> {quote.description}</p>}
+        {/* Quote details summary — read-only */}
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2.5 text-sm">
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Quote Details — Auto-copied to Job</p>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <div className="flex items-center gap-1.5 text-gray-700">
+              <Briefcase className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+              <span className="font-medium">Service:</span>
+              <span>{SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-700">
+              <User className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+              <span className="font-medium">Contact:</span>
+              <span>{quote.contactPerson}</span>
+            </div>
+            {quote.phone && (
+              <div className="flex items-center gap-1.5 text-gray-700">
+                <Phone className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                <span>{quote.phone}</span>
+              </div>
+            )}
+            {quote.email && (
+              <div className="flex items-center gap-1.5 text-gray-700">
+                <Mail className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                <span className="truncate">{quote.email}</span>
+              </div>
+            )}
+            {quote.address && (
+              <div className="col-span-2 flex items-start gap-1.5 text-gray-700">
+                <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                <span className="font-medium shrink-0">Site:</span>
+                <span>{quote.address}</span>
+              </div>
+            )}
+          </div>
+
+          {quote.description && (
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <ClipboardList className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-xs font-semibold text-gray-600">Scope of Work</span>
+              </div>
+              <p className="text-xs text-gray-700 bg-white rounded p-2 border border-blue-100 leading-relaxed whitespace-pre-wrap">{quote.description}</p>
+            </div>
+          )}
+
+          {(() => {
+            const items = parseLineItems(quote.lineItemsJson);
+            return items.length > 0 ? (
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs font-semibold text-gray-600">Products / Items Required</span>
+                </div>
+                <ul className="bg-white border border-blue-100 rounded p-2 space-y-0.5">
+                  {items.map((li, i) => (
+                    <li key={i} className="text-xs text-gray-700 flex items-baseline gap-1.5">
+                      <span className="text-blue-400">•</span>
+                      {li.description}
+                      {li.qty && <span className="text-gray-400">— qty: {li.qty}{li.unit ? ' ' + li.unit : ''}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null;
+          })()}
+
+          {(quote as any).specialInstructions && (
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-xs font-semibold text-gray-600">Special Instructions</span>
+              </div>
+              <p className="text-xs text-gray-700 bg-amber-50 border border-amber-100 rounded p-2 whitespace-pre-wrap">{(quote as any).specialInstructions}</p>
+            </div>
+          )}
+
+          {(quote as any).frequency && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-700">
+              <RefreshCw className="h-3.5 w-3.5 text-blue-500" />
+              <span className="font-medium">Frequency:</span>
+              <span>{FREQUENCY_OPTIONS.find(f => f.value === (quote as any).frequency)?.label ?? (quote as any).frequency}</span>
+            </div>
+          )}
         </div>
 
         <Form {...convertJobForm}>
@@ -628,6 +753,25 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
                 </FormItem>
               )} />
 
+              {/* Frequency */}
+              <FormField control={convertJobForm.control} name="frequency" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-1">
+                    <RefreshCw className="h-3.5 w-3.5 text-gray-400" /> Frequency
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">— Not specified —</SelectItem>
+                      {FREQUENCY_OPTIONS.map(f => (
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               {/* Estimated value */}
               <FormField control={convertJobForm.control} name="estimatedValue" render={({ field }) => (
                 <FormItem>
@@ -637,11 +781,29 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
                 </FormItem>
               )} />
 
+              {/* Special Instructions */}
+              <FormField control={convertJobForm.control} name="specialInstructions" render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel className="flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-500" /> Special Instructions
+                    <span className="text-gray-400 font-normal ml-1">(pre-filled from quote)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={2}
+                      placeholder="Access codes, safety requirements, client preferences..."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               {/* Notes */}
               <FormField control={convertJobForm.control} name="notes" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Job Notes</FormLabel>
-                  <FormControl><Textarea rows={2} {...field} /></FormControl>
+                  <FormLabel>Additional Job Notes</FormLabel>
+                  <FormControl><Textarea rows={2} placeholder="Internal notes for the field worker..." {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

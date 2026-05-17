@@ -531,6 +531,8 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
   followUpDate: timestamp("follow_up_date"),
   quoteNumber: text("quote_number"),
+  frequency: text("frequency"), // e.g. "monthly", "weekly", "once_off"
+  specialInstructions: text("special_instructions"),
 });
 
 export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).omit({
