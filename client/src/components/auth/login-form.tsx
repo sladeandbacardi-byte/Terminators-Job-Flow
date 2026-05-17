@@ -71,7 +71,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             <img
               src={jobFlowFullLogo}
               alt="Job Flow – Field Service Management"
-              className="w-[220px] sm:w-[260px] h-auto object-contain"
+              className="w-[220px] sm:w-[260px] h-auto object-contain mb-6"
             />
           </div>
         </CardHeader>
