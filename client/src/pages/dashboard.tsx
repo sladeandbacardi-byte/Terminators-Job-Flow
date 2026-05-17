@@ -37,11 +37,11 @@ const rolePageTitles: Record<DashboardRole, string> = {
 };
 
 const roleSubtitles: Record<DashboardRole, string> = {
-  admin:    "Full business overview — sales, service, and finance",
-  manager:  "Operations, jobs, staff workload and performance",
-  sales:    "Leads, quotes, pipeline and client activity",
-  service:  "Your assigned jobs, schedule and field activity",
-  accounts: "Invoices, debtors, creditors and recurring revenue",
+  admin:    "Business overview, jobs, finance and performance",
+  manager:  "Operations, jobs, staff workload and service performance",
+  sales:    "Leads, quotes, follow-ups and sales performance",
+  service:  "Today's jobs, field diaries and assigned work",
+  accounts: "Invoices, debtors, contracts and financial performance",
 };
 
 export default function Dashboard() {
