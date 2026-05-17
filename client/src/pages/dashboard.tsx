@@ -154,7 +154,10 @@ export default function Dashboard() {
               </div>
 
               {/* Stats strip */}
-              <div className="border-t border-gray-100 px-4 pt-3 pb-3">
+              <div className="border-t border-gray-100 px-4 pt-2.5 pb-0.5">
+                <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">Live Department Snapshot</p>
+              </div>
+              <div className="px-4 pb-3">
 
                 {/* SALES role */}
                 {dashboardRole === "sales" && (
