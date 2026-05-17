@@ -245,7 +245,7 @@ export default function Dashboard() {
                     {/* Sales */}
                     <div className="sm:flex-shrink-0 sm:pr-4">
                       <div className="flex items-center gap-1.5 mb-1.5">
-                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sales</p>
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sales Department</p>
                         <button
                           onClick={() => setShowAddRep(true)}
                           className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 hover:border-gray-300 transition-colors"
@@ -258,9 +258,9 @@ export default function Dashboard() {
                           <div key={rep.id} className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1">
                             <p className="text-[11px] font-semibold text-gray-700">{rep.name.split(" ")[0]}</p>
                             <p className="text-[10px] text-gray-400 leading-tight">
-                              <span className="text-purple-600 font-medium">{total}</span> q ·{" "}
-                              <span className="text-green-600 font-medium">{won}</span> w ·{" "}
-                              <span className="text-red-500 font-medium">{lost}</span> l
+                              <span className="text-purple-600 font-medium">{total}</span> quoted ·{" "}
+                              <span className="text-green-600 font-medium">{won}</span> won ·{" "}
+                              <span className="text-red-500 font-medium">{lost}</span> lost
                             </p>
                           </div>
                         ))}
@@ -274,7 +274,7 @@ export default function Dashboard() {
 
                     {/* Service */}
                     <div className="sm:flex-shrink-0 sm:px-4">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Service</p>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Service Department</p>
                       <div className="flex gap-1.5 flex-wrap">
                         <div className="bg-blue-50 border border-blue-100 rounded-md px-2 py-1 text-center min-w-[52px]">
                           <p className="text-sm font-bold text-blue-600 leading-tight">{metrics?.activeJobs ?? "—"}</p>
@@ -301,7 +301,7 @@ export default function Dashboard() {
 
                     {/* Finance */}
                     <div className="sm:flex-shrink-0 sm:pl-4">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance</p>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance Department</p>
                       <div className="flex gap-1.5 flex-wrap">
                         <div className="bg-green-50 border border-green-100 rounded-md px-2 py-1 text-center min-w-[64px]">
                           <p className="text-sm font-bold text-green-600 leading-tight">R{(metrics?.monthlyRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
