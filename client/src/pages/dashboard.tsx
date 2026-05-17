@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -8,6 +9,7 @@ import { SalesDashboard } from "@/components/dashboard/sales-dashboard";
 import { AccountsDashboard } from "@/components/dashboard/accounts-dashboard";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 import { ManagerDashboard } from "@/components/dashboard/manager-dashboard";
+import { CoordinatorDashboard } from "@/components/dashboard/coordinator-dashboard";
 import { SuspendedServices } from "@/components/dashboard/suspended-services";
 import { TerminatorsLogo } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,19 +31,21 @@ interface DashboardMetrics {
 }
 
 const rolePageTitles: Record<DashboardRole, string> = {
-  admin:    "Managing Member Dashboard",
-  manager:  "Service Manager Dashboard",
-  sales:    "Sales Dashboard",
-  service:  "My Jobs Dashboard",
-  accounts: "Finance Dashboard",
+  admin:       "Managing Member Dashboard",
+  manager:     "Service Manager Dashboard",
+  sales:       "Sales Dashboard",
+  service:     "My Jobs Dashboard",
+  accounts:    "Finance Dashboard",
+  coordinator: "Service Coordinator Dashboard",
 };
 
 const roleSubtitles: Record<DashboardRole, string> = {
-  admin:    "Business overview, jobs, finance and performance",
-  manager:  "Operations, jobs, staff workload and service performance",
-  sales:    "Leads, quotes, follow-ups and sales performance",
-  service:  "Today's jobs, field diaries and assigned work",
-  accounts: "Invoices, debtors, contracts and financial performance",
+  admin:       "Business overview, jobs, finance and performance",
+  manager:     "Operations, jobs, staff workload and service performance",
+  sales:       "Leads, quotes, follow-ups and sales performance",
+  service:     "Today's jobs, field diaries and assigned work",
+  accounts:    "Invoices, debtors, contracts and financial performance",
+  coordinator: "Today's jobs, workers, departments and field progress",
 };
 
 export default function Dashboard() {
@@ -272,6 +276,23 @@ export default function Dashboard() {
                   </div>
                 )}
 
+                {/* COORDINATOR role */}
+                {dashboardRole === "coordinator" && (
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { label: "Jobs Done",   sub: "today",      value: allJobs.filter(j => { const d = j.scheduledDate ? new Date(j.scheduledDate) : null; return j.status === "completed" && d && format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd"); }).length, cls: "bg-green-50 border-green-100", val: "text-green-600" },
+                      { label: "Invoiced",    sub: "this month", value: invoicesSentThisMonth, cls: "bg-blue-50 border-blue-100",   val: "text-blue-600"   },
+                      { label: "Active Jobs", sub: "right now",  value: metrics?.activeJobs ?? "—", cls: "bg-orange-50 border-orange-100", val: "text-orange-600" },
+                    ].map(({ label, sub, value, cls, val }) => (
+                      <div key={label} className={`border rounded-md px-2.5 py-1.5 min-w-[90px] ${cls}`}>
+                        <p className="text-[10px] text-gray-500">{label}</p>
+                        <p className={`text-lg font-bold ${val}`}>{value}</p>
+                        <p className="text-[10px] text-gray-400">{sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* SERVICE role */}
                 {dashboardRole === "service" && (
                   <div className="flex gap-2 flex-wrap">
@@ -298,11 +319,12 @@ export default function Dashboard() {
             <SuspendedServices />
 
             {/* ── Role-specific dashboard sections ──────────────── */}
-            {dashboardRole === "service"  && <ServiceDashboard />}
-            {dashboardRole === "sales"    && <SalesDashboard />}
-            {dashboardRole === "accounts" && <AccountsDashboard />}
-            {dashboardRole === "manager"  && <ManagerDashboard />}
-            {dashboardRole === "admin"    && <AdminDashboard />}
+            {dashboardRole === "service"     && <ServiceDashboard />}
+            {dashboardRole === "coordinator" && <CoordinatorDashboard />}
+            {dashboardRole === "sales"       && <SalesDashboard />}
+            {dashboardRole === "accounts"    && <AccountsDashboard />}
+            {dashboardRole === "manager"     && <ManagerDashboard />}
+            {dashboardRole === "admin"       && <AdminDashboard />}
 
           </div>
         </main>
