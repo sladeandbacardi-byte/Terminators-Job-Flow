@@ -79,9 +79,9 @@ const ALL_CATEGORIES = [
   {
     name: "Finance",
     icon: CreditCard,
-    roles: ["admin", "manager", "accounts"],
+    roles: ["admin", "manager", "accounts", "coordinator"],
     items: [
-      { name: "Invoices", href: "/invoices", icon: Receipt, roles: ["admin", "manager", "accounts"] },
+      { name: "Invoices", href: "/invoices", icon: Receipt, roles: ["admin", "manager", "accounts", "coordinator"] },
     ],
   },
 

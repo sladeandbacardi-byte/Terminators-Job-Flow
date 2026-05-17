@@ -278,10 +278,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* COORDINATOR role — stats shown in CoordinatorDashboard cards below, not duplicated here */}
-                {dashboardRole === "coordinator" && (
-                  <p className="text-xs text-gray-400 italic">Full breakdown below ↓</p>
-                )}
+                {/* COORDINATOR role — full stats shown in CoordinatorDashboard cards below */}
 
                 {/* SERVICE role */}
                 {dashboardRole === "service" && (
