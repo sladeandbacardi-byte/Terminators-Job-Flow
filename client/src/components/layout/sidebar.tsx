@@ -10,6 +10,7 @@ import { getDashboardRole } from "@/lib/dashboardRole";
 
 // All possible nav categories
 const ALL_CATEGORIES = [
+  // ── SALES ────────────────────────────────────────────────────────────────
   {
     name: "Sales",
     icon: DollarSign,
@@ -22,39 +23,59 @@ const ALL_CATEGORIES = [
       { name: "Email Center",     href: "/emails",    icon: Mail,       roles: ["admin", "manager", "sales"] },
     ],
   },
+
+  // ── SERVICE (full ops — admin, manager, coordinator) ─────────────────────
   {
     name: "Service",
     icon: Wrench,
-    roles: ["admin", "manager", "service"],
+    roles: ["admin", "manager", "coordinator"],
     items: [
-      { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "service"] },
-      { name: "Field Diaries",   href: "/field-diaries",   icon: Users,        roles: ["admin", "manager", "service", "sales"] },
-      { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "service"] },
-      { name: "Clients",         href: "/clients",         icon: Shield,       roles: ["admin", "manager", "service"] },
-      { name: "Staff",           href: "/workers",         icon: Users,        roles: ["admin", "manager", "service"] },
-      { name: "Stock Management",href: "/inventory",       icon: Box,          roles: ["admin", "manager", "service"] },
-      { name: "Stock Manager Pro",href: "https://stock-manager-pro-sladeandbacardi.replit.app/login", icon: ExternalLink, roles: ["admin", "manager", "service"], external: true },
-      { name: "Suppliers",       href: "/suppliers",       icon: Building2,    roles: ["admin", "manager", "service"] },
-      { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["admin", "manager", "service"] },
+      { name: "Calendar",         href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
+      { name: "Field Diaries",    href: "/field-diaries",   icon: ClipboardList,roles: ["admin", "manager", "coordinator"] },
+      { name: "Job Scheduling",   href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
+      { name: "Clients",          href: "/clients",         icon: Shield,       roles: ["admin", "manager", "coordinator"] },
+      { name: "Staff",            href: "/workers",         icon: Users,        roles: ["admin", "manager", "coordinator"] },
+      { name: "Stock Management", href: "/inventory",       icon: Box,          roles: ["admin", "manager", "coordinator"] },
+      { name: "Stock Manager Pro",href: "https://stock-manager-pro-sladeandbacardi.replit.app/login", icon: ExternalLink, roles: ["admin", "manager", "coordinator"], external: true },
+      { name: "Suppliers",        href: "/suppliers",       icon: Building2,    roles: ["admin", "manager", "coordinator"] },
+      { name: "Purchase Orders",  href: "/purchase-orders", icon: ShoppingCart, roles: ["admin", "manager", "coordinator"] },
     ],
   },
+
+  // ── SERVICE (field technician — own jobs, diaries, calendar only) ─────────
+  {
+    name: "Service",
+    icon: Wrench,
+    roles: ["service"],
+    items: [
+      { name: "Calendar",       href: "/calendar",      icon: Calendar,     roles: ["service"] },
+      { name: "Field Diaries",  href: "/field-diaries", icon: ClipboardList,roles: ["service"] },
+      { name: "Job Scheduling", href: "/jobs",          icon: Calendar,     roles: ["service"] },
+    ],
+  },
+
+  // ── SERVICE (accounts — limited view) ────────────────────────────────────
   {
     name: "Service",
     icon: Wrench,
     roles: ["accounts"],
     items: [
-      { name: "Calendar",        href: "/calendar", icon: Calendar, roles: ["accounts"] },
-      { name: "Job Scheduling",  href: "/jobs",     icon: Calendar, roles: ["accounts"] },
+      { name: "Calendar",       href: "/calendar", icon: Calendar, roles: ["accounts"] },
+      { name: "Job Scheduling", href: "/jobs",     icon: Calendar, roles: ["accounts"] },
     ],
   },
+
+  // ── CLIENTS (accounts only) ───────────────────────────────────────────────
   {
     name: "Clients",
     icon: Shield,
     roles: ["accounts"],
     items: [
-      { name: "Clients",         href: "/clients",   icon: Shield,  roles: ["accounts"] },
+      { name: "Clients", href: "/clients", icon: Shield, roles: ["accounts"] },
     ],
   },
+
+  // ── FINANCE ───────────────────────────────────────────────────────────────
   {
     name: "Finance",
     icon: CreditCard,
@@ -63,15 +84,17 @@ const ALL_CATEGORIES = [
       { name: "Invoices", href: "/invoices", icon: Receipt, roles: ["admin", "manager", "accounts"] },
     ],
   },
+
+  // ── ADMIN ────────────────────────────────────────────────────────────────
   {
     name: "Admin",
     icon: Settings,
-    roles: ["admin", "manager"],
+    roles: ["admin", "manager", "coordinator"],
     items: [
-      { name: "Reports",            href: "/reports",            icon: BarChart,       roles: ["admin", "manager"] },
-      { name: "Custom Reports",    href: "/custom-reports",     icon: BarChart3,      roles: ["admin", "manager"] },
-      { name: "Testing Checklist", href: "/testing-checklist",  icon: ClipboardList,  roles: ["admin", "manager"] },
-      { name: "Backup & Restore",  href: "/backup",             icon: Database,       roles: ["admin"] },
+      { name: "Reports",            href: "/reports",           icon: BarChart,      roles: ["admin", "manager", "coordinator"] },
+      { name: "Custom Reports",     href: "/custom-reports",    icon: BarChart3,     roles: ["admin", "manager"] },
+      { name: "Testing Checklist",  href: "/testing-checklist", icon: ClipboardList, roles: ["admin", "manager", "coordinator"] },
+      { name: "Backup & Restore",   href: "/backup",            icon: Database,      roles: ["admin"] },
     ],
   },
 ];
