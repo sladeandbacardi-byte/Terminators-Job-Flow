@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
-import jobFlowLogo from "@assets/ChatGPT_Image_May_16,_2026,_04_38_50_PM_(2)_1778943332999.png";
+import jobFlowLogo from "@assets/job-flow-header-logo_1779017630067.png";
 
 interface HeaderProps {
   title?: string;

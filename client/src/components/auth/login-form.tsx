@@ -7,8 +7,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogIn, AlertCircle, User, Briefcase, TrendingUp, DollarSign, Shield } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
-import { TerminatorsLogo } from "@/components/terminators-logo";
 import type { Worker } from "@shared/schema";
+import jobFlowFullLogo from "@assets/job-flow-full-logo_1779017630066.png";
 
 const roleIcons: Record<string, JSX.Element> = {
   admin: <Shield className="h-3.5 w-3.5" />,
@@ -67,10 +67,13 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center pb-4">
-          <div className="mx-auto pt-2">
-            <TerminatorsLogo size="lg" />
+          <div className="mx-auto pt-2 flex justify-center">
+            <img
+              src={jobFlowFullLogo}
+              alt="Job Flow – Field Service Management"
+              className="h-24 w-auto object-contain"
+            />
           </div>
-          <CardDescription className="text-gray-600 font-medium">Terminators Job Flow</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-5">
