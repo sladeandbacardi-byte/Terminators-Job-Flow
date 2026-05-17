@@ -159,7 +159,9 @@ export default function Dashboard() {
 
               {/* Stats strip */}
               <div className="border-t border-gray-100 px-4 pt-2.5 pb-0.5">
-                <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">Live Department Snapshot</p>
+                <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">
+                  {dashboardRole === "coordinator" ? "Today's Service Snapshot" : "Live Department Snapshot"}
+                </p>
               </div>
               <div className="px-4 pb-3">
 
@@ -276,21 +278,9 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* COORDINATOR role */}
+                {/* COORDINATOR role — stats shown in CoordinatorDashboard cards below, not duplicated here */}
                 {dashboardRole === "coordinator" && (
-                  <div className="flex gap-2 flex-wrap">
-                    {[
-                      { label: "Jobs Done",   sub: "today",      value: allJobs.filter(j => { const d = j.scheduledDate ? new Date(j.scheduledDate) : null; return j.status === "completed" && d && format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd"); }).length, cls: "bg-green-50 border-green-100", val: "text-green-600" },
-                      { label: "Invoiced",    sub: "this month", value: invoicesSentThisMonth, cls: "bg-blue-50 border-blue-100",   val: "text-blue-600"   },
-                      { label: "Active Jobs", sub: "right now",  value: metrics?.activeJobs ?? "—", cls: "bg-orange-50 border-orange-100", val: "text-orange-600" },
-                    ].map(({ label, sub, value, cls, val }) => (
-                      <div key={label} className={`border rounded-md px-2.5 py-1.5 min-w-[90px] ${cls}`}>
-                        <p className="text-[10px] text-gray-500">{label}</p>
-                        <p className={`text-lg font-bold ${val}`}>{value}</p>
-                        <p className="text-[10px] text-gray-400">{sub}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-xs text-gray-400 italic">Full breakdown below ↓</p>
                 )}
 
                 {/* SERVICE role */}

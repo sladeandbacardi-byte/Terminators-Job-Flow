@@ -115,8 +115,8 @@ export function DepartmentOverview({ className = "" }: DepartmentOverviewProps) 
                       <h3 className="font-semibold text-gray-900">{dept.name}</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" style={{ borderColor: dept.colorCode }}>
-                        {departmentFilter.isAllSelected ? 'All Departments' : 'Selected'}
+                      <Badge variant="outline" style={{ borderColor: dept.colorCode, color: dept.colorCode }}>
+                        View Department
                       </Badge>
                       <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
                     </div>

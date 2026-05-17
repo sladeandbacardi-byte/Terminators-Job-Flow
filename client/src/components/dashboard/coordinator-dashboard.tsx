@@ -3,16 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DepartmentOverview } from "./department-overview";
 import { WorkerJobsSummary } from "./worker-jobs-summary";
-import { CalendarDays, CheckCircle, ClipboardList, Users } from "lucide-react";
+import {
+  CalendarDays, CheckCircle, ClipboardList, Users,
+  AlertCircle, FileWarning, Clock,
+} from "lucide-react";
 import { format, isValid } from "date-fns";
 import type { Job, Worker, Client, Department } from "@shared/schema";
 
 const STATUS_COLORS: Record<string, string> = {
-  completed:   "bg-green-100 text-green-800",
+  completed:     "bg-green-100 text-green-800",
   "in-progress": "bg-blue-100 text-blue-800",
-  scheduled:   "bg-gray-100 text-gray-700",
-  pending:     "bg-yellow-100 text-yellow-800",
-  cancelled:   "bg-red-100 text-red-700",
+  scheduled:     "bg-gray-100 text-gray-700",
+  pending:       "bg-yellow-100 text-yellow-800",
+  cancelled:     "bg-red-100 text-red-700",
 };
 
 export function CoordinatorDashboard() {
@@ -29,10 +32,13 @@ export function CoordinatorDashboard() {
     return isValid(d) && format(d, "yyyy-MM-dd") === todayStr;
   });
 
-  const jobsDoneToday    = todayJobs.filter(j => j.status === "completed").length;
-  const activeJobsToday  = todayJobs.filter(j => j.status === "in-progress").length;
-  const pendingToday     = todayJobs.filter(j => j.status === "scheduled" || j.status === "pending").length;
-  const unassignedToday  = todayJobs.filter(j => !j.workerId).length;
+  const jobsDoneToday       = todayJobs.filter(j => j.status === "completed").length;
+  const activeJobsToday     = todayJobs.filter(j => j.status === "in-progress").length;
+  const pendingToday        = todayJobs.filter(j => j.status === "scheduled" || j.status === "pending").length;
+  const unassignedToday     = todayJobs.filter(j => !j.workerId).length;
+  const activeWorkers       = workers.filter(w => w.isActive !== false).length;
+  // Completed today but no notes entered — proxy for "field diary missing"
+  const awaitingReview      = todayJobs.filter(j => j.status === "completed" && !j.notes).length;
 
   const getWorkerName = (id: string | null) =>
     workers.find(w => w.id === id)?.name ?? "Unassigned";
@@ -41,31 +47,70 @@ export function CoordinatorDashboard() {
   const getDeptName = (id: string | null) =>
     departments.find(d => d.id === id)?.name ?? "—";
 
+  const statCards = [
+    {
+      label: "Jobs Done Today",
+      value: jobsDoneToday,
+      icon: CheckCircle,
+      color: "text-green-600",
+      bg: "bg-green-50 border-green-100",
+    },
+    {
+      label: "In Progress",
+      value: activeJobsToday,
+      icon: ClipboardList,
+      color: "text-blue-600",
+      bg: "bg-blue-50 border-blue-100",
+    },
+    {
+      label: "Scheduled / Pending",
+      value: pendingToday,
+      icon: CalendarDays,
+      color: "text-orange-600",
+      bg: "bg-orange-50 border-orange-100",
+    },
+    {
+      label: "Unassigned Jobs",
+      value: unassignedToday,
+      icon: AlertCircle,
+      color: unassignedToday > 0 ? "text-red-600"  : "text-gray-400",
+      bg:    unassignedToday > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-100",
+    },
+    {
+      label: "Workers Active",
+      value: activeWorkers,
+      icon: Users,
+      color: "text-cyan-700",
+      bg: "bg-cyan-50 border-cyan-100",
+    },
+    {
+      label: "Awaiting Review",
+      sub: "completed, no diary",
+      value: awaitingReview,
+      icon: FileWarning,
+      color: awaitingReview > 0 ? "text-amber-600" : "text-gray-400",
+      bg:    awaitingReview > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100",
+    },
+  ];
+
   return (
     <div className="space-y-6">
 
-      {/* Quick-stat strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {[
-          { label: "Jobs Done Today",     value: jobsDoneToday,   icon: CheckCircle,   color: "text-green-600",  bg: "bg-green-50  border-green-100"  },
-          { label: "In Progress",         value: activeJobsToday, icon: ClipboardList, color: "text-blue-600",   bg: "bg-blue-50   border-blue-100"   },
-          { label: "Scheduled / Pending", value: pendingToday,    icon: CalendarDays,  color: "text-orange-600", bg: "bg-orange-50 border-orange-100" },
-          { label: "Unassigned Jobs",     value: unassignedToday, icon: Users,         color: unassignedToday > 0 ? "text-red-600" : "text-gray-400", bg: unassignedToday > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-100" },
-          { label: "Workers Active",      value: workers.filter(w => w.isActive !== false).length, icon: Users, color: "text-cyan-700", bg: "bg-cyan-50 border-cyan-100" },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
+      {/* Main stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {statCards.map(({ label, sub, value, icon: Icon, color, bg }) => (
           <Card key={label} className={`border ${bg}`}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <Icon className={`h-8 w-8 ${color} flex-shrink-0`} />
-              <div>
-                <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                <p className="text-xs text-gray-500 leading-tight">{label}</p>
-              </div>
+            <CardContent className="p-4">
+              <Icon className={`h-5 w-5 ${color} mb-2`} />
+              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+              <p className="text-xs text-gray-600 font-medium leading-tight mt-0.5">{label}</p>
+              {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Jobs by Department */}
+      {/* Department Overview */}
       <DepartmentOverview />
 
       {/* Jobs by Worker */}
@@ -75,9 +120,11 @@ export function CoordinatorDashboard() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-gray-400" />
+            <Clock className="h-4 w-4 text-gray-400" />
             All Jobs Today — {format(new Date(), "d MMMM yyyy")}
-            <span className="ml-auto text-xs font-normal text-gray-400">{todayJobs.length} job{todayJobs.length !== 1 ? "s" : ""}</span>
+            <span className="ml-auto text-xs font-normal text-gray-400">
+              {todayJobs.length} job{todayJobs.length !== 1 ? "s" : ""}
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -98,17 +145,30 @@ export function CoordinatorDashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {todayJobs.map(job => (
-                    <tr key={job.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={job.id}
+                      className={`hover:bg-gray-50 transition-colors ${!job.workerId ? "bg-red-50/40" : ""}`}
+                    >
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{job.jobNumber ?? job.id.slice(0, 8)}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-800">{getClientName(job.clientId)}</td>
                       <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell">{getDeptName(job.departmentId ?? null)}</td>
-                      <td className="px-4 py-2.5 text-gray-600 hidden md:table-cell">{getWorkerName(job.workerId ?? null)}</td>
+                      <td className="px-4 py-2.5 hidden md:table-cell">
+                        {job.workerId
+                          ? <span className="text-gray-600">{getWorkerName(job.workerId)}</span>
+                          : <span className="text-red-500 font-medium text-xs">Unassigned</span>}
+                      </td>
                       <td className="px-4 py-2.5">
                         <Badge className={`text-[11px] px-2 py-0.5 rounded-full capitalize font-medium border-0 ${STATUS_COLORS[job.status] ?? "bg-gray-100 text-gray-600"}`}>
                           {job.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-400 text-xs truncate max-w-[180px] hidden lg:table-cell">{job.notes ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-gray-400 text-xs truncate max-w-[180px] hidden lg:table-cell">
+                        {job.notes
+                          ? job.notes
+                          : job.status === "completed"
+                            ? <span className="text-amber-500 italic">No diary entry</span>
+                            : "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
