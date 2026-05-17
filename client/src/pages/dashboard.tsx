@@ -240,8 +240,8 @@ export default function Dashboard() {
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance Department</p>
                       <div className="flex gap-1.5 flex-wrap">
                         {[
-                          { label: "revenue",   value: `R${Math.round(metrics?.monthlyRevenue ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0")}`, cls: "bg-green-50 border-green-100", val: "text-green-600", minW: "min-w-[72px]" },
-                          { label: "debtors",   value: `R${Math.round(debtors).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0")}`,                cls: "bg-red-50 border-red-100",   val: "text-red-600",   minW: "min-w-[72px]" },
+                          { label: "revenue",   value: `R${Math.round(metrics?.monthlyRevenue ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`, cls: "bg-green-50 border-green-100", val: "text-green-600", minW: "min-w-[72px]" },
+                          { label: "debtors",   value: `R${Math.round(debtors).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`,                    cls: "bg-red-50 border-red-100",   val: "text-red-600",   minW: "min-w-[72px]" },
                           { label: "expiring",  value: metrics?.expiringContracts ?? "—",                                                              cls: "bg-amber-50 border-amber-100", val: "text-amber-600", minW: "min-w-[52px]" },
                         ].map(({ label, value, cls, val, minW }) => (
                           <div key={label} className={`border rounded-md px-2 py-1 text-center ${minW} ${cls}`}>
@@ -259,8 +259,8 @@ export default function Dashboard() {
                 {dashboardRole === "accounts" && (
                   <div className="flex gap-2 flex-wrap">
                     {[
-                      { label: "Debtors",   sub: "outstanding",  value: `R${Math.round(debtors).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0")}`,         cls: "bg-red-50 border-red-100",   val: "text-red-600" },
-                      { label: "Sales",     sub: "this month",   value: `R${Math.round(salesThisMonth).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0")}`, cls: "bg-blue-50 border-blue-100", val: "text-blue-600" },
+                      { label: "Debtors",   sub: "outstanding",  value: `R${Math.round(debtors).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`,         cls: "bg-red-50 border-red-100",   val: "text-red-600" },
+                      { label: "Sales",     sub: "this month",   value: `R${Math.round(salesThisMonth).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`, cls: "bg-blue-50 border-blue-100", val: "text-blue-600" },
                       { label: "Collected", sub: "of sales",     value: `${collectedPct}%`,                                                              cls: "bg-green-50 border-green-100", val: "text-green-600" },
                     ].map(({ label, sub, value, cls, val }) => (
                       <div key={label} className={`border rounded-md px-2.5 py-1.5 min-w-[90px] ${cls}`}>

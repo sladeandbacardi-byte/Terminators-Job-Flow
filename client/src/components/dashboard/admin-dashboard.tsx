@@ -52,7 +52,7 @@ function pct(current: number, prev: number) {
 }
 
 function fmt(n: number) {
-  const abs = Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
+  const abs = Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   return (n < 0 ? "-R" : "R") + abs;
 }
 
@@ -127,7 +127,7 @@ export function AdminDashboard() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
         {/* Sales */}
         <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
           <CardContent className="p-5">

@@ -7,7 +7,7 @@ interface TerminatorsLogoProps {
 
 export function TerminatorsLogo({ className = "", size = 'md' }: TerminatorsLogoProps) {
   const sizeClasses = {
-    sm: 'h-[53px] w-auto max-w-[240px]',
+    sm: 'h-[48px] w-auto max-w-[220px]',
     md: 'h-14 w-auto max-w-[220px]',
     lg: 'h-24 w-auto max-w-[320px]'
   };
