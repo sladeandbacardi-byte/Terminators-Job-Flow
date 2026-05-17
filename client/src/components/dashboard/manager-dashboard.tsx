@@ -137,7 +137,7 @@ export function ManagerDashboard() {
     cancelled: "bg-gray-100 text-gray-600",
   };
 
-  const fmt = (n: number) => `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 0 })}`;
+  const fmt = (n: number) => (n < 0 ? "-R" : "R") + Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
 
   return (
     <div className="space-y-6">

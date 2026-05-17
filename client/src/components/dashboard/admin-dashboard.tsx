@@ -52,7 +52,8 @@ function pct(current: number, prev: number) {
 }
 
 function fmt(n: number) {
-  return `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const abs = Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
+  return (n < 0 ? "-R" : "R") + abs;
 }
 
 export function AdminDashboard() {
@@ -111,9 +112,13 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Range toggle */}
-      <div className="flex justify-end">
-        <div className="flex gap-1">
+      {/* Monthly Business Overview heading + range toggle inline */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700">Monthly Business Overview</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Revenue, expenses and gross profit for the selected period</p>
+        </div>
+        <div className="flex gap-1 flex-shrink-0">
           {(["today","week","month"] as Range[]).map(r => (
             <Button key={r} size="sm" variant={range === r ? "default" : "outline"}
               className="text-xs h-8 px-3" onClick={() => setRange(r)}>
@@ -121,12 +126,6 @@ export function AdminDashboard() {
             </Button>
           ))}
         </div>
-      </div>
-
-      {/* P&L Summary Cards */}
-      <div className="mb-1">
-        <h3 className="text-sm font-semibold text-gray-700">Monthly Business Overview</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Selected period financial performance</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Sales */}
