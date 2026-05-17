@@ -1,0 +1,160 @@
+I want to improve the backend structure of this app and make it safer for daily business use.
+
+Please inspect the current codebase and database structure first. Do not remove existing features.
+
+I need the following backend foundations added or improved:
+
+1. PostgreSQL database structure
+- Use PostgreSQL as the production database.
+- Use DATABASE_URL from environment variables.
+- Do not hard-code database credentials.
+- Add migration files if the project does not already have them.
+
+2. Users and roles
+Create or improve user authentication with these roles:
+- super_admin
+- admin
+- manager
+- office
+- service_user
+- technician
+- read_only
+
+Each user must have:
+- id
+- name
+- email
+- password hash or external auth id
+- role
+- active true/false
+- created_at
+- updated_at
+- last_login_at
+
+Only active users should be able to log in.
+
+3. Permissions
+Add role-based access control.
+The frontend must not be the only protection.
+Backend routes/API endpoints must check permissions.
+
+Basic rules:
+- super_admin and admin can manage everything.
+- manager can view all jobs, edit jobs, assign jobs, and view reports.
+- office can create and schedule jobs, view customers, and view quote/document details.
+- service_user can view assigned jobs and quote/document details but cannot edit financial/admin settings.
+- technician can view assigned jobs, complete checklists, upload photos, and submit vehicle checks.
+- read_only can only view dashboards/reports.
+
+4. Job status system
+Use fixed backend status values:
+- draft
+- scheduled
+- to_be_completed
+- in_progress
+- completed
+- cancelled
+- on_hold
+- requires_attention
+
+Store status values consistently in the database.
+Add a job_status_history table so every status change is recorded with:
+- job_id
+- old_status
+- new_status
+- changed_by_user_id
+- notes
+- created_at
+
+5. Quote/document reference
+Add fields to jobs for:
+- quote_number
+- document_number
+- source_document_type
+- customer_reference
+- internal_notes
+- technician_notes
+
+Service users must be able to view quote/document details linked to their assigned jobs.
+
+6. Audit logs
+Add an audit_logs table and backend helper function to log important actions:
+- user created
+- user disabled
+- job created
+- job edited
+- job cancelled
+- job completed
+- job reassigned
+- status changed
+- quote/document number changed
+- customer changed
+- vehicle issue reported
+- vehicle issue closed
+- inspection failed
+- service record added
+
+The audit log should record:
+- user_id
+- action
+- table_name
+- record_id
+- old_value JSON
+- new_value JSON
+- created_at
+
+7. Backups
+Add an admin-only backup/export section.
+Admins must be able to export:
+- jobs CSV
+- customers CSV
+- users CSV
+- vehicle checks CSV
+- vehicle issues CSV
+- full database backup if technically possible
+
+Add clear backend routes for these exports.
+Protect all export routes so only admin/super_admin can access them.
+
+8. Restore planning
+Create a RESTORE_PLAN.md file explaining:
+- how to backup before changes
+- how to restore the database
+- how to test the restored data
+- what to check after restore
+- how to recover if a deployment breaks
+
+9. Environment variables
+Use environment variables for:
+- DATABASE_URL
+- SESSION_SECRET
+- EMAIL_HOST
+- EMAIL_PORT
+- EMAIL_USER
+- EMAIL_PASS
+- ADMIN_EMAIL
+- APP_BASE_URL
+
+Do not expose secrets in frontend code.
+
+10. Email alerts foundation
+Add an email service/helper that can later be used for:
+- failed vehicle inspection alerts
+- weekly vehicle check summary
+- overdue job alerts
+- completed job summaries
+
+For now, create the structure safely without breaking current app functionality.
+
+11. Safety
+Before making large changes, create a clear summary of what files will be changed.
+Keep changes incremental.
+Do not redesign the frontend unless required for the backend connection.
+After changes, provide testing steps for:
+- login
+- role permissions
+- job creation
+- job status change
+- quote/document visibility
+- export backup
+- audit logs

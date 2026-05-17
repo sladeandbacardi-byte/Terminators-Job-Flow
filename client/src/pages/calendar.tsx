@@ -51,7 +51,7 @@ interface CalendarEvent {
   workerId?: string;
   departmentId?: string;
   location?: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending';
   color?: string;
   estimatedDuration?: number;
 }
@@ -267,6 +267,22 @@ export default function Calendar() {
     const endTime = new Date(scheduledDate.getTime() + (job.estimatedDuration || 60) * 60000);
     
     
+    const jobColor = (() => {
+      if (job.status !== 'completed' && job.status !== 'cancelled') {
+        const jobDate = new Date(job.scheduledDate);
+        if (!isNaN(jobDate.getTime()) && jobDate < new Date()) return '#dc2626';
+      }
+      if (!job.workerId) return '#9ca3af';
+      switch (job.status) {
+        case 'scheduled':   return '#f97316';
+        case 'in_progress': return '#3b82f6';
+        case 'completed':   return '#22c55e';
+        case 'cancelled':   return '#ef4444';
+        case 'pending':     return '#eab308';
+        default:            return '#9ca3af';
+      }
+    })();
+
     return {
       id: job.id,
       title: `${job.title}${client ? ` - ${client.name}` : ''}`,
@@ -279,8 +295,8 @@ export default function Calendar() {
       workerId: job.workerId || undefined,
       departmentId: job.departmentId,
       location: job.location || (client ? client.address : '') || undefined,
-      status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
-      color: getPriorityColor(job.priority),
+      status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending',
+      color: jobColor,
     };
   }).filter(Boolean) as CalendarEvent[];
 
@@ -320,11 +336,12 @@ export default function Calendar() {
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'scheduled':   return 'bg-orange-100 text-orange-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'completed':   return 'bg-green-100 text-green-800';
+      case 'cancelled':   return 'bg-red-100 text-red-800';
+      case 'pending':     return 'bg-yellow-100 text-yellow-800';
+      default:            return 'bg-gray-100 text-gray-700';
     }
   }
 
@@ -1280,12 +1297,57 @@ export default function Calendar() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="scheduled">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
+                      Scheduled
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="in_progress">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                      In Progress
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="completed">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                      Completed
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="cancelled">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                      Cancelled
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="pending">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
+                      Pending
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Status Colour Legend */}
+              <div className="hidden lg:flex items-center gap-2.5 flex-wrap bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                <span className="text-xs text-gray-500 font-medium shrink-0">Legend:</span>
+                {[
+                  { label: 'Scheduled', color: '#f97316' },
+                  { label: 'In Progress', color: '#3b82f6' },
+                  { label: 'Completed', color: '#22c55e' },
+                  { label: 'Cancelled', color: '#ef4444' },
+                  { label: 'Pending', color: '#eab308' },
+                  { label: 'Unassigned', color: '#9ca3af' },
+                  { label: 'Overdue', color: '#dc2626' },
+                ].map(({ label, color }) => (
+                  <div key={label} className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-xs text-gray-600">{label}</span>
+                  </div>
+                ))}
+              </div>
 
               {/* Hour View Toggle for Day View */}
               {viewType === 'day' && (

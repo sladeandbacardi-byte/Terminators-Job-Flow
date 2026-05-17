@@ -43,10 +43,6 @@ export default function Jobs() {
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusBadgeVariant = (status: string) => {
-    const color = getStatusColor(status);
-    return color === 'green' ? 'default' : 'secondary';
-  };
 
   return (
     <div className="min-h-screen flex bg-gray-50" data-testid="jobs-page">
@@ -89,10 +85,11 @@ export default function Jobs() {
                 data-testid="filter-status"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
+                <option value="scheduled">Scheduled</option>
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="pending">Pending</option>
               </select>
               <ExportButton 
                 onExportCSV={() => exportJobs(jobs)}
@@ -194,14 +191,9 @@ export default function Jobs() {
                           </h4>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge 
-                            variant={getStatusBadgeVariant(job.status)}
-                            className={`${
-                              getStatusColor(job.status) === 'green' ? 'bg-green-100 text-green-800' :
-                              getStatusColor(job.status) === 'orange' ? 'bg-orange-100 text-orange-800' :
-                              getStatusColor(job.status) === 'red' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}
+                          <Badge
+                            variant="secondary"
+                            className={getStatusColor(job.status)}
                             data-testid={`job-status-${job.id}`}
                           >
                             {job.status.replace('_', ' ')}

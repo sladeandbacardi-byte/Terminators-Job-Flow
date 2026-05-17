@@ -171,9 +171,9 @@ export function DailyDepartmentCard({ departmentId, date, className = "" }: Dail
 
                 {/* Status */}
                 <div className="flex flex-col gap-1 print:gap-0.5">
-                  <Badge 
-                    variant={getStatusColor(job.status) === 'green' ? 'default' : 'secondary'}
-                    className="text-xs print:text-xs w-fit"
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs print:text-xs w-fit ${getStatusColor(job.status)}`}
                   >
                     {job.status.replace('_', ' ')}
                   </Badge>

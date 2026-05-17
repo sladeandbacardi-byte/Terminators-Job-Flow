@@ -47,7 +47,6 @@ export function JobCard({ jobId, className = "" }: JobCardProps) {
     );
   }
 
-  const statusColor = getStatusColor(jobData.status);
   const priorityColor = jobData.priority === 'urgent' ? 'red' : 
                        jobData.priority === 'high' ? 'orange' : 
                        jobData.priority === 'medium' ? 'blue' : 'gray';
@@ -104,9 +103,9 @@ export function JobCard({ jobId, className = "" }: JobCardProps) {
               <div className="flex gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-700">Status</p>
-                  <Badge 
-                    variant={statusColor === 'green' ? 'default' : 'secondary'}
-                    className="capitalize"
+                  <Badge
+                    variant="secondary"
+                    className={`capitalize ${getStatusColor(jobData.status)}`}
                   >
                     {jobData.status.replace('_', ' ')}
                   </Badge>
