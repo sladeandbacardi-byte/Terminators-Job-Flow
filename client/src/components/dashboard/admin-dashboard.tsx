@@ -124,6 +124,10 @@ export function AdminDashboard() {
       </div>
 
       {/* P&L Summary Cards */}
+      <div className="mb-1">
+        <h3 className="text-sm font-semibold text-gray-700">Monthly Business Overview</h3>
+        <p className="text-xs text-gray-400 mt-0.5">Revenue, expenses and gross profit for the selected period</p>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Sales */}
         <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
