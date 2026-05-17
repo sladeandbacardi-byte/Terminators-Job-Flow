@@ -29,9 +29,10 @@ export function CoordinatorDashboard() {
     return isValid(d) && format(d, "yyyy-MM-dd") === todayStr;
   });
 
-  const jobsDoneToday   = todayJobs.filter(j => j.status === "completed").length;
-  const activeJobsToday = todayJobs.filter(j => j.status === "in-progress").length;
-  const pendingToday    = todayJobs.filter(j => j.status === "scheduled" || j.status === "pending").length;
+  const jobsDoneToday    = todayJobs.filter(j => j.status === "completed").length;
+  const activeJobsToday  = todayJobs.filter(j => j.status === "in-progress").length;
+  const pendingToday     = todayJobs.filter(j => j.status === "scheduled" || j.status === "pending").length;
+  const unassignedToday  = todayJobs.filter(j => !j.workerId).length;
 
   const getWorkerName = (id: string | null) =>
     workers.find(w => w.id === id)?.name ?? "Unassigned";
@@ -44,12 +45,13 @@ export function CoordinatorDashboard() {
     <div className="space-y-6">
 
       {/* Quick-stat strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Jobs Done Today",   value: jobsDoneToday,   icon: CheckCircle,   color: "text-green-600",  bg: "bg-green-50  border-green-100"  },
-          { label: "In Progress",       value: activeJobsToday, icon: ClipboardList, color: "text-blue-600",   bg: "bg-blue-50   border-blue-100"   },
-          { label: "Scheduled / Pending", value: pendingToday,  icon: CalendarDays,  color: "text-orange-600", bg: "bg-orange-50 border-orange-100" },
-          { label: "Workers Active",    value: workers.filter(w => w.isActive !== false).length, icon: Users, color: "text-cyan-700", bg: "bg-cyan-50 border-cyan-100" },
+          { label: "Jobs Done Today",     value: jobsDoneToday,   icon: CheckCircle,   color: "text-green-600",  bg: "bg-green-50  border-green-100"  },
+          { label: "In Progress",         value: activeJobsToday, icon: ClipboardList, color: "text-blue-600",   bg: "bg-blue-50   border-blue-100"   },
+          { label: "Scheduled / Pending", value: pendingToday,    icon: CalendarDays,  color: "text-orange-600", bg: "bg-orange-50 border-orange-100" },
+          { label: "Unassigned Jobs",     value: unassignedToday, icon: Users,         color: unassignedToday > 0 ? "text-red-600" : "text-gray-400", bg: unassignedToday > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-100" },
+          { label: "Workers Active",      value: workers.filter(w => w.isActive !== false).length, icon: Users, color: "text-cyan-700", bg: "bg-cyan-50 border-cyan-100" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <Card key={label} className={`border ${bg}`}>
             <CardContent className="p-4 flex items-center gap-3">
