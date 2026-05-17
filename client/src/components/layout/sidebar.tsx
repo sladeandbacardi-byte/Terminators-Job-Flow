@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   BarChart3, Calendar, Users, Shield, Box, FileText, Receipt, Mail,
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
-  Settings, TrendingUp, ExternalLink, Database, ClipboardList,
+  Settings, TrendingUp, ExternalLink, Database, ClipboardList, Briefcase,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -48,30 +48,23 @@ const ALL_CATEGORIES = [
     icon: Wrench,
     roles: ["service"],
     items: [
-      { name: "Calendar",       href: "/calendar",      icon: Calendar,     roles: ["service"] },
-      { name: "Field Diaries",  href: "/field-diaries", icon: ClipboardList,roles: ["service"] },
-      { name: "Job Scheduling", href: "/jobs",          icon: Calendar,     roles: ["service"] },
+      { name: "Calendar",      href: "/calendar",      icon: Calendar,      roles: ["service"] },
+      { name: "Field Diaries", href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
+      { name: "My Jobs",       href: "/jobs",          icon: Briefcase,     roles: ["service"] },
     ],
   },
 
-  // ── SERVICE (accounts — limited view) ────────────────────────────────────
+  // ── SERVICE (accounts/finance — limited view) ─────────────────────────────
   {
     name: "Service",
     icon: Wrench,
     roles: ["accounts"],
     items: [
-      { name: "Calendar",       href: "/calendar", icon: Calendar, roles: ["accounts"] },
-      { name: "Job Scheduling", href: "/jobs",     icon: Calendar, roles: ["accounts"] },
-    ],
-  },
-
-  // ── CLIENTS (accounts only) ───────────────────────────────────────────────
-  {
-    name: "Clients",
-    icon: Shield,
-    roles: ["accounts"],
-    items: [
-      { name: "Clients", href: "/clients", icon: Shield, roles: ["accounts"] },
+      { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["accounts"] },
+      { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["accounts"] },
+      { name: "Clients",         href: "/clients",         icon: Shield,       roles: ["accounts"] },
+      { name: "Suppliers",       href: "/suppliers",       icon: Building2,    roles: ["accounts"] },
+      { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["accounts"] },
     ],
   },
 
@@ -89,12 +82,12 @@ const ALL_CATEGORIES = [
   {
     name: "Admin",
     icon: Settings,
-    roles: ["admin", "manager", "coordinator"],
+    roles: ["admin", "manager", "coordinator", "accounts"],
     items: [
-      { name: "Reports",            href: "/reports",           icon: BarChart,      roles: ["admin", "manager", "coordinator"] },
-      { name: "Custom Reports",     href: "/custom-reports",    icon: BarChart3,     roles: ["admin", "manager"] },
-      { name: "Testing Checklist",  href: "/testing-checklist", icon: ClipboardList, roles: ["admin", "manager", "coordinator"] },
-      { name: "Backup & Restore",   href: "/backup",            icon: Database,      roles: ["admin"] },
+      { name: "Reports",           href: "/reports",           icon: BarChart,      roles: ["admin", "manager", "coordinator", "accounts"] },
+      { name: "Custom Reports",    href: "/custom-reports",    icon: BarChart3,     roles: ["admin", "manager"] },
+      { name: "Testing Checklist", href: "/testing-checklist", icon: ClipboardList, roles: ["admin", "manager", "coordinator"] },
+      { name: "Backup & Restore",  href: "/backup",            icon: Database,      roles: ["admin"] },
     ],
   },
 ];

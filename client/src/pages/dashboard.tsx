@@ -44,8 +44,17 @@ const roleSubtitles: Record<DashboardRole, string> = {
   manager:     "Operations, jobs, staff workload and service performance",
   sales:       "Leads, quotes, follow-ups and sales performance",
   service:     "Today's jobs, field diaries and assigned work",
-  accounts:    "Invoices, debtors, contracts and financial performance",
+  accounts:    "Invoices, debtors, creditors and financial performance",
   coordinator: "Today's jobs, workers, departments and field progress",
+};
+
+const roleSnapshotLabels: Record<DashboardRole, string> = {
+  admin:       "Live Business Snapshot",
+  manager:     "Operations Snapshot",
+  sales:       "Sales Pipeline Snapshot",
+  service:     "My Jobs Snapshot",
+  accounts:    "Finance Snapshot",
+  coordinator: "Today's Service Snapshot",
 };
 
 export default function Dashboard() {
@@ -160,7 +169,7 @@ export default function Dashboard() {
               {/* Stats strip */}
               <div className="border-t border-gray-100 px-4 pt-2.5 pb-0.5">
                 <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest mb-2">
-                  {dashboardRole === "coordinator" ? "Today's Service Snapshot" : "Live Department Snapshot"}
+                  {roleSnapshotLabels[dashboardRole]}
                 </p>
               </div>
               <div className="px-4 pb-3">
