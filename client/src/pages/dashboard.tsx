@@ -32,7 +32,7 @@ const rolePageTitles: Record<DashboardRole, string> = {
   admin:    "Managing Member Dashboard",
   manager:  "Service Manager Dashboard",
   sales:    "Sales Dashboard",
-  service:  "Service Dashboard",
+  service:  "My Jobs Dashboard",
   accounts: "Finance Dashboard",
 };
 
@@ -40,7 +40,7 @@ const roleSubtitles: Record<DashboardRole, string> = {
   admin:    "Full business overview — sales, service, and finance",
   manager:  "Operations, jobs, staff workload and performance",
   sales:    "Leads, quotes, pipeline and client activity",
-  service:  "Scheduled jobs, field team and department workload",
+  service:  "Your assigned jobs, schedule and field activity",
   accounts: "Invoices, debtors, creditors and recurring revenue",
 };
 
