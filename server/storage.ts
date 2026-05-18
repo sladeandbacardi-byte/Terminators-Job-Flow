@@ -899,7 +899,9 @@ export class MemStorage implements IStorage {
       // Sanitary Bins
       { name: "Jackie Roelfse",     email: "jackie@terminators.co.za",   phone: "+27 82 123 0014", departmentId: "div-2", role: "Sanitary Bin Team 2" },
       { name: "Sanitary Bin Team 1",email: "",                            phone: "",                departmentId: "div-2", role: "Sanitary Bin Team" },
+      { name: "Re-Althon",          email: "reealthon@terminators.co.za",phone: "+27 82 123 0016", departmentId: "div-3", role: "Washroom Technician" },
     ];
+    // worker-16 = Re-Althon (div-3 / Washroom Technician)
     // worker-1  = Julien Botha (div-6 / manager)
     // worker-2  = Maryka Venter (null / admin)
     // worker-3  = Mariette Koekemoer (null / admin)
@@ -3395,44 +3397,104 @@ export class MemStorage implements IStorage {
     const td = (daysAgo: number, hour = 8) => {
       const d = new Date(); d.setDate(d.getDate() - daysAgo); d.setHours(hour, 0, 0, 0); return d;
     };
+    const tdf = (daysAhead: number) => {
+      const d = new Date(); d.setDate(d.getDate() + daysAhead); d.setHours(8, 0, 0, 0); return d;
+    };
+
+    // ── Real Terminators Fleet ─────────────────────────────────────────────
+    // Driver mapping:
+    //   vehicle-1  DPN524EC  2006 Mercedes Vito      Re-Althon  (worker-16, div-3 Washroom)
+    //   vehicle-2  HDF872EC  2013 VW Caddy            Jackie     (worker-14, div-2 Sanitary Bins)
+    //   vehicle-3  JPC031EC  2020 VW Caddy            Garth      (worker-9,  div-1 Pest Control)
+    //   vehicle-4  DJG667EC  2005 VW Caddy            Leon       (worker-13, div-1 Pest Control)
+    //   vehicle-5  HKY517EC  2015 Suzuki Celerio      Chane      (worker-6,  div-5 Sales)
+    //   vehicle-6  HRW489EC  2016 VW Caddy            Zain       (worker-12, div-3 Washroom)
+    //   vehicle-7  KRM914EC  2023 Isuzu D-Max         Mike       (worker-10, div-1 Pest Control)
+    //   vehicle-8  HRS116EC  2016 VW Caddy            Xolani/X   (worker-11, div-1 Pest Control)
+    //   vehicle-9  KDM688EC  2023 VW Caddy            Reece      (worker-8,  div-1 Pest Control)
+    //   vehicle-10 (TBA)     2026 Toyota Surf         Julien     (worker-1,  div-6 Management)
 
     const vehiclesData: Vehicle[] = [
-      { id: "vehicle-1", name: "Toyota HiAce Van (Pest Control)", registration: "GA 12-34 FP", make: "Toyota", model: "HiAce", year: "2021", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2024-01-10") },
-      { id: "vehicle-2", name: "Toyota HiLux (Washroom)", registration: "GA 56-78 FP", make: "Toyota", model: "HiLux", year: "2022", departmentId: "div-3", isActive: true, notes: null, createdAt: new Date("2024-02-15") },
-      { id: "vehicle-3", name: "Ford Transit (Sanitary Bins)", registration: "GA 90-12 FP", make: "Ford", model: "Transit", year: "2020", departmentId: "div-2", isActive: true, notes: null, createdAt: new Date("2024-03-01") },
-      { id: "vehicle-4", name: "VW Caddy (Deep Cleaning)", registration: "GA 34-56 FP", make: "Volkswagen", model: "Caddy", year: "2023", departmentId: "div-4", isActive: true, notes: null, createdAt: new Date("2024-01-20") },
-      { id: "vehicle-5", name: "Toyota Corolla (Management)", registration: "GA 78-90 FP", make: "Toyota", model: "Corolla", year: "2022", departmentId: "div-6", isActive: true, notes: null, createdAt: new Date("2024-01-05") },
+      { id: "vehicle-1",  name: "Mercedes Vito (Re-Althon)",  registration: "DPN524EC", make: "Mercedes-Benz", model: "Vito",    year: "2006", departmentId: "div-3", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-2",  name: "VW Caddy (Jackie)",          registration: "HDF872EC", make: "Volkswagen",   model: "Caddy",   year: "2013", departmentId: "div-2", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-3",  name: "VW Caddy (Garth)",           registration: "JPC031EC", make: "Volkswagen",   model: "Caddy",   year: "2020", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2020-06-01") },
+      { id: "vehicle-4",  name: "VW Caddy (Leon)",            registration: "DJG667EC", make: "Volkswagen",   model: "Caddy",   year: "2005", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-5",  name: "Suzuki Celerio (Chane)",     registration: "HKY517EC", make: "Suzuki",       model: "Celerio", year: "2015", departmentId: "div-5", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-6",  name: "VW Caddy (Zain)",            registration: "HRW489EC", make: "Volkswagen",   model: "Caddy",   year: "2016", departmentId: "div-3", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-7",  name: "Isuzu D-Max (Mike)",         registration: "KRM914EC", make: "Isuzu",        model: "D-Max",   year: "2023", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2023-03-01") },
+      { id: "vehicle-8",  name: "VW Caddy (Xolani)",          registration: "HRS116EC", make: "Volkswagen",   model: "Caddy",   year: "2016", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-9",  name: "VW Caddy (Reece)",           registration: "KDM688EC", make: "Volkswagen",   model: "Caddy",   year: "2023", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2023-06-01") },
+      { id: "vehicle-10", name: "Toyota Surf (Julien)",        registration: "TBA",      make: "Toyota",       model: "Surf",    year: "2026", departmentId: "div-6", isActive: true, notes: "New vehicle — registration pending", createdAt: new Date("2026-01-01") },
     ];
     vehiclesData.forEach(v => this.vehicles.set(v.id, v));
 
     const assignmentsData: VehicleAssignment[] = [
-      { id: "assign-1", vehicleId: "vehicle-5", workerId: "worker-1", isActive: true, notes: null, assignedAt: new Date("2024-01-10") },
-      { id: "assign-2", vehicleId: "vehicle-1", workerId: "worker-3", isActive: true, notes: null, assignedAt: new Date("2024-02-01") },
-      { id: "assign-3", vehicleId: "vehicle-3", workerId: "worker-4", isActive: true, notes: null, assignedAt: new Date("2024-02-15") },
-      { id: "assign-4", vehicleId: "vehicle-2", workerId: "worker-5", isActive: true, notes: null, assignedAt: new Date("2024-03-01") },
-      { id: "assign-5", vehicleId: "vehicle-4", workerId: "worker-6", isActive: true, notes: null, assignedAt: new Date("2024-03-10") },
+      { id: "assign-1",  vehicleId: "vehicle-1",  workerId: "worker-16", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
+      { id: "assign-2",  vehicleId: "vehicle-2",  workerId: "worker-14", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
+      { id: "assign-3",  vehicleId: "vehicle-3",  workerId: "worker-9",  isActive: true, notes: null, assignedAt: new Date("2020-06-01") },
+      { id: "assign-4",  vehicleId: "vehicle-4",  workerId: "worker-13", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
+      { id: "assign-5",  vehicleId: "vehicle-5",  workerId: "worker-6",  isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
+      { id: "assign-6",  vehicleId: "vehicle-6",  workerId: "worker-12", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
+      { id: "assign-7",  vehicleId: "vehicle-7",  workerId: "worker-10", isActive: true, notes: null, assignedAt: new Date("2023-03-01") },
+      { id: "assign-8",  vehicleId: "vehicle-8",  workerId: "worker-11", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
+      { id: "assign-9",  vehicleId: "vehicle-9",  workerId: "worker-8",  isActive: true, notes: null, assignedAt: new Date("2023-06-01") },
+      { id: "assign-10", vehicleId: "vehicle-10", workerId: "worker-1",  isActive: true, notes: null, assignedAt: new Date("2026-01-01") },
     ];
     assignmentsData.forEach(a => this.vehicleAssignments.set(a.id, a));
 
+    // Estimated current odometers (realistic for each vehicle's age & usage)
+    // DPN524EC 2006 Vito     ~285,200 km
+    // HDF872EC 2013 Caddy    ~198,400 km
+    // JPC031EC 2020 Caddy    ~88,700 km
+    // DJG667EC 2005 Caddy    ~322,600 km
+    // HKY517EC 2015 Celerio  ~141,800 km
+    // HRW489EC 2016 Caddy    ~178,300 km
+    // KRM914EC 2023 Isuzu    ~42,100 km
+    // HRS116EC 2016 Caddy    ~165,500 km
+    // KDM688EC 2023 Caddy    ~36,400 km
+    // (TBA)    2026 Surf      ~8,200 km
+
     const kmLogsData: KmLog[] = [
-      { id: "km-1", vehicleId: "vehicle-5", workerId: "worker-1", logDate: td(1), startOdometer: 62450, endOdometer: 62530, totalKm: 80, businessKm: 80, privateKm: 0, notes: "Client visits Sandton", createdAt: td(1) },
-      { id: "km-2", vehicleId: "vehicle-1", workerId: "worker-3", logDate: td(2), startOdometer: 85420, endOdometer: 85570, totalKm: 150, businessKm: 140, privateKm: 10, notes: "Pest treatment routes", createdAt: td(2) },
-      { id: "km-3", vehicleId: "vehicle-2", workerId: "worker-5", logDate: td(2), startOdometer: 41200, endOdometer: 41380, totalKm: 180, businessKm: 180, privateKm: 0, notes: "Washroom servicing", createdAt: td(2) },
-      { id: "km-4", vehicleId: "vehicle-3", workerId: "worker-4", logDate: td(3), startOdometer: 73100, endOdometer: 73240, totalKm: 140, businessKm: 130, privateKm: 10, notes: null, createdAt: td(3) },
-      { id: "km-5", vehicleId: "vehicle-4", workerId: "worker-6", logDate: td(5), startOdometer: 28450, endOdometer: 28590, totalKm: 140, businessKm: 140, privateKm: 0, notes: "Deep cleaning routes", createdAt: td(5) },
-      { id: "km-6", vehicleId: "vehicle-1", workerId: "worker-3", logDate: td(7), startOdometer: 85220, endOdometer: 85420, totalKm: 200, businessKm: 185, privateKm: 15, notes: "Weekly routes", createdAt: td(7) },
-      { id: "km-7", vehicleId: "vehicle-5", workerId: "worker-1", logDate: td(8), startOdometer: 62350, endOdometer: 62450, totalKm: 100, businessKm: 100, privateKm: 0, notes: "Head office visits", createdAt: td(8) },
-      { id: "km-8", vehicleId: "vehicle-2", workerId: "worker-5", logDate: td(10), startOdometer: 41000, endOdometer: 41200, totalKm: 200, businessKm: 200, privateKm: 0, notes: null, createdAt: td(10) },
+      // Re-Althon — Vito
+      { id: "km-1",  vehicleId: "vehicle-1",  workerId: "worker-16", logDate: td(1),  startOdometer: 285110, endOdometer: 285200, totalKm: 90,  businessKm: 90,  privateKm: 0,  notes: "Washroom servicing — Newton Park route", createdAt: td(1) },
+      { id: "km-2",  vehicleId: "vehicle-1",  workerId: "worker-16", logDate: td(6),  startOdometer: 284980, endOdometer: 285110, totalKm: 130, businessKm: 120, privateKm: 10, notes: "Walmer & Summerstrand route", createdAt: td(6) },
+      // Jackie — Caddy (Sanitary Bins)
+      { id: "km-3",  vehicleId: "vehicle-2",  workerId: "worker-14", logDate: td(1),  startOdometer: 198310, endOdometer: 198400, totalKm: 90,  businessKm: 90,  privateKm: 0,  notes: "Sanitary bin collection — Greenacres area", createdAt: td(1) },
+      { id: "km-4",  vehicleId: "vehicle-2",  workerId: "worker-14", logDate: td(8),  startOdometer: 198180, endOdometer: 198310, totalKm: 130, businessKm: 125, privateKm: 5,  notes: "Lorraine & Framesby route", createdAt: td(8) },
+      // Garth — Caddy (Pest Control)
+      { id: "km-5",  vehicleId: "vehicle-3",  workerId: "worker-9",  logDate: td(2),  startOdometer: 88580,  endOdometer: 88700,  totalKm: 120, businessKm: 120, privateKm: 0,  notes: "Pest control treatments — Uitenhage Road clients", createdAt: td(2) },
+      { id: "km-6",  vehicleId: "vehicle-3",  workerId: "worker-9",  logDate: td(7),  startOdometer: 88420,  endOdometer: 88580,  totalKm: 160, businessKm: 150, privateKm: 10, notes: "Industrial area treatments", createdAt: td(7) },
+      // Leon — Caddy (Pest Control)
+      { id: "km-7",  vehicleId: "vehicle-4",  workerId: "worker-13", logDate: td(2),  startOdometer: 322480, endOdometer: 322600, totalKm: 120, businessKm: 110, privateKm: 10, notes: "Pest control route — North End & Korsten", createdAt: td(2) },
+      // Zain — Caddy (Washroom)
+      { id: "km-8",  vehicleId: "vehicle-6",  workerId: "worker-12", logDate: td(1),  startOdometer: 178210, endOdometer: 178310, totalKm: 100, businessKm: 100, privateKm: 0,  notes: "Washroom maintenance — Baywest & surrounds", createdAt: td(1) },
+      { id: "km-9",  vehicleId: "vehicle-6",  workerId: "worker-12", logDate: td(9),  startOdometer: 178060, endOdometer: 178210, totalKm: 150, businessKm: 150, privateKm: 0,  notes: null, createdAt: td(9) },
+      // Mike — Isuzu D-Max (Pest Control)
+      { id: "km-10", vehicleId: "vehicle-7",  workerId: "worker-10", logDate: td(3),  startOdometer: 41960,  endOdometer: 42100,  totalKm: 140, businessKm: 140, privateKm: 0,  notes: "Pest treatments — VW Plant & industrial clients", createdAt: td(3) },
+      // Xolani — Caddy (Pest Control)
+      { id: "km-11", vehicleId: "vehicle-8",  workerId: "worker-11", logDate: td(2),  startOdometer: 165380, endOdometer: 165500, totalKm: 120, businessKm: 115, privateKm: 5,  notes: "Pest control — hospital & clinic route", createdAt: td(2) },
+      // Reece — Caddy (Pest Control)
+      { id: "km-12", vehicleId: "vehicle-9",  workerId: "worker-8",  logDate: td(1),  startOdometer: 36300,  endOdometer: 36410,  totalKm: 110, businessKm: 110, privateKm: 0,  notes: "Pest control treatments — Walmer area", createdAt: td(1) },
+      // Julien — Toyota Surf (Management)
+      { id: "km-13", vehicleId: "vehicle-10", workerId: "worker-1",  logDate: td(2),  startOdometer: 8130,   endOdometer: 8200,   totalKm: 70,  businessKm: 70,  privateKm: 0,  notes: "Client site visits — Boardwalk & Baywest", createdAt: td(2) },
+      // Chane — Celerio (Sales)
+      { id: "km-14", vehicleId: "vehicle-5",  workerId: "worker-6",  logDate: td(3),  startOdometer: 141720, endOdometer: 141800, totalKm: 80,  businessKm: 75,  privateKm: 5,  notes: "Sales visits — new client prospects", createdAt: td(3) },
     ];
     kmLogsData.forEach(l => this.kmLogs.set(l.id, l));
 
     const fuelData: FuelFillup[] = [
-      { id: "fuel-1", vehicleId: "vehicle-1", workerId: "worker-3", fillDate: td(3), odometer: 85570, litres: "55.80", cost: "1477.62", fuelStation: "Engen Fourways", receiptPhoto: null, notes: null, createdAt: td(3) },
-      { id: "fuel-2", vehicleId: "vehicle-2", workerId: "worker-5", fillDate: td(4), odometer: 41380, litres: "62.30", cost: "1649.95", fuelStation: "BP Sandton", receiptPhoto: null, notes: null, createdAt: td(4) },
-      { id: "fuel-3", vehicleId: "vehicle-5", workerId: "worker-1", fillDate: td(5), odometer: 62450, litres: "40.10", cost: "1062.65", fuelStation: "Shell Rosebank", receiptPhoto: null, notes: null, createdAt: td(5) },
-      { id: "fuel-4", vehicleId: "vehicle-3", workerId: "worker-4", fillDate: td(7), odometer: 73240, litres: "58.40", cost: "1547.16", fuelStation: "Engen Midrand", receiptPhoto: null, notes: null, createdAt: td(7) },
-      { id: "fuel-5", vehicleId: "vehicle-4", workerId: "worker-6", fillDate: td(9), odometer: 28590, litres: "44.20", cost: "1170.90", fuelStation: "Total Boksburg", receiptPhoto: null, notes: null, createdAt: td(9) },
-      { id: "fuel-6", vehicleId: "vehicle-1", workerId: "worker-3", fillDate: td(14), odometer: 85220, litres: "51.60", cost: "1366.86", fuelStation: "BP Fourways", receiptPhoto: null, notes: null, createdAt: td(14) },
+      { id: "fuel-1",  vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(4),  odometer: 285110, litres: "70.40", cost: "1864.60", fuelStation: "Engen Greenacres",      receiptPhoto: null, notes: null,                    createdAt: td(4)  },
+      { id: "fuel-2",  vehicleId: "vehicle-2",  workerId: "worker-14", fillDate: td(5),  odometer: 198310, litres: "52.10", cost: "1380.65", fuelStation: "BP Newton Park",         receiptPhoto: null, notes: null,                    createdAt: td(5)  },
+      { id: "fuel-3",  vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(3),  odometer: 88580,  litres: "48.60", cost: "1287.90", fuelStation: "Shell Walmer",           receiptPhoto: null, notes: null,                    createdAt: td(3)  },
+      { id: "fuel-4",  vehicleId: "vehicle-4",  workerId: "worker-13", fillDate: td(6),  odometer: 322480, litres: "55.30", cost: "1465.45", fuelStation: "Caltex Summerstrand",    receiptPhoto: null, notes: "Tank very low",          createdAt: td(6)  },
+      { id: "fuel-5",  vehicleId: "vehicle-5",  workerId: "worker-6",  fillDate: td(4),  odometer: 141720, litres: "32.80", cost: "869.20",  fuelStation: "Total Lorraine",         receiptPhoto: null, notes: null,                    createdAt: td(4)  },
+      { id: "fuel-6",  vehicleId: "vehicle-6",  workerId: "worker-12", fillDate: td(2),  odometer: 178210, litres: "50.70", cost: "1343.55", fuelStation: "BP Newton Park",         receiptPhoto: null, notes: null,                    createdAt: td(2)  },
+      { id: "fuel-7",  vehicleId: "vehicle-7",  workerId: "worker-10", fillDate: td(5),  odometer: 41960,  litres: "65.20", cost: "1727.80", fuelStation: "Engen Uitenhage Road",   receiptPhoto: null, notes: "Diesel",                createdAt: td(5)  },
+      { id: "fuel-8",  vehicleId: "vehicle-8",  workerId: "worker-11", fillDate: td(7),  odometer: 165380, litres: "49.40", cost: "1309.10", fuelStation: "Shell Walmer",           receiptPhoto: null, notes: null,                    createdAt: td(7)  },
+      { id: "fuel-9",  vehicleId: "vehicle-9",  workerId: "worker-8",  fillDate: td(3),  odometer: 36300,  litres: "46.90", cost: "1242.85", fuelStation: "Caltex Greenacres",      receiptPhoto: null, notes: null,                    createdAt: td(3)  },
+      { id: "fuel-10", vehicleId: "vehicle-10", workerId: "worker-1",  fillDate: td(6),  odometer: 8130,   litres: "58.30", cost: "1544.95", fuelStation: "Shell Summerstrand",     receiptPhoto: null, notes: null,                    createdAt: td(6)  },
+      { id: "fuel-11", vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(18), odometer: 284980, litres: "68.90", cost: "1825.85", fuelStation: "Total Gqeberha CBD",     receiptPhoto: null, notes: null,                    createdAt: td(18) },
+      { id: "fuel-12", vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(16), odometer: 88420,  litres: "47.10", cost: "1248.15", fuelStation: "BP Charlo",             receiptPhoto: null, notes: null,                    createdAt: td(16) },
     ];
     fuelData.forEach(f => this.fuelFillups.set(f.id, f));
 
@@ -3454,11 +3516,29 @@ export class MemStorage implements IStorage {
       { name: "Licence disc valid", result: "pass" },
       { name: "Driver's licence in possession", result: "pass" },
     ]);
-    const failItems = JSON.stringify([
+    const failItemsVito = JSON.stringify([
       { name: "Tyres (condition & pressure)", result: "pass" },
       { name: "Front lights", result: "pass" },
-      { name: "Rear lights & indicators", result: "fail", comments: "Left rear indicator not working" },
-      { name: "Brakes", result: "fail", comments: "Squeaking when braking hard" },
+      { name: "Rear lights & indicators", result: "fail", comments: "Right rear brake light not working" },
+      { name: "Brakes", result: "pass" },
+      { name: "Engine oil", result: "fail", comments: "Oil level low — topped up but needs monitoring" },
+      { name: "Coolant / water level", result: "pass" },
+      { name: "Windscreen (no cracks)", result: "pass" },
+      { name: "Wipers", result: "pass" },
+      { name: "Mirrors", result: "pass" },
+      { name: "Seat belts", result: "pass" },
+      { name: "Fire extinguisher", result: "pass" },
+      { name: "First aid kit", result: "pass" },
+      { name: "Equipment secured", result: "pass" },
+      { name: "Vehicle cleanliness", result: "pass" },
+      { name: "Licence disc valid", result: "pass" },
+      { name: "Driver's licence in possession", result: "pass" },
+    ]);
+    const failItemsLeon = JSON.stringify([
+      { name: "Tyres (condition & pressure)", result: "fail", comments: "Front left tyre worn — needs replacing soon" },
+      { name: "Front lights", result: "pass" },
+      { name: "Rear lights & indicators", result: "pass" },
+      { name: "Brakes", result: "pass" },
       { name: "Engine oil", result: "pass" },
       { name: "Coolant / water level", result: "pass" },
       { name: "Windscreen (no cracks)", result: "pass" },
@@ -3472,32 +3552,37 @@ export class MemStorage implements IStorage {
       { name: "Licence disc valid", result: "pass" },
       { name: "Driver's licence in possession", result: "pass" },
     ]);
+
     const inspectionsData: VehicleInspection[] = [
-      { id: "insp-1", vehicleId: "vehicle-5", workerId: "worker-1", inspectionDate: td(1), overallResult: "pass", itemsJson: passItems, comments: "All good.", photoUrl: null, failAlertSent: false, createdAt: td(1) },
-      { id: "insp-2", vehicleId: "vehicle-1", workerId: "worker-3", inspectionDate: td(3), overallResult: "fail", itemsJson: failItems, comments: "Brakes and indicator need attention.", photoUrl: null, failAlertSent: true, createdAt: td(3) },
-      { id: "insp-3", vehicleId: "vehicle-2", workerId: "worker-5", inspectionDate: td(5), overallResult: "pass", itemsJson: passItems, comments: null, photoUrl: null, failAlertSent: false, createdAt: td(5) },
-      { id: "insp-4", vehicleId: "vehicle-3", workerId: "worker-4", inspectionDate: td(7), overallResult: "pass", itemsJson: passItems, comments: "Vehicle in good condition.", photoUrl: null, failAlertSent: false, createdAt: td(7) },
+      { id: "insp-1",  vehicleId: "vehicle-10", workerId: "worker-1",  inspectionDate: td(2),  overallResult: "pass", itemsJson: passItems,      comments: "New vehicle — all checks passed.", photoUrl: null, failAlertSent: false, createdAt: td(2)  },
+      { id: "insp-2",  vehicleId: "vehicle-1",  workerId: "worker-16", inspectionDate: td(1),  overallResult: "fail", itemsJson: failItemsVito,   comments: "Brake light and oil issue reported. Needs attention.", photoUrl: null, failAlertSent: true,  createdAt: td(1)  },
+      { id: "insp-3",  vehicleId: "vehicle-2",  workerId: "worker-14", inspectionDate: td(1),  overallResult: "pass", itemsJson: passItems,      comments: null, photoUrl: null, failAlertSent: false, createdAt: td(1)  },
+      { id: "insp-4",  vehicleId: "vehicle-3",  workerId: "worker-9",  inspectionDate: td(2),  overallResult: "pass", itemsJson: passItems,      comments: "Vehicle clean and in good condition.", photoUrl: null, failAlertSent: false, createdAt: td(2)  },
+      { id: "insp-5",  vehicleId: "vehicle-4",  workerId: "worker-13", inspectionDate: td(2),  overallResult: "fail", itemsJson: failItemsLeon,   comments: "Front left tyre wear reported — monitor closely.", photoUrl: null, failAlertSent: true,  createdAt: td(2)  },
+      { id: "insp-6",  vehicleId: "vehicle-5",  workerId: "worker-6",  inspectionDate: td(3),  overallResult: "pass", itemsJson: passItems,      comments: null, photoUrl: null, failAlertSent: false, createdAt: td(3)  },
+      { id: "insp-7",  vehicleId: "vehicle-6",  workerId: "worker-12", inspectionDate: td(1),  overallResult: "pass", itemsJson: passItems,      comments: "All good.", photoUrl: null, failAlertSent: false, createdAt: td(1)  },
+      { id: "insp-8",  vehicleId: "vehicle-7",  workerId: "worker-10", inspectionDate: td(3),  overallResult: "pass", itemsJson: passItems,      comments: null, photoUrl: null, failAlertSent: false, createdAt: td(3)  },
+      { id: "insp-9",  vehicleId: "vehicle-8",  workerId: "worker-11", inspectionDate: td(2),  overallResult: "pass", itemsJson: passItems,      comments: "Vehicle in good condition.", photoUrl: null, failAlertSent: false, createdAt: td(2)  },
+      { id: "insp-10", vehicleId: "vehicle-9",  workerId: "worker-8",  inspectionDate: td(1),  overallResult: "pass", itemsJson: passItems,      comments: null, photoUrl: null, failAlertSent: false, createdAt: td(1)  },
     ];
     inspectionsData.forEach(i => this.vehicleInspections.set(i.id, i));
 
-    // — Vehicle Issues seed data —
-    const tdf = (daysAhead: number) => { const d = new Date(); d.setDate(d.getDate() + daysAhead); d.setHours(8, 0, 0, 0); return d; };
     const issuesData: VehicleIssue[] = [
-      { id: "issue-1", vehicleId: "vehicle-1", workerId: "worker-3", reportedAt: td(3), category: "brakes", description: "Grinding noise when braking at speed. Gets worse after highway driving.", urgency: "high", status: "open", photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(3) },
-      { id: "issue-2", vehicleId: "vehicle-1", workerId: "worker-3", reportedAt: td(5), category: "tyres", description: "Front left tyre has a visible sidewall bulge. Risk of blowout at highway speeds.", urgency: "not_safe", status: "booked", photoUrl: null, managerNotes: "Booked at Kyalami Tyres for Friday 9am. Do not drive on highway.", resolvedAt: null, serviceRecordId: null, createdAt: td(5) },
-      { id: "issue-3", vehicleId: "vehicle-2", workerId: "worker-5", reportedAt: td(2), category: "electrical", description: "Red battery warning light appeared on dashboard. Checked connections — all fine.", urgency: "medium", status: "in_progress", photoUrl: null, managerNotes: "Diagnostics being done. May be alternator.", resolvedAt: null, serviceRecordId: null, createdAt: td(2) },
-      { id: "issue-4", vehicleId: "vehicle-3", workerId: "worker-4", reportedAt: td(7), category: "body", description: "Large scratch on passenger door from parking incident at client site.", urgency: "low", status: "open", photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(7) },
-      { id: "issue-5", vehicleId: "vehicle-4", workerId: "worker-6", reportedAt: td(14), category: "engine", description: "Engine stuttering at startup, took 3 attempts to start.", urgency: "medium", status: "completed", photoUrl: null, managerNotes: "Fixed — spark plugs replaced during service.", resolvedAt: td(10), serviceRecordId: "sr-4", createdAt: td(14) },
-      { id: "issue-6", vehicleId: "vehicle-5", workerId: "worker-1", reportedAt: td(1), category: "other", description: "Driver side windscreen wiper leaving streaks — visibility poor in rain.", urgency: "low", status: "open", photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(1) },
+      { id: "issue-1", vehicleId: "vehicle-1",  workerId: "worker-16", reportedAt: td(1),  category: "electrical", description: "Right rear brake light not working. Bulb may need replacing.", urgency: "high",    status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(1)  },
+      { id: "issue-2", vehicleId: "vehicle-1",  workerId: "worker-16", reportedAt: td(1),  category: "engine",     description: "Engine oil level low. Topped up temporarily but burns oil — needs workshop check.", urgency: "medium",  status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(1)  },
+      { id: "issue-3", vehicleId: "vehicle-4",  workerId: "worker-13", reportedAt: td(2),  category: "tyres",      description: "Front left tyre showing wear on inner edge. High mileage vehicle — requires inspection.", urgency: "medium",  status: "open",        photoUrl: null, managerNotes: "Monitor tyre — book at PE Tyres if wear increases.", resolvedAt: null, serviceRecordId: null, createdAt: td(2)  },
+      { id: "issue-4", vehicleId: "vehicle-2",  workerId: "worker-14", reportedAt: td(10), category: "body",       description: "Dent on rear bumper from reversing into a bollard at client site.", urgency: "low",     status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(10) },
+      { id: "issue-5", vehicleId: "vehicle-8",  workerId: "worker-11", reportedAt: td(21), category: "engine",     description: "Clutch slipping slightly on hills. Getting worse over past two weeks.", urgency: "medium",  status: "in_progress", photoUrl: null, managerNotes: "Booked at Gqeberha Auto for Thursday. Driver to be careful on hills.", resolvedAt: null, serviceRecordId: null, createdAt: td(21) },
+      { id: "issue-6", vehicleId: "vehicle-10", workerId: "worker-1",  reportedAt: td(5),  category: "other",      description: "Passenger window rattles at highway speed. Seal may need adjustment.", urgency: "low",     status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(5)  },
     ];
     issuesData.forEach(i => this.vehicleIssues.set(i.id, i));
 
-    // — Service Records seed data —
     const serviceData: ServiceRecord[] = [
-      { id: "sr-1", vehicleId: "vehicle-1", serviceDate: td(180), odometer: 84200, serviceProvider: "Kyalami Motors", workDone: "Full 85,000km service. Oil change, oil filter, air filter, cabin filter, spark plugs. Brake pads front and rear replaced.", issuesFixed: "Brake squealing resolved", cost: "8500.00", invoiceNumber: "KM-2025-0441", invoiceUrl: null, notes: null, nextServiceDate: tdf(5), nextServiceOdometer: 95000, createdByWorkerId: "worker-1", createdAt: td(180) },
-      { id: "sr-2", vehicleId: "vehicle-2", serviceDate: td(90), odometer: 40200, serviceProvider: "Toyota Midrand", workDone: "60,000km service. Transmission fluid, brake fluid, coolant flush. All filters replaced. Tyre rotation and alignment.", issuesFixed: null, cost: "6200.00", invoiceNumber: "TM-2026-0118", invoiceUrl: null, notes: "Next service at 75,000km or 6 months", nextServiceDate: tdf(90), nextServiceOdometer: 75000, createdByWorkerId: "worker-1", createdAt: td(90) },
-      { id: "sr-3", vehicleId: "vehicle-3", serviceDate: td(120), odometer: 72100, serviceProvider: "Ford Fourways", workDone: "Transmission fluid change, general inspection, wiper blades replaced, tyre rotation.", issuesFixed: null, cost: "3800.00", invoiceNumber: "FF-2025-0889", invoiceUrl: null, notes: null, nextServiceDate: tdf(30), nextServiceOdometer: 85000, createdByWorkerId: "worker-1", createdAt: td(120) },
-      { id: "sr-4", vehicleId: "vehicle-4", serviceDate: td(10), odometer: 28300, serviceProvider: "Autozone Service Centre", workDone: "30,000km service. Spark plugs replaced, oil change, belts checked. Engine startup issue diagnosed and resolved.", issuesFixed: "Engine stuttering at startup fixed — spark plugs replaced", cost: "4500.00", invoiceNumber: "AZ-2026-0342", invoiceUrl: null, notes: null, nextServiceDate: tdf(180), nextServiceOdometer: 43000, createdByWorkerId: "worker-1", createdAt: td(10) },
+      { id: "sr-1", vehicleId: "vehicle-1",  serviceDate: td(120), odometer: 284200, serviceProvider: "Mercedes-Benz Eastern Cape", workDone: "Major service — oil change, all filters replaced, gearbox fluid, brake fluid flush. Wiper blades replaced. Tyre rotation.", issuesFixed: null, cost: "9800.00", invoiceNumber: "MBEC-2026-0112", invoiceUrl: null, notes: "High mileage vehicle — recommend checking engine mounts at next service.", nextServiceDate: tdf(60), nextServiceOdometer: 295000, createdByWorkerId: "worker-1", createdAt: td(120) },
+      { id: "sr-2", vehicleId: "vehicle-3",  serviceDate: td(90),  odometer: 87500,  serviceProvider: "Caddy Specialists Gqeberha", workDone: "90,000km service — oil, filters, spark plugs, brake pads front. Alignment and balancing.", issuesFixed: null, cost: "6400.00", invoiceNumber: "CSG-2026-0044", invoiceUrl: null, notes: null, nextServiceDate: tdf(90), nextServiceOdometer: 97500, createdByWorkerId: "worker-1", createdAt: td(90) },
+      { id: "sr-3", vehicleId: "vehicle-7",  serviceDate: td(45),  odometer: 40000,  serviceProvider: "Isuzu Port Elizabeth",       workDone: "40,000km service — oil change, all filters, fuel filter, diff fluid, tyre rotation and alignment.", issuesFixed: null, cost: "7200.00", invoiceNumber: "IPE-2026-0078", invoiceUrl: null, notes: "Next service at 50,000km.", nextServiceDate: tdf(120), nextServiceOdometer: 50000, createdByWorkerId: "worker-1", createdAt: td(45) },
+      { id: "sr-4", vehicleId: "vehicle-9",  serviceDate: td(30),  odometer: 35000,  serviceProvider: "Caddy Specialists Gqeberha", workDone: "35,000km service — oil change, oil filter, air filter, cabin filter, tyre rotation.", issuesFixed: null, cost: "4800.00", invoiceNumber: "CSG-2026-0091", invoiceUrl: null, notes: null, nextServiceDate: tdf(150), nextServiceOdometer: 45000, createdByWorkerId: "worker-1", createdAt: td(30) },
+      { id: "sr-5", vehicleId: "vehicle-6",  serviceDate: td(150), odometer: 177000, serviceProvider: "PE Auto Service Centre",      workDone: "Service — oil and filter change, brake pads rear, coolant top-up. Wiper blades replaced.", issuesFixed: null, cost: "5100.00", invoiceNumber: "PEAS-2025-0334", invoiceUrl: null, notes: null, nextServiceDate: tdf(30), nextServiceOdometer: 188000, createdByWorkerId: "worker-1", createdAt: td(150) },
     ];
     serviceData.forEach(r => this.serviceRecords.set(r.id, r));
   }
