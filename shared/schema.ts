@@ -555,6 +555,7 @@ export const vehicles = pgTable("vehicles", {
   year: text("year"),
   departmentId: varchar("department_id"),
   isActive: boolean("is_active").notNull().default(true),
+  vehicleStatus: text("vehicle_status").notNull().default("active"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });

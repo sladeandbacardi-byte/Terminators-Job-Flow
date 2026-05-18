@@ -8,14 +8,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Truck, Gauge, Fuel, ClipboardCheck, AlertTriangle, CheckCircle,
-  Car, Calendar, User, Plus, Search,
+  Car, Calendar, User, Search, ChevronRight, Wrench,
 } from "lucide-react";
 import { format } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  active:      { label: "Active",        color: "text-green-700",  bg: "bg-green-100",  dot: "bg-green-500"  },
+  due_service: { label: "Due Service",   color: "text-orange-700", bg: "bg-orange-100", dot: "bg-orange-500" },
+  workshop:    { label: "Workshop",      color: "text-gray-600",   bg: "bg-gray-200",   dot: "bg-gray-500"   },
+  unsafe:      { label: "Unsafe",        color: "text-red-700",    bg: "bg-red-100",    dot: "bg-red-500"    },
+  spare:       { label: "Spare Vehicle", color: "text-blue-700",   bg: "bg-blue-100",   dot: "bg-blue-500"   },
+};
+
+function VehicleStatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.active;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
 
 function StatCard({ title, value, sub, icon: Icon, color }: {
   title: string; value: string | number; sub?: string;
@@ -74,6 +92,22 @@ export default function FleetPage() {
     },
   });
   const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/workers"] });
+  const { data: issues = [] } = useQuery<any[]>({
+    queryKey: ["/api/fleet/issues"],
+    queryFn: async () => {
+      const res = await fetch("/api/fleet/issues");
+      const d = await res.json();
+      return Array.isArray(d) ? d : [];
+    },
+  });
+  const { data: serviceRecords = [] } = useQuery<any[]>({
+    queryKey: ["/api/fleet/service-records"],
+    queryFn: async () => {
+      const res = await fetch("/api/fleet/service-records");
+      const d = await res.json();
+      return Array.isArray(d) ? d : [];
+    },
+  });
 
   // stats
   const now = new Date();
@@ -105,6 +139,7 @@ export default function FleetPage() {
     return mv && ms;
   });
 
+  const [, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -223,39 +258,111 @@ export default function FleetPage() {
 
               {isAdmin && (
                 <TabsContent value="vehicles" className="mt-4">
+                  {/* Status legend */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      <span key={key} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                      </span>
+                    ))}
+                  </div>
                   <Card>
-                    <CardContent className="p-0">
-                      <table className="w-full text-sm">
+                    <CardContent className="p-0 overflow-x-auto">
+                      <table className="w-full text-sm min-w-[900px]">
                         <thead className="bg-gray-50 border-b">
                           <tr>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Registration</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Assigned Driver</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                            <th className="text-right px-4 py-3 font-medium text-gray-600">Odometer</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Last Inspection</th>
+                            <th className="text-center px-4 py-3 font-medium text-gray-600">Open Issues</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Last Service</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Next Service Due</th>
+                            <th className="px-3 py-3" />
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {vehicles.map((v: any) => {
                             const assignment = assignments.find((a: any) => a.vehicleId === v.id && a.isActive);
+                            const vKmLogs = kmLogs.filter((l: any) => l.vehicleId === v.id);
+                            const latestKm = vKmLogs.sort((a: any, b: any) => new Date(b.logDate).getTime() - new Date(a.logDate).getTime())[0];
+                            const vInspList = inspections.filter((i: any) => i.vehicleId === v.id);
+                            const lastInsp = vInspList.sort((a: any, b: any) => new Date(b.inspectionDate).getTime() - new Date(a.inspectionDate).getTime())[0];
+                            const openCount = issues.filter((i: any) => i.vehicleId === v.id && (i.status === "open" || i.status === "in_progress")).length;
+                            const vSvc = serviceRecords.filter((r: any) => r.vehicleId === v.id).sort((a: any, b: any) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime());
+                            const lastSvc = vSvc[0];
+                            const nextSvcDate = lastSvc?.nextServiceDate;
+                            const daysToService = nextSvcDate ? Math.ceil((new Date(nextSvcDate).getTime() - Date.now()) / 86400000) : null;
                             return (
-                              <tr key={v.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium flex items-center gap-2">
-                                  <Car className="h-4 w-4 text-blue-500" /> {v.name}
+                              <tr
+                                key={v.id}
+                                className="hover:bg-blue-50 cursor-pointer transition-colors"
+                                onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                              >
+                                <td className="px-4 py-3 font-medium">
+                                  <span className="flex items-center gap-2">
+                                    <Car className="h-4 w-4 text-blue-500 shrink-0" />
+                                    {v.name}
+                                  </span>
                                 </td>
-                                <td className="px-4 py-3 text-gray-600">{v.registration}</td>
+                                <td className="px-4 py-3 text-gray-600 font-mono text-xs">{v.registration}</td>
                                 <td className="px-4 py-3">
-                                  {assignment ? <span className="flex items-center gap-1 text-gray-700"><User className="h-3.5 w-3.5" />{workerName(assignment.workerId)}</span> : <span className="text-gray-400">Unassigned</span>}
+                                  {assignment
+                                    ? <span className="flex items-center gap-1 text-gray-700"><User className="h-3.5 w-3.5 shrink-0" />{workerName(assignment.workerId)}</span>
+                                    : <span className="text-gray-400 text-xs">Unassigned</span>}
                                 </td>
                                 <td className="px-4 py-3">
-                                  <Badge variant={v.isActive ? "default" : "secondary"} className={v.isActive ? "bg-green-100 text-green-700" : ""}>
-                                    {v.isActive ? "Active" : "Inactive"}
-                                  </Badge>
+                                  <VehicleStatusBadge status={v.vehicleStatus ?? "active"} />
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-700">
+                                  {latestKm ? <>{latestKm.endOdometer.toLocaleString()} <span className="text-xs text-gray-400">km</span></> : <span className="text-gray-300">—</span>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {lastInsp ? (
+                                    <span className="flex items-center gap-1.5">
+                                      {lastInsp.overallResult === "pass"
+                                        ? <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                        : <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                                      <span className="text-xs text-gray-600">{format(new Date(lastInsp.inspectionDate), "dd MMM yy")}</span>
+                                    </span>
+                                  ) : <span className="text-gray-300 text-xs">—</span>}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {openCount > 0
+                                    ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold">{openCount}</span>
+                                    : <span className="text-gray-300">—</span>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {lastSvc ? (
+                                    <span className="flex items-center gap-1">
+                                      <Wrench className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                      <span className="text-xs text-gray-600">{format(new Date(lastSvc.serviceDate), "dd MMM yy")}</span>
+                                    </span>
+                                  ) : <span className="text-gray-300 text-xs">—</span>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {nextSvcDate ? (
+                                    <span className={`text-xs font-medium ${daysToService !== null && daysToService <= 0 ? "text-red-600" : daysToService !== null && daysToService <= 30 ? "text-orange-600" : "text-gray-600"}`}>
+                                      {format(new Date(nextSvcDate), "dd MMM yy")}
+                                      {daysToService !== null && (
+                                        <span className="ml-1 text-gray-400">
+                                          {daysToService <= 0 ? "(overdue)" : `(${daysToService}d)`}
+                                        </span>
+                                      )}
+                                    </span>
+                                  ) : <span className="text-gray-300 text-xs">—</span>}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <ChevronRight className="h-4 w-4 text-gray-300" />
                                 </td>
                               </tr>
                             );
                           })}
                           {vehicles.length === 0 && (
-                            <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No vehicles in fleet</td></tr>
+                            <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">No vehicles in fleet</td></tr>
                           )}
                         </tbody>
                       </table>

@@ -35,6 +35,7 @@ import FleetFuel from "@/pages/fleet-fuel";
 import FleetReportIssue from "@/pages/fleet-report-issue";
 import FleetMaintenance from "@/pages/fleet-maintenance";
 import FleetVehicleMaintenance from "@/pages/fleet-vehicle-maintenance";
+import FleetVehicleProfile from "@/pages/fleet-vehicle-profile";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -83,6 +84,7 @@ function AuthenticatedApp() {
       <Route path="/fleet/inspection" component={FleetInspection} />
       <Route path="/fleet/fuel" component={FleetFuel} />
       <Route path="/fleet/report-issue" component={FleetReportIssue} />
+      <Route path="/fleet/vehicles/:id" component={FleetVehicleProfile} />
       <Route path="/fleet/maintenance/:vehicleId" component={FleetVehicleMaintenance} />
       <Route path="/fleet/maintenance" component={FleetMaintenance} />
       <Route component={NotFound} />
