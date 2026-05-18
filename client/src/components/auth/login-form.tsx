@@ -80,10 +80,10 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
 
         {/* ── Sign-in card ──────────────────────────────────────────────────── */}
         <Card className="shadow-xl">
-          <CardContent className="pt-5 pb-6 space-y-4">
+          <CardContent className="pt-4 pb-5 space-y-4">
 
-            {/* Logo — tighter padding */}
-            <div className="flex justify-center pt-1 pb-1">
+            {/* Logo — centred, bottom margin trims image's built-in whitespace */}
+            <div className="flex justify-center -mb-4">
               <img
                 src={jobFlowFullLogo}
                 alt="Job Flow – Field Service Management"
