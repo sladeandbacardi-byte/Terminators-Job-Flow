@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { AlertCircle, ArrowLeft, Truck, User, Camera } from "lucide-react";
 import { format } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
@@ -52,8 +52,10 @@ export default function FleetReportIssue() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const search = useSearch();
+  const preselectedVehicle = new URLSearchParams(search).get("vehicleId") ?? "";
 
-  const [vehicleId, setVehicleId] = useState("");
+  const [vehicleId, setVehicleId] = useState(preselectedVehicle);
   const [reportedAt, setReportedAt] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm").slice(0, 16));
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");

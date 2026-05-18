@@ -11,12 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Link, useLocation } from "wouter";
 import {
   Truck, Gauge, Fuel, ClipboardCheck, AlertTriangle, CheckCircle,
-  Car, Calendar, User, Search, ChevronRight, Wrench,
+  Car, User, Search, ChevronRight, Wrench, Calendar, Shield,
+  TriangleAlert, Activity,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addMonths, differenceInDays } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
+// ── Service interval defaults ─────────────────────────────────────────────────
+const SERVICE_KM_INTERVAL   = 10_000;  // km
+const SERVICE_MONTH_INTERVAL = 6;      // months
+
+// ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   active:      { label: "Active",        color: "text-green-700",  bg: "bg-green-100",  dot: "bg-green-500"  },
   due_service: { label: "Due Service",   color: "text-orange-700", bg: "bg-orange-100", dot: "bg-orange-500" },
@@ -35,94 +41,182 @@ function VehicleStatusBadge({ status }: { status: string }) {
   );
 }
 
-function StatCard({ title, value, sub, icon: Icon, color }: {
-  title: string; value: string | number; sub?: string;
-  icon: any; color: string;
-}) {
+// ── Service due colour logic ──────────────────────────────────────────────────
+type ServiceDue = { daysLeft: number | null; kmLeft: number | null; label: string; urgency: "ok" | "warn" | "soon" | "overdue" };
+
+function calcServiceDue(lastSvc: any, currentOdometer: number | null): ServiceDue {
+  if (!lastSvc) return { daysLeft: null, kmLeft: null, label: "No service record", urgency: "ok" };
+
+  const now = new Date();
+  const svcDate = new Date(lastSvc.serviceDate);
+  const nextByTime = lastSvc.nextServiceDate ? new Date(lastSvc.nextServiceDate) : addMonths(svcDate, SERVICE_MONTH_INTERVAL);
+  const daysLeft = differenceInDays(nextByTime, now);
+
+  let kmLeft: number | null = null;
+  if (currentOdometer !== null && lastSvc.odometer) {
+    const kmSince = currentOdometer - lastSvc.odometer;
+    const nextKm = lastSvc.nextServiceOdometer ?? (lastSvc.odometer + SERVICE_KM_INTERVAL);
+    kmLeft = nextKm - currentOdometer;
+  }
+
+  // Urgency = worst of time and km
+  const timeUrgency = daysLeft <= 0 ? "overdue" : daysLeft <= 30 ? "soon" : daysLeft <= 60 ? "warn" : "ok";
+  const kmUrgency   = kmLeft === null ? "ok" : kmLeft <= 0 ? "overdue" : kmLeft <= 1000 ? "soon" : kmLeft <= 2000 ? "warn" : "ok";
+  const urgencyRank: Record<string, number> = { ok: 0, warn: 1, soon: 2, overdue: 3 };
+  const urgency = urgencyRank[timeUrgency] >= urgencyRank[kmUrgency] ? timeUrgency : kmUrgency;
+
+  const parts: string[] = [];
+  if (daysLeft !== null) parts.push(daysLeft <= 0 ? `${Math.abs(daysLeft)}d overdue` : `${daysLeft}d`);
+  if (kmLeft !== null) parts.push(kmLeft <= 0 ? `${Math.abs(kmLeft).toLocaleString()}km overdue` : `${kmLeft.toLocaleString()}km`);
+  const label = parts.join(" / ") || "—";
+
+  return { daysLeft, kmLeft, label, urgency };
+}
+
+function ServiceDueCell({ due, nextSvcDate }: { due: ServiceDue; nextSvcDate?: string }) {
+  if (!nextSvcDate && due.daysLeft === null) return <span className="text-gray-300 text-xs">—</span>;
+
+  const dateStr = nextSvcDate ? format(new Date(nextSvcDate), "dd MMM yy") : "—";
+
+  const colorClass = {
+    ok:      "text-green-700",
+    warn:    "text-orange-600",
+    soon:    "text-red-600",
+    overdue: "text-red-700",
+  }[due.urgency];
+
+  const bgClass = {
+    ok:      "",
+    warn:    "bg-orange-50 rounded px-1",
+    soon:    "bg-red-50 rounded px-1",
+    overdue: "bg-red-100 rounded px-1 animate-pulse",
+  }[due.urgency];
+
   return (
-    <Card>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-500">{title}</p>
-            <p className="text-2xl font-bold mt-0.5">{value}</p>
-            {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-          </div>
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div>
+      <div className={`text-xs font-semibold ${colorClass} ${bgClass}`}>{dateStr}</div>
+      <div className={`text-xs mt-0.5 ${colorClass} opacity-80`}>{due.label}</div>
+    </div>
   );
 }
 
+// ── Summary card ──────────────────────────────────────────────────────────────
+function SummaryCard({
+  title, value, sub, icon: Icon, iconColor, bgColor, onClick, badge,
+}: {
+  title: string; value: string | number; sub?: string;
+  icon: any; iconColor: string; bgColor: string;
+  onClick?: () => void; badge?: number;
+}) {
+  const inner = (
+    <CardContent className="pt-4 pb-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide truncate">{title}</p>
+          <p className="text-2xl font-bold mt-0.5 text-gray-900">{value}</p>
+          {sub && <p className="text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
+        </div>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bgColor}`}>
+          <Icon className={`h-5 w-5 ${iconColor}`} />
+        </div>
+      </div>
+      {badge !== undefined && badge > 0 && (
+        <div className="mt-2">
+          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+            {badge} need attention
+          </span>
+        </div>
+      )}
+    </CardContent>
+  );
+  if (onClick) {
+    return (
+      <Card className="cursor-pointer hover:shadow-md hover:border-blue-200 transition-all" onClick={onClick}>
+        {inner}
+      </Card>
+    );
+  }
+  return <Card>{inner}</Card>;
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function FleetPage() {
   const { user } = useAuth();
   const role = user ? getDashboardRole(user) : "service";
   const isAdmin = ["admin", "manager", "coordinator"].includes(role);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch]             = useState("");
   const [vehicleFilter, setVehicleFilter] = useState("all");
+  const [activeTab, setActiveTab]       = useState(isAdmin ? "vehicles" : "km");
+  const [, navigate]                    = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const { data: vehicles = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
-  const { data: assignments = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/assignments"] });
-  const { data: kmLogs = [] } = useQuery<any[]>({
+  // ── Data queries ────────────────────────────────────────────────────────────
+  const { data: vehicles = [] }     = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
+  const { data: assignments = [] }  = useQuery<any[]>({ queryKey: ["/api/fleet/assignments"] });
+  const { data: workers = [] }      = useQuery<any[]>({ queryKey: ["/api/workers"] });
+  const { data: kmLogs = [] }       = useQuery<any[]>({
     queryKey: ["/api/fleet/km-logs", isAdmin ? undefined : user?.id],
     queryFn: async () => {
       const url = isAdmin ? "/api/fleet/km-logs" : `/api/fleet/km-logs?workerId=${user?.id}`;
-      const res = await fetch(url, { credentials: "include" });
-      return res.json();
+      return (await fetch(url, { credentials: "include" })).json();
     },
   });
-  const { data: fuelFillups = [] } = useQuery<any[]>({
+  const { data: fuelFillups = [] }  = useQuery<any[]>({
     queryKey: ["/api/fleet/fuel-fillups", isAdmin ? undefined : user?.id],
     queryFn: async () => {
       const url = isAdmin ? "/api/fleet/fuel-fillups" : `/api/fleet/fuel-fillups?workerId=${user?.id}`;
-      const res = await fetch(url, { credentials: "include" });
-      return res.json();
+      return (await fetch(url, { credentials: "include" })).json();
     },
   });
-  const { data: inspections = [] } = useQuery<any[]>({
+  const { data: inspections = [] }  = useQuery<any[]>({
     queryKey: ["/api/fleet/inspections", isAdmin ? undefined : user?.id],
     queryFn: async () => {
       const url = isAdmin ? "/api/fleet/inspections" : `/api/fleet/inspections?workerId=${user?.id}`;
-      const res = await fetch(url, { credentials: "include" });
-      return res.json();
+      return (await fetch(url, { credentials: "include" })).json();
     },
   });
-  const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/workers"] });
-  const { data: issues = [] } = useQuery<any[]>({
+  const { data: issues = [] }       = useQuery<any[]>({
     queryKey: ["/api/fleet/issues"],
-    queryFn: async () => {
-      const res = await fetch("/api/fleet/issues");
-      const d = await res.json();
-      return Array.isArray(d) ? d : [];
-    },
+    queryFn: async () => { const r = await fetch("/api/fleet/issues"); const d = await r.json(); return Array.isArray(d) ? d : []; },
   });
   const { data: serviceRecords = [] } = useQuery<any[]>({
     queryKey: ["/api/fleet/service-records"],
-    queryFn: async () => {
-      const res = await fetch("/api/fleet/service-records");
-      const d = await res.json();
-      return Array.isArray(d) ? d : [];
-    },
+    queryFn: async () => { const r = await fetch("/api/fleet/service-records"); const d = await r.json(); return Array.isArray(d) ? d : []; },
   });
 
-  // stats
-  const now = new Date();
+  // ── Computed helpers ────────────────────────────────────────────────────────
+  const now        = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const kmThisMonth = kmLogs
-    .filter((l: any) => new Date(l.logDate) >= monthStart)
-    .reduce((s: number, l: any) => s + (l.totalKm || 0), 0);
-  const fuelCostThisMonth = fuelFillups
-    .filter((f: any) => new Date(f.fillDate) >= monthStart)
-    .reduce((s: number, f: any) => s + parseFloat(f.cost || "0"), 0);
-  const failedInspections = inspections.filter((i: any) => i.overallResult === "fail");
 
   const vehicleName = (id: string) => vehicles.find((v: any) => v.id === id)?.name ?? id;
-  const workerName = (id: string) => workers.find((w: any) => w.id === id)?.name ?? id;
+  const workerName  = (id: string) => workers.find((w: any) => w.id === id)?.name ?? id;
 
+  const kmThisMonth       = kmLogs.filter((l: any) => new Date(l.logDate) >= monthStart).reduce((s: number, l: any) => s + (l.totalKm || 0), 0);
+  const fuelCostThisMonth = fuelFillups.filter((f: any) => new Date(f.fillDate) >= monthStart).reduce((s: number, f: any) => s + parseFloat(f.cost || "0"), 0);
+  const failedInspections = inspections.filter((i: any) => i.overallResult === "fail");
+  const openIssues        = issues.filter((i: any) => i.status === "open" || i.status === "in_progress");
+
+  // Per-vehicle computed data (keyed by vehicleId)
+  const vehicleStats = vehicles.reduce((acc: any, v: any) => {
+    const vKm = kmLogs.filter((l: any) => l.vehicleId === v.id).sort((a: any, b: any) => new Date(b.logDate).getTime() - new Date(a.logDate).getTime());
+    const vSvc = serviceRecords.filter((r: any) => r.vehicleId === v.id).sort((a: any, b: any) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime());
+    const vInsp = inspections.filter((i: any) => i.vehicleId === v.id).sort((a: any, b: any) => new Date(b.inspectionDate).getTime() - new Date(a.inspectionDate).getTime());
+    const currentOdo = vKm[0]?.endOdometer ?? null;
+    const lastSvc = vSvc[0] ?? null;
+    const due = calcServiceDue(lastSvc, currentOdo);
+    acc[v.id] = { vKm, vSvc, vInsp, currentOdo, lastSvc, due };
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Fleet summary counts
+  const totalVehicles    = vehicles.length;
+  const activeVehicles   = vehicles.filter((v: any) => v.vehicleStatus === "active").length;
+  const dueServiceCount  = vehicles.filter((v: any) => v.vehicleStatus === "due_service" || vehicleStats[v.id]?.due.urgency === "overdue" || vehicleStats[v.id]?.due.urgency === "soon").length;
+  const workshopCount    = vehicles.filter((v: any) => v.vehicleStatus === "workshop").length;
+  const unsafeCount      = vehicles.filter((v: any) => v.vehicleStatus === "unsafe").length;
+
+  // ── Filtered lists for other tabs ───────────────────────────────────────────
   const filteredKm = kmLogs.filter((l: any) => {
     const mv = vehicleFilter === "all" || l.vehicleId === vehicleFilter;
     const ms = !search || workerName(l.workerId).toLowerCase().includes(search.toLowerCase()) || vehicleName(l.vehicleId).toLowerCase().includes(search.toLowerCase());
@@ -138,9 +232,14 @@ export default function FleetPage() {
     const ms = !search || workerName(i.workerId).toLowerCase().includes(search.toLowerCase()) || vehicleName(i.vehicleId).toLowerCase().includes(search.toLowerCase());
     return mv && ms;
   });
-
-  const [, navigate] = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const filteredVehicles = vehicles.filter((v: any) => {
+    if (!search) return true;
+    const asgn = assignments.find((a: any) => a.vehicleId === v.id && a.isActive);
+    const driver = asgn ? workerName(asgn.workerId) : "";
+    return v.name.toLowerCase().includes(search.toLowerCase()) ||
+           v.registration.toLowerCase().includes(search.toLowerCase()) ||
+           driver.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -148,10 +247,10 @@ export default function FleetPage() {
       <div className="flex flex-1">
         <Sidebar />
         <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-7xl mx-auto space-y-5">
 
-            {/* Header row */}
-            <div className="flex items-center justify-between">
+            {/* ── Page header ─────────────────────────────────────────────── */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <Truck className="h-6 w-6 text-blue-600" />
@@ -159,9 +258,12 @@ export default function FleetPage() {
                 </h1>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {isAdmin ? "All vehicles & drivers" : "My fleet activity"}
+                  <span className="ml-2 text-xs text-gray-400">
+                    Service interval: {SERVICE_KM_INTERVAL.toLocaleString()} km or {SERVICE_MONTH_INTERVAL} months
+                  </span>
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Link href="/fleet/km-log">
                   <Button size="sm" variant="outline" className="gap-1.5">
                     <Gauge className="h-4 w-4" /> Log KMs
@@ -172,6 +274,11 @@ export default function FleetPage() {
                     <ClipboardCheck className="h-4 w-4" /> Inspection
                   </Button>
                 </Link>
+                <Link href="/fleet/report-issue">
+                  <Button size="sm" variant="outline" className="gap-1.5 border-orange-300 text-orange-700 hover:bg-orange-50">
+                    <AlertTriangle className="h-4 w-4" /> Report Issue
+                  </Button>
+                </Link>
                 <Link href="/fleet/fuel">
                   <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
                     <Fuel className="h-4 w-4" /> Fuel Fill-up
@@ -180,45 +287,85 @@ export default function FleetPage() {
               </div>
             </div>
 
-            {/* Stats cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard title="Active Vehicles" value={vehicles.filter((v: any) => v.isActive).length} sub="in fleet" icon={Truck} color="bg-blue-500" />
-              <StatCard title="KMs This Month" value={kmThisMonth.toLocaleString()} sub="business + private" icon={Gauge} color="bg-green-500" />
-              <StatCard title="Fuel Cost (MTD)" value={`R ${fuelCostThisMonth.toFixed(2)}`} sub="month to date" icon={Fuel} color="bg-amber-500" />
-              <StatCard title="Failed Inspections" value={failedInspections.length} sub="require attention" icon={AlertTriangle} color={failedInspections.length > 0 ? "bg-red-500" : "bg-gray-400"} />
+            {/* ── 6 summary cards ─────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <SummaryCard
+                title="Total Vehicles" value={totalVehicles} sub="in fleet"
+                icon={Truck} iconColor="text-blue-600" bgColor="bg-blue-100"
+              />
+              <SummaryCard
+                title="Active" value={activeVehicles} sub="on the road"
+                icon={CheckCircle} iconColor="text-green-600" bgColor="bg-green-100"
+              />
+              <SummaryCard
+                title="Due Service" value={dueServiceCount} sub="km or time"
+                icon={Wrench} iconColor="text-orange-600" bgColor="bg-orange-100"
+                badge={dueServiceCount}
+              />
+              <SummaryCard
+                title="Workshop" value={workshopCount} sub="off road"
+                icon={Shield} iconColor="text-gray-600" bgColor="bg-gray-200"
+              />
+              <SummaryCard
+                title="Unsafe" value={unsafeCount} sub="grounded"
+                icon={TriangleAlert} iconColor="text-red-600" bgColor="bg-red-100"
+                badge={unsafeCount}
+              />
+              <SummaryCard
+                title="Open Issues" value={openIssues.length} sub="tap to review"
+                icon={Activity} iconColor="text-purple-600" bgColor="bg-purple-100"
+                badge={openIssues.length}
+                onClick={() => { setActiveTab("vehicles"); navigate("/fleet/maintenance"); }}
+              />
             </div>
 
-            {/* Failed inspection alerts */}
+            {/* ── Legend row ──────────────────────────────────────────────── */}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs text-gray-500 font-medium">Vehicle status:</span>
+              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                <span key={key} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                  {cfg.label}
+                </span>
+              ))}
+              <span className="text-xs text-gray-400 ml-2">Service due:</span>
+              <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">● &gt;60 days</span>
+              <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">● 30–60 days</span>
+              <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">● &lt;30 days</span>
+              <span className="text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded-full animate-pulse">● overdue</span>
+            </div>
+
+            {/* ── Failed inspection alert strip ────────────────────────────── */}
             {failedInspections.length > 0 && (
               <Card className="border-red-200 bg-red-50">
-                <CardHeader className="pb-3 pt-4">
-                  <CardTitle className="text-base text-red-800 flex items-center gap-2">
+                <CardHeader className="pb-2 pt-3">
+                  <CardTitle className="text-sm text-red-800 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
                     Failed Inspection Alerts ({failedInspections.length})
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 pb-4">
+                <CardContent className="space-y-2 pb-3">
                   {failedInspections.map((ins: any) => {
                     const items = ins.itemsJson ? JSON.parse(ins.itemsJson) : [];
                     const failedItems = items.filter((it: any) => it.result === "fail");
                     return (
-                      <div key={ins.id} className="bg-white rounded-lg border border-red-200 p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                      <div key={ins.id} className="bg-white rounded-lg border border-red-200 p-3 flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant="destructive" className="text-xs">FAIL</Badge>
                             <span className="font-medium text-sm">{vehicleName(ins.vehicleId)}</span>
                             <span className="text-gray-500 text-sm">· {workerName(ins.workerId)}</span>
                           </div>
-                          <span className="text-xs text-gray-400">{format(new Date(ins.inspectionDate), "dd MMM yyyy HH:mm")}</span>
+                          {failedItems.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {failedItems.map((it: any, i: number) => (
+                                <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{it.name}</span>
+                              ))}
+                            </div>
+                          )}
+                          {ins.comments && <p className="text-xs text-gray-500 mt-1">{ins.comments}</p>}
                         </div>
-                        {failedItems.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1">
-                            {failedItems.map((it: any, i: number) => (
-                              <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{it.name}</span>
-                            ))}
-                          </div>
-                        )}
-                        {ins.comments && <p className="text-xs text-gray-500 mt-1">{ins.comments}</p>}
+                        <span className="text-xs text-gray-400 shrink-0">{format(new Date(ins.inspectionDate), "dd MMM yy HH:mm")}</span>
                       </div>
                     );
                   })}
@@ -226,9 +373,9 @@ export default function FleetPage() {
               </Card>
             )}
 
-            {/* Filters */}
-            <div className="flex gap-3 items-center">
-              <div className="relative flex-1 max-w-xs">
+            {/* ── Search + vehicle filter ──────────────────────────────────── */}
+            <div className="flex gap-3 items-center flex-wrap">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input placeholder="Search driver or vehicle..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
               </div>
@@ -247,8 +394,8 @@ export default function FleetPage() {
               )}
             </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="vehicles">
+            {/* ── Tabs ────────────────────────────────────────────────────── */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
                 {isAdmin && <TabsTrigger value="vehicles">Vehicles</TabsTrigger>}
                 <TabsTrigger value="km">KM Logs</TabsTrigger>
@@ -256,70 +403,72 @@ export default function FleetPage() {
                 <TabsTrigger value="inspections">Inspections</TabsTrigger>
               </TabsList>
 
+              {/* ── VEHICLES TABLE ─────────────────────────────────────────── */}
               {isAdmin && (
                 <TabsContent value="vehicles" className="mt-4">
-                  {/* Status legend */}
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                      <span key={key} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                        {cfg.label}
-                      </span>
-                    ))}
-                  </div>
                   <Card>
                     <CardContent className="p-0 overflow-x-auto">
-                      <table className="w-full text-sm min-w-[900px]">
+                      <table className="w-full text-sm min-w-[1100px]">
                         <thead className="bg-gray-50 border-b">
                           <tr>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Registration</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Assigned Driver</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Driver</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Odometer</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Last Inspection</th>
-                            <th className="text-center px-4 py-3 font-medium text-gray-600">Open Issues</th>
+                            <th className="text-center px-4 py-3 font-medium text-gray-600">Issues</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Last Service</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Next Service Due</th>
-                            <th className="px-3 py-3" />
+                            <th className="text-center px-4 py-3 font-medium text-gray-600">Quick Actions</th>
+                            <th className="px-2 py-3" />
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {vehicles.map((v: any) => {
+                          {filteredVehicles.map((v: any) => {
+                            const stats = vehicleStats[v.id] ?? {};
+                            const { currentOdo, lastSvc, due, vInsp } = stats;
+                            const lastInsp = vInsp?.[0] ?? null;
                             const assignment = assignments.find((a: any) => a.vehicleId === v.id && a.isActive);
-                            const vKmLogs = kmLogs.filter((l: any) => l.vehicleId === v.id);
-                            const latestKm = vKmLogs.sort((a: any, b: any) => new Date(b.logDate).getTime() - new Date(a.logDate).getTime())[0];
-                            const vInspList = inspections.filter((i: any) => i.vehicleId === v.id);
-                            const lastInsp = vInspList.sort((a: any, b: any) => new Date(b.inspectionDate).getTime() - new Date(a.inspectionDate).getTime())[0];
                             const openCount = issues.filter((i: any) => i.vehicleId === v.id && (i.status === "open" || i.status === "in_progress")).length;
-                            const vSvc = serviceRecords.filter((r: any) => r.vehicleId === v.id).sort((a: any, b: any) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime());
-                            const lastSvc = vSvc[0];
-                            const nextSvcDate = lastSvc?.nextServiceDate;
-                            const daysToService = nextSvcDate ? Math.ceil((new Date(nextSvcDate).getTime() - Date.now()) / 86400000) : null;
+
                             return (
                               <tr
                                 key={v.id}
-                                className="hover:bg-blue-50 cursor-pointer transition-colors"
+                                className="hover:bg-blue-50 cursor-pointer transition-colors group"
                                 onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
                               >
+                                {/* Vehicle name */}
                                 <td className="px-4 py-3 font-medium">
                                   <span className="flex items-center gap-2">
                                     <Car className="h-4 w-4 text-blue-500 shrink-0" />
-                                    {v.name}
+                                    <span className="group-hover:text-blue-700 transition-colors">{v.name}</span>
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-gray-600 font-mono text-xs">{v.registration}</td>
+
+                                {/* Registration */}
+                                <td className="px-4 py-3 font-mono text-xs text-gray-600">{v.registration}</td>
+
+                                {/* Driver */}
                                 <td className="px-4 py-3">
                                   {assignment
-                                    ? <span className="flex items-center gap-1 text-gray-700"><User className="h-3.5 w-3.5 shrink-0" />{workerName(assignment.workerId)}</span>
+                                    ? <span className="flex items-center gap-1 text-gray-700"><User className="h-3.5 w-3.5 shrink-0 text-gray-400" />{workerName(assignment.workerId)}</span>
                                     : <span className="text-gray-400 text-xs">Unassigned</span>}
                                 </td>
+
+                                {/* Status */}
                                 <td className="px-4 py-3">
                                   <VehicleStatusBadge status={v.vehicleStatus ?? "active"} />
                                 </td>
-                                <td className="px-4 py-3 text-right text-gray-700">
-                                  {latestKm ? <>{latestKm.endOdometer.toLocaleString()} <span className="text-xs text-gray-400">km</span></> : <span className="text-gray-300">—</span>}
+
+                                {/* Odometer */}
+                                <td className="px-4 py-3 text-right">
+                                  {currentOdo != null
+                                    ? <span className="font-medium text-gray-800">{currentOdo.toLocaleString()} <span className="text-xs text-gray-400">km</span></span>
+                                    : <span className="text-gray-300">—</span>}
                                 </td>
+
+                                {/* Last inspection */}
                                 <td className="px-4 py-3">
                                   {lastInsp ? (
                                     <span className="flex items-center gap-1.5">
@@ -330,11 +479,18 @@ export default function FleetPage() {
                                     </span>
                                   ) : <span className="text-gray-300 text-xs">—</span>}
                                 </td>
+
+                                {/* Open issues */}
                                 <td className="px-4 py-3 text-center">
                                   {openCount > 0
-                                    ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold">{openCount}</span>
-                                    : <span className="text-gray-300">—</span>}
+                                    ? <span
+                                        className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold cursor-pointer hover:bg-red-200"
+                                        onClick={e => { e.stopPropagation(); navigate(`/fleet/vehicles/${v.id}`); }}
+                                      >{openCount}</span>
+                                    : <span className="text-gray-300 text-xs">—</span>}
                                 </td>
+
+                                {/* Last service */}
                                 <td className="px-4 py-3">
                                   {lastSvc ? (
                                     <span className="flex items-center gap-1">
@@ -343,26 +499,48 @@ export default function FleetPage() {
                                     </span>
                                   ) : <span className="text-gray-300 text-xs">—</span>}
                                 </td>
+
+                                {/* Next service due — colour-coded */}
                                 <td className="px-4 py-3">
-                                  {nextSvcDate ? (
-                                    <span className={`text-xs font-medium ${daysToService !== null && daysToService <= 0 ? "text-red-600" : daysToService !== null && daysToService <= 30 ? "text-orange-600" : "text-gray-600"}`}>
-                                      {format(new Date(nextSvcDate), "dd MMM yy")}
-                                      {daysToService !== null && (
-                                        <span className="ml-1 text-gray-400">
-                                          {daysToService <= 0 ? "(overdue)" : `(${daysToService}d)`}
-                                        </span>
-                                      )}
-                                    </span>
-                                  ) : <span className="text-gray-300 text-xs">—</span>}
+                                  <ServiceDueCell due={due} nextSvcDate={lastSvc?.nextServiceDate} />
                                 </td>
-                                <td className="px-3 py-3">
-                                  <ChevronRight className="h-4 w-4 text-gray-300" />
+
+                                {/* Quick actions */}
+                                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      title="Inspect"
+                                      className="p-1.5 rounded-lg hover:bg-green-100 text-gray-400 hover:text-green-700 transition-colors"
+                                      onClick={e => { e.stopPropagation(); navigate(`/fleet/inspection?vehicleId=${v.id}`); }}
+                                    >
+                                      <ClipboardCheck className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      title="Log Fuel"
+                                      className="p-1.5 rounded-lg hover:bg-amber-100 text-gray-400 hover:text-amber-700 transition-colors"
+                                      onClick={e => { e.stopPropagation(); navigate(`/fleet/fuel?vehicleId=${v.id}`); }}
+                                    >
+                                      <Fuel className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      title="Report Issue"
+                                      className="p-1.5 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-700 transition-colors"
+                                      onClick={e => { e.stopPropagation(); navigate(`/fleet/report-issue?vehicleId=${v.id}`); }}
+                                    >
+                                      <AlertTriangle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+
+                                {/* Arrow */}
+                                <td className="px-2 py-3">
+                                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-blue-400" />
                                 </td>
                               </tr>
                             );
                           })}
-                          {vehicles.length === 0 && (
-                            <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">No vehicles in fleet</td></tr>
+                          {filteredVehicles.length === 0 && (
+                            <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">No vehicles found</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -371,6 +549,7 @@ export default function FleetPage() {
                 </TabsContent>
               )}
 
+              {/* ── KM LOGS ──────────────────────────────────────────────────── */}
               <TabsContent value="km" className="mt-4">
                 <Card>
                   <CardContent className="p-0">
@@ -409,6 +588,7 @@ export default function FleetPage() {
                 </Card>
               </TabsContent>
 
+              {/* ── FUEL ─────────────────────────────────────────────────────── */}
               <TabsContent value="fuel" className="mt-4">
                 <Card>
                   <CardContent className="p-0">
@@ -443,6 +623,7 @@ export default function FleetPage() {
                 </Card>
               </TabsContent>
 
+              {/* ── INSPECTIONS ───────────────────────────────────────────────── */}
               <TabsContent value="inspections" className="mt-4">
                 <Card>
                   <CardContent className="p-0">
@@ -469,14 +650,12 @@ export default function FleetPage() {
                               <td className="px-4 py-3">
                                 {ins.overallResult === "pass"
                                   ? <Badge className="bg-green-100 text-green-700 flex items-center gap-1 w-fit"><CheckCircle className="h-3 w-3" /> Pass</Badge>
-                                  : <Badge variant="destructive" className="flex items-center gap-1 w-fit"><AlertTriangle className="h-3 w-3" /> Fail</Badge>
-                                }
+                                  : <Badge variant="destructive" className="flex items-center gap-1 w-fit"><AlertTriangle className="h-3 w-3" /> Fail</Badge>}
                               </td>
                               <td className="px-4 py-3">
                                 {failedItems.length > 0
                                   ? <span className="text-red-600 text-xs">{failedItems.map((it: any) => it.name).join(", ")}</span>
-                                  : <span className="text-gray-400">—</span>
-                                }
+                                  : <span className="text-gray-400">—</span>}
                               </td>
                               <td className="px-4 py-3 text-gray-500 text-xs max-w-xs truncate">{ins.comments || "—"}</td>
                             </tr>
@@ -491,7 +670,6 @@ export default function FleetPage() {
                 </Card>
               </TabsContent>
             </Tabs>
-
           </div>
         </main>
       </div>

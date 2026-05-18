@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Fuel, ArrowLeft, Truck, User } from "lucide-react";
 import { format } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
@@ -19,8 +19,10 @@ export default function FleetFuel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const search = useSearch();
+  const preselectedVehicle = new URLSearchParams(search).get("vehicleId") ?? "";
 
-  const [vehicleId, setVehicleId] = useState("");
+  const [vehicleId, setVehicleId] = useState(preselectedVehicle);
   const [fillDate, setFillDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [odometer, setOdometer] = useState("");
   const [litres, setLitres] = useState("");

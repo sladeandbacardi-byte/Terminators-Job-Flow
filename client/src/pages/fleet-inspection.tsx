@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { ClipboardCheck, ArrowLeft, CheckCircle, XCircle, AlertTriangle, Truck, User } from "lucide-react";
 import { format } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
@@ -44,8 +44,10 @@ export default function FleetInspection() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const search = useSearch();
+  const preselectedVehicle = new URLSearchParams(search).get("vehicleId") ?? "";
 
-  const [vehicleId, setVehicleId] = useState("");
+  const [vehicleId, setVehicleId] = useState(preselectedVehicle);
   const [inspectionDate, setInspectionDate] = useState(
     format(new Date(), "yyyy-MM-dd'T'HH:mm").slice(0, 16)
   );
