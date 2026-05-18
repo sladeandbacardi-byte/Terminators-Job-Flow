@@ -17,6 +17,7 @@ import {
   insertVehicleInspectionSchema,
   insertVehicleIssueSchema,
   insertServiceRecordSchema,
+  insertWorkshopJobSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -2427,6 +2428,58 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
   app.get("/api/fleet/maintenance-dashboard", requireAuth, async (_req, res) => {
     try { res.json(await storage.getMaintenanceDashboardData()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── FLEET — WORKSHOP JOBS ───────────────────────────────────────────────────
+  app.get("/api/fleet/workshop-jobs", async (req, res) => {
+    try {
+      const { vehicleId } = req.query as Record<string, string>;
+      if (vehicleId) return res.json(await storage.getWorkshopJobsByVehicle(vehicleId));
+      res.json(await storage.getWorkshopJobs());
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/fleet/workshop-jobs/:id", async (req, res) => {
+    try {
+      const job = await storage.getWorkshopJob(req.params.id);
+      if (!job) return res.status(404).json({ error: "Workshop job not found" });
+      res.json(job);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/api/fleet/workshop-jobs", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const body: any = { ...req.body };
+      if (body.scheduledDate) body.scheduledDate = new Date(body.scheduledDate);
+      if (body.completedAt) body.completedAt = new Date(body.completedAt);
+      const parsed = insertWorkshopJobSchema.safeParse(body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors });
+      const job = await storage.createWorkshopJob(parsed.data);
+      res.status(201).json(job);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  app.patch("/api/fleet/workshop-jobs/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const body: any = { ...req.body };
+      if (body.scheduledDate) body.scheduledDate = new Date(body.scheduledDate);
+      if (body.completedAt) body.completedAt = new Date(body.completedAt);
+      const job = await storage.updateWorkshopJob(req.params.id, body);
+      res.json(job);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  app.delete("/api/fleet/workshop-jobs/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteWorkshopJob(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── FLEET — NOTIFICATIONS ───────────────────────────────────────────────────
+  app.get("/api/fleet/notifications", async (_req, res) => {
+    try { res.json(await storage.getFleetNotifications()); }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 

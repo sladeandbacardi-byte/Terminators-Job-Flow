@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   ArrowLeft, Car, User, Gauge, Fuel, ClipboardCheck, AlertTriangle,
   CheckCircle, Wrench, Calendar, DollarSign, FileText, MapPin,
-  Edit, TrendingUp, Shield, Clock,
+  Edit, TrendingUp, Shield, Clock, Hammer,
 } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, startOfMonth, subMonths } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
@@ -37,6 +38,28 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Workshop job helpers ─────────────────────────────────────────────────────
+
+const WJ_STATUS_COLOR: Record<string, string> = {
+  open:          "bg-red-100 text-red-700",
+  booked:        "bg-blue-100 text-blue-700",
+  in_progress:   "bg-amber-100 text-amber-700",
+  waiting_parts: "bg-purple-100 text-purple-700",
+  completed:     "bg-green-100 text-green-700",
+  cancelled:     "bg-gray-100 text-gray-500",
+};
+const WJ_PRIORITY_COLOR: Record<string, string> = {
+  low:    "bg-gray-100 text-gray-600",
+  medium: "bg-amber-100 text-amber-700",
+  high:   "bg-orange-100 text-orange-700",
+  urgent: "bg-red-100 text-red-700",
+};
+const WJ_SOURCE_LABEL: Record<string, string> = {
+  manual:       "Manual",
+  inspection:   "Failed Inspection",
+  issue_report: "Issue Report",
+};
+
 // ─── Issue / urgency helpers ─────────────────────────────────────────────────
 
 const URGENCY_COLOR: Record<string, string> = {
@@ -53,6 +76,24 @@ const ISSUE_STATUS_COLOR: Record<string, string> = {
   not_required: "bg-gray-100 text-gray-500",
 };
 
+// ─── Health score ─────────────────────────────────────────────────────────────
+
+function calcHealthScore(vehicleStatus: string, vIssues: any[], vInspections: any[], latestSvc: any): number {
+  let score = 100;
+  const openIssues = vIssues.filter((i: any) => ["open", "in_progress", "booked", "waiting_parts"].includes(i.status));
+  score -= openIssues.length * 5;
+  const failedInsp = vInspections.filter((i: any) => i.overallResult === "fail" && !i.reviewedAt);
+  score -= failedInsp.length * 10;
+  if (latestSvc?.nextServiceDate && new Date(latestSvc.nextServiceDate) < new Date()) score -= 15;
+  if (vehicleStatus === "unsafe") score -= 20;
+  const catCounts: Record<string, number> = {};
+  openIssues.forEach((i: any) => { catCounts[i.category] = (catCounts[i.category] || 0) + 1; });
+  Object.values(catCounts).forEach(cnt => { if (cnt > 1) score -= (cnt - 1) * 5; });
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// ─── Utility ─────────────────────────────────────────────────────────────────
+
 function fmt(date: any) {
   if (!date) return "—";
   try { return format(new Date(date), "dd MMM yyyy"); } catch { return "—"; }
@@ -60,6 +101,16 @@ function fmt(date: any) {
 function fmtFull(date: any) {
   if (!date) return "—";
   try { return format(new Date(date), "dd MMM yyyy HH:mm"); } catch { return "—"; }
+}
+function randAmount(date: any, list: any[]): number {
+  return list
+    .filter((x: any) => {
+      const d = new Date(x.fillDate ?? x.serviceDate ?? x.createdAt);
+      const ms = startOfMonth(new Date(date));
+      const me = new Date(ms.getFullYear(), ms.getMonth() + 1, 1);
+      return d >= ms && d < me;
+    })
+    .reduce((s: number, x: any) => s + parseFloat(x.cost || "0"), 0);
 }
 
 // ─── Main page ───────────────────────────────────────────────────────────────
@@ -71,6 +122,9 @@ export default function FleetVehicleProfile() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
+  const [wjStatusDialog, setWjStatusDialog] = useState<{ open: boolean; job: any | null }>({ open: false, job: null });
+  const [wjNewStatus, setWjNewStatus] = useState("");
+  const { toast } = useToast();
 
   const { data: vehicle, isLoading } = useQuery<any>({
     queryKey: ["/api/fleet/vehicles", vehicleId],
@@ -105,6 +159,15 @@ export default function FleetVehicleProfile() {
       return Array.isArray(d) ? d : [];
     },
   });
+  const { data: allWorkshopJobs = [] } = useQuery<any[]>({
+    queryKey: ["/api/fleet/workshop-jobs", vehicleId],
+    queryFn: async () => {
+      const res = await fetch(`/api/fleet/workshop-jobs?vehicleId=${vehicleId}`);
+      const d = await res.json();
+      return Array.isArray(d) ? d : [];
+    },
+    enabled: !!vehicleId,
+  });
 
   const statusMutation = useMutation({
     mutationFn: (status: string) =>
@@ -113,6 +176,17 @@ export default function FleetVehicleProfile() {
       queryClient.invalidateQueries({ queryKey: ["/api/fleet/vehicles", vehicleId] });
       queryClient.invalidateQueries({ queryKey: ["/api/fleet/vehicles"] });
       setStatusDialogOpen(false);
+    },
+  });
+
+  const wjUpdateMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiRequest("PATCH", `/api/fleet/workshop-jobs/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet/workshop-jobs", vehicleId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet/workshop-jobs"] });
+      setWjStatusDialog({ open: false, job: null });
+      toast({ title: "Workshop job updated" });
     },
   });
 
@@ -142,7 +216,7 @@ export default function FleetVehicleProfile() {
     );
   }
 
-  const workerName = (id: string) => workers.find((w: any) => w.id === id)?.name ?? id;
+  const workerName = (id: string | null) => id ? (workers.find((w: any) => w.id === id)?.name ?? id) : "—";
   const deptName = (id: string) => departments.find((d: any) => d.id === id)?.name ?? id;
 
   // Per-vehicle data
@@ -156,22 +230,43 @@ export default function FleetVehicleProfile() {
     .sort((a: any, b: any) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
   const vServiceRecords = allServiceRecords.filter((r: any) => r.vehicleId === vehicleId)
     .sort((a: any, b: any) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime());
+  const vWorkshopJobs = allWorkshopJobs;
 
   const assignment = assignments.find((a: any) => a.vehicleId === vehicleId && a.isActive);
   const currentOdometer = vKmLogs[0]?.endOdometer ?? null;
   const latestService = vServiceRecords[0] ?? null;
   const lastInspection = vInspections[0] ?? null;
   const openIssues = vIssues.filter((i: any) => i.status === "open" || i.status === "in_progress");
+  const openWorkshopJobs = vWorkshopJobs.filter((w: any) => !["completed", "cancelled"].includes(w.status));
 
   const totalFuelCost = vFuel.reduce((s: number, f: any) => s + parseFloat(f.cost || "0"), 0);
   const totalServiceCost = vServiceRecords.reduce((s: number, r: any) => s + parseFloat(r.cost || "0"), 0);
   const totalKm = vKmLogs.reduce((s: number, l: any) => s + (l.totalKm || 0), 0);
+  const costPerKm = totalKm > 0 ? (totalFuelCost + totalServiceCost) / totalKm : 0;
 
   const nextServiceDays = latestService?.nextServiceDate
     ? differenceInDays(new Date(latestService.nextServiceDate), new Date())
     : null;
 
-  const statusCfg = STATUS_CONFIG[vehicle.vehicleStatus] ?? STATUS_CONFIG.active;
+  // Monthly cost tracking — last 4 months
+  const now = new Date();
+  const monthlyData = [0, 1, 2, 3].map(offset => {
+    const mo = subMonths(now, offset);
+    const label = format(mo, "MMM yy");
+    const ms = startOfMonth(mo);
+    const me = new Date(ms.getFullYear(), ms.getMonth() + 1, 1);
+    const fuel = vFuel.filter((f: any) => { const d = new Date(f.fillDate); return d >= ms && d < me; }).reduce((s: number, f: any) => s + parseFloat(f.cost || "0"), 0);
+    const svc  = vServiceRecords.filter((r: any) => { const d = new Date(r.serviceDate); return d >= ms && d < me; }).reduce((s: number, r: any) => s + parseFloat(r.cost || "0"), 0);
+    return { label, fuel, svc, total: fuel + svc };
+  }).reverse();
+
+  // Health score
+  const healthScore = calcHealthScore(vehicle.vehicleStatus, vIssues, vInspections, latestService);
+  const healthIsGood = healthScore >= 80, healthIsMed = healthScore >= 60;
+  const healthBg   = healthIsGood ? "bg-green-50 border-green-200" : healthIsMed ? "bg-orange-50 border-orange-200" : "bg-red-50 border-red-200";
+  const healthText = healthIsGood ? "text-green-700" : healthIsMed ? "text-orange-600" : "text-red-700";
+  const healthBar  = healthIsGood ? "bg-green-500" : healthIsMed ? "bg-orange-400" : "bg-red-500";
+  const healthLabel = healthIsGood ? "Vehicle Healthy" : healthIsMed ? "Needs Attention" : "High Risk";
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -204,12 +299,12 @@ export default function FleetVehicleProfile() {
             </div>
 
             {/* Key stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Gauge className="h-4 w-4 text-blue-500" />
-                    <span className="text-xs text-gray-500 font-medium">Current Odometer</span>
+                    <span className="text-xs text-gray-500 font-medium">Odometer</span>
                   </div>
                   <p className="text-xl font-bold text-gray-900">
                     {currentOdometer ? currentOdometer.toLocaleString() : "—"}
@@ -217,6 +312,24 @@ export default function FleetVehicleProfile() {
                   </p>
                 </CardContent>
               </Card>
+
+              {/* Health Score card */}
+              <Card className={`border ${healthBg}`}>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Shield className={`h-4 w-4 ${healthText}`} />
+                    <span className={`text-xs font-medium ${healthText}`}>Health Score</span>
+                  </div>
+                  <div className="flex items-end gap-2 mb-1.5">
+                    <span className={`text-2xl font-bold ${healthText}`}>{healthScore}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${healthBar}`} style={{ width: `${healthScore}%` }} />
+                  </div>
+                  <p className={`text-xs mt-1 font-medium ${healthText}`}>{healthLabel}</p>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -229,6 +342,7 @@ export default function FleetVehicleProfile() {
                   </p>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -239,17 +353,18 @@ export default function FleetVehicleProfile() {
                   {latestService && <p className="text-xs text-gray-400 truncate">{latestService.serviceProvider}</p>}
                 </CardContent>
               </Card>
+
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Calendar className={`h-4 w-4 ${nextServiceDays !== null && nextServiceDays <= 30 ? "text-orange-500" : "text-green-500"}`} />
-                    <span className="text-xs text-gray-500 font-medium">Next Service Due</span>
+                    <span className="text-xs text-gray-500 font-medium">Next Service</span>
                   </div>
                   {latestService?.nextServiceDate ? (
                     <>
                       <p className="text-sm font-semibold text-gray-900">{fmt(latestService.nextServiceDate)}</p>
                       <p className={`text-xs font-medium ${nextServiceDays !== null && nextServiceDays <= 0 ? "text-red-600" : nextServiceDays !== null && nextServiceDays <= 30 ? "text-orange-600" : "text-gray-400"}`}>
-                        {nextServiceDays !== null && nextServiceDays <= 0 ? "Overdue" : nextServiceDays !== null ? `${nextServiceDays} days` : ""}
+                        {nextServiceDays !== null && nextServiceDays <= 0 ? "Overdue" : nextServiceDays !== null ? `${nextServiceDays}d` : ""}
                         {latestService.nextServiceOdometer ? ` · ${latestService.nextServiceOdometer.toLocaleString()} km` : ""}
                       </p>
                     </>
@@ -262,6 +377,12 @@ export default function FleetVehicleProfile() {
             <Tabs defaultValue="overview">
               <TabsList className="flex-wrap h-auto gap-1">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="workshop">
+                  Workshop
+                  {openWorkshopJobs.length > 0 && (
+                    <span className="ml-1.5 bg-orange-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{openWorkshopJobs.length}</span>
+                  )}
+                </TabsTrigger>
                 <TabsTrigger value="issues">
                   Issues
                   {openIssues.length > 0 && (
@@ -270,8 +391,8 @@ export default function FleetVehicleProfile() {
                 </TabsTrigger>
                 <TabsTrigger value="inspections">Inspections</TabsTrigger>
                 <TabsTrigger value="service">Service Records</TabsTrigger>
-                <TabsTrigger value="fuel">Fuel History</TabsTrigger>
-                <TabsTrigger value="km">KM History</TabsTrigger>
+                <TabsTrigger value="fuel">Fuel</TabsTrigger>
+                <TabsTrigger value="km">KM Logs</TabsTrigger>
               </TabsList>
 
               {/* OVERVIEW */}
@@ -330,26 +451,52 @@ export default function FleetVehicleProfile() {
                     </CardContent>
                   </Card>
 
-                  {/* Cost Summary */}
+                  {/* Monthly Cost Tracking */}
                   <Card>
                     <CardHeader className="pb-2 pt-4">
                       <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" /> Cost Summary
+                        <DollarSign className="h-4 w-4" /> Cost Tracking
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 pb-4">
-                      {[
-                        ["Total Fuel Cost", `R ${totalFuelCost.toFixed(2)}`],
-                        ["Total Service Cost", `R ${totalServiceCost.toFixed(2)}`],
-                        ["Combined Fleet Cost", `R ${(totalFuelCost + totalServiceCost).toFixed(2)}`],
-                        ["Service Records", `${vServiceRecords.length} records`],
-                        ["Fuel Fill-ups", `${vFuel.length} fill-ups`],
-                      ].map(([label, val]) => (
-                        <div key={String(label)} className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
-                          <span className="text-xs text-gray-500">{String(label)}</span>
-                          <span className={`text-sm font-semibold ${String(label).includes("Combined") ? "text-blue-700" : "text-gray-900"}`}>{String(val)}</span>
-                        </div>
-                      ))}
+                    <CardContent className="pb-4">
+                      <div className="space-y-1 mb-3">
+                        {[
+                          ["Total Fuel", `R ${totalFuelCost.toFixed(2)}`],
+                          ["Total Service", `R ${totalServiceCost.toFixed(2)}`],
+                          ["Total Fleet Cost", `R ${(totalFuelCost + totalServiceCost).toFixed(2)}`],
+                          ["Cost per km", costPerKm > 0 ? `R ${costPerKm.toFixed(2)}/km` : "—"],
+                        ].map(([label, val]) => (
+                          <div key={String(label)} className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-xs text-gray-500">{String(label)}</span>
+                            <span className={`text-sm font-semibold ${String(label).includes("Total Fleet") ? "text-blue-700" : "text-gray-900"}`}>{String(val)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 mt-3">Monthly breakdown (last 4 months)</p>
+                      <div className="space-y-1.5">
+                        {monthlyData.map(m => {
+                          const maxVal = Math.max(...monthlyData.map(x => x.total), 1);
+                          const pct = Math.round((m.total / maxVal) * 100);
+                          return (
+                            <div key={m.label}>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <span className="text-xs text-gray-500">{m.label}</span>
+                                <span className="text-xs font-semibold text-gray-700">R {m.total.toFixed(0)}</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-blue-400 transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="flex gap-3 mt-0.5">
+                                <span className="text-[10px] text-amber-600">Fuel: R {m.fuel.toFixed(0)}</span>
+                                <span className="text-[10px] text-blue-600">Service: R {m.svc.toFixed(0)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -368,6 +515,8 @@ export default function FleetVehicleProfile() {
                         ["Failed Inspections", `${vInspections.filter((i: any) => i.overallResult === "fail").length}`],
                         ["Issues Reported", `${vIssues.length}`],
                         ["Open / In Progress", `${openIssues.length}`],
+                        ["Workshop Jobs", `${vWorkshopJobs.length} (${openWorkshopJobs.length} open)`],
+                        ["Fuel Fill-ups", `${vFuel.length}`],
                       ].map(([label, val]) => (
                         <div key={String(label)} className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
                           <span className="text-xs text-gray-500">{String(label)}</span>
@@ -377,6 +526,87 @@ export default function FleetVehicleProfile() {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              {/* WORKSHOP JOBS */}
+              <TabsContent value="workshop" className="mt-4">
+                <Card>
+                  <CardHeader className="pb-2 pt-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <Hammer className="h-4 w-4" /> Workshop Jobs
+                      </CardTitle>
+                      <span className="text-xs text-gray-400">{vWorkshopJobs.length} total</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {vWorkshopJobs.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-gray-400">
+                        <Hammer className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No workshop jobs for this vehicle</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {vWorkshopJobs.map((job: any) => (
+                          <div key={job.id} className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${WJ_STATUS_COLOR[job.status] ?? "bg-gray-100 text-gray-600"}`}>
+                                    {job.status.replace(/_/g, " ")}
+                                  </span>
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${WJ_PRIORITY_COLOR[job.priority] ?? "bg-gray-100 text-gray-600"}`}>
+                                    {job.priority}
+                                  </span>
+                                  <span className="text-xs bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">
+                                    {WJ_SOURCE_LABEL[job.issueSource] ?? job.issueSource}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-800">{job.description}</p>
+                                {job.serviceProvider && (
+                                  <p className="text-xs text-blue-700 mt-1">Provider: {job.serviceProvider}</p>
+                                )}
+                                {job.notes && (
+                                  <p className="text-xs text-gray-500 mt-1 italic">{job.notes}</p>
+                                )}
+                                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                  {job.scheduledDate && (
+                                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />Scheduled: {fmt(job.scheduledDate)}
+                                    </span>
+                                  )}
+                                  {job.cost && (
+                                    <span className="text-xs text-green-700 flex items-center gap-1">
+                                      <DollarSign className="h-3 w-3" />R {parseFloat(job.cost).toFixed(2)}
+                                    </span>
+                                  )}
+                                  {job.completedAt && (
+                                    <span className="text-xs text-green-600 flex items-center gap-1">
+                                      <CheckCircle className="h-3 w-3" />Completed {fmt(job.completedAt)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-xs text-gray-400 mb-2">{fmt(job.createdAt)}</p>
+                                {!["completed", "cancelled"].includes(job.status) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    onClick={() => { setWjNewStatus(job.status); setWjStatusDialog({ open: true, job }); }}
+                                  >
+                                    Update Status
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* ISSUES */}
@@ -436,12 +666,15 @@ export default function FleetVehicleProfile() {
                             <div key={ins.id} className="p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     {ins.overallResult === "pass"
                                       ? <Badge className="bg-green-100 text-green-700 gap-1"><CheckCircle className="h-3 w-3" /> Pass</Badge>
                                       : <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Fail</Badge>
                                     }
                                     <span className="text-sm font-medium text-gray-700">{workerName(ins.workerId)}</span>
+                                    {ins.reviewedAt && (
+                                      <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">Reviewed</span>
+                                    )}
                                   </div>
                                   {failedItems.length > 0 && (
                                     <div className="mt-2 flex flex-wrap gap-1">
@@ -621,7 +854,7 @@ export default function FleetVehicleProfile() {
         </main>
       </div>
 
-      {/* Change Status Dialog */}
+      {/* Change Vehicle Status Dialog */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -650,6 +883,43 @@ export default function FleetVehicleProfile() {
                 disabled={!newStatus || statusMutation.isPending}
               >
                 {statusMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Workshop Job Status Dialog */}
+      <Dialog open={wjStatusDialog.open} onOpenChange={open => setWjStatusDialog(s => ({ ...s, open }))}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Update Workshop Job Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {wjStatusDialog.job && (
+              <p className="text-xs text-gray-500 bg-gray-50 rounded p-2 line-clamp-2">
+                {wjStatusDialog.job.description}
+              </p>
+            )}
+            <Select value={wjNewStatus} onValueChange={setWjNewStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select status..." />
+              </SelectTrigger>
+              <SelectContent>
+                {["open", "booked", "in_progress", "waiting_parts", "completed", "cancelled"].map(s => (
+                  <SelectItem key={s} value={s}>
+                    <span className="capitalize">{s.replace(/_/g, " ")}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setWjStatusDialog({ open: false, job: null })}>Cancel</Button>
+              <Button
+                onClick={() => wjUpdateMutation.mutate({ id: wjStatusDialog.job!.id, status: wjNewStatus })}
+                disabled={!wjNewStatus || wjUpdateMutation.isPending}
+              >
+                {wjUpdateMutation.isPending ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>

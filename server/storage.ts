@@ -26,6 +26,7 @@ import {
   type VehicleInspection, type InsertVehicleInspection,
   type VehicleIssue, type InsertVehicleIssue,
   type ServiceRecord, type InsertServiceRecord,
+  type WorkshopJob, type InsertWorkshopJob,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -256,6 +257,15 @@ export interface IStorage {
   deleteServiceRecord(id: string): Promise<boolean>;
   getMaintenanceDashboardData(): Promise<any>;
 
+  // Fleet — Workshop Jobs
+  getWorkshopJobs(): Promise<WorkshopJob[]>;
+  getWorkshopJob(id: string): Promise<WorkshopJob | undefined>;
+  getWorkshopJobsByVehicle(vehicleId: string): Promise<WorkshopJob[]>;
+  createWorkshopJob(job: InsertWorkshopJob): Promise<WorkshopJob>;
+  updateWorkshopJob(id: string, job: Partial<InsertWorkshopJob>): Promise<WorkshopJob>;
+  deleteWorkshopJob(id: string): Promise<boolean>;
+  getFleetNotifications(): Promise<any[]>;
+
   // Backup & Restore
   exportBackup(): Promise<Record<string, any>>;
   restoreBackup(data: Record<string, any>): Promise<void>;
@@ -288,6 +298,7 @@ export class MemStorage implements IStorage {
   private vehicleInspections: Map<string, VehicleInspection> = new Map();
   private vehicleIssues: Map<string, VehicleIssue> = new Map();
   private serviceRecords: Map<string, ServiceRecord> = new Map();
+  private workshopJobs: Map<string, WorkshopJob> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 9;
@@ -3584,6 +3595,14 @@ export class MemStorage implements IStorage {
       { id: "sr-5", vehicleId: "vehicle-6",  serviceDate: td(150), odometer: 177000, serviceProvider: "PE Auto Service Centre",      workDone: "Service — oil and filter change, brake pads rear, coolant top-up. Wiper blades replaced.", issuesFixed: null, cost: "5100.00", invoiceNumber: "PEAS-2025-0334", invoiceUrl: null, notes: null, nextServiceDate: tdf(30), nextServiceOdometer: 188000, createdByWorkerId: "worker-1", createdAt: td(150) },
     ];
     serviceData.forEach(r => this.serviceRecords.set(r.id, r));
+
+    const workshopData: WorkshopJob[] = [
+      { id: "wj-1", vehicleId: "vehicle-1",  assignedDriverId: "worker-16", issueSource: "inspection",  sourceInspectionId: "insp-2", sourceIssueId: null,    description: "Brake light fault and engine oil consumption — from failed inspection. Requires workshop assessment and repair.", reportedByWorkerId: "worker-1", scheduledDate: tdf(3),   priority: "high",   status: "booked",      serviceProvider: "Mercedes-Benz Eastern Cape", cost: null,       notes: "Vehicle grounded until repairs completed.", completedAt: null, createdAt: td(1)  },
+      { id: "wj-2", vehicleId: "vehicle-4",  assignedDriverId: "worker-13", issueSource: "issue_report", sourceInspectionId: null,     sourceIssueId: "issue-3", description: "Front left tyre showing inner edge wear. Inspect and replace if necessary. Check wheel alignment.",                         reportedByWorkerId: "worker-1", scheduledDate: tdf(7),   priority: "medium", status: "open",        serviceProvider: "PE Tyres",                   cost: null,       notes: null, completedAt: null, createdAt: td(2)  },
+      { id: "wj-3", vehicleId: "vehicle-8",  assignedDriverId: "worker-11", issueSource: "issue_report", sourceInspectionId: null,     sourceIssueId: "issue-5", description: "Clutch replacement — slipping under load. Gqeberha Auto to assess and replace clutch kit.",                             reportedByWorkerId: "worker-1", scheduledDate: td(0),    priority: "high",   status: "in_progress", serviceProvider: "Gqeberha Auto",              cost: null,       notes: "Vehicle dropped off this morning.", completedAt: null, createdAt: td(3)  },
+      { id: "wj-4", vehicleId: "vehicle-6",  assignedDriverId: null,        issueSource: "manual",       sourceInspectionId: null,     sourceIssueId: null,      description: "Scheduled service — 180,000km major service. Oil, filters, plugs, brake fluid, timing belt inspection.",                  reportedByWorkerId: "worker-1", scheduledDate: tdf(14),  priority: "medium", status: "open",        serviceProvider: "PE Auto Service Centre",      cost: null,       notes: null, completedAt: null, createdAt: td(5)  },
+    ];
+    workshopData.forEach(w => this.workshopJobs.set(w.id, w));
   }
 
   // Fleet — Vehicles
@@ -3805,6 +3824,96 @@ export class MemStorage implements IStorage {
   }
   async deleteServiceRecord(id: string): Promise<boolean> {
     return this.serviceRecords.delete(id);
+  }
+
+  // Fleet — Workshop Jobs
+  async getWorkshopJobs(): Promise<WorkshopJob[]> {
+    return Array.from(this.workshopJobs.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  async getWorkshopJob(id: string): Promise<WorkshopJob | undefined> {
+    return this.workshopJobs.get(id);
+  }
+  async getWorkshopJobsByVehicle(vehicleId: string): Promise<WorkshopJob[]> {
+    return Array.from(this.workshopJobs.values()).filter(w => w.vehicleId === vehicleId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  async createWorkshopJob(job: InsertWorkshopJob): Promise<WorkshopJob> {
+    const id = randomUUID();
+    const newJob: WorkshopJob = {
+      ...job, id,
+      assignedDriverId: job.assignedDriverId ?? null,
+      sourceInspectionId: job.sourceInspectionId ?? null,
+      sourceIssueId: job.sourceIssueId ?? null,
+      reportedByWorkerId: job.reportedByWorkerId ?? null,
+      scheduledDate: job.scheduledDate ?? null,
+      serviceProvider: job.serviceProvider ?? null,
+      cost: job.cost ?? null,
+      notes: job.notes ?? null,
+      completedAt: job.completedAt ?? null,
+      createdAt: new Date(),
+    };
+    this.workshopJobs.set(id, newJob);
+    return newJob;
+  }
+  async updateWorkshopJob(id: string, job: Partial<InsertWorkshopJob>): Promise<WorkshopJob> {
+    const existing = this.workshopJobs.get(id);
+    if (!existing) throw new Error("Workshop job not found");
+    const updated: WorkshopJob = { ...existing, ...job };
+    if (job.status === "completed" && !existing.completedAt) updated.completedAt = new Date();
+    this.workshopJobs.set(id, updated);
+    return updated;
+  }
+  async deleteWorkshopJob(id: string): Promise<boolean> {
+    return this.workshopJobs.delete(id);
+  }
+
+  async getFleetNotifications(): Promise<any[]> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const notifications: any[] = [];
+
+    // Failed unreviewed inspections
+    const failedInsp = Array.from(this.vehicleInspections.values()).filter(i => i.overallResult === "fail" && !i.reviewedAt);
+    for (const ins of failedInsp) {
+      const v = this.vehicles.get(ins.vehicleId);
+      notifications.push({ id: `insp-${ins.id}`, type: "inspection_failed", severity: "high", title: "Inspection Failed", message: `${v?.name ?? ins.vehicleId} failed inspection`, vehicleId: ins.vehicleId, createdAt: ins.inspectionDate });
+    }
+
+    // Unsafe vehicles
+    for (const v of this.vehicles.values()) {
+      if (v.vehicleStatus === "unsafe") {
+        notifications.push({ id: `unsafe-${v.id}`, type: "vehicle_unsafe", severity: "critical", title: "Vehicle Marked Unsafe", message: `${v.name} is marked as unsafe`, vehicleId: v.id, createdAt: v.createdAt });
+      }
+    }
+
+    // Open high-urgency issues
+    const hotIssues = Array.from(this.vehicleIssues.values()).filter(i => ["open", "in_progress"].includes(i.status) && ["high", "not_safe"].includes(i.urgency));
+    for (const issue of hotIssues) {
+      const v = this.vehicles.get(issue.vehicleId);
+      notifications.push({ id: `issue-${issue.id}`, type: "issue_reported", severity: issue.urgency === "not_safe" ? "critical" : "high", title: "Issue Reported", message: `${v?.name ?? issue.vehicleId}: ${issue.description.slice(0, 60)}...`, vehicleId: issue.vehicleId, createdAt: issue.reportedAt });
+    }
+
+    // Service overdue
+    const allSvc = Array.from(this.serviceRecords.values());
+    for (const v of this.vehicles.values()) {
+      const svc = allSvc.filter(r => r.vehicleId === v.id).sort((a, b) => b.serviceDate.getTime() - a.serviceDate.getTime())[0];
+      if (svc?.nextServiceDate && new Date(svc.nextServiceDate) < now) {
+        notifications.push({ id: `svc-due-${v.id}`, type: "service_overdue", severity: "medium", title: "Service Overdue", message: `${v.name} service was due ${Math.abs(Math.round((now.getTime() - new Date(svc.nextServiceDate).getTime()) / 86400000))} days ago`, vehicleId: v.id, createdAt: svc.nextServiceDate });
+      } else if (svc?.nextServiceDate) {
+        const daysLeft = Math.round((new Date(svc.nextServiceDate).getTime() - now.getTime()) / 86400000);
+        if (daysLeft <= 30 && daysLeft > 0) {
+          notifications.push({ id: `svc-soon-${v.id}`, type: "service_due_soon", severity: "low", title: "Service Due Soon", message: `${v.name} service due in ${daysLeft} days`, vehicleId: v.id, createdAt: svc.nextServiceDate });
+        }
+      }
+    }
+
+    // Recent workshop jobs (created today)
+    const todayJobs = Array.from(this.workshopJobs.values()).filter(w => w.createdAt >= today);
+    for (const wj of todayJobs) {
+      const v = this.vehicles.get(wj.vehicleId);
+      notifications.push({ id: `wj-${wj.id}`, type: "workshop_job_created", severity: "low", title: "Workshop Job Created", message: `${v?.name ?? wj.vehicleId}: ${wj.description.slice(0, 60)}`, vehicleId: wj.vehicleId, createdAt: wj.createdAt });
+    }
+
+    return notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getMaintenanceDashboardData(): Promise<any> {

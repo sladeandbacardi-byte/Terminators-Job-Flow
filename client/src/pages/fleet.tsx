@@ -141,6 +141,39 @@ function SummaryCard({
   return <Card>{inner}</Card>;
 }
 
+// ── Health Score ──────────────────────────────────────────────────────────────
+function calcHealthScore(v: any, vIssues: any[], vInspections: any[], latestSvc: any): number {
+  let score = 100;
+  const openIssues = vIssues.filter((i: any) => ["open", "in_progress", "booked", "waiting_parts"].includes(i.status));
+  score -= openIssues.length * 5;
+  const failedInsp = vInspections.filter((i: any) => i.overallResult === "fail" && !i.reviewedAt);
+  score -= failedInsp.length * 10;
+  if (latestSvc?.nextServiceDate && new Date(latestSvc.nextServiceDate) < new Date()) score -= 15;
+  if (v?.vehicleStatus === "unsafe") score -= 20;
+  const catCounts: Record<string, number> = {};
+  openIssues.forEach((i: any) => { catCounts[i.category] = (catCounts[i.category] || 0) + 1; });
+  Object.values(catCounts).forEach(cnt => { if (cnt > 1) score -= (cnt - 1) * 5; });
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function HealthScoreCell({ score }: { score: number }) {
+  const isGood = score >= 80, isMed = score >= 60;
+  const bg    = isGood ? "bg-green-50 text-green-700" : isMed ? "bg-orange-50 text-orange-600" : "bg-red-100 text-red-700";
+  const bar   = isGood ? "bg-green-500" : isMed ? "bg-orange-400" : "bg-red-500";
+  const label = isGood ? "Healthy" : isMed ? "Attention" : "High Risk";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5">
+        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${bg}`}>{score}%</span>
+        <span className="text-xs text-gray-400">{label}</span>
+      </div>
+      <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${score}%` }} />
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function FleetPage() {
   const { user } = useAuth();
@@ -178,18 +211,19 @@ export default function FleetPage() {
       const failed = items.filter((it: any) => it.result === "fail").map((it: any) => it.name).join(", ");
       const body = {
         vehicleId: ins.vehicleId,
-        workerId: ins.workerId,
-        reportedAt: new Date().toISOString(),
-        category: "other",
-        description: `Workshop job from failed inspection on ${new Date(ins.inspectionDate).toLocaleDateString("en-ZA")}. Failed items: ${failed || "see inspection"}. ${ins.comments ? "Notes: " + ins.comments : ""}`.trim(),
-        urgency: "high",
-        status: "booked",
-        managerNotes: `Auto-created from inspection ${ins.id}`,
+        issueSource: "inspection",
+        sourceInspectionId: ins.id,
+        description: `Failed inspection: ${failed || "see inspection"}. ${ins.comments || ""}`.trim(),
+        reportedByWorkerId: ins.workerId,
+        priority: "high",
+        status: "open",
+        notes: `Auto-created from failed inspection on ${new Date(ins.inspectionDate).toLocaleDateString("en-ZA")}`,
       };
-      const r = await apiRequest("POST", "/api/fleet/issues", body);
+      const r = await apiRequest("POST", "/api/fleet/workshop-jobs", body);
       return r.json();
     },
     onSuccess: (_data, { vName, ins }) => {
+      qc.invalidateQueries({ queryKey: ["/api/fleet/workshop-jobs"] });
       qc.invalidateQueries({ queryKey: ["/api/fleet/issues"] });
       setCreatingJob(prev => ({ ...prev, [ins.id]: false }));
       toast({ title: "Workshop job created", description: `Maintenance request booked for ${vName}.` });
@@ -264,6 +298,12 @@ export default function FleetPage() {
   const dueServiceCount  = vehicles.filter((v: any) => v.vehicleStatus === "due_service" || vehicleStats[v.id]?.due.urgency === "overdue" || vehicleStats[v.id]?.due.urgency === "soon").length;
   const workshopCount    = vehicles.filter((v: any) => v.vehicleStatus === "workshop").length;
   const unsafeCount      = vehicles.filter((v: any) => v.vehicleStatus === "unsafe").length;
+
+  // Alert strip counts (alert strip only shows unreviewed failures)
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const resolvedToday = inspections.filter((i: any) =>
+    i.overallResult === "fail" && i.reviewedAt && new Date(i.reviewedAt) >= today0
+  ).length;
 
   // ── Filtered lists for other tabs ───────────────────────────────────────────
   const filteredKm = kmLogs.filter((l: any) => {
@@ -388,10 +428,22 @@ export default function FleetPage() {
             {failedInspections.length > 0 && (
               <Card className="border-red-200 bg-red-50">
                 <CardHeader className="pb-2 pt-3">
-                  <CardTitle className="text-sm text-red-800 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Failed Inspection Alerts ({failedInspections.length})
-                  </CardTitle>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-sm text-red-800 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Failed Inspection Alerts
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-red-200 text-red-800 font-semibold px-2 py-0.5 rounded-full">
+                        {failedInspections.length} active
+                      </span>
+                      {resolvedToday > 0 && (
+                        <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
+                          {resolvedToday} resolved today
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-2 pb-3">
                   {failedInspections.map((ins: any) => {
@@ -512,6 +564,7 @@ export default function FleetPage() {
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Driver</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Odometer</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Health</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Last Inspection</th>
                             <th className="text-center px-4 py-3 font-medium text-gray-600">Issues</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Last Service</th>
@@ -527,6 +580,8 @@ export default function FleetPage() {
                             const lastInsp = vInsp?.[0] ?? null;
                             const assignment = assignments.find((a: any) => a.vehicleId === v.id && a.isActive);
                             const openCount = issues.filter((i: any) => i.vehicleId === v.id && (i.status === "open" || i.status === "in_progress")).length;
+                            const vIssuesAll = issues.filter((i: any) => i.vehicleId === v.id);
+                            const healthScore = calcHealthScore(v, vIssuesAll, vInsp ?? [], lastSvc);
 
                             return (
                               <tr
@@ -562,6 +617,11 @@ export default function FleetPage() {
                                   {currentOdo != null
                                     ? <span className="font-medium text-gray-800">{currentOdo.toLocaleString()} <span className="text-xs text-gray-400">km</span></span>
                                     : <span className="text-gray-300">—</span>}
+                                </td>
+
+                                {/* Health Score */}
+                                <td className="px-4 py-3">
+                                  <HealthScoreCell score={healthScore} />
                                 </td>
 
                                 {/* Last inspection */}

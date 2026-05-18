@@ -665,10 +665,32 @@ export const serviceRecords = pgTable("service_records", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const workshopJobs = pgTable("workshop_jobs", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  assignedDriverId: varchar("assigned_driver_id"),
+  issueSource: text("issue_source").notNull().default("manual"),
+  sourceInspectionId: varchar("source_inspection_id"),
+  sourceIssueId: varchar("source_issue_id"),
+  description: text("description").notNull(),
+  reportedByWorkerId: varchar("reported_by_worker_id"),
+  scheduledDate: timestamp("scheduled_date"),
+  priority: text("priority").notNull().default("medium"),
+  status: text("status").notNull().default("open"),
+  serviceProvider: text("service_provider"),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export const insertVehicleIssueSchema = createInsertSchema(vehicleIssues).omit({ id: true, createdAt: true });
 export const insertServiceRecordSchema = createInsertSchema(serviceRecords).omit({ id: true, createdAt: true });
+export const insertWorkshopJobSchema = createInsertSchema(workshopJobs).omit({ id: true, createdAt: true });
 
 export type InsertVehicleIssue = z.infer<typeof insertVehicleIssueSchema>;
 export type VehicleIssue = typeof vehicleIssues.$inferSelect;
 export type InsertServiceRecord = z.infer<typeof insertServiceRecordSchema>;
 export type ServiceRecord = typeof serviceRecords.$inferSelect;
+export type InsertWorkshopJob = z.infer<typeof insertWorkshopJobSchema>;
+export type WorkshopJob = typeof workshopJobs.$inferSelect;
