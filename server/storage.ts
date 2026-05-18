@@ -3412,7 +3412,7 @@ export class MemStorage implements IStorage {
     //   vehicle-7  KRM914EC  2023 Isuzu D-Max         Mike       (worker-10, div-1 Pest Control)
     //   vehicle-8  HRS116EC  2016 VW Caddy            Xolani/X   (worker-11, div-1 Pest Control)
     //   vehicle-9  KDM688EC  2023 VW Caddy            Reece      (worker-8,  div-1 Pest Control)
-    //   vehicle-10 (TBA)     2026 Toyota Surf         Julien     (worker-1,  div-6 Management)
+    //   vehicle-10 (TBA)     2026 BYD Dolphin Surf     Julien     (worker-1,  div-6 Management) — ELECTRIC
 
     const vehiclesData: Vehicle[] = [
       { id: "vehicle-1",  name: "Mercedes Vito (Re-Althon)",  registration: "DPN524EC", make: "Mercedes-Benz", model: "Vito",    year: "2006", departmentId: "div-3", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
@@ -3424,7 +3424,7 @@ export class MemStorage implements IStorage {
       { id: "vehicle-7",  name: "Isuzu D-Max (Mike)",         registration: "KRM914EC", make: "Isuzu",        model: "D-Max",   year: "2023", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2023-03-01") },
       { id: "vehicle-8",  name: "VW Caddy (Xolani)",          registration: "HRS116EC", make: "Volkswagen",   model: "Caddy",   year: "2016", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2020-01-01") },
       { id: "vehicle-9",  name: "VW Caddy (Reece)",           registration: "KDM688EC", make: "Volkswagen",   model: "Caddy",   year: "2023", departmentId: "div-1", isActive: true, notes: null, createdAt: new Date("2023-06-01") },
-      { id: "vehicle-10", name: "Toyota Surf (Julien)",        registration: "TBA",      make: "Toyota",       model: "Surf",    year: "2026", departmentId: "div-6", isActive: true, notes: "New vehicle — registration pending", createdAt: new Date("2026-01-01") },
+      { id: "vehicle-10", name: "BYD Dolphin Surf (Julien)",    registration: "TBA",      make: "BYD",          model: "Dolphin Surf", year: "2026", departmentId: "div-6", isActive: true, notes: "Electric vehicle — registration pending", createdAt: new Date("2026-01-01") },
     ];
     vehiclesData.forEach(v => this.vehicles.set(v.id, v));
 
@@ -3492,7 +3492,6 @@ export class MemStorage implements IStorage {
       { id: "fuel-7",  vehicleId: "vehicle-7",  workerId: "worker-10", fillDate: td(5),  odometer: 41960,  litres: "65.20", cost: "1727.80", fuelStation: "Engen Uitenhage Road",   receiptPhoto: null, notes: "Diesel",                createdAt: td(5)  },
       { id: "fuel-8",  vehicleId: "vehicle-8",  workerId: "worker-11", fillDate: td(7),  odometer: 165380, litres: "49.40", cost: "1309.10", fuelStation: "Shell Walmer",           receiptPhoto: null, notes: null,                    createdAt: td(7)  },
       { id: "fuel-9",  vehicleId: "vehicle-9",  workerId: "worker-8",  fillDate: td(3),  odometer: 36300,  litres: "46.90", cost: "1242.85", fuelStation: "Caltex Greenacres",      receiptPhoto: null, notes: null,                    createdAt: td(3)  },
-      { id: "fuel-10", vehicleId: "vehicle-10", workerId: "worker-1",  fillDate: td(6),  odometer: 8130,   litres: "58.30", cost: "1544.95", fuelStation: "Shell Summerstrand",     receiptPhoto: null, notes: null,                    createdAt: td(6)  },
       { id: "fuel-11", vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(18), odometer: 284980, litres: "68.90", cost: "1825.85", fuelStation: "Total Gqeberha CBD",     receiptPhoto: null, notes: null,                    createdAt: td(18) },
       { id: "fuel-12", vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(16), odometer: 88420,  litres: "47.10", cost: "1248.15", fuelStation: "BP Charlo",             receiptPhoto: null, notes: null,                    createdAt: td(16) },
     ];
