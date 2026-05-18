@@ -2315,7 +2315,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // ── FLEET MAINTENANCE — ISSUES ──────────────────────────────────────────────
-  app.get("/api/fleet/issues", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/fleet/issues", async (req, res) => {
     try {
       const { vehicleId, workerId, status, urgency } = req.query as Record<string, string>;
       let issues = await storage.getVehicleIssues();
@@ -2327,17 +2327,17 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/issues/open", requireAuth, async (_req, res) => {
+  app.get("/api/fleet/issues/open", async (_req, res) => {
     try { res.json(await storage.getOpenVehicleIssues()); }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/issues/not-safe", requireAuth, async (_req, res) => {
+  app.get("/api/fleet/issues/not-safe", async (_req, res) => {
     try { res.json(await storage.getNotSafeVehicleIssues()); }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/issues/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/fleet/issues/:id", async (req, res) => {
     try {
       const issue = await storage.getVehicleIssue(req.params.id);
       if (!issue) return res.status(404).json({ error: "Issue not found" });
@@ -2371,7 +2371,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // ── FLEET MAINTENANCE — SERVICE RECORDS ─────────────────────────────────────
-  app.get("/api/fleet/service-records", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/fleet/service-records", async (req, res) => {
     try {
       const { vehicleId } = req.query as Record<string, string>;
       if (vehicleId) return res.json(await storage.getServiceRecordsByVehicle(vehicleId));
@@ -2379,7 +2379,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/service-records/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/fleet/service-records/:id", async (req, res) => {
     try {
       const rec = await storage.getServiceRecord(req.params.id);
       if (!rec) return res.status(404).json({ error: "Service record not found" });
