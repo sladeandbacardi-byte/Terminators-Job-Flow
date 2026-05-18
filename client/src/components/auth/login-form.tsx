@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   LogIn, AlertCircle, User, Briefcase, TrendingUp, DollarSign, Shield,
-  FlaskConical, ChevronRight,
+  FlaskConical, ChevronRight, Wrench,
 } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
@@ -18,7 +18,7 @@ const roleIcons: Record<string, JSX.Element> = {
   admin:       <Shield className="h-3.5 w-3.5" />,
   manager:     <Briefcase className="h-3.5 w-3.5" />,
   sales:       <TrendingUp className="h-3.5 w-3.5" />,
-  service:     <Briefcase className="h-3.5 w-3.5" />,
+  service:     <Wrench className="h-3.5 w-3.5" />,
   accounts:    <DollarSign className="h-3.5 w-3.5" />,
   coordinator: <Briefcase className="h-3.5 w-3.5" />,
 };
@@ -32,6 +32,15 @@ const roleColors: Record<string, string> = {
   coordinator: "bg-cyan-100 text-cyan-700",
 };
 
+// Icon per demo profile
+const DEMO_ICONS: Record<string, JSX.Element> = {
+  admin:       <Shield className="h-5 w-5" />,
+  coordinator: <Briefcase className="h-5 w-5" />,
+  accounts:    <DollarSign className="h-5 w-5" />,
+  sales:       <TrendingUp className="h-5 w-5" />,
+  service:     <Wrench className="h-5 w-5" />,
+};
+
 interface LoginFormProps {
   onSuccess: (token: string, user: any) => void;
   onDemoLogin?: (profile: any) => void;
@@ -39,7 +48,6 @@ interface LoginFormProps {
 
 export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [showDemo, setShowDemo] = useState(false);
 
   const LOGIN_USER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4", "worker-5", "worker-6"];
 
@@ -73,7 +81,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
-      <div className="w-full max-w-md space-y-3">
+      <div className="w-full max-w-md space-y-4">
 
         {/* Main login card */}
         <Card className="shadow-xl">
@@ -146,44 +154,37 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           </CardContent>
         </Card>
 
-        {/* Demo mode section */}
-        <div className="space-y-2">
-          <button
-            onClick={() => setShowDemo(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm font-medium text-amber-800"
-          >
-            <div className="flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-amber-600" />
-              <span>Demo / Safe Review Access</span>
+        {/* ── Demo Access ─────────────────────────────────────────────────────── */}
+        <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="bg-amber-50 border-b border-amber-100 px-4 py-3 flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Demo Access</p>
+              <p className="text-xs text-amber-700">Explore with sample data — no login required</p>
             </div>
-            <ChevronRight className={`h-4 w-4 text-amber-500 transition-transform ${showDemo ? "rotate-90" : ""}`} />
-          </button>
+          </div>
 
-          {showDemo && (
-            <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
-              <div className="bg-amber-50 px-4 py-2.5 border-b border-amber-100">
-                <p className="text-xs text-amber-700 font-medium flex items-center gap-1.5">
-                  <FlaskConical className="h-3.5 w-3.5" />
-                  Demo Mode — uses sample data only. Destructive actions are disabled.
-                </p>
-              </div>
-              <div className="p-3 space-y-2">
-                {DEMO_PROFILES.map(profile => (
-                  <button
-                    key={profile.key}
-                    onClick={() => onDemoLogin?.(profile)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-left transition-colors ${profile.colorClass}`}
-                  >
-                    <div>
-                      <p className="text-sm font-semibold leading-tight">{profile.label}</p>
-                      <p className="text-xs opacity-70 mt-0.5">{profile.description}</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 opacity-50 shrink-0 ml-2" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Demo buttons — always visible */}
+          <div className="p-3 grid grid-cols-1 gap-2">
+            {DEMO_PROFILES.map(profile => {
+              const icon = DEMO_ICONS[profile.key] ?? <User className="h-5 w-5" />;
+              return (
+                <button
+                  key={profile.key}
+                  onClick={() => onDemoLogin?.(profile)}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg border text-left transition-all hover:shadow-sm active:scale-[0.99] ${profile.colorClass}`}
+                >
+                  <span className="shrink-0 opacity-70">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold leading-tight">{profile.label}</p>
+                    <p className="text-xs opacity-70 mt-0.5">{profile.description}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 opacity-40 shrink-0" />
+                </button>
+              );
+            })}
+          </div>
         </div>
 
       </div>
