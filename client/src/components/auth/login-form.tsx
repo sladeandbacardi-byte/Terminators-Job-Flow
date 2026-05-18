@@ -32,13 +32,12 @@ const roleColors: Record<string, string> = {
   coordinator: "bg-cyan-100 text-cyan-700",
 };
 
-// Icon per demo profile
 const DEMO_ICONS: Record<string, JSX.Element> = {
-  admin:       <Shield className="h-5 w-5" />,
-  coordinator: <Briefcase className="h-5 w-5" />,
-  accounts:    <DollarSign className="h-5 w-5" />,
-  sales:       <TrendingUp className="h-5 w-5" />,
-  service:     <Wrench className="h-5 w-5" />,
+  admin:       <Shield className="h-4 w-4" />,
+  coordinator: <Briefcase className="h-4 w-4" />,
+  accounts:    <DollarSign className="h-4 w-4" />,
+  sales:       <TrendingUp className="h-4 w-4" />,
+  service:     <Wrench className="h-4 w-4" />,
 };
 
 interface LoginFormProps {
@@ -75,22 +74,20 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const selectedWorker = workers.find(w => w.id === selectedUserId);
   const previewRole = selectedWorker ? getDashboardRole(selectedWorker) : null;
 
-  const handleLogin = () => {
-    if (selectedUserId) loginMutation.mutate(selectedUserId);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
-      <div className="w-full max-w-md space-y-4">
+      <div className="w-full max-w-md space-y-6">
 
-        {/* Main login card */}
+        {/* ── Sign-in card ──────────────────────────────────────────────────── */}
         <Card className="shadow-xl">
-          <CardContent className="pt-6 pb-6 space-y-5">
-            <div className="flex justify-center">
+          <CardContent className="pt-5 pb-6 space-y-4">
+
+            {/* Logo — tighter padding */}
+            <div className="flex justify-center pt-1 pb-1">
               <img
                 src={jobFlowFullLogo}
                 alt="Job Flow – Field Service Management"
-                className="w-[220px] sm:w-[260px] h-auto object-contain"
+                className="w-[200px] sm:w-[240px] h-auto object-contain"
               />
             </div>
 
@@ -105,8 +102,11 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="user-select">Select your profile</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}
-                disabled={loginMutation.isPending || workersLoading}>
+              <Select
+                value={selectedUserId}
+                onValueChange={setSelectedUserId}
+                disabled={loginMutation.isPending || workersLoading}
+              >
                 <SelectTrigger data-testid="select-user">
                   <SelectValue placeholder={workersLoading ? "Loading..." : "Choose a user to continue"} />
                 </SelectTrigger>
@@ -142,8 +142,12 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
               </div>
             )}
 
-            <Button onClick={handleLogin} className="w-full bg-[#1a3a8f] hover:bg-[#142d72] text-white"
-              disabled={loginMutation.isPending || !selectedUserId} data-testid="button-login">
+            <Button
+              onClick={() => selectedUserId && loginMutation.mutate(selectedUserId)}
+              className="w-full bg-[#1a3a8f] hover:bg-[#142d72] text-white"
+              disabled={loginMutation.isPending || !selectedUserId}
+              data-testid="button-login"
+            >
               <LogIn className="h-4 w-4 mr-2" />
               {loginMutation.isPending ? "Signing in..." : "Sign In"}
             </Button>
@@ -154,33 +158,37 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           </CardContent>
         </Card>
 
-        {/* ── Demo Access ─────────────────────────────────────────────────────── */}
+        {/* ── Demo / Safe Review Access ─────────────────────────────────────── */}
         <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="bg-amber-50 border-b border-amber-100 px-4 py-3 flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-amber-600 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-amber-900">Demo Access</p>
-              <p className="text-xs text-amber-700">Explore with sample data — no login required</p>
+
+          {/* Section header */}
+          <div className="bg-amber-50 border-b border-amber-100 px-4 py-3">
+            <div className="flex items-center gap-2 mb-1">
+              <FlaskConical className="h-4 w-4 text-amber-600 shrink-0" />
+              <p className="text-sm font-semibold text-amber-900">Demo / Safe Review Access</p>
             </div>
+            {/* Yellow warning — always visible */}
+            <p className="text-xs text-amber-700 leading-snug">
+              Demo Mode — uses sample data only. Destructive actions are disabled.
+            </p>
           </div>
 
-          {/* Demo buttons — always visible */}
-          <div className="p-3 grid grid-cols-1 gap-2">
+          {/* Demo role buttons — visible immediately, no click required */}
+          <div className="p-3 space-y-2">
             {DEMO_PROFILES.map(profile => {
-              const icon = DEMO_ICONS[profile.key] ?? <User className="h-5 w-5" />;
+              const icon = DEMO_ICONS[profile.key] ?? <User className="h-4 w-4" />;
               return (
                 <button
                   key={profile.key}
                   onClick={() => onDemoLogin?.(profile)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg border text-left transition-all hover:shadow-sm active:scale-[0.99] ${profile.colorClass}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all hover:shadow-sm active:scale-[0.99] ${profile.colorClass}`}
                 >
-                  <span className="shrink-0 opacity-70">{icon}</span>
+                  <span className="shrink-0 opacity-60">{icon}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold leading-tight">{profile.label}</p>
-                    <p className="text-xs opacity-70 mt-0.5">{profile.description}</p>
+                    <p className="text-xs opacity-60 mt-0.5">{profile.description}</p>
                   </div>
-                  <ChevronRight className="h-4 w-4 opacity-40 shrink-0" />
+                  <ChevronRight className="h-3.5 w-3.5 opacity-35 shrink-0" />
                 </button>
               );
             })}

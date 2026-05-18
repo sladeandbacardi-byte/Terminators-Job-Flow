@@ -1,31 +1,22 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
-// Endpoints / patterns blocked in demo mode
-const DEMO_BLOCKED: { method: string; pattern?: RegExp }[] = [
-  { method: "DELETE" },
-  { method: "POST", pattern: /\/api\/emails\// },
-  { method: "POST", pattern: /\/send/ },
-  { method: "POST", pattern: /\/email/ },
-];
+// All write methods are blocked in demo mode — the demo is read-only
+const DEMO_WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
 function isDemoMode(): boolean {
   return localStorage.getItem("demo_mode") === "true";
 }
 
-function checkDemoBlock(method: string, url: string): void {
+function checkDemoBlock(method: string, _url: string): void {
   if (!isDemoMode()) return;
-  const upper = method.toUpperCase();
-  for (const rule of DEMO_BLOCKED) {
-    if (rule.method !== upper) continue;
-    if (!rule.pattern || rule.pattern.test(url)) {
-      toast({
-        title: "Demo Mode",
-        description: "This action is disabled in Demo Mode.",
-        variant: "destructive",
-      });
-      throw new Error("This action is disabled in Demo Mode.");
-    }
+  if (DEMO_WRITE_METHODS.has(method.toUpperCase())) {
+    toast({
+      title: "Demo Mode",
+      description: "This action is disabled in Demo Mode.",
+      variant: "destructive",
+    });
+    throw new Error("This action is disabled in Demo Mode.");
   }
 }
 
