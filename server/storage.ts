@@ -3694,7 +3694,9 @@ export class MemStorage implements IStorage {
     return Array.from(this.vehicleInspections.values()).filter(i => i.vehicleId === vehicleId).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
   }
   async getFailedInspections(): Promise<VehicleInspection[]> {
-    return Array.from(this.vehicleInspections.values()).filter(i => i.overallResult === "fail").sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
+    return Array.from(this.vehicleInspections.values())
+      .filter(i => i.overallResult === "fail" && !i.reviewedAt)
+      .sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
   }
   async createVehicleInspection(i: InsertVehicleInspection): Promise<VehicleInspection> {
     const id = randomUUID();

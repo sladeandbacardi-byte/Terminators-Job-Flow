@@ -1,0 +1,134 @@
+Enhance Fleet Dashboard and Fleet workflow.
+
+FAILED INSPECTION ALERTS
+
+Add action buttons to each failed inspection alert:
+
+Open Vehicle
+Create Workshop Job
+Mark Reviewed
+
+Workflow:
+
+Failed inspection
+-> Manager receives alert
+-> Open dashboard
+-> Create workshop job
+-> Vehicle issue automatically moves into Maintenance queue
+-> Link issue to vehicle profile
+
+Creating a workshop job must automatically create a maintenance/service request linked to that vehicle.
+
+WORKSHOP JOB FIELDS
+
+Vehicle
+Registration
+Assigned driver
+Issue source
+Issue description
+Reported by
+Date/time
+Priority
+Status
+
+Statuses:
+Open
+Booked
+In Progress
+Waiting Parts
+Completed
+Cancelled
+
+HEALTH SCORE
+
+Add Vehicle Health Score.
+
+Display example:
+
+Vehicle Health: 72%
+
+Calculate score using:
+
+Open issues
+Failed inspections
+Overdue services
+Workshop history
+Vehicle marked unsafe
+Repeated faults
+
+Suggested logic:
+
+Start at 100
+
+Minus 5 for open issue
+Minus 10 for failed inspection
+Minus 15 overdue service
+Minus 20 unsafe status
+Minus points for repeated unresolved faults
+
+Color indicators:
+
+Green = healthy
+Orange = attention needed
+Red = high risk
+
+MONTHLY COST TRACKING
+
+For each vehicle profile show:
+
+Fuel spend this month
+Maintenance spend this month
+Maintenance spend this year
+Lifetime maintenance cost
+Cost per kilometer
+
+Formula:
+
+Cost per kilometer =
+Total fuel + maintenance costs
+divided by
+total kilometers
+
+NOTIFICATIONS
+
+Add notification bell beside user profile.
+
+Show:
+
+Inspection failed
+Service due soon
+Vehicle marked unsafe
+Issue reported
+Workshop job created
+Overdue maintenance
+
+Include unread counter.
+
+ALERT SUMMARY
+
+Enhance failed inspection section:
+
+Show:
+
+Active alerts
+Resolved today
+
+VEHICLE PROFILE
+
+Add:
+
+Current odometer
+Open issues
+Issue history
+Inspection history
+Fuel history
+KM history
+Workshop jobs
+Service history
+Service provider
+Service costs
+Invoices
+Photos
+Vehicle health score
+
+Keep design consistent with Job Flow and Fleet module.

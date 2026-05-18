@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,11 +147,58 @@ export default function FleetPage() {
   const role = user ? getDashboardRole(user) : "service";
   const isAdmin = ["admin", "manager", "coordinator"].includes(role);
 
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
   const [search, setSearch]             = useState("");
   const [vehicleFilter, setVehicleFilter] = useState("all");
   const [activeTab, setActiveTab]       = useState(isAdmin ? "vehicles" : "km");
   const [, navigate]                    = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [creatingJob, setCreatingJob]   = useState<Record<string, boolean>>({});
+
+  // ── Inspection action mutations ──────────────────────────────────────────────
+  const markReviewedMutation = useMutation({
+    mutationFn: async (insId: string) => {
+      const r = await apiRequest("PATCH", `/api/fleet/inspections/${insId}`, {
+        reviewedAt: new Date().toISOString(),
+      });
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/fleet/inspections"] });
+      toast({ title: "Marked as reviewed", description: "Inspection removed from alert strip." });
+    },
+    onError: () => toast({ title: "Error", description: "Could not mark as reviewed.", variant: "destructive" }),
+  });
+
+  const createWorkshopJobMutation = useMutation({
+    mutationFn: async ({ ins, vName }: { ins: any; vName: string }) => {
+      const items = ins.itemsJson ? JSON.parse(ins.itemsJson) : [];
+      const failed = items.filter((it: any) => it.result === "fail").map((it: any) => it.name).join(", ");
+      const body = {
+        vehicleId: ins.vehicleId,
+        workerId: ins.workerId,
+        reportedAt: new Date().toISOString(),
+        category: "other",
+        description: `Workshop job from failed inspection on ${new Date(ins.inspectionDate).toLocaleDateString("en-ZA")}. Failed items: ${failed || "see inspection"}. ${ins.comments ? "Notes: " + ins.comments : ""}`.trim(),
+        urgency: "high",
+        status: "booked",
+        managerNotes: `Auto-created from inspection ${ins.id}`,
+      };
+      const r = await apiRequest("POST", "/api/fleet/issues", body);
+      return r.json();
+    },
+    onSuccess: (_data, { vName, ins }) => {
+      qc.invalidateQueries({ queryKey: ["/api/fleet/issues"] });
+      setCreatingJob(prev => ({ ...prev, [ins.id]: false }));
+      toast({ title: "Workshop job created", description: `Maintenance request booked for ${vName}.` });
+    },
+    onError: (_e, { ins }) => {
+      setCreatingJob(prev => ({ ...prev, [ins.id]: false }));
+      toast({ title: "Error", description: "Could not create workshop job.", variant: "destructive" });
+    },
+  });
 
   // ── Data queries ────────────────────────────────────────────────────────────
   const { data: vehicles = [] }     = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
@@ -348,24 +397,71 @@ export default function FleetPage() {
                   {failedInspections.map((ins: any) => {
                     const items = ins.itemsJson ? JSON.parse(ins.itemsJson) : [];
                     const failedItems = items.filter((it: any) => it.result === "fail");
+                    const vName = vehicleName(ins.vehicleId);
+                    const isReviewing = markReviewedMutation.isPending && markReviewedMutation.variables === ins.id;
+                    const isCreating = creatingJob[ins.id] || (createWorkshopJobMutation.isPending && createWorkshopJobMutation.variables?.ins?.id === ins.id);
                     return (
-                      <div key={ins.id} className="bg-white rounded-lg border border-red-200 p-3 flex items-start justify-between gap-2">
-                        <div>
+                      <div key={ins.id} className="bg-white rounded-lg border border-red-200 p-3 space-y-2.5">
+                        {/* Top row: badge, vehicle, driver, date */}
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant="destructive" className="text-xs">FAIL</Badge>
-                            <span className="font-medium text-sm">{vehicleName(ins.vehicleId)}</span>
+                            <span className="font-medium text-sm">{vName}</span>
                             <span className="text-gray-500 text-sm">· {workerName(ins.workerId)}</span>
                           </div>
-                          {failedItems.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {failedItems.map((it: any, i: number) => (
-                                <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{it.name}</span>
-                              ))}
-                            </div>
-                          )}
-                          {ins.comments && <p className="text-xs text-gray-500 mt-1">{ins.comments}</p>}
+                          <span className="text-xs text-gray-400 shrink-0">{format(new Date(ins.inspectionDate), "dd MMM yy HH:mm")}</span>
                         </div>
-                        <span className="text-xs text-gray-400 shrink-0">{format(new Date(ins.inspectionDate), "dd MMM yy HH:mm")}</span>
+
+                        {/* Failed items chips */}
+                        {failedItems.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {failedItems.map((it: any, i: number) => (
+                              <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{it.name}</span>
+                            ))}
+                          </div>
+                        )}
+                        {ins.comments && <p className="text-xs text-gray-500">{ins.comments}</p>}
+
+                        {/* ── Action buttons ── */}
+                        <div className="flex items-center gap-2 flex-wrap pt-0.5 border-t border-red-100">
+                          {/* Open Vehicle */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5 border-gray-300 hover:bg-gray-50"
+                            onClick={() => navigate(`/fleet/vehicles/${ins.vehicleId}`)}
+                          >
+                            <Car className="h-3.5 w-3.5" />
+                            Open Vehicle
+                          </Button>
+
+                          {/* Create Workshop Job */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5 border-orange-300 text-orange-700 hover:bg-orange-50"
+                            disabled={isCreating}
+                            onClick={() => {
+                              setCreatingJob(prev => ({ ...prev, [ins.id]: true }));
+                              createWorkshopJobMutation.mutate({ ins, vName });
+                            }}
+                          >
+                            <Wrench className="h-3.5 w-3.5" />
+                            {isCreating ? "Creating…" : "Create Workshop Job"}
+                          </Button>
+
+                          {/* Mark Reviewed */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-50"
+                            disabled={isReviewing}
+                            onClick={() => markReviewedMutation.mutate(ins.id)}
+                          >
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            {isReviewing ? "Saving…" : "Mark Reviewed"}
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}

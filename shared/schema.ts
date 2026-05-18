@@ -607,6 +607,8 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   comments: text("comments"),
   photoUrl: text("photo_url"),
   failAlertSent: boolean("fail_alert_sent").notNull().default(false),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 

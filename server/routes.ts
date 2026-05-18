@@ -2300,6 +2300,15 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
+  app.patch("/api/fleet/inspections/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const body: any = { ...req.body };
+      if (body.reviewedAt) body.reviewedAt = new Date(body.reviewedAt);
+      const updated = await storage.updateVehicleInspection(req.params.id, body);
+      res.json(updated);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
   app.delete("/api/fleet/inspections/:id", async (req, res) => {
     const ok = await storage.deleteVehicleInspection(req.params.id);
     if (!ok) return res.status(404).json({ error: "Inspection not found" });
