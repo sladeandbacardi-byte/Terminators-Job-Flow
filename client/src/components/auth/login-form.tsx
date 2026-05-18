@@ -144,7 +144,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
 
             <Button
               onClick={() => selectedUserId && loginMutation.mutate(selectedUserId)}
-              className="w-full bg-[#1a3a8f] hover:bg-[#142d72] text-white"
+              className="w-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white"
               disabled={loginMutation.isPending || !selectedUserId}
               data-testid="button-login"
             >
