@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Search, Plus, FileText, AlertTriangle, Edit, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatZAR } from "@/components/forms/contract-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ExportButton } from "@/components/export-button";
@@ -285,40 +286,40 @@ export default function Contracts() {
                         </div>
                         
                         {/* Pricing summary row */}
-                        <div className="mb-3">
-                          {contract.unitPrice && contract.quantity && contract.billingFrequency ? (
-                            <div className="flex flex-wrap items-center gap-1.5 text-sm" data-testid={`contract-price-${contract.id}`}>
-                              <span className="font-mono font-semibold text-gray-900">{formatCurrency(Number(contract.unitPrice))}</span>
-                              <span className="text-gray-400">×</span>
-                              <span className="text-gray-700">{contract.quantity} {Number(contract.quantity) === 1 ? "unit" : "units"}</span>
-                              <span className="text-gray-400 capitalize">{contract.billingFrequency}</span>
-                              <span className="text-gray-400">=</span>
-                              <span className="font-bold text-blue-700 text-base">
-                                {formatCurrency(Number(contract.calculatedTotal ?? (Number(contract.unitPrice) * Number(contract.quantity))))}
-                              </span>
-                              <span className="text-gray-500 text-xs">/ {contract.billingFrequency === "once-off" ? "once" : contract.billingFrequency}</span>
+                        {(() => {
+                          const hasNew = contract.unitPrice && contract.quantity && contract.billingFrequency;
+                          const qty = Number(contract.quantity ?? 1);
+                          const up  = Number(contract.unitPrice ?? contract.monthlyPrice ?? 0);
+                          const tot = Number(contract.calculatedTotal ?? (up * qty));
+                          const freqSuffixMap: Record<string, string> = {
+                            weekly: "per week", monthly: "per month", quarterly: "per quarter",
+                            annually: "per year", "once-off": "once-off",
+                          };
+                          const freq = contract.billingFrequency ?? "monthly";
+                          const suffix = freqSuffixMap[freq] ?? freq;
+                          return (
+                            <div className="mb-4" data-testid={`contract-price-${contract.id}`}>
+                              {hasNew ? (
+                                <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
+                                  <p className="text-sm font-semibold text-blue-900">
+                                    {qty} {qty === 1 ? "unit" : "units"} x {formatZAR(up)} {freq} = {" "}
+                                    <span className="text-blue-700">{formatZAR(tot)}</span>{" "}
+                                    <span className="font-normal text-blue-600">{suffix}</span>
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                                  <p className="text-sm font-semibold text-gray-700">
+                                    {formatZAR(Number(contract.monthlyPrice ?? 0))}{" "}
+                                    <span className="font-normal text-gray-500">per month</span>
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-sm" data-testid={`contract-price-${contract.id}`}>
-                              <span className="font-medium text-gray-500">Billing Amount: </span>
-                              <span className="font-semibold text-gray-900">{formatCurrency(Number(contract.monthlyPrice))} / month</span>
-                            </div>
-                          )}
-                        </div>
+                          );
+                        })()}
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-600 mb-4">
-                          {contract.unitPrice && contract.quantity ? (
-                            <>
-                              <div>
-                                <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Unit Price</span>
-                                <p className="text-gray-900 font-medium">{formatCurrency(Number(contract.unitPrice))}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Quantity</span>
-                                <p className="text-gray-900 font-medium">{contract.quantity} units</p>
-                              </div>
-                            </>
-                          ) : null}
                           <div>
                             <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Start Date</span>
                             <p className="text-gray-900" data-testid={`contract-start-${contract.id}`}>{formatDate(contract.startDate)}</p>
@@ -327,6 +328,18 @@ export default function Contracts() {
                             <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">End Date</span>
                             <p className="text-gray-900" data-testid={`contract-end-${contract.id}`}>
                               {contract.endDate ? formatDate(contract.endDate) : "Indefinite"}
+                            </p>
+                          </div>
+                          {contract.billingFrequency && (
+                            <div>
+                              <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Frequency</span>
+                              <p className="text-gray-900 capitalize">{contract.billingFrequency}</p>
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Last Price Increase</span>
+                            <p className="text-gray-900" data-testid={`contract-increase-${contract.id}`}>
+                              {contract.lastPriceIncrease ? formatDate(contract.lastPriceIncrease) : "Never"}
                             </p>
                           </div>
                         </div>

@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { RentalContract, Client, InventoryItem } from "@shared/schema";
 import { z } from "zod";
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const BILLING_FREQUENCIES = [
   { value: "weekly",    label: "Weekly" },
   { value: "monthly",   label: "Monthly" },
@@ -26,43 +27,55 @@ const BILLING_FREQUENCIES = [
   { value: "once-off",  label: "Once-off" },
 ] as const;
 
+type BillingFrequency = typeof BILLING_FREQUENCIES[number]["value"];
+
+// "per week", "per month", "per quarter", "per year", "once-off"
+const FREQ_SUFFIX: Record<BillingFrequency, string> = {
+  weekly:    "per week",
+  monthly:   "per month",
+  quarterly: "per quarter",
+  annually:  "per year",
+  "once-off": "once-off",
+};
+
+// ── Schema ────────────────────────────────────────────────────────────────────
+
 const contractFormSchema = z.object({
-  clientId: z.string().min(1, "Client is required"),
-  inventoryItemId: z.string().min(1, "Equipment is required"),
-  unitPrice: z.string().min(1, "Unit price is required").refine(
-    (v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0,
+  clientId:         z.string().min(1, "Client is required"),
+  inventoryItemId:  z.string().min(1, "Equipment is required"),
+  unitPrice:        z.string().min(1, "Unit price is required").refine(
+    v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0,
     "Unit price must be 0 or more"
   ),
-  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
+  quantity:         z.coerce.number().int().min(1, "Quantity must be at least 1"),
   billingFrequency: z.enum(["weekly", "monthly", "quarterly", "annually", "once-off"]),
-  calculatedTotal: z.string().optional(),
-  startDate: z.date({ required_error: "Start date is required" }),
-  endDate: z.date().optional(),
+  calculatedTotal:  z.string().optional(),
+  startDate:        z.date({ required_error: "Start date is required" }),
+  endDate:          z.date().optional(),
   lastPriceIncrease: z.date().optional(),
-  isActive: z.boolean().default(true),
-  notes: z.string().optional(),
+  isActive:         z.boolean().default(true),
+  notes:            z.string().optional(),
 });
 
 type ContractFormData = z.infer<typeof contractFormSchema>;
 
-const FREQ_LABEL: Record<string, string> = {
-  weekly:    "week",
-  monthly:   "month",
-  quarterly: "quarter",
-  annually:  "year",
-  "once-off": "once",
-};
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function calcTotal(unitPrice: string, quantity: number): number {
-  const p = parseFloat(unitPrice);
-  const q = Number(quantity);
-  if (isNaN(p) || isNaN(q) || q <= 0) return 0;
+/** Format as "R1 500.00" — space thousands, dot decimal */
+export function formatZAR(amount: number): string {
+  const [whole, cents] = amount.toFixed(2).split(".");
+  const withSpaces = whole.replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0"); // non-breaking space
+  return `R${withSpaces}.${cents}`;
+}
+
+function computeTotal(unitPrice: string, qty: number | string): number {
+  const p = parseFloat(String(unitPrice));
+  const q = parseInt(String(qty), 10);
+  if (!isFinite(p) || !isFinite(q) || p < 0 || q <= 0) return 0;
   return p * q;
 }
 
-function formatZAR(amount: number) {
-  return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", minimumFractionDigits: 2 }).format(amount);
-}
+// ── Component ─────────────────────────────────────────────────────────────────
 
 interface ContractFormProps {
   contract?: RentalContract | null;
@@ -78,74 +91,78 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
   const { data: allItems = [] } = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
   const inventoryItems = allItems.filter(i => i.type === "rental_equipment");
 
-  // Resolve defaults — migrate legacy monthlyPrice if new fields absent
+  // Migrate legacy monthlyPrice → unitPrice for edit mode
   const defaultUnitPrice = contract
-    ? (contract.unitPrice ?? contract.monthlyPrice ?? "")
+    ? String(contract.unitPrice ?? contract.monthlyPrice ?? "")
     : "";
-  const defaultQuantity = contract
-    ? (contract.quantity ?? 1)
-    : 1;
-  const defaultFreq = (contract?.billingFrequency as ContractFormData["billingFrequency"]) ?? "monthly";
+  const defaultQty = contract ? (contract.quantity ?? 1) : 1;
+  const defaultFreq = (contract?.billingFrequency as BillingFrequency | undefined) ?? "monthly";
 
   const form = useForm<ContractFormData>({
     resolver: zodResolver(contractFormSchema),
     defaultValues: {
-      clientId: contract?.clientId ?? "",
-      inventoryItemId: contract?.inventoryItemId ?? "",
-      unitPrice: String(defaultUnitPrice),
-      quantity: defaultQuantity,
+      clientId:         contract?.clientId ?? "",
+      inventoryItemId:  contract?.inventoryItemId ?? "",
+      unitPrice:        defaultUnitPrice,
+      quantity:         defaultQty,
       billingFrequency: defaultFreq,
-      calculatedTotal: contract?.calculatedTotal ?? "",
-      startDate: contract ? new Date(contract.startDate) : new Date(),
-      endDate: contract?.endDate ? new Date(contract.endDate) : undefined,
+      calculatedTotal:  contract?.calculatedTotal ?? "",
+      startDate:        contract ? new Date(contract.startDate) : new Date(),
+      endDate:          contract?.endDate ? new Date(contract.endDate) : undefined,
       lastPriceIncrease: contract?.lastPriceIncrease ? new Date(contract.lastPriceIncrease) : undefined,
-      isActive: contract?.isActive ?? true,
-      notes: contract?.notes ?? "",
+      isActive:         contract?.isActive ?? true,
+      notes:            contract?.notes ?? "",
     },
   });
 
-  const unitPriceVal = useWatch({ control: form.control, name: "unitPrice" });
-  const quantityVal  = useWatch({ control: form.control, name: "quantity" });
-  const freqVal      = useWatch({ control: form.control, name: "billingFrequency" });
+  // form.watch() triggers re-render on every keystroke — most reliable approach
+  const unitPriceVal     = form.watch("unitPrice");
+  const quantityVal      = form.watch("quantity");
+  const billingFreqVal   = form.watch("billingFrequency") as BillingFrequency;
 
-  const total = calcTotal(unitPriceVal, quantityVal);
+  const total    = computeTotal(unitPriceVal, quantityVal);
+  const hasTotal = total > 0;
+  const freqSuffix = FREQ_SUFFIX[billingFreqVal] ?? billingFreqVal;
 
-  // Keep calculatedTotal field in sync so it's submitted correctly
-  useEffect(() => {
-    form.setValue("calculatedTotal", total > 0 ? total.toFixed(2) : "");
-  }, [total, form]);
+  // ── Mutations ──────────────────────────────────────────────────────────────
+
+  const buildPayload = (data: ContractFormData) => ({
+    ...data,
+    calculatedTotal: hasTotal ? total.toFixed(2) : undefined,
+    // keep monthlyPrice in sync for legacy reports
+    monthlyPrice: billingFreqVal === "monthly" && hasTotal ? total.toFixed(2) : null,
+  });
 
   const createMutation = useMutation({
-    mutationFn: (data: ContractFormData) => apiRequest("POST", "/api/contracts", {
-      ...data,
-      monthlyPrice: freqVal === "monthly" ? total.toFixed(2) : null,
-    }),
+    mutationFn: (data: ContractFormData) =>
+      apiRequest("POST", "/api/contracts", buildPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       toast({ title: "Contract created", description: "Rental contract created successfully." });
       onSuccess();
     },
-    onError: () => toast({ title: "Error", description: "Failed to create contract.", variant: "destructive" }),
+    onError: () =>
+      toast({ title: "Error", description: "Failed to create contract.", variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: ContractFormData) => apiRequest("PUT", `/api/contracts/${contract!.id}`, {
-      ...data,
-      monthlyPrice: freqVal === "monthly" ? total.toFixed(2) : null,
-    }),
+    mutationFn: (data: ContractFormData) =>
+      apiRequest("PUT", `/api/contracts/${contract!.id}`, buildPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       toast({ title: "Contract updated", description: "Rental contract updated successfully." });
       onSuccess();
     },
-    onError: () => toast({ title: "Error", description: "Failed to update contract.", variant: "destructive" }),
+    onError: () =>
+      toast({ title: "Error", description: "Failed to update contract.", variant: "destructive" }),
   });
 
-  const onSubmit = (data: ContractFormData) => {
+  const onSubmit = (data: ContractFormData) =>
     contract ? updateMutation.mutate(data) : createMutation.mutate(data);
-  };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <Form {...form}>
@@ -191,7 +208,9 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
                 </FormControl>
                 <SelectContent>
                   {inventoryItems.map(item => (
-                    <SelectItem key={item.id} value={item.id}>{item.name} ({item.sku})</SelectItem>
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} ({item.sku})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -200,15 +219,22 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
           )} />
         </div>
 
-        {/* Pricing structure */}
+        {/* ── Pricing ──────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField control={form.control} name="unitPrice" render={({ field }) => (
             <FormItem>
               <FormLabel>Unit Price (ZAR)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" min="0" placeholder="150.00" {...field} data-testid="input-unit-price" />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="150.00"
+                  {...field}
+                  data-testid="input-unit-price"
+                />
               </FormControl>
-              <p className="text-xs text-muted-foreground mt-1">Price per unit / item</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Price per unit / item</p>
               <FormMessage />
             </FormItem>
           )} />
@@ -217,9 +243,16 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
             <FormItem>
               <FormLabel>Quantity</FormLabel>
               <FormControl>
-                <Input type="number" min="1" step="1" placeholder="1" {...field} data-testid="input-quantity" />
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="1"
+                  {...field}
+                  data-testid="input-quantity"
+                />
               </FormControl>
-              <p className="text-xs text-muted-foreground mt-1">Number of units</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Number of units</p>
               <FormMessage />
             </FormItem>
           )} />
@@ -227,7 +260,7 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
           <FormField control={form.control} name="billingFrequency" render={({ field }) => (
             <FormItem>
               <FormLabel>Billing Frequency</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger data-testid="select-frequency">
                     <SelectValue placeholder="Select frequency" />
@@ -239,41 +272,56 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">How often billed</p>
+              <p className="text-xs text-muted-foreground mt-0.5">How often billed</p>
               <FormMessage />
             </FormItem>
           )} />
         </div>
 
-        {/* Calculated Total — live, read-only */}
+        {/* ── Calculated Total — live read-only display ─────────────── */}
         <div className={cn(
-          "rounded-lg border-2 px-4 py-3 flex items-center gap-3",
-          total > 0 ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50"
+          "rounded-lg border-2 px-4 py-3",
+          hasTotal ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50"
         )}>
-          <Calculator className={cn("h-5 w-5 shrink-0", total > 0 ? "text-blue-500" : "text-gray-400")} />
-          <div className="flex-1">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Calculated Total</p>
-            {total > 0 ? (
-              <p className="text-lg font-bold text-blue-700">
-                {formatZAR(total)}
-                <span className="text-sm font-normal text-blue-500 ml-1">
-                  / {freqVal === "once-off" ? "once" : FREQ_LABEL[freqVal] ?? freqVal}
-                </span>
+          <div className="flex items-start gap-3">
+            <Calculator className={cn(
+              "h-5 w-5 mt-0.5 shrink-0",
+              hasTotal ? "text-blue-500" : "text-gray-400"
+            )} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Calculated Total
               </p>
-            ) : (
-              <p className="text-sm text-gray-400 italic">Enter unit price and quantity above</p>
-            )}
-          </div>
-          {total > 0 && (
-            <div className="text-right text-xs text-gray-400 shrink-0">
-              {unitPriceVal && Number(quantityVal) > 0 && (
-                <span>{formatZAR(parseFloat(unitPriceVal))} × {quantityVal}</span>
+
+              {hasTotal ? (
+                <>
+                  {/* Big total line */}
+                  <p className="text-2xl font-bold text-blue-700 leading-tight">
+                    {formatZAR(total)}
+                    <span className="text-sm font-normal text-blue-500 ml-2">{freqSuffix}</span>
+                  </p>
+                  {/* Breakdown line */}
+                  <p className="text-xs text-gray-500 mt-1">
+                    {parseInt(String(quantityVal), 10)}{" "}
+                    {parseInt(String(quantityVal), 10) === 1 ? "unit" : "units"}
+                    {" × "}
+                    {formatZAR(parseFloat(unitPriceVal) || 0)}
+                    {" = "}
+                    <strong>{formatZAR(total)}</strong>
+                    {" "}
+                    {freqSuffix}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  Enter unit price and quantity above
+                </p>
               )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Dates */}
+        {/* ── Dates ─────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField control={form.control} name="startDate" render={({ field }) => (
             <FormItem className="flex flex-col">
@@ -281,7 +329,11 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
-                    <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} data-testid="input-start-date">
+                    <Button
+                      variant="outline"
+                      className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                      data-testid="input-start-date"
+                    >
                       {field.value ? formatDate(field.value) : <span>Pick start date</span>}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
@@ -297,11 +349,17 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
 
           <FormField control={form.control} name="endDate" render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>End Date <span className="text-muted-foreground font-normal">(Optional)</span></FormLabel>
+              <FormLabel>
+                End Date <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+              </FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
-                    <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} data-testid="input-end-date">
+                    <Button
+                      variant="outline"
+                      className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                      data-testid="input-end-date"
+                    >
                       {field.value ? formatDate(field.value) : <span>Pick end date</span>}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
@@ -312,7 +370,10 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
-                    disabled={(date) => { const s = form.getValues("startDate"); return s ? date < s : false; }}
+                    disabled={(date) => {
+                      const s = form.getValues("startDate");
+                      return s ? date < s : false;
+                    }}
                     initialFocus
                   />
                 </PopoverContent>
@@ -324,18 +385,30 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
 
         <FormField control={form.control} name="lastPriceIncrease" render={({ field }) => (
           <FormItem className="flex flex-col">
-            <FormLabel>Last Price Increase <span className="text-muted-foreground font-normal">(Optional)</span></FormLabel>
+            <FormLabel>
+              Last Price Increase <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+            </FormLabel>
             <Popover>
               <PopoverTrigger asChild>
                 <FormControl>
-                  <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} data-testid="input-price-increase">
+                  <Button
+                    variant="outline"
+                    className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                    data-testid="input-price-increase"
+                  >
                     {field.value ? formatDate(field.value) : <span>Select date of last increase</span>}
                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                   </Button>
                 </FormControl>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(d) => d > new Date()} initialFocus />
+                <Calendar
+                  mode="single"
+                  selected={field.value}
+                  onSelect={field.onChange}
+                  disabled={(d) => d > new Date()}
+                  initialFocus
+                />
               </PopoverContent>
             </Popover>
             <FormMessage />
@@ -346,7 +419,13 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
           <FormItem>
             <FormLabel>Notes</FormLabel>
             <FormControl>
-              <Textarea placeholder="Additional contract notes or terms" className="min-h-[80px]" {...field} value={field.value ?? ""} data-testid="input-notes" />
+              <Textarea
+                placeholder="Additional contract notes or terms"
+                className="min-h-[80px]"
+                {...field}
+                value={field.value ?? ""}
+                data-testid="input-notes"
+              />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -366,7 +445,9 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
         )} />
 
         <div className="flex justify-end space-x-3 pt-2">
-          <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel">Cancel</Button>
+          <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel">
+            Cancel
+          </Button>
           <Button type="submit" disabled={isPending} data-testid="button-submit">
             {isPending ? "Saving..." : (contract ? "Update Contract" : "Create Contract")}
           </Button>
