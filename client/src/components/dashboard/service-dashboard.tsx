@@ -144,21 +144,6 @@ export function ServiceDashboard() {
   return (
     <div className="space-y-5">
 
-      {/* ── Snapshot cards ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Jobs Today",         value: countToday,      cls: "bg-blue-50 border-blue-100",   val: "text-blue-700"   },
-          { label: "Completed Today",    value: countDone,       cls: "bg-green-50 border-green-100", val: "text-green-700"  },
-          { label: "In Progress",        value: countInProgress, cls: countInProgress > 0 ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-100", val: countInProgress > 0 ? "text-blue-600" : "text-gray-400" },
-          { label: "Field Diaries Due",  value: countDiaryDue,   cls: countDiaryDue > 0   ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100", val: countDiaryDue > 0   ? "text-amber-600" : "text-gray-400" },
-        ].map(({ label, value, cls, val }) => (
-          <div key={label} className={`border rounded-xl p-3 text-center ${cls}`}>
-            <p className={`text-2xl font-bold leading-tight ${val}`}>{value}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{label}</p>
-          </div>
-        ))}
-      </div>
-
       {/* ── Current Job (if any in-progress) ────────────────────────────────── */}
       {currentJob && (
         <Card className="border-blue-300 bg-blue-50/40">

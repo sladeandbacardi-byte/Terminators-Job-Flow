@@ -315,7 +315,43 @@ export default function Dashboard() {
                   );
                 })()}
 
-                {/* SERVICE role — stats are rendered inside ServiceDashboard to stay in sync with the job list */}
+                {/* SERVICE role — 4 stat cards, filtered to the matched worker */}
+                {dashboardRole === "service" && (() => {
+                  const todayStr = format(new Date(), "yyyy-MM-dd");
+
+                  // Same worker-finding logic as ServiceDashboard
+                  const serviceDepts = new Set(["div-1","div-2","div-3","div-4"]);
+                  const myWorker =
+                    salesWorkers.find(w => w.id === (user as any)?.id || w.email === (user as any)?.email) ??
+                    salesWorkers
+                      .filter(w => serviceDepts.has(w.departmentId ?? "") && w.isActive !== false)
+                      .map(w => ({ w, count: allJobs.filter(j => j.workerId === w.id).length }))
+                      .sort((a, b) => b.count - a.count)[0]?.w;
+
+                  const myJobs  = myWorker ? allJobs.filter(j => j.workerId === myWorker.id) : [];
+                  const myToday = myJobs.filter(j => {
+                    if (!j.scheduledDate) return false;
+                    return format(new Date(j.scheduledDate), "yyyy-MM-dd") === todayStr;
+                  });
+
+                  const stats = [
+                    { label: "Jobs Today",        value: myToday.length,                                                                           cls: "bg-blue-50 border-blue-100",   val: "text-blue-700"   },
+                    { label: "Completed Today",   value: myToday.filter(j => j.status === "completed").length,                                     cls: "bg-green-50 border-green-100", val: "text-green-700"  },
+                    { label: "In Progress",       value: myToday.filter(j => j.status === "in-progress" || j.status === "in_progress").length,      cls: myToday.filter(j => j.status === "in-progress" || j.status === "in_progress").length > 0 ? "bg-indigo-50 border-indigo-200" : "bg-gray-50 border-gray-100", val: myToday.filter(j => j.status === "in-progress" || j.status === "in_progress").length > 0 ? "text-indigo-600" : "text-gray-400" },
+                    { label: "Field Diaries Due", value: myJobs.filter(j => j.status === "completed" && !j.notes).length,                          cls: myJobs.filter(j => j.status === "completed" && !j.notes).length > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100", val: myJobs.filter(j => j.status === "completed" && !j.notes).length > 0 ? "text-amber-600" : "text-gray-400" },
+                  ];
+
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {stats.map(({ label, value, cls, val }) => (
+                        <div key={label} className={`border rounded-lg px-2 py-2 text-center ${cls}`}>
+                          <p className={`text-xl font-bold leading-tight ${val}`}>{value}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5 leading-tight">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
               </div>
 
