@@ -192,7 +192,7 @@ export default function FleetPage() {
 
   const sendWeeklySummaryMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/fleet/send-weekly-summary", {}),
-    onSuccess: () => toast({ title: "Weekly report sent", description: "Fleet summary emailed to admin@terminators.co.za" }),
+    onSuccess: () => toast({ title: "Weekly report sent", description: "Fleet summary emailed to info@terminators.co.za" }),
     onError: () => toast({ title: "Failed to send", description: "Could not send weekly fleet report.", variant: "destructive" }),
   });
 
