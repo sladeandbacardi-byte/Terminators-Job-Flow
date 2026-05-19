@@ -25,6 +25,20 @@ function statusColor(status: string) {
   return STATUS_COLORS[status] ?? STATUS_COLORS[status.replace("-", "_")] ?? "bg-gray-100 text-gray-600";
 }
 
+function formatStatus(status: string) {
+  const map: Record<string, string> = {
+    in_progress:  "In Progress",
+    "in-progress": "In Progress",
+    scheduled:    "Scheduled",
+    completed:    "Completed",
+    cancelled:    "Cancelled",
+    pending:      "Pending",
+    unassigned:   "Unassigned",
+    overdue:      "Overdue",
+  };
+  return map[status] ?? status.replace(/[_-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
 const SERVICE_DEPTS = [
   { id: "div-1", name: "Pest Control",   color: "#22c55e" },
   { id: "div-2", name: "Sanitary Bins",  color: "#8b5cf6" },
@@ -144,8 +158,8 @@ export function CoordinatorDashboard() {
                       </td>
                       <td className="px-3 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{getTime(job)}</td>
                       <td className="px-3 py-2.5">
-                        <Badge className={`text-[11px] px-2 py-0.5 rounded-full capitalize font-medium border-0 ${statusColor(job.status)}`}>
-                          {job.status?.replace(/_|-/g, " ")}
+                        <Badge className={`text-[11px] px-2 py-0.5 rounded-full font-medium border-0 ${statusColor(job.status)}`}>
+                          {formatStatus(job.status)}
                         </Badge>
                       </td>
                       <td className="px-3 py-2.5 text-gray-400 text-xs truncate max-w-[150px] hidden lg:table-cell">
@@ -157,9 +171,9 @@ export function CoordinatorDashboard() {
                       </td>
                       <td className="px-3 py-2.5">
                         <Link href="/jobs">
-                          <button className="text-[11px] text-blue-600 hover:underline font-medium flex items-center gap-0.5 whitespace-nowrap">
-                            View <ExternalLink className="h-3 w-3" />
-                          </button>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50 transition-colors cursor-pointer whitespace-nowrap">
+                            View Job <ExternalLink className="h-3 w-3" />
+                          </span>
                         </Link>
                       </td>
                     </tr>
@@ -224,15 +238,15 @@ export function CoordinatorDashboard() {
                           {job.workerId ? getWorkerName(job.workerId) : <span className="text-red-500">—</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          <Badge className={`text-[11px] px-2 py-0.5 rounded-full capitalize font-medium border-0 ${statusColor(job.status)}`}>
-                            {job.status?.replace(/_|-/g, " ")}
+                          <Badge className={`text-[11px] px-2 py-0.5 rounded-full font-medium border-0 ${statusColor(job.status)}`}>
+                            {formatStatus(job.status)}
                           </Badge>
                         </td>
                         <td className="px-3 py-2.5">
                           <Link href="/jobs">
-                            <button className="text-[11px] text-blue-600 hover:underline font-medium flex items-center gap-0.5">
-                              View <ExternalLink className="h-3 w-3" />
-                            </button>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50 transition-colors cursor-pointer whitespace-nowrap">
+                              View Job <ExternalLink className="h-3 w-3" />
+                            </span>
                           </Link>
                         </td>
                       </tr>

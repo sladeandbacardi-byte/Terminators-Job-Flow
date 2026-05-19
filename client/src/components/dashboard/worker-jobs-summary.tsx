@@ -142,25 +142,40 @@ export function WorkerJobsSummary() {
                       <p className="text-xs text-gray-500">{worker.role}{dept ? ` · ${dept.name}` : ""}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5 text-xs">
                       {completed > 0 && (
-                        <span className="flex items-center gap-1 text-green-600">
-                          <CheckCircle className="h-3 w-3" />{completed}
+                        <span
+                          title="Completed"
+                          className="flex items-center gap-0.5 bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5"
+                        >
+                          <CheckCircle className="h-3 w-3" />
+                          {completed}
+                          <span className="hidden sm:inline ml-0.5 font-normal text-green-600">done</span>
                         </span>
                       )}
                       {inProgress > 0 && (
-                        <span className="flex items-center gap-1 text-blue-600">
-                          <Clock className="h-3 w-3" />{inProgress}
+                        <span
+                          title="In Progress"
+                          className="flex items-center gap-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5"
+                        >
+                          <Clock className="h-3 w-3" />
+                          {inProgress}
+                          <span className="hidden sm:inline ml-0.5 font-normal text-blue-600">active</span>
                         </span>
                       )}
                       {pending > 0 && (
-                        <span className="flex items-center gap-1 text-yellow-600">
-                          <AlertCircle className="h-3 w-3" />{pending}
+                        <span
+                          title="Scheduled / Pending"
+                          className="flex items-center gap-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded px-1.5 py-0.5"
+                        >
+                          <AlertCircle className="h-3 w-3" />
+                          {pending}
+                          <span className="hidden sm:inline ml-0.5 font-normal text-orange-600">sched</span>
                         </span>
                       )}
                     </div>
-                    <Badge variant="outline" className="text-xs font-semibold min-w-[28px] justify-center">
+                    <Badge variant="outline" className="text-xs font-semibold min-w-[28px] justify-center" title="Total jobs">
                       {wJobs.length}
                     </Badge>
                     <span className="text-gray-400 text-xs">{expandedWorker === worker.id ? "▲" : "▼"}</span>
