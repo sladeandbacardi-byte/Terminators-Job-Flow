@@ -9,6 +9,8 @@ import {
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -428,6 +430,10 @@ function MonthView({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function FieldDiariesPage() {
+  const { user } = useAuth();
+  const dashboardRole = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const isTechnician = dashboardRole === "service";
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [view, setView]             = useState<ViewMode>("day");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -443,12 +449,22 @@ export default function FieldDiariesPage() {
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c    => [c.id, c])),    [clients]);
   const deptMap   = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d])), [departments]);
 
-  const fieldWorkers = useMemo(() =>
-    workers
+  // For technicians: find their own worker record (match by email, then by name)
+  const myWorker = useMemo(() => {
+    if (!isTechnician) return null;
+    return workers.find(w => user?.email && w.email === user.email)
+        ?? workers.find(w => user?.firstName && user?.lastName && w.name === `${user.firstName} ${user.lastName}`)
+        ?? null;
+  }, [isTechnician, workers, user]);
+
+  const fieldWorkers = useMemo(() => {
+    // Technicians only see their own row
+    if (isTechnician) return myWorker ? [myWorker] : [];
+    return workers
       .filter(w => w.departmentId && SERVICE_DEPT_IDS.includes(w.departmentId) && w.isActive)
       .filter(w => deptFilter === "all" || w.departmentId === deptFilter)
-      .sort((a, b) => (a.departmentId ?? "").localeCompare(b.departmentId ?? "") || a.name.localeCompare(b.name)),
-    [workers, deptFilter]);
+      .sort((a, b) => (a.departmentId ?? "").localeCompare(b.departmentId ?? "") || a.name.localeCompare(b.name));
+  }, [workers, deptFilter, isTechnician, myWorker]);
 
   const serviceDepts = departments.filter(d => SERVICE_DEPT_IDS.includes(d.id));
 
@@ -531,7 +547,7 @@ export default function FieldDiariesPage() {
     <div className="min-h-screen bg-background flex">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Field Diaries" onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
+        <Header title={isTechnician ? "My Schedule" : "Staff Schedule"} onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
         <MobileNavigation isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
@@ -542,10 +558,12 @@ export default function FieldDiariesPage() {
               <div>
                 <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
                   <CalendarDays className="h-7 w-7 text-primary" />
-                  Field Staff Diaries
+                  {isTechnician ? "My Schedule" : "Field Staff Schedule"}
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  See where each technician will be — useful for planning on-site surveys
+                  {isTechnician
+                    ? "Your jobs, locations and availability for the day"
+                    : "See each technician's jobs, locations and availability for the day"}
                 </p>
               </div>
 
@@ -566,18 +584,20 @@ export default function FieldDiariesPage() {
 
             {/* Controls bar */}
             <div className="flex flex-wrap items-center gap-3">
-              {/* Department filter */}
-              <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {serviceDepts.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Department filter — hidden for technicians (they only see themselves) */}
+              {!isTechnician && (
+                <Select value={deptFilter} onValueChange={setDeptFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {serviceDepts.map(d => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Date navigator */}
               <div className="flex items-center gap-1">

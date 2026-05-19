@@ -32,7 +32,7 @@ const ALL_CATEGORIES = [
     roles: ["admin", "manager", "coordinator"],
     items: [
       { name: "Calendar",         href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
-      { name: "Field Diaries",    href: "/field-diaries",   icon: ClipboardList,roles: ["admin", "manager", "coordinator"] },
+      { name: "Staff Schedule",    href: "/field-diaries",   icon: ClipboardList,roles: ["admin", "manager", "coordinator"] },
       { name: "Job Scheduling",   href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
       { name: "Clients",          href: "/clients",         icon: Shield,       roles: ["admin", "manager", "coordinator"] },
       { name: "Staff",            href: "/workers",         icon: Users,        roles: ["admin", "manager", "coordinator"] },
@@ -50,7 +50,7 @@ const ALL_CATEGORIES = [
     roles: ["service"],
     items: [
       { name: "Calendar",      href: "/calendar",      icon: Calendar,      roles: ["service"] },
-      { name: "Field Diaries", href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
+      { name: "My Schedule",   href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
       { name: "My Jobs",       href: "/jobs",          icon: Briefcase,     roles: ["service"] },
     ],
   },
