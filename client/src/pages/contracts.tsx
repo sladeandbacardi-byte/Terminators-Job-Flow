@@ -284,29 +284,49 @@ export default function Contracts() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-4">
+                        {/* Pricing summary row */}
+                        <div className="mb-3">
+                          {contract.unitPrice && contract.quantity && contract.billingFrequency ? (
+                            <div className="flex flex-wrap items-center gap-1.5 text-sm" data-testid={`contract-price-${contract.id}`}>
+                              <span className="font-mono font-semibold text-gray-900">{formatCurrency(Number(contract.unitPrice))}</span>
+                              <span className="text-gray-400">×</span>
+                              <span className="text-gray-700">{contract.quantity} {Number(contract.quantity) === 1 ? "unit" : "units"}</span>
+                              <span className="text-gray-400 capitalize">{contract.billingFrequency}</span>
+                              <span className="text-gray-400">=</span>
+                              <span className="font-bold text-blue-700 text-base">
+                                {formatCurrency(Number(contract.calculatedTotal ?? (Number(contract.unitPrice) * Number(contract.quantity))))}
+                              </span>
+                              <span className="text-gray-500 text-xs">/ {contract.billingFrequency === "once-off" ? "once" : contract.billingFrequency}</span>
+                            </div>
+                          ) : (
+                            <div className="text-sm" data-testid={`contract-price-${contract.id}`}>
+                              <span className="font-medium text-gray-500">Billing Amount: </span>
+                              <span className="font-semibold text-gray-900">{formatCurrency(Number(contract.monthlyPrice))} / month</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-600 mb-4">
+                          {contract.unitPrice && contract.quantity ? (
+                            <>
+                              <div>
+                                <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Unit Price</span>
+                                <p className="text-gray-900 font-medium">{formatCurrency(Number(contract.unitPrice))}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Quantity</span>
+                                <p className="text-gray-900 font-medium">{contract.quantity} units</p>
+                              </div>
+                            </>
+                          ) : null}
                           <div>
-                            <span className="font-medium">Monthly Price:</span>
-                            <p className="text-gray-900 font-semibold" data-testid={`contract-price-${contract.id}`}>
-                              {formatCurrency(Number(contract.monthlyPrice))}
-                            </p>
+                            <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">Start Date</span>
+                            <p className="text-gray-900" data-testid={`contract-start-${contract.id}`}>{formatDate(contract.startDate)}</p>
                           </div>
                           <div>
-                            <span className="font-medium">Start Date:</span>
-                            <p className="text-gray-900" data-testid={`contract-start-${contract.id}`}>
-                              {formatDate(contract.startDate)}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium">End Date:</span>
+                            <span className="font-medium text-gray-500 text-xs uppercase tracking-wide block mb-0.5">End Date</span>
                             <p className="text-gray-900" data-testid={`contract-end-${contract.id}`}>
-                              {contract.endDate ? formatDate(contract.endDate) : 'Indefinite'}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium">Last Price Increase:</span>
-                            <p className="text-gray-900" data-testid={`contract-increase-${contract.id}`}>
-                              {contract.lastPriceIncrease ? formatDate(contract.lastPriceIncrease) : 'Never'}
+                              {contract.endDate ? formatDate(contract.endDate) : "Indefinite"}
                             </p>
                           </div>
                         </div>

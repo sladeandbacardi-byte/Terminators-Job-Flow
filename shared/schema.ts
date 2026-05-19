@@ -69,7 +69,13 @@ export const rentalContracts = pgTable("rental_contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull(),
   inventoryItemId: varchar("inventory_item_id").notNull(),
-  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
+  // Legacy field — kept for backward compatibility
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
+  // Structured pricing fields
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  quantity: integer("quantity").default(1),
+  billingFrequency: text("billing_frequency").default("monthly"),
+  calculatedTotal: decimal("calculated_total", { precision: 10, scale: 2 }),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
   lastPriceIncrease: timestamp("last_price_increase"),
