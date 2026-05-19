@@ -2478,7 +2478,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // ── FLEET — WEEKLY SUMMARY EMAIL ────────────────────────────────────────────
-  app.post("/api/fleet/send-weekly-summary", requireAuth, async (_req, res) => {
+  app.post("/api/fleet/send-weekly-summary", async (_req, res) => {
     try {
       const { generateWeeklyFleetSummaryEmail, sendEmail } = await import("./email-service");
       const params = await generateWeeklyFleetSummaryEmail(storage);
