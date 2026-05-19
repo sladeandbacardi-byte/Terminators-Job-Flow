@@ -50,7 +50,7 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
   admin:       "Managing Member",
   manager:     "Service Manager",
   sales:       "Sales",
-  service:     "Service",
+  service:     "Technician",
   accounts:    "Finance",
   coordinator: "Coordinator",
 };

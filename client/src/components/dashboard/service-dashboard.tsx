@@ -64,16 +64,23 @@ function isActive(status: string) {
   return status === "in_progress" || status === "in-progress";
 }
 
-/* ── action button label based on job status ─────────────────────────────── */
-function actionLabel(status: string) {
-  if (isActive(status)) return "Continue Job";
-  if (status === "completed") return "View Job";
+/* ── action button label + style based on job status ────────────────────── */
+function actionLabel(status: string, hasNotes: boolean) {
+  if (isActive(status))                            return "Continue Job";
+  if (status === "completed" && !hasNotes)         return "Submit Field Diary";
+  if (status === "completed")                      return "View Job";
   return "Start Job";
 }
 
-function actionStyle(status: string) {
-  if (isActive(status)) return "bg-blue-600 hover:bg-blue-700 text-white";
-  if (status === "completed") return "bg-gray-100 hover:bg-gray-200 text-gray-700";
+function actionHref(status: string, hasNotes: boolean) {
+  if (status === "completed" && !hasNotes) return "/field-diaries";
+  return "/jobs";
+}
+
+function actionStyle(status: string, hasNotes: boolean) {
+  if (isActive(status))                    return "bg-blue-600 hover:bg-blue-700 text-white";
+  if (status === "completed" && !hasNotes) return "bg-purple-600 hover:bg-purple-700 text-white";
+  if (status === "completed")              return "bg-gray-100 hover:bg-gray-200 text-gray-700";
   return "bg-green-600 hover:bg-green-700 text-white";
 }
 
@@ -156,6 +163,9 @@ export function ServiceDashboard() {
           <CardContent>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="space-y-0.5">
+                {currentJob.jobNumber && (
+                  <p className="font-mono text-[11px] text-blue-400 tracking-wide">{currentJob.jobNumber}</p>
+                )}
                 <p className="font-semibold text-gray-900">{getClient(currentJob.clientId)}</p>
                 <p className="text-sm text-gray-600">{getDept(currentJob.departmentId ?? null)}</p>
                 {currentJob.location && (
@@ -251,9 +261,9 @@ export function ServiceDashboard() {
                   </div>
                   {/* Row 2: action button */}
                   <div className="flex justify-end mt-1">
-                    <Link href="/jobs">
-                      <button className={`text-xs font-medium px-3 py-1 rounded-md transition-colors ${actionStyle(job.status)}`}>
-                        {actionLabel(job.status)}
+                    <Link href={actionHref(job.status, !!job.notes)}>
+                      <button className={`text-xs font-medium px-3 py-1 rounded-md transition-colors ${actionStyle(job.status, !!job.notes)}`}>
+                        {actionLabel(job.status, !!job.notes)}
                       </button>
                     </Link>
                   </div>
