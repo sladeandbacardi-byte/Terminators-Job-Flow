@@ -157,6 +157,7 @@ export default function FleetInspection() {
                             <span className="flex items-center gap-2">
                               <Truck className="h-3.5 w-3.5 text-blue-500" />
                               {v.name}
+                              <span className="text-xs text-gray-400 font-mono">{v.registration}</span>
                             </span>
                           </SelectItem>
                         ))}
