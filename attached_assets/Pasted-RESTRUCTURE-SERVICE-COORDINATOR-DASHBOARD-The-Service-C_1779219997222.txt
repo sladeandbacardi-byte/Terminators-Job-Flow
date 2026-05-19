@@ -1,0 +1,101 @@
+RESTRUCTURE SERVICE COORDINATOR DASHBOARD
+
+The Service Coordinator Dashboard currently shows too much information before the user reaches the actual job list.
+
+Please simplify and reorder the dashboard.
+
+Main goal:
+The coordinator must see today’s jobs first.
+
+Use this order:
+
+Today’s Service Snapshot
+Keep the compact top card with:
+Jobs Done Today
+In Progress
+Scheduled / Pending
+Unassigned
+Workers Active
+Awaiting Review
+All Jobs Today
+Move this section directly underneath the status cards.
+
+This should be the main working section for the coordinator.
+
+Show:
+
+Job number
+Client
+Department
+Worker
+Time
+Status
+Notes / instructions
+Action button: View Job
+Jobs Needing Attention
+Show only if there are issues.
+
+Include:
+
+Unassigned jobs
+Overdue jobs
+Jobs awaiting review
+Completed jobs with no field diary
+Cancelled or failed jobs
+Jobs with reported issues
+Jobs by Worker
+Keep this section, but make it more compact.
+
+Default view should show:
+
+Worker name
+Department
+Number of jobs today or this week
+Number completed
+Number in progress
+Expand arrow
+
+Only show full worker job details after clicking/expanding the worker.
+
+Department Overview
+Move Department Overview lower down.
+
+Do not show every department fully expanded by default.
+
+Show a compact department summary:
+
+Department name
+Active jobs
+Workers
+Awaiting review
+Open issues
+View Department button
+
+When the user clicks View Department, open the detailed department page with:
+
+Workers
+Jobs
+Clients
+Items
+Stock
+Recent activity
+Open alerts
+
+For Service Coordinator users, the dashboard should focus on jobs, workers, field diaries and operational issues.
+
+Do not show Sales, Admin, Accounts and other non-service departments in the main Department Overview unless the user selects “All Departments”.
+
+Default Department Overview filter for Service Coordinator should show only service departments:
+
+Pest Control
+Sanitary Bins
+Washroom
+Deep Cleaning
+
+Sales, Admin and Accounts can be hidden by default or shown only when “All Departments” is selected.
+
+Keep the sidebar as it is.
+
+Keep the Fleet section as it is.
+
+Make the dashboard shorter and more practical for daily use.

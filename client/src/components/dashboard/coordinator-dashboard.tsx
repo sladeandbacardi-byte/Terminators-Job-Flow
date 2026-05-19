@@ -1,24 +1,37 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DepartmentOverview } from "./department-overview";
 import { WorkerJobsSummary } from "./worker-jobs-summary";
 import {
-  CalendarDays, CheckCircle, ClipboardList, Users,
-  AlertCircle, FileWarning, Clock,
+  Clock, AlertTriangle, ChevronDown, ChevronUp, ExternalLink,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
+import { Link } from "wouter";
 import type { Job, Worker, Client, Department } from "@shared/schema";
 
 const STATUS_COLORS: Record<string, string> = {
   completed:   "bg-green-100 text-green-800",
   in_progress: "bg-blue-100 text-blue-800",
+  in_progress2: "bg-blue-100 text-blue-800",
   scheduled:   "bg-orange-100 text-orange-800",
   pending:     "bg-yellow-100 text-yellow-800",
   cancelled:   "bg-red-100 text-red-800",
 };
 
+function statusColor(status: string) {
+  return STATUS_COLORS[status] ?? STATUS_COLORS[status.replace("-", "_")] ?? "bg-gray-100 text-gray-600";
+}
+
+// Service departments to show by default (coordinator view)
+const SERVICE_DEPT_IDS = ["div-1", "div-2", "div-3", "div-4"];
+
 export function CoordinatorDashboard() {
+  const [showAllDepts, setShowAllDepts] = useState(false);
+  const [attentionExpanded, setAttentionExpanded] = useState(true);
+
   const { data: jobs = [] }        = useQuery<Job[]>({        queryKey: ["/api/jobs"] });
   const { data: workers = [] }     = useQuery<Worker[]>({     queryKey: ["/api/workers"] });
   const { data: clients = [] }     = useQuery<Client[]>({     queryKey: ["/api/clients"] });
@@ -32,77 +45,45 @@ export function CoordinatorDashboard() {
     return isValid(d) && format(d, "yyyy-MM-dd") === todayStr;
   });
 
-  const jobsDoneToday       = todayJobs.filter(j => j.status === "completed").length;
-  const activeJobsToday     = todayJobs.filter(j => j.status === "in-progress").length;
-  const pendingToday        = todayJobs.filter(j => j.status === "scheduled" || j.status === "pending").length;
-  const unassignedToday     = todayJobs.filter(j => !j.workerId).length;
-  const activeWorkers       = workers.filter(w => w.isActive !== false).length;
-  // Completed today but no notes entered — proxy for "field diary missing"
-  const awaitingReview      = todayJobs.filter(j => j.status === "completed" && !j.notes).length;
-
   const getWorkerName = (id: string | null) =>
     workers.find(w => w.id === id)?.name ?? "Unassigned";
   const getClientName = (id: string | null) =>
     clients.find(c => c.id === id)?.name ?? "—";
   const getDeptName = (id: string | null) =>
     departments.find(d => d.id === id)?.name ?? "—";
+  const getTime = (job: Job) => {
+    if (job.scheduledTime) return job.scheduledTime;
+    if (job.scheduledDate) {
+      const d = new Date(job.scheduledDate);
+      const h = d.getHours(), m = d.getMinutes();
+      if (h > 0 || m > 0) return format(d, "HH:mm");
+    }
+    return "—";
+  };
 
-  const statCards = [
-    {
-      label: "Jobs Done Today",
-      value: jobsDoneToday,
-      icon: CheckCircle,
-      color: "text-green-600",
-      bg: "bg-green-50 border-green-100",
-    },
-    {
-      label: "In Progress",
-      value: activeJobsToday,
-      icon: ClipboardList,
-      color: "text-blue-600",
-      bg: "bg-blue-50 border-blue-100",
-    },
-    {
-      label: "Scheduled / Pending",
-      value: pendingToday,
-      icon: CalendarDays,
-      color: "text-orange-600",
-      bg: "bg-orange-50 border-orange-100",
-    },
-    {
-      label: "Unassigned Jobs",
-      value: unassignedToday,
-      icon: AlertCircle,
-      color: unassignedToday > 0 ? "text-red-600"  : "text-gray-400",
-      bg:    unassignedToday > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-100",
-    },
-    {
-      label: "Workers Active",
-      value: activeWorkers,
-      icon: Users,
-      color: "text-cyan-700",
-      bg: "bg-cyan-50 border-cyan-100",
-    },
-    {
-      label: "Awaiting Review",
-      sub: "completed, no diary",
-      value: awaitingReview,
-      icon: FileWarning,
-      color: awaitingReview > 0 ? "text-amber-600" : "text-gray-400",
-      bg:    awaitingReview > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100",
-    },
+  // Jobs needing attention
+  const unassignedJobs  = todayJobs.filter(j => !j.workerId);
+  const awaitingReview  = todayJobs.filter(j => j.status === "completed" && !j.notes);
+  const cancelledJobs   = todayJobs.filter(j => j.status === "cancelled");
+  const overdueJobs     = jobs.filter(j => {
+    if (!j.scheduledDate) return false;
+    const d = new Date(j.scheduledDate);
+    return d < new Date() && j.status !== "completed" && j.status !== "cancelled"
+      && format(d, "yyyy-MM-dd") !== todayStr;
+  });
+
+  const attentionJobs = [
+    ...unassignedJobs.map(j => ({ ...j, _reason: "Unassigned" })),
+    ...awaitingReview.map(j =>  ({ ...j, _reason: "No diary entry" })),
+    ...cancelledJobs.map(j =>   ({ ...j, _reason: "Cancelled" })),
+    ...overdueJobs.map(j =>     ({ ...j, _reason: "Overdue" })),
   ];
+  const hasAttention = attentionJobs.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
-      {/* Department Overview */}
-      <DepartmentOverview />
-
-      {/* Jobs by Worker */}
-      <WorkerJobsSummary />
-
-      {/* All Jobs Today */}
+      {/* ── 1. ALL JOBS TODAY ─────────────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -120,40 +101,50 @@ export function CoordinatorDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 text-left">
-                    <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Job #</th>
-                    <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-                    <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Department</th>
-                    <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Worker</th>
-                    <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Notes</th>
+                  <tr className="border-b border-gray-100 text-left bg-gray-50/60">
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Job #</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Client</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Dept</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Worker</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Time</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Notes</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {todayJobs.map(job => (
                     <tr
                       key={job.id}
-                      className={`hover:bg-gray-50 transition-colors ${!job.workerId ? "bg-red-50/40" : ""}`}
+                      className={`hover:bg-gray-50 transition-colors ${!job.workerId ? "bg-red-50/30" : ""}`}
                     >
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{job.jobNumber ?? job.id.slice(0, 8)}</td>
-                      <td className="px-4 py-2.5 font-medium text-gray-800">{getClientName(job.clientId)}</td>
-                      <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell">{getDeptName(job.departmentId ?? null)}</td>
-                      <td className="px-4 py-2.5 hidden md:table-cell">
+                      <td className="px-3 py-2.5 font-mono text-xs text-gray-400">{job.jobNumber ?? job.id.slice(0, 6)}</td>
+                      <td className="px-3 py-2.5 font-medium text-gray-800 max-w-[130px] truncate">{getClientName(job.clientId)}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{getDeptName(job.departmentId ?? null)}</td>
+                      <td className="px-3 py-2.5 hidden md:table-cell text-xs">
                         {job.workerId
                           ? <span className="text-gray-600">{getWorkerName(job.workerId)}</span>
-                          : <span className="text-red-500 font-medium text-xs">Unassigned</span>}
+                          : <span className="text-red-500 font-semibold">Unassigned</span>}
                       </td>
-                      <td className="px-4 py-2.5">
-                        <Badge className={`text-[11px] px-2 py-0.5 rounded-full capitalize font-medium border-0 ${STATUS_COLORS[job.status] ?? "bg-gray-100 text-gray-600"}`}>
-                          {job.status}
+                      <td className="px-3 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{getTime(job)}</td>
+                      <td className="px-3 py-2.5">
+                        <Badge className={`text-[11px] px-2 py-0.5 rounded-full capitalize font-medium border-0 ${statusColor(job.status)}`}>
+                          {job.status?.replace(/_|-/g, " ")}
                         </Badge>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-400 text-xs truncate max-w-[180px] hidden lg:table-cell">
+                      <td className="px-3 py-2.5 text-gray-400 text-xs truncate max-w-[150px] hidden lg:table-cell">
                         {job.notes
                           ? job.notes
                           : job.status === "completed"
                             ? <span className="text-amber-500 italic">No diary entry</span>
                             : "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Link href="/jobs">
+                          <button className="text-[11px] text-blue-600 hover:underline font-medium flex items-center gap-0.5 whitespace-nowrap">
+                            View <ExternalLink className="h-3 w-3" />
+                          </button>
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -163,6 +154,100 @@ export function CoordinatorDashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── 2. JOBS NEEDING ATTENTION (conditional) ────────────────────────── */}
+      {hasAttention && (
+        <Card className="border-amber-200">
+          <CardHeader className="pb-2">
+            <button
+              className="w-full flex items-center justify-between text-left"
+              onClick={() => setAttentionExpanded(e => !e)}
+            >
+              <CardTitle className="text-sm font-semibold text-amber-700 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Jobs Needing Attention
+                <span className="ml-1 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                  {attentionJobs.length}
+                </span>
+              </CardTitle>
+              {attentionExpanded
+                ? <ChevronUp className="h-4 w-4 text-amber-400" />
+                : <ChevronDown className="h-4 w-4 text-amber-400" />}
+            </button>
+          </CardHeader>
+          {attentionExpanded && (
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-amber-100 text-left bg-amber-50/40">
+                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Issue</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Job #</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Client</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide hidden sm:table-cell">Worker</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Status</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-50">
+                    {attentionJobs.map((job, idx) => (
+                      <tr key={`${job.id}-${idx}`} className="hover:bg-amber-50/30 transition-colors">
+                        <td className="px-3 py-2.5">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                            job._reason === "Unassigned"     ? "bg-red-100 text-red-700" :
+                            job._reason === "No diary entry" ? "bg-amber-100 text-amber-700" :
+                            job._reason === "Cancelled"      ? "bg-gray-100 text-gray-500" :
+                            "bg-orange-100 text-orange-700"
+                          }`}>
+                            {job._reason}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-gray-400">{job.jobNumber ?? job.id.slice(0, 6)}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-800 max-w-[120px] truncate">{getClientName(job.clientId)}</td>
+                        <td className="px-3 py-2.5 hidden sm:table-cell text-xs text-gray-500">
+                          {job.workerId ? getWorkerName(job.workerId) : <span className="text-red-500">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Badge className={`text-[11px] px-2 py-0.5 rounded-full capitalize font-medium border-0 ${statusColor(job.status)}`}>
+                            {job.status?.replace(/_|-/g, " ")}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Link href="/jobs">
+                            <button className="text-[11px] text-blue-600 hover:underline font-medium flex items-center gap-0.5">
+                              View <ExternalLink className="h-3 w-3" />
+                            </button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* ── 3. JOBS BY WORKER ─────────────────────────────────────────────── */}
+      <WorkerJobsSummary />
+
+      {/* ── 4. DEPARTMENT OVERVIEW (service depts by default) ─────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Department Overview</p>
+          <button
+            className="text-xs text-blue-600 hover:underline font-medium"
+            onClick={() => setShowAllDepts(v => !v)}
+          >
+            {showAllDepts ? "Service Depts Only" : "All Departments"}
+          </button>
+        </div>
+        <DepartmentOverview
+          defaultSelection={showAllDepts ? [] : SERVICE_DEPT_IDS}
+          compact
+        />
+      </div>
 
     </div>
   );

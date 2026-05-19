@@ -10,6 +10,8 @@ import type { Worker, Job, InventoryItem, Client, Department } from "@shared/sch
 
 interface DepartmentOverviewProps {
   className?: string;
+  defaultSelection?: string[];
+  compact?: boolean;
 }
 
 interface DepartmentStats {
@@ -22,8 +24,8 @@ interface DepartmentStats {
   inventoryItems: number;
 }
 
-export function DepartmentOverview({ className = "" }: DepartmentOverviewProps) {
-  const departmentFilter = useDepartmentFilter();
+export function DepartmentOverview({ className = "", defaultSelection, compact = false }: DepartmentOverviewProps) {
+  const departmentFilter = useDepartmentFilter(defaultSelection ?? []);
   const [selectedDept, setSelectedDept] = useState<DepartmentStats | null>(null);
 
   const { data: departments = [] } = useQuery<Department[]>({
