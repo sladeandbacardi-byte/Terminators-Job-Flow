@@ -97,27 +97,40 @@ export function ServiceDashboard() {
   const { data: clients     = [] } = useQuery<Client[]>({    queryKey: ["/api/clients"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
-  /* Try to find the matching worker record for the logged-in user.
-     In demo mode this may not match — fall back to first active service worker. */
-  const myWorker: Worker | undefined =
-    workers.find(w => w.id === user?.id || w.email === (user as any)?.email) ??
-    workers.find(w => ["div-1","div-2","div-3","div-4"].includes(w.departmentId ?? "") && w.isActive !== false);
+  /* ── Resolve which worker this user is ────────────────────────────────────
+     Priority: direct ID match → email match → worker with most assigned jobs
+     (the last fallback gives meaningful demo data when no auth link exists)   */
+  const myWorker: Worker | undefined = (() => {
+    // 1. direct ID or email match
+    const direct = workers.find(
+      w => w.id === (user as any)?.id || w.email === (user as any)?.email
+    );
+    if (direct) return direct;
 
-  const getClient   = (id: string | null) => clients.find(c => c.id === id)?.name ?? "—";
-  const getDept     = (id: string | null) => departments.find(d => d.id === id)?.name ?? "—";
+    // 2. service-dept worker with the most jobs (best demo fallback)
+    const serviceDepts = new Set(["div-1","div-2","div-3","div-4"]);
+    const ranked = workers
+      .filter(w => serviceDepts.has(w.departmentId ?? "") && w.isActive !== false)
+      .map(w => ({ w, count: allJobs.filter(j => j.workerId === w.id).length }))
+      .sort((a, b) => b.count - a.count);
+    return ranked[0]?.w;
+  })();
 
-  /* ── Filter jobs to this worker ───────────────────────────────────────── */
-  const myJobs      = myWorker ? allJobs.filter(j => j.workerId === myWorker.id) : [];
-  const myToday     = myJobs.filter(j => isToday(j.scheduledDate));
-  const myWeek      = myJobs.filter(j => isThisWeek(j.scheduledDate));
+  const getClient = (id: string | null) => clients.find(c => c.id === id)?.name ?? "—";
+  const getDept   = (id: string | null) => departments.find(d => d.id === id)?.name ?? "—";
+
+  /* ── All data filtered to THIS worker — single source of truth ────────── */
+  const myJobs  = myWorker ? allJobs.filter(j => j.workerId === myWorker.id) : [];
+  const myToday = myJobs.filter(j => isToday(j.scheduledDate));   // ← used by BOTH stats AND list
+  const myWeek  = myJobs.filter(j => isThisWeek(j.scheduledDate));
 
   /* Current job = first in-progress job today */
-  const currentJob  = myToday.find(j => isActive(j.status));
+  const currentJob = myToday.find(j => isActive(j.status));
 
-  /* Jobs needing diary = completed today but no notes */
-  const diaryDue    = myJobs.filter(j => j.status === "completed" && !j.notes);
+  /* Jobs needing diary = completed (any date) with no notes */
+  const diaryDue = myJobs.filter(j => j.status === "completed" && !j.notes);
 
-  /* Snapshot counts */
+  /* Snapshot counts — derived from myToday, same as the list below */
   const countToday      = myToday.length;
   const countDone       = myToday.filter(j => j.status === "completed").length;
   const countInProgress = myToday.filter(j => isActive(j.status)).length;

@@ -315,31 +315,7 @@ export default function Dashboard() {
                   );
                 })()}
 
-                {/* SERVICE role — technician snapshot */}
-                {dashboardRole === "service" && (() => {
-                  const todayStr = format(new Date(), "yyyy-MM-dd");
-                  const todayJobs = allJobs.filter(j => {
-                    if (!j.scheduledDate) return false;
-                    const d = new Date(j.scheduledDate);
-                    return format(d, "yyyy-MM-dd") === todayStr;
-                  });
-                  const techStats = [
-                    { label: "Jobs Today",        value: todayJobs.length,                                                                     cls: "bg-blue-50 border-blue-100",   val: "text-blue-600"  },
-                    { label: "Completed Today",   value: todayJobs.filter(j => j.status === "completed").length,                               cls: "bg-green-50 border-green-100", val: "text-green-600" },
-                    { label: "In Progress",       value: todayJobs.filter(j => j.status === "in-progress" || j.status === "in_progress").length, cls: "bg-indigo-50 border-indigo-100", val: "text-indigo-600" },
-                    { label: "Diaries Due",       value: allJobs.filter(j => j.status === "completed" && !j.notes).length,                      cls: allJobs.filter(j => j.status === "completed" && !j.notes).length > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100", val: allJobs.filter(j => j.status === "completed" && !j.notes).length > 0 ? "text-amber-600" : "text-gray-400" },
-                  ];
-                  return (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {techStats.map(({ label, value, cls, val }) => (
-                        <div key={label} className={`border rounded-lg px-2 py-2 text-center ${cls}`}>
-                          <p className={`text-xl font-bold leading-tight ${val}`}>{value}</p>
-                          <p className="text-[10px] text-gray-500 font-medium mt-0.5 leading-tight">{label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                {/* SERVICE role — stats are rendered inside ServiceDashboard to stay in sync with the job list */}
 
               </div>
 
