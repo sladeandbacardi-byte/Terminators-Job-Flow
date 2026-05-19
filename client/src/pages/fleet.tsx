@@ -14,7 +14,7 @@ import { Link, useLocation } from "wouter";
 import {
   Truck, Gauge, Fuel, ClipboardCheck, AlertTriangle, CheckCircle,
   Car, User, Search, ChevronRight, Wrench, Calendar, Shield,
-  TriangleAlert, Activity,
+  TriangleAlert, Activity, Mail,
 } from "lucide-react";
 import { format, addMonths, differenceInDays } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
@@ -189,6 +189,12 @@ export default function FleetPage() {
   const [, navigate]                    = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [creatingJob, setCreatingJob]   = useState<Record<string, boolean>>({});
+
+  const sendWeeklySummaryMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/fleet/send-weekly-summary", {}),
+    onSuccess: () => toast({ title: "Weekly report sent", description: "Fleet summary emailed to admin@terminators.co.za" }),
+    onError: () => toast({ title: "Failed to send", description: "Could not send weekly fleet report.", variant: "destructive" }),
+  });
 
   // ── Inspection action mutations ──────────────────────────────────────────────
   const markReviewedMutation = useMutation({
@@ -373,6 +379,18 @@ export default function FleetPage() {
                     <Fuel className="h-4 w-4" /> Fuel Fill-up
                   </Button>
                 </Link>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"
+                    onClick={() => sendWeeklySummaryMutation.mutate()}
+                    disabled={sendWeeklySummaryMutation.isPending}
+                  >
+                    <Mail className="h-4 w-4" />
+                    {sendWeeklySummaryMutation.isPending ? "Sending…" : "Weekly Report"}
+                  </Button>
+                )}
               </div>
             </div>
 

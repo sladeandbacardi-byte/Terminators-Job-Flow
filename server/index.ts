@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -55,6 +57,31 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
+
+  // ── Weekly fleet summary scheduler ────────────────────────────────────────
+  // Fires every hour; sends report on Monday between 07:00–07:59 SAST (UTC+2)
+  let weeklySummarySentThisWeek = false;
+  setInterval(async () => {
+    const now = new Date();
+    const saTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC→SAST
+    const isMonday = saTime.getUTCDay() === 1;
+    const isSevenAm = saTime.getUTCHours() === 7;
+    if (isMonday && isSevenAm && !weeklySummarySentThisWeek) {
+      weeklySummarySentThisWeek = true;
+      try {
+        const params = await generateWeeklyFleetSummaryEmail(storage);
+        if (params) {
+          await sendEmail(params);
+          log("Weekly fleet summary email sent to " + params.to);
+        }
+      } catch (e) {
+        console.error("Weekly fleet summary failed:", e);
+        weeklySummarySentThisWeek = false; // allow retry next hour
+      }
+    }
+    // Reset flag on Tuesday so it fires again next Monday
+    if (saTime.getUTCDay() === 2) weeklySummarySentThisWeek = false;
+  }, 60 * 60 * 1000);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.

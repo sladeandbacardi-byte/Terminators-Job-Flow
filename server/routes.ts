@@ -2477,6 +2477,17 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
+  // ── FLEET — WEEKLY SUMMARY EMAIL ────────────────────────────────────────────
+  app.post("/api/fleet/send-weekly-summary", requireAuth, async (_req, res) => {
+    try {
+      const { generateWeeklyFleetSummaryEmail, sendEmail } = await import("./email-service");
+      const params = await generateWeeklyFleetSummaryEmail(storage);
+      if (!params) return res.status(500).json({ error: "Could not generate summary" });
+      await sendEmail(params);
+      res.json({ success: true, message: `Weekly fleet summary sent to ${params.to}` });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
   // ── FLEET — NOTIFICATIONS ───────────────────────────────────────────────────
   app.get("/api/fleet/notifications", async (_req, res) => {
     try { res.json(await storage.getFleetNotifications()); }

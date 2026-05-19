@@ -1,0 +1,129 @@
+Integrate the existing Fleet Guard app into Job Flow as a Fleet module.
+
+Do not keep Fleet Guard as a separate app.
+Move the Fleet Guard features into Job Flow using Job Flow’s existing authentication, layout, users, roles, and database.
+
+Add Fleet section to Job Flow with these pages:
+Fleet Dashboard
+Maintenance
+Report Issue
+Log KMs
+Vehicle Inspection
+Fuel Fill-up
+Vehicle Profile
+
+Use Job Flow users as drivers.
+Use Job Flow admin/manager roles for fleet management permissions.
+
+Create or update these database tables:
+vehicles
+vehicle_assignments
+km_logs
+fuel_fillups
+vehicle_inspections
+inspection_items
+vehicle_issues
+maintenance_requests
+service_records
+
+Every fleet record must link to:
+vehicle_id
+driver_id
+date_time
+
+Vehicle Inspection:
+Use the Terminators vehicle maintenance checklist as the standard inspection template.
+Each inspection item must have:
+category
+item_to_check
+how_to_check
+result: Pass / Fail / Not Checked
+comments
+problem_reported
+photo_upload
+
+If any inspection item fails:
+create failed inspection alert
+create vehicle issue
+add it to maintenance queue
+send immediate admin email
+
+If all inspection items pass:
+do not send immediate email
+
+Weekly fleet summary:
+Send one weekly email to admin including:
+drivers
+vehicles
+registrations
+KM logs
+business kilometers
+private kilometers
+fuel fill-ups
+fuel litres
+fuel cost
+inspections completed
+failed inspections
+open issues
+maintenance completed
+service costs
+
+Maintenance:
+Drivers can report issues.
+Reported issues must appear on the vehicle profile and in the maintenance queue.
+Managers can update issue status:
+Open
+Booked
+In Progress
+Waiting Parts
+Completed
+Cancelled
+
+Service records:
+Managers can add service records with:
+vehicle
+registration
+service date
+odometer
+service provider
+work done
+issues fixed
+cost
+invoice/photo upload
+next service due date
+next service due odometer
+notes
+
+Fleet Dashboard:
+Show summary cards:
+total vehicles
+active vehicles
+due service
+workshop
+unsafe
+open issues
+
+Vehicle Profile:
+Show:
+vehicle details
+assigned driver
+registration
+current odometer
+open issues
+inspection history
+KM history
+fuel history
+maintenance history
+service history
+service provider
+service costs
+uploaded invoices/photos
+next service due
+
+Migration:
+Inspect the old Fleet Guard Replit app and identify where data is stored.
+Migrate existing Fleet Guard vehicles, drivers, KM logs, fuel fill-ups, inspections, and issues into Job Flow.
+Create a backup before migration.
+Do not delete existing Job Flow data.
+Do not overwrite existing records.
+Keep styling consistent with the current Job Flow app.
