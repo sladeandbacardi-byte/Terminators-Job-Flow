@@ -49,10 +49,9 @@ const ALL_CATEGORIES = [
     icon: Wrench,
     roles: ["service"],
     items: [
-      { name: "Calendar",      href: "/calendar",      icon: Calendar,      roles: ["service"] },
-      { name: "My Schedule",   href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
-      { name: "My Jobs",       href: "/jobs",          icon: Briefcase,     roles: ["service"] },
-      { name: "Field Diaries", href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
+      { name: "Calendar",      href: "/calendar",      icon: Calendar,      roles: ["service"], tooltip: "View your assigned jobs by date." },
+      { name: "My Jobs",       href: "/jobs",          icon: Briefcase,     roles: ["service"], tooltip: "Your main job list and daily work sheet." },
+      { name: "Field Diaries", href: "/field-diaries", icon: ClipboardList, roles: ["service"], tooltip: "Submit and view job reports linked to completed work." },
     ],
   },
 
@@ -181,6 +180,7 @@ export default function Sidebar() {
                   }
                   return (
                     <Link key={item.name} href={item.href} className={linkClass}
+                      title={(item as any).tooltip}
                       data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}>
                       <Icon className="h-4 w-4" />
                       <span>{item.name}</span>

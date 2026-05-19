@@ -563,7 +563,7 @@ export default function FieldDiariesPage() {
     <div className="min-h-screen bg-background flex">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={isTechnician ? "My Schedule" : "Staff Schedule"} onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
+        <Header title={isTechnician ? "Field Diaries" : "Staff Schedule"} onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
         <MobileNavigation isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
@@ -574,11 +574,11 @@ export default function FieldDiariesPage() {
               <div>
                 <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
                   <CalendarDays className="h-7 w-7 text-primary" />
-                  {isTechnician ? "My Schedule" : "Field Staff Schedule"}
+                  {isTechnician ? "Field Diaries" : "Field Staff Schedule"}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {isTechnician
-                    ? "Your jobs, locations and availability for the day"
+                    ? "Submit job reports, notes, photos and signatures after completing work."
                     : "See each technician's jobs, locations and availability for the day"}
                 </p>
               </div>

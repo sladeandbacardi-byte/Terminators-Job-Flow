@@ -1185,6 +1185,13 @@ export default function Calendar() {
         />
         
         <main className="flex-1 overflow-hidden p-6 pb-20 lg:pb-6">
+          {/* Technician subtitle */}
+          {isTechnician && (
+            <p className="text-sm text-muted-foreground mb-4">
+              View your assigned jobs by day, week or month.
+            </p>
+          )}
+
           {/* Calendar Controls */}
           <div className="mb-6 space-y-4">
             {/* Top Controls */}

@@ -90,6 +90,13 @@ export default function Jobs() {
         />
         
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+          {/* Technician subtitle */}
+          {isTechnician && (
+            <p className="text-sm text-muted-foreground mb-4">
+              Your daily work sheet. Start, continue and complete assigned jobs.
+            </p>
+          )}
+
           {/* Header Actions */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1 relative">
