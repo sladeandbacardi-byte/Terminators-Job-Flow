@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DepartmentOverview } from "./department-overview";
 import { WorkerJobsSummary } from "./worker-jobs-summary";
 import {
-  Clock, AlertTriangle, ChevronDown, ChevronUp, ExternalLink,
+  Clock, AlertTriangle, ChevronDown, ChevronUp, ExternalLink, LayoutGrid,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
 import { Link } from "wouter";
@@ -15,7 +16,6 @@ import type { Job, Worker, Client, Department } from "@shared/schema";
 const STATUS_COLORS: Record<string, string> = {
   completed:   "bg-green-100 text-green-800",
   in_progress: "bg-blue-100 text-blue-800",
-  in_progress2: "bg-blue-100 text-blue-800",
   scheduled:   "bg-orange-100 text-orange-800",
   pending:     "bg-yellow-100 text-yellow-800",
   cancelled:   "bg-red-100 text-red-800",
@@ -25,16 +25,20 @@ function statusColor(status: string) {
   return STATUS_COLORS[status] ?? STATUS_COLORS[status.replace("-", "_")] ?? "bg-gray-100 text-gray-600";
 }
 
-// Service departments to show by default (coordinator view)
-const SERVICE_DEPT_IDS = ["div-1", "div-2", "div-3", "div-4"];
+const SERVICE_DEPTS = [
+  { id: "div-1", name: "Pest Control",   color: "#22c55e" },
+  { id: "div-2", name: "Sanitary Bins",  color: "#8b5cf6" },
+  { id: "div-3", name: "Washroom",       color: "#3b82f6" },
+  { id: "div-4", name: "Deep Cleaning",  color: "#f59e0b" },
+];
 
 export function CoordinatorDashboard() {
-  const [showAllDepts, setShowAllDepts] = useState(false);
   const [attentionExpanded, setAttentionExpanded] = useState(true);
+  const [deptDialogOpen, setDeptDialogOpen] = useState(false);
 
-  const { data: jobs = [] }        = useQuery<Job[]>({        queryKey: ["/api/jobs"] });
-  const { data: workers = [] }     = useQuery<Worker[]>({     queryKey: ["/api/workers"] });
-  const { data: clients = [] }     = useQuery<Client[]>({     queryKey: ["/api/clients"] });
+  const { data: jobs = [] }    = useQuery<Job[]>({       queryKey: ["/api/jobs"] });
+  const { data: workers = [] } = useQuery<Worker[]>({    queryKey: ["/api/workers"] });
+  const { data: clients = [] } = useQuery<Client[]>({    queryKey: ["/api/clients"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -62,28 +66,40 @@ export function CoordinatorDashboard() {
   };
 
   // Jobs needing attention
-  const unassignedJobs  = todayJobs.filter(j => !j.workerId);
-  const awaitingReview  = todayJobs.filter(j => j.status === "completed" && !j.notes);
-  const cancelledJobs   = todayJobs.filter(j => j.status === "cancelled");
-  const overdueJobs     = jobs.filter(j => {
+  const unassignedJobs = todayJobs.filter(j => !j.workerId);
+  const awaitingReview = todayJobs.filter(j => j.status === "completed" && !j.notes);
+  const cancelledJobs  = todayJobs.filter(j => j.status === "cancelled");
+  const overdueJobs    = jobs.filter(j => {
     if (!j.scheduledDate) return false;
     const d = new Date(j.scheduledDate);
-    return d < new Date() && j.status !== "completed" && j.status !== "cancelled"
+    return d < new Date()
+      && j.status !== "completed"
+      && j.status !== "cancelled"
       && format(d, "yyyy-MM-dd") !== todayStr;
   });
 
   const attentionJobs = [
     ...unassignedJobs.map(j => ({ ...j, _reason: "Unassigned" })),
-    ...awaitingReview.map(j =>  ({ ...j, _reason: "No diary entry" })),
-    ...cancelledJobs.map(j =>   ({ ...j, _reason: "Cancelled" })),
-    ...overdueJobs.map(j =>     ({ ...j, _reason: "Overdue" })),
+    ...awaitingReview.map(j => ({ ...j, _reason: "No diary entry" })),
+    ...cancelledJobs.map(j =>  ({ ...j, _reason: "Cancelled" })),
+    ...overdueJobs.map(j =>    ({ ...j, _reason: "Overdue" })),
   ];
   const hasAttention = attentionJobs.length > 0;
+
+  // Compact dept counts (active = not completed/cancelled)
+  const deptCounts = SERVICE_DEPTS.map(d => ({
+    ...d,
+    activeJobs: jobs.filter(j =>
+      j.departmentId === d.id &&
+      j.status !== "completed" &&
+      j.status !== "cancelled"
+    ).length,
+  }));
 
   return (
     <div className="space-y-5">
 
-      {/* ── 1. ALL JOBS TODAY ─────────────────────────────────────────────── */}
+      {/* ── 1. ALL JOBS TODAY ──────────────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -109,7 +125,7 @@ export function CoordinatorDashboard() {
                     <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Time</th>
                     <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                     <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Notes</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide"></th>
+                    <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -186,7 +202,7 @@ export function CoordinatorDashboard() {
                       <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Client</th>
                       <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide hidden sm:table-cell">Worker</th>
                       <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Status</th>
-                      <th className="px-3 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide"></th>
+                      <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-amber-50">
@@ -232,22 +248,53 @@ export function CoordinatorDashboard() {
       {/* ── 3. JOBS BY WORKER ─────────────────────────────────────────────── */}
       <WorkerJobsSummary />
 
-      {/* ── 4. DEPARTMENT OVERVIEW (service depts by default) ─────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Department Overview</p>
-          <button
-            className="text-xs text-blue-600 hover:underline font-medium"
-            onClick={() => setShowAllDepts(v => !v)}
-          >
-            {showAllDepts ? "Service Depts Only" : "All Departments"}
-          </button>
-        </div>
-        <DepartmentOverview
-          defaultSelection={showAllDepts ? [] : SERVICE_DEPT_IDS}
-          compact
-        />
-      </div>
+      {/* ── 4. COMPACT DEPARTMENT SUMMARY ─────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4 text-gray-400" />
+              Service Departments
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7 px-3"
+              onClick={() => setDeptDialogOpen(true)}
+            >
+              View Department Overview
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {deptCounts.map(d => (
+              <div
+                key={d.id}
+                className="flex flex-col items-center justify-center rounded-lg border p-3 gap-1"
+                style={{ borderLeftColor: d.color, borderLeftWidth: 3 }}
+              >
+                <span className="text-2xl font-bold text-gray-900">{d.activeJobs}</span>
+                <span className="text-[11px] text-gray-500 text-center leading-tight">{d.name}</span>
+                <span className="text-[10px] text-gray-400">active jobs</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Full Department Overview dialog */}
+      <Dialog open={deptDialogOpen} onOpenChange={setDeptDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutGrid className="h-5 w-5 text-gray-500" />
+              Department Overview
+            </DialogTitle>
+          </DialogHeader>
+          <DepartmentOverview defaultSelection={["div-1", "div-2", "div-3", "div-4"]} />
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
