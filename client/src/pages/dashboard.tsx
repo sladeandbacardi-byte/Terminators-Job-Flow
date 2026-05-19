@@ -287,7 +287,33 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* COORDINATOR role — full stats shown in CoordinatorDashboard cards below */}
+                {/* COORDINATOR role — compact 6-stat grid inside the top card */}
+                {dashboardRole === "coordinator" && (() => {
+                  const todayStr = format(new Date(), "yyyy-MM-dd");
+                  const todayJobs = allJobs.filter(j => {
+                    if (!j.scheduledDate) return false;
+                    const d = new Date(j.scheduledDate);
+                    return format(d, "yyyy-MM-dd") === todayStr;
+                  });
+                  const coordStats = [
+                    { label: "Jobs Done Today",    value: todayJobs.filter(j => j.status === "completed").length,                                   cls: "bg-green-50 border-green-100",   val: "text-green-600" },
+                    { label: "In Progress",         value: todayJobs.filter(j => j.status === "in-progress" || j.status === "in_progress").length,   cls: "bg-blue-50 border-blue-100",     val: "text-blue-600" },
+                    { label: "Scheduled/Pending",   value: todayJobs.filter(j => j.status === "scheduled" || j.status === "pending").length,         cls: "bg-orange-50 border-orange-100", val: "text-orange-600" },
+                    { label: "Unassigned",          value: todayJobs.filter(j => !j.workerId).length,                                               cls: todayJobs.filter(j => !j.workerId).length > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-100", val: todayJobs.filter(j => !j.workerId).length > 0 ? "text-red-600" : "text-gray-400" },
+                    { label: "Workers Active",      value: metrics?.activeWorkers ?? "—",                                                           cls: "bg-cyan-50 border-cyan-100",     val: "text-cyan-700" },
+                    { label: "Awaiting Review",     value: todayJobs.filter(j => j.status === "completed" && !j.notes).length,                      cls: todayJobs.filter(j => j.status === "completed" && !j.notes).length > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100", val: todayJobs.filter(j => j.status === "completed" && !j.notes).length > 0 ? "text-amber-600" : "text-gray-400" },
+                  ];
+                  return (
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {coordStats.map(({ label, value, cls, val }) => (
+                        <div key={label} className={`border rounded-lg px-2 py-2 text-center ${cls}`}>
+                          <p className={`text-xl font-bold leading-tight ${val}`}>{value}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5 leading-tight">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* SERVICE role */}
                 {dashboardRole === "service" && (

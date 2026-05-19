@@ -96,20 +96,6 @@ export function CoordinatorDashboard() {
   return (
     <div className="space-y-6">
 
-      {/* Main stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {statCards.map(({ label, sub, value, icon: Icon, color, bg }) => (
-          <Card key={label} className={`border ${bg}`}>
-            <CardContent className="p-4">
-              <Icon className={`h-5 w-5 ${color} mb-2`} />
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              <p className="text-xs text-gray-600 font-medium leading-tight mt-0.5">{label}</p>
-              {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
       {/* Department Overview */}
       <DepartmentOverview />
 
