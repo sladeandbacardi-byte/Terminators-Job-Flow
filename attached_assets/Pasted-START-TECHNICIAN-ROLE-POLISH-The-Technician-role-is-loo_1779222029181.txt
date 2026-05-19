@@ -1,0 +1,122 @@
+START TECHNICIAN ROLE POLISH
+
+The Technician role is looking better, but there are still permission and data issues.
+
+Technician calendar permissions
+
+For Technician / Worker users, remove or hide:
+
+Create Appointment
+Create Job
+Edit other workers’ jobs
+Print Daily Schedule, unless specifically enabled
+
+Technicians should only be able to:
+
+View their assigned jobs
+Open job details
+Start Job
+Continue Job
+Complete Job
+Submit Field Diary
+Report Issue
+Use fleet actions assigned to them
+Technician My Jobs page
+
+The My Jobs page must show only jobs assigned to the logged-in technician.
+
+Remove the Create Job button for Technician users.
+
+Keep search and status filters if useful, but filter results by the logged-in technician automatically.
+
+Fix My Schedule page
+
+The My Schedule page currently shows:
+0 staff • 0 jobs
+No field staff found for the selected filter
+
+This is wrong for Technician users.
+
+For Technician users, My Schedule should not show all staff.
+It should show only the logged-in technician’s assigned schedule.
+
+Rename the empty state if needed:
+No jobs scheduled for you for the selected day.
+
+My Schedule should show:
+
+Job number
+Client
+Location
+Time
+Service type
+Status
+Notes
+Button: View Job / Start Job / Continue Job
+Technician sidebar
+
+Keep Technician sidebar as:
+
+SERVICE
+
+Calendar
+My Schedule
+My Jobs
+Field Diaries
+
+FLEET
+
+Report Issue
+Log KMs
+Vehicle Inspection
+Fuel Fill-up
+
+Do not show:
+
+Leads
+Quotes
+Clients
+Staff
+Stock Management
+Suppliers
+Purchase Orders
+Invoices
+Reports
+Create Job
+unless specifically enabled by permission.
+Technician calendar data
+
+Calendar must only show jobs assigned to the logged-in technician by default.
+
+If the technician has permission to view team jobs, add a separate permission:
+canViewTeamSchedule
+
+Default for Technician:
+canViewTeamSchedule = false
+
+Demo Technician
+
+Make sure Demo Technician has sample assigned jobs so these pages are not empty:
+
+Dashboard
+My Schedule
+My Jobs
+Calendar
+
+The same jobs should appear consistently across all technician pages.
+
+Example:
+JOB-2026-0009
+Mutual Heights Office Park
+Washroom
+19 May 2026, 16:00
+Status: In Progress
+
+This job should appear on:
+
+Technician Dashboard
+My Schedule
+My Jobs
+Calendar
+
+END

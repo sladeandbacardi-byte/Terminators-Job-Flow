@@ -52,6 +52,7 @@ const ALL_CATEGORIES = [
       { name: "Calendar",      href: "/calendar",      icon: Calendar,      roles: ["service"] },
       { name: "My Schedule",   href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
       { name: "My Jobs",       href: "/jobs",          icon: Briefcase,     roles: ["service"] },
+      { name: "Field Diaries", href: "/field-diaries", icon: ClipboardList, roles: ["service"] },
     ],
   },
 

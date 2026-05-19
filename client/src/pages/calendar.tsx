@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isToday, addWeeks, subWeeks, addMonths, subMonths, startOfDay, endOfDay, addHours, differenceInCalendarDays, isBefore, isAfter, min, max } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
@@ -38,6 +38,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Job, Client, Worker, Department } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 
 interface CalendarEvent {
   id: string;
@@ -109,6 +111,9 @@ export default function Calendar() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { user } = useAuth();
+  const isTechnician = getDashboardRole({ departmentId: user?.departmentId, role: user?.role }) === "service";
+
   // Form handlers
   const appointmentForm = useForm<AppointmentForm>({
     resolver: zodResolver(appointmentSchema),
@@ -156,6 +161,19 @@ export default function Calendar() {
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
   });
+
+  // Resolve the logged-in technician's worker record
+  const myWorker = useMemo(() => {
+    if (!isTechnician) return null;
+    const byEmail = workers.find(w => user?.email && w.email === user.email);
+    if (byEmail) return byEmail;
+    // Fallback: busiest active worker in user's department (demo mode)
+    const inDept = workers
+      .filter(w => w.departmentId === user?.departmentId && w.isActive !== false)
+      .map(w => ({ w, count: jobs.filter(j => j.workerId === w.id).length }))
+      .sort((a, b) => b.count - a.count);
+    return inDept[0]?.w ?? null;
+  }, [isTechnician, workers, jobs, user]);
 
   // Mutations
   const createAppointmentMutation = useMutation({
@@ -319,10 +337,10 @@ export default function Calendar() {
                          (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
-    
+    // Technicians only see their own jobs
+    const matchesWorker = !isTechnician || !myWorker || event.workerId === myWorker.id;
 
-    
-    return matchesSearch && matchesDepartment && matchesStatus;
+    return matchesSearch && matchesDepartment && matchesStatus && matchesWorker;
   });
 
   function getPriorityColor(priority: string): string {
@@ -1230,27 +1248,31 @@ export default function Calendar() {
               </div>
 
               <div className="flex items-center space-x-2">
-                {/* Daily Department Card Button */}
-                <Link href="/daily-department-card">
-                  <Button
-                    variant="outline"
-                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                    data-testid="daily-department-card"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Print Daily Schedule
-                  </Button>
-                </Link>
+                {/* Daily Department Card Button — coordinators/admin only */}
+                {!isTechnician && (
+                  <Link href="/daily-department-card">
+                    <Button
+                      variant="outline"
+                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                      data-testid="daily-department-card"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Print Daily Schedule
+                    </Button>
+                  </Link>
+                )}
                 
-                {/* Create Appointment Button */}
-                <Button
-                  onClick={() => setIsCreateDialogOpen(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  data-testid="create-appointment"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Appointment
-                </Button>
+                {/* Create Appointment Button — coordinators/admin only */}
+                {!isTechnician && (
+                  <Button
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="create-appointment"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Appointment
+                  </Button>
+                )}
 
                 {/* View Tabs */}
                 <Tabs value={viewType} onValueChange={(value) => setViewType(value as ViewType)}>

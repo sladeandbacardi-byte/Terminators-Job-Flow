@@ -106,13 +106,14 @@ function JobPill({ job, clientMap }: { job: Job; clientMap: Record<string, Clien
 // ─── Day View ─────────────────────────────────────────────────────────────────
 
 function DayView({
-  selectedDate, fieldWorkers, jobs, clientMap, deptMap,
+  selectedDate, fieldWorkers, jobs, clientMap, deptMap, isTechnician,
 }: {
   selectedDate: Date;
   fieldWorkers: Worker[];
   jobs: Job[];
   clientMap: Record<string, Client>;
   deptMap: Record<string, Department>;
+  isTechnician?: boolean;
 }) {
   const jobsForDate = useMemo(
     () => jobs.filter(j => jobOnDay(j, selectedDate)),
@@ -123,7 +124,11 @@ function DayView({
     return (
       <div className="text-center py-12 text-muted-foreground">
         <User className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>No field staff found for the selected filter.</p>
+        <p>
+          {isTechnician
+            ? "No jobs scheduled for you for the selected day."
+            : "No field staff found for the selected filter."}
+        </p>
       </div>
     );
   }
@@ -449,13 +454,24 @@ export default function FieldDiariesPage() {
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c    => [c.id, c])),    [clients]);
   const deptMap   = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d])), [departments]);
 
-  // For technicians: find their own worker record (match by email, then by name)
+  // For technicians: find their own worker record
+  // Priority: email match → name match → busiest active worker in user's dept (demo fallback)
   const myWorker = useMemo(() => {
     if (!isTechnician) return null;
-    return workers.find(w => user?.email && w.email === user.email)
-        ?? workers.find(w => user?.firstName && user?.lastName && w.name === `${user.firstName} ${user.lastName}`)
-        ?? null;
-  }, [isTechnician, workers, user]);
+    const byEmail = workers.find(w => user?.email && w.email === user.email);
+    if (byEmail) return byEmail;
+    const byName = workers.find(w =>
+      user?.firstName && user?.lastName &&
+      w.name === `${user.firstName} ${user.lastName}`
+    );
+    if (byName) return byName;
+    // Demo fallback: busiest active worker in user's department
+    const inDept = workers
+      .filter(w => w.departmentId === user?.departmentId && w.isActive !== false)
+      .map(w => ({ w, count: jobs.filter(j => j.workerId === w.id).length }))
+      .sort((a, b) => b.count - a.count);
+    return inDept[0]?.w ?? null;
+  }, [isTechnician, workers, jobs, user]);
 
   const fieldWorkers = useMemo(() => {
     // Technicians only see their own row
@@ -632,6 +648,7 @@ export default function FieldDiariesPage() {
                 jobs={jobs}
                 clientMap={clientMap}
                 deptMap={deptMap}
+                isTechnician={isTechnician}
               />
             )}
 

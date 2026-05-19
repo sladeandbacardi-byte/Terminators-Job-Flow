@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -12,10 +12,15 @@ import { Calendar, Search, Plus, Filter, Download, Printer, Edit } from "lucide-
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
-import type { Job, QuoteSubmission } from "@shared/schema";
+import type { Job, QuoteSubmission, Worker } from "@shared/schema";
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 
 export default function Jobs() {
+  const { user } = useAuth();
+  const isTechnician = getDashboardRole({ departmentId: user?.departmentId, role: user?.role }) === "service";
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
@@ -26,11 +31,28 @@ export default function Jobs() {
     queryKey: ['/api/jobs'],
   });
 
+  const { data: workers = [] } = useQuery<Worker[]>({
+    queryKey: ['/api/workers'],
+  });
+
   const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({
     queryKey: ['/api/quote-submissions'],
   });
 
   const quoteMap = new Map(quoteSubmissions.map(q => [q.id, q]));
+
+  // Resolve the logged-in technician's worker record
+  const myWorker = useMemo(() => {
+    if (!isTechnician) return null;
+    const byEmail = workers.find(w => user?.email && w.email === user.email);
+    if (byEmail) return byEmail;
+    // Fallback: busiest active worker in this user's department (demo mode)
+    const inDept = workers
+      .filter(w => w.departmentId === user?.departmentId && w.isActive !== false)
+      .map(w => ({ w, count: jobs.filter(j => j.workerId === w.id).length }))
+      .sort((a, b) => b.count - a.count);
+    return inDept[0]?.w ?? null;
+  }, [isTechnician, workers, jobs, user]);
 
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = searchTerm === "" || 
@@ -39,8 +61,11 @@ export default function Jobs() {
       job.jobNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || job.status === statusFilter;
+
+    // Technicians only see their own assigned jobs
+    const matchesWorker = !isTechnician || !myWorker || job.workerId === myWorker.id;
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesWorker;
   });
 
 
@@ -60,7 +85,7 @@ export default function Jobs() {
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title="Job Scheduling" 
+          title={isTechnician ? "My Jobs" : "Job Scheduling"}
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
         />
         
@@ -91,40 +116,44 @@ export default function Jobs() {
                 <option value="cancelled">Cancelled</option>
                 <option value="pending">Pending</option>
               </select>
-              <ExportButton 
-                onExportCSV={() => exportJobs(jobs)}
-                entityName="Jobs"
-                variant="outline"
-                size="sm"
-              />
-              <Dialog open={isJobFormOpen} onOpenChange={setIsJobFormOpen}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-create-job">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Job
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <JobForm
-                    job={editingJob}
-                    onSuccess={() => {
-                      setIsJobFormOpen(false);
-                      setEditingJob(null);
-                    }}
-                    onCancel={() => {
-                      setIsJobFormOpen(false);
-                      setEditingJob(null);
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
+              {!isTechnician && (
+                <ExportButton 
+                  onExportCSV={() => exportJobs(jobs)}
+                  entityName="Jobs"
+                  variant="outline"
+                  size="sm"
+                />
+              )}
+              {!isTechnician && (
+                <Dialog open={isJobFormOpen} onOpenChange={setIsJobFormOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-create-job">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Job
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <JobForm
+                      job={editingJob}
+                      onSuccess={() => {
+                        setIsJobFormOpen(false);
+                        setEditingJob(null);
+                      }}
+                      onCancel={() => {
+                        setIsJobFormOpen(false);
+                        setEditingJob(null);
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </div>
 
           {/* Jobs List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">All Jobs</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{isTechnician ? "My Assigned Jobs" : "All Jobs"}</h3>
               <p className="text-sm text-gray-600 mt-1">
                 {filteredJobs.length} job{filteredJobs.length !== 1 ? 's' : ''} found
               </p>
@@ -199,17 +228,19 @@ export default function Jobs() {
                             {job.status.replace('_', ' ')}
                           </Badge>
                           <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingJob(job);
-                                setIsJobFormOpen(true);
-                              }}
-                              data-testid={`button-edit-job-${job.id}`}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
+                            {!isTechnician && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingJob(job);
+                                  setIsJobFormOpen(true);
+                                }}
+                                data-testid={`button-edit-job-${job.id}`}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            )}
                             <Link href={`/jobs/${job.id}/card`}>
                               <Button
                                 size="sm"
