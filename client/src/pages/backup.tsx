@@ -378,6 +378,39 @@ export default function BackupPage() {
                   </div>
                 )}
 
+                {lastEmailFailed &&
+                  (!lastEmailSuccess ||
+                    new Date(lastEmailFailed.datetime) > new Date(lastEmailSuccess.datetime)) &&
+                  !lastEmailFailed.errorMessage?.toLowerCase().includes("too large") && (
+                    <div className="rounded-lg border-2 border-red-300 bg-red-50 p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-red-900">Last backup email failed</p>
+                          <p className="text-xs text-red-700 mt-0.5">
+                            {formatDatetime(lastEmailFailed.datetime)} — sent to{" "}
+                            {lastEmailFailed.recipientEmail ?? emailConfig?.recipient ?? "recipient"}
+                          </p>
+                          {lastEmailFailed.errorMessage && (
+                            <p className="text-sm text-red-800 mt-2 break-words">
+                              {lastEmailFailed.errorMessage}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleSendBackupEmail}
+                        disabled={isDemoMode || emailSendMutation.isPending}
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        {emailSendMutation.isPending
+                          ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Retrying…</>
+                          : <><RefreshCw className="mr-2 h-4 w-4" />Retry Backup Email</>}
+                      </Button>
+                    </div>
+                  )}
+
                 {isDemoMode && (
                   <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
                     <Info className="h-4 w-4 shrink-0" />
