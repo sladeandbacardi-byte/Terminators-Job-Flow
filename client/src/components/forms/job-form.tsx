@@ -98,6 +98,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
       recurrenceDay: job?.recurrenceDay || "",
       recurrenceCount: job?.recurrenceCount || undefined,
       recurrenceYears: job?.recurrenceYears || undefined,
+      googleMapsLink: job?.googleMapsLink || "",
     },
   });
 
@@ -284,6 +285,27 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                   <FormLabel className="text-sm">Service At (Location)</FormLabel>
                   <FormControl>
                     <Input placeholder="Service location" {...field} value={field.value || ""} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="googleMapsLink"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel className="text-sm">Google Maps Link</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="url"
+                      placeholder="Paste Google Maps link (e.g. https://maps.app.goo.gl/...)"
+                      {...field}
+                      value={field.value || ""}
+                      className="h-8 text-sm"
+                      data-testid="input-google-maps-link"
+                    />
                   </FormControl>
                   <FormMessage className="text-xs" />
                 </FormItem>

@@ -132,6 +132,7 @@ export const jobs = pgTable("jobs", {
   jobNumber: text("job_number"),
   linkedQuoteId: varchar("linked_quote_id"),
   invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | exported | invoiced
+  googleMapsLink: text("google_maps_link"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

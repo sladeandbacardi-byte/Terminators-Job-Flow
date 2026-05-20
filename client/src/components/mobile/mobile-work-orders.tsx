@@ -282,6 +282,23 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                     <MapPin className="h-4 w-4 mt-0.5" />
                     <span className="flex-1">{job.location || job.client.address}</span>
                   </div>
+
+                  {job.googleMapsLink ? (
+                    <a
+                      href={job.googleMapsLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-sm flex items-center justify-center space-x-2"
+                      data-testid={`button-open-google-maps-${job.id}`}
+                    >
+                      <Navigation className="h-5 w-5" />
+                      <span>Open in Google Maps</span>
+                    </a>
+                  ) : (
+                    <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 rounded-lg py-2 px-3 text-center">
+                      No Google Maps link added for this job.
+                    </div>
+                  )}
                   {job.client.phone && (
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <Phone className="h-4 w-4" />
