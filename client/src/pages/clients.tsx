@@ -503,7 +503,7 @@ export default function ClientsPage() {
 
       {/* View Details Dialog */}
       <Dialog open={!!viewingClient} onOpenChange={() => setViewingClient(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Client Details - {viewingClient?.name}</DialogTitle>
             <DialogDescription>
@@ -606,7 +606,7 @@ export default function ClientsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingClient} onOpenChange={() => setEditingClient(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
             <DialogDescription>
