@@ -2509,21 +2509,21 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.post("/api/teams", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/teams", async (req, res) => {
     try {
       const team = await storage.createTeam(req.body);
       res.status(201).json(team);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  app.patch("/api/teams/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/teams/:id", async (req, res) => {
     try {
       const team = await storage.updateTeam(req.params.id, req.body);
       res.json(team);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  app.delete("/api/teams/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/teams/:id", async (req, res) => {
     try {
       await storage.deleteTeam(req.params.id);
       res.json({ success: true });
@@ -2535,14 +2535,14 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.post("/api/teams/:id/members", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/teams/:id/members", async (req, res) => {
     try {
       const member = await storage.addTeamMember({ teamId: req.params.id, workerId: req.body.workerId });
       res.status(201).json(member);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  app.delete("/api/teams/:id/members/:workerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/teams/:id/members/:workerId", async (req, res) => {
     try {
       await storage.removeTeamMember(req.params.id, req.params.workerId);
       res.json({ success: true });
@@ -2592,7 +2592,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // Update a single member's status
-  app.patch("/api/attendance/:id/member", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/attendance/:id/member", async (req, res) => {
     try {
       const { workerId, employeeName, role, status, absenceReason, notes } = req.body;
       const updated = await storage.upsertAttendanceMemberRecord({
@@ -2609,9 +2609,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // Submit attendance
-  app.post("/api/attendance/:id/submit", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/attendance/:id/submit", async (req, res) => {
     try {
-      const submittedBy = req.body.submittedBy ?? req.user?.id ?? "unknown";
+      const submittedBy = req.body.submittedBy ?? "supervisor";
       const record = await storage.submitAttendance(req.params.id, submittedBy);
       res.json(record);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
