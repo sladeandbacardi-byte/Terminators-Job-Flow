@@ -3,7 +3,6 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
-import { runDailyBackupToOneDrive, getOneDriveConfig } from "./onedrive";
 import { runDailyBackupEmail } from "./email-backup";
 
 const app = express();
@@ -85,9 +84,8 @@ app.use((req, res, next) => {
     if (saTime.getUTCDay() === 2) weeklySummarySentThisWeek = false;
   }, 60 * 60 * 1000);
 
-  // ── Daily backup scheduler (OneDrive + Email) ─────────────────────────────
+  // ── Daily backup scheduler (Email) ────────────────────────────────────────
   // Fires every minute; runs at 21:30 UTC (23:30 SAST) once per day
-  let lastDailyOneDriveDate = "";
   let lastDailyEmailDate = "";
   setInterval(async () => {
     const now = new Date();
@@ -95,16 +93,6 @@ app.use((req, res, next) => {
     const utcHours = now.getUTCHours();
     const utcMins = now.getUTCMinutes();
     if (!(utcHours === 21 && utcMins >= 30)) return;
-
-    if (getOneDriveConfig() && lastDailyOneDriveDate !== todayStr) {
-      lastDailyOneDriveDate = todayStr;
-      try {
-        await runDailyBackupToOneDrive(false);
-        log("Daily OneDrive backup completed successfully");
-      } catch (e: any) {
-        console.error("Daily OneDrive backup failed:", e.message);
-      }
-    }
 
     if (lastDailyEmailDate !== todayStr) {
       lastDailyEmailDate = todayStr;

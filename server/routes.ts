@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { getOneDriveConfig, runDailyBackupToOneDrive } from "./onedrive";
 import { runDailyBackupEmail, getBackupEmailConfig } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
 import { sendWhatsAppBackupTest } from "./whatsapp-service";
@@ -2595,39 +2594,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/backup/onedrive-config", async (_req, res) => {
-    const config = getOneDriveConfig();
-    res.json({
-      configured: config !== null,
-      folder: config?.backupFolder ?? null,
-    });
-  });
-
   app.get("/api/backup/logs", async (_req, res) => {
     try {
       const logs = await storage.getBackupLogs();
       res.json(logs);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post("/api/backup/onedrive-run", async (_req, res) => {
-    try {
-      const config = getOneDriveConfig();
-      if (!config) {
-        return res.status(400).json({
-          error: "OneDrive is not configured. Please set ONEDRIVE_TENANT_ID, ONEDRIVE_CLIENT_ID, ONEDRIVE_CLIENT_SECRET, and ONEDRIVE_USER_ID environment variables.",
-        });
-      }
-      await runDailyBackupToOneDrive(true);
-      const logs = await storage.getBackupLogs();
-      const latest = logs[0] ?? null;
-      res.json({ success: true, log: latest });
-    } catch (e: any) {
-      const logs = await storage.getBackupLogs().catch(() => []);
-      const latest = logs[0] ?? null;
-      res.status(500).json({ error: e.message, log: latest });
     }
   });
 

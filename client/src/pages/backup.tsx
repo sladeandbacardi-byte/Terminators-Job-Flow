@@ -21,8 +21,6 @@ import {
   FileJson,
   FileSpreadsheet,
   Cloud,
-  CloudOff,
-  Play,
   Info,
   ChevronDown,
   ChevronUp,
@@ -79,7 +77,7 @@ function nextScheduledBackup(): string {
   });
 }
 
-type BackupType = "onedrive-auto" | "onedrive-manual" | "email-auto" | "email-manual" | "email-test";
+type BackupType = "email-auto" | "email-manual" | "email-test";
 
 interface BackupLog {
   id: string;
@@ -93,11 +91,6 @@ interface BackupLog {
   recipientEmail?: string;
 }
 
-interface OneDriveConfigResponse {
-  configured: boolean;
-  folder: string | null;
-}
-
 interface EmailConfigResponse {
   recipient: string;
   sender: string;
@@ -105,8 +98,6 @@ interface EmailConfigResponse {
 }
 
 const TYPE_LABEL: Record<BackupType, string> = {
-  "onedrive-auto": "OneDrive Auto",
-  "onedrive-manual": "OneDrive Manual",
   "email-auto": "Email Auto",
   "email-manual": "Email Manual",
   "email-test": "Email Test",
@@ -126,10 +117,6 @@ export default function BackupPage() {
   const { isDemoMode } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: odConfig } = useQuery<OneDriveConfigResponse>({
-    queryKey: ["/api/backup/onedrive-config"],
-  });
-
   const { data: emailConfig } = useQuery<EmailConfigResponse>({
     queryKey: ["/api/backup/email-config"],
   });
@@ -139,23 +126,9 @@ export default function BackupPage() {
     refetchInterval: 30_000,
   });
 
-  const lastSuccess = backupLogs.find((l) => l.status === "success");
-  const lastFailed = backupLogs.find((l) => l.status === "failed");
   const emailLogs = backupLogs.filter((l) => l.backupType.startsWith("email"));
   const lastEmailSuccess = emailLogs.find((l) => l.status === "success");
   const lastEmailFailed = emailLogs.find((l) => l.status === "failed");
-
-  const runMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/backup/onedrive-run"),
-    onSuccess: async () => {
-      toast({ title: "Backup uploaded to OneDrive", description: "Both files were saved successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
-    },
-    onError: (e: any) => {
-      toast({ title: "Backup failed", description: e.message, variant: "destructive" });
-      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
-    },
-  });
 
   const emailSendMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/backup/email-send"),
@@ -321,14 +294,6 @@ export default function BackupPage() {
     }
   };
 
-  const handleRunBackup = () => {
-    if (isDemoMode) {
-      toast({ title: "Demo Mode", description: "This action is disabled in Demo Mode.", variant: "destructive" });
-      return;
-    }
-    runMutation.mutate();
-  };
-
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -342,7 +307,7 @@ export default function BackupPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Backup & Restore</h1>
               <p className="text-muted-foreground mt-1">
-                Download, auto-upload to OneDrive, or restore your data.
+                Download, email, or restore your data.
               </p>
             </div>
 
@@ -355,99 +320,9 @@ export default function BackupPage() {
                   <p>
                     The <strong>Restore Backup</strong> (.json) captures all data for a full system restore.
                     The <strong>Excel Backup</strong> (.xlsx) creates a workbook you can open in Excel or Google Sheets.
-                    Both are uploaded to OneDrive automatically each night.
+                    Both are emailed automatically each night.
                   </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* ── OneDrive Backup Settings ──────────────────────────────────── */}
-            <Card className={odConfig?.configured ? "border-green-200" : "border-amber-200"}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${odConfig?.configured ? "bg-green-100" : "bg-amber-100"}`}>
-                    {odConfig?.configured
-                      ? <Cloud className="h-5 w-5 text-green-600" />
-                      : <CloudOff className="h-5 w-5 text-amber-600" />}
-                  </div>
-                  <div>
-                    <CardTitle>OneDrive Backup Settings</CardTitle>
-                    <CardDescription>
-                      {odConfig?.configured
-                        ? `Auto-backup enabled — saving to ${odConfig.folder}`
-                        : "Not configured — set environment variables to enable"}
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-
-                {/* Status row */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Last successful backup
-                    </p>
-                    {lastSuccess ? (
-                      <p className="text-sm font-medium">{formatDatetime(lastSuccess.datetime)}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No successful backups yet</p>
-                    )}
-                  </div>
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Last failed backup
-                    </p>
-                    {lastFailed ? (
-                      <p className="text-sm font-medium text-red-600">{formatDatetime(lastFailed.datetime)}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No failures</p>
-                    )}
-                  </div>
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-blue-500" /> Next scheduled backup
-                    </p>
-                    {odConfig?.configured ? (
-                      <p className="text-sm font-medium">{nextScheduledBackup()}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Not scheduled</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Manual run button */}
-                {isDemoMode ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-                    <Info className="h-4 w-4 shrink-0" />
-                    This action is disabled in Demo Mode.
-                  </div>
-                ) : odConfig?.configured ? (
-                  <Button
-                    onClick={handleRunBackup}
-                    disabled={runMutation.isPending}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    {runMutation.isPending
-                      ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Running backup…</>
-                      : <><Play className="mr-2 h-4 w-4" />Run Backup Now</>}
-                  </Button>
-                ) : (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-2 text-sm text-amber-800">
-                    <p className="font-semibold flex items-center gap-2">
-                      <Info className="h-4 w-4" /> OneDrive not configured
-                    </p>
-                    <p>Set these environment variables to enable automatic daily backups:</p>
-                    <ul className="font-mono text-xs space-y-1 bg-amber-100 rounded p-2">
-                      <li>ONEDRIVE_TENANT_ID</li>
-                      <li>ONEDRIVE_CLIENT_ID</li>
-                      <li>ONEDRIVE_CLIENT_SECRET</li>
-                      <li>ONEDRIVE_USER_ID</li>
-                      <li>ONEDRIVE_BACKUP_FOLDER (optional, default: /Job Flow Backups/Daily Backups)</li>
-                    </ul>
-                    <p className="text-xs">Use a Microsoft Azure App Registration with <strong>Files.ReadWrite.All</strong> application permission on the Microsoft Graph API.</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -750,7 +625,7 @@ export default function BackupPage() {
                       <CardTitle>Backup Logs</CardTitle>
                       <CardDescription>
                         {backupLogs.length === 0
-                          ? "No OneDrive backup attempts yet"
+                          ? "No backup attempts yet"
                           : `${backupLogs.length} record${backupLogs.length !== 1 ? "s" : ""}`}
                       </CardDescription>
                     </div>
@@ -859,7 +734,7 @@ export default function BackupPage() {
               <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>• Download a <strong>Restore Backup</strong> before making large changes — it can be used to undo everything.</p>
                 <p>• Use the <strong>Excel Backup</strong> to share records with staff, do admin checks, or print reports.</p>
-                <p>• OneDrive backups run automatically at <strong>23:30 South Africa time</strong> every night.</p>
+                <p>• Backup emails are sent automatically at <strong>23:30 South Africa time</strong> every night.</p>
                 <p>• Retention policy: daily backups kept for <strong>30 days</strong>; month-end backups kept for <strong>12 months</strong>.</p>
                 <p>• Keep backups in a secure location — they contain all client and financial data.</p>
                 <p>• Because data is stored in memory, a server restart clears all changes — back up regularly.</p>
