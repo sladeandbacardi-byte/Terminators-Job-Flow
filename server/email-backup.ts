@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import { sendEmail } from "./email-service";
 import { storage } from "./storage";
 import { generateJsonBackupBuffer, generateExcelBackupBuffer } from "./backup-helpers";
@@ -15,6 +16,7 @@ const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER ?? "brevo").toLowerCase();
 const BREVO_MAX_TOTAL_BYTES = 10 * 1024 * 1024; // Brevo free plan: 10 MB total attachments
 const TOO_LARGE_MESSAGE =
   "Backup files are too large to email. Please download manually or set up cloud backup.";
+const DEMO_MODE = (process.env.DEMO_MODE ?? "").toLowerCase() === "true";
 
 export type EmailBackupKind = "auto" | "manual" | "test";
 
@@ -28,7 +30,53 @@ interface BackupAttachment {
   type: string;
 }
 
-async function sendViaBrevo(opts: {
+async function sendViaBrevoSmtp(opts: {
+  to: string;
+  from: string;
+  subject: string;
+  text: string;
+  html: string;
+  attachments: BackupAttachment[];
+}): Promise<void> {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = Number(process.env.SMTP_PORT ?? "587");
+
+  if (!host || !user || !pass) {
+    const missing = [
+      !host && "SMTP_HOST",
+      !user && "SMTP_USER",
+      !pass && "SMTP_PASS",
+    ].filter(Boolean).join(", ");
+    throw new Error(
+      `Brevo SMTP not fully configured. Missing secrets: ${missing}. ` +
+      `Set SMTP_HOST=smtp-relay.brevo.com, SMTP_PORT=587, SMTP_USER=<brevo login>, SMTP_PASS=<brevo SMTP key>.`,
+    );
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+
+  await transporter.sendMail({
+    from: opts.from,
+    to: opts.to,
+    subject: opts.subject,
+    text: opts.text,
+    html: opts.html,
+    attachments: opts.attachments.map((a) => ({
+      filename: a.filename,
+      content: Buffer.from(a.contentBase64, "base64"),
+      contentType: a.type,
+    })),
+  });
+}
+
+async function sendViaBrevoApi(opts: {
   to: string;
   from: string;
   subject: string;
@@ -121,8 +169,19 @@ export async function runDailyBackupEmail(
       { filename: excelInfo.name, contentBase64: excelResult.buffer.toString("base64"), type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
     ];
 
-    if (EMAIL_PROVIDER === "brevo") {
-      await sendViaBrevo({
+    if (DEMO_MODE) {
+      // Demo Mode disables real email sending. Skip provider call but still log.
+    } else if (EMAIL_PROVIDER === "brevo") {
+      // Brevo's HTTP API rejects .json attachments, so SMTP relay is required
+      // for backup emails (which always include a .json file). Fail fast with
+      // a clear, actionable error if SMTP secrets are missing.
+      if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        throw new Error(
+          "Brevo SMTP secrets are required for backup emails because the JSON attachment is not accepted by the Brevo HTTP API. " +
+          "Set SMTP_HOST=smtp-relay.brevo.com, SMTP_PORT=587, SMTP_USER=<brevo login>, SMTP_PASS=<brevo SMTP key>.",
+        );
+      }
+      await sendViaBrevoSmtp({
         to: recipient,
         from: BACKUP_SENDER,
         subject,
@@ -150,7 +209,7 @@ export async function runDailyBackupEmail(
       backupType: logTypeFor(kind),
       fileNames: [jsonInfo.name, excelInfo.name],
       fileSizesBytes: [jsonInfo.sizeBytes, excelInfo.sizeBytes],
-      destination: `Email (${EMAIL_PROVIDER})`,
+      destination: DEMO_MODE ? `Email (${EMAIL_PROVIDER}, demo)` : `Email (${EMAIL_PROVIDER})`,
       status: "success",
       recipientEmail: recipient,
     });
@@ -177,11 +236,15 @@ export function getBackupEmailConfig() {
     recipient: BACKUP_RECIPIENT,
     sender: BACKUP_SENDER,
     provider: EMAIL_PROVIDER,
-    brevoConfigured: Boolean(process.env.BREVO_API_KEY),
+    brevoConfigured:
+      Boolean(process.env.BREVO_API_KEY) ||
+      Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
     sendgridConfigured: Boolean(process.env.SENDGRID_API_KEY),
+    demoMode: DEMO_MODE,
     emailConfigured:
       EMAIL_PROVIDER === "brevo"
-        ? Boolean(process.env.BREVO_API_KEY)
+        ? Boolean(process.env.BREVO_API_KEY) ||
+          Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
         : Boolean(process.env.SENDGRID_API_KEY),
     maxAttachmentBytes: BREVO_MAX_TOTAL_BYTES,
   };
