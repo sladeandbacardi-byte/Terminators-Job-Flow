@@ -1,0 +1,109 @@
+SET UP DAILY ONEDRIVE BACKUPS
+
+I want the app to automatically save backups to a OneDrive folder every day.
+
+Keep the current manual backup system, but add automatic daily OneDrive backup.
+
+Backup types:
+
+Restore Backup JSON
+This is used to restore the app properly.
+Excel Backup XLSX
+This is used for opening and checking business records in Excel.
+
+Daily backup should create both files:
+
+job-flow-restore-backup-YYYY-MM-DD.json
+job-flow-excel-backup-YYYY-MM-DD.xlsx
+
+Example:
+job-flow-restore-backup-2026-05-20.json
+job-flow-excel-backup-2026-05-20.xlsx
+
+Save both files into OneDrive folder:
+
+/Job Flow Backups/Daily Backups/
+
+Create the folder automatically if it does not exist.
+
+Add backup retention:
+Keep daily backups for 30 days.
+Keep month-end backups for 12 months.
+Do not delete the latest backup.
+
+OneDrive setup:
+
+Add Microsoft OneDrive / Microsoft Graph integration.
+
+Use environment variables for the OneDrive connection:
+
+ONEDRIVE_TENANT_ID=
+ONEDRIVE_CLIENT_ID=
+ONEDRIVE_CLIENT_SECRET=
+ONEDRIVE_USER_ID=
+ONEDRIVE_BACKUP_FOLDER=/Job Flow Backups/Daily Backups
+
+Never hard-code these values into the app.
+
+Add a backend function:
+
+runDailyBackupToOneDrive()
+
+This function must:
+
+Generate the JSON restore backup.
+Generate the Excel XLSX backup.
+Upload both files to the OneDrive backup folder.
+Save a backup log record in the app.
+Show success or failure in the Admin backup screen.
+
+Backup log should store:
+
+Date and time
+Backup type
+File names
+File sizes
+Upload destination
+Status: success or failed
+Error message if failed
+
+Add Admin screen section:
+
+Backup Settings
+
+Show:
+
+Last successful backup
+Last failed backup
+Next scheduled backup
+Manual button: Run Backup Now
+Manual button: Download JSON Backup
+Manual button: Download Excel Backup
+Backup logs
+
+If OneDrive upload fails:
+
+Still create the backup locally if possible.
+Save the failure in backup logs.
+Show an alert to Managing Member/Admin.
+Do not delete previous successful backups.
+
+Schedule:
+Run automatic backup once per day at 23:30 South Africa time.
+
+If Railway cron uses UTC, schedule it as 21:30 UTC.
+
+Permissions:
+Only Managing Member and Admin users can access backup settings and run manual backups.
+
+Demo Mode:
+Disable real OneDrive backup in demo mode.
+Show:
+This action is disabled in Demo Mode.
+
+Important:
+Do not remove the JSON backup.
+JSON is for restore.
+XLSX is for human review.
+
+END

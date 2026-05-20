@@ -2114,62 +2114,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Sage Export ──────────────────────────────────────────────────────────
 
   // Query jobs eligible for Sage export
+  // Helper: treat all "done" variants as completed
+  const isCompletedStatus = (s: string | null | undefined) => {
+    if (!s) return false;
+    return ["completed", "complete", "done", "finished"].includes(s.toLowerCase().trim());
+  };
+
+  // Helper: map a raw job + lookups to the export row shape
+  const toExportRow = (j: any, clientMap: Map<string,any>, workerMap: Map<string,any>, deptMap: Map<string,any>) => {
+    const client  = clientMap.get(j.clientId) as any;
+    const worker  = workerMap.get(j.workerId) as any;
+    const dept    = deptMap.get(j.departmentId) as any;
+    const priceEx = parseFloat(String(j.price ?? j.pricePerUnit ?? 0)) || 0;
+    const qty     = 1;
+    const vat     = 0.15;
+    const vatAmt  = priceEx * qty * vat;
+    const total   = priceEx * qty + vatAmt;
+    return {
+      id:           j.id,
+      jobNumber:    j.jobNumber ?? j.id,
+      jobDate:      j.scheduledDate,
+      clientName:   client?.name ?? "",
+      sageCode:     client?.sageCustomerCode ?? "",
+      department:   dept?.name ?? "",
+      technician:   worker?.name ?? "",
+      description:  j.title ?? j.service ?? j.serviceType ?? "",
+      quantity:     qty,
+      unitPriceEx:  priceEx,
+      vatPct:       15,
+      vatAmount:    vatAmt,
+      totalIncl:    total,
+      invoiceNotes: j.notes ?? j.completionNotes ?? "",
+      invoiceStatus: j.invoiceStatus ?? "not_invoiced",
+      rawStatus:    j.status,
+    };
+  };
+
   app.get("/api/sage-export/jobs", async (req, res) => {
     try {
       const { from, to, departmentId, workerId, clientId, includeExported } = req.query as Record<string, string>;
-      const allJobs = await storage.getJobs();
+      const allJobs    = await storage.getJobs();
       const allClients = await storage.getClients();
       const allWorkers = await storage.getWorkers();
-      const allDepts = await storage.getDepartments();
+      const allDepts   = await storage.getDepartments();
 
       const clientMap = new Map(allClients.map((c: any) => [c.id, c]));
       const workerMap = new Map(allWorkers.map((w: any) => [w.id, w]));
       const deptMap   = new Map(allDepts.map((d: any) => [d.id, d]));
 
+      // Step 1: only completed + not fully invoiced
       let jobs = allJobs.filter((j: any) => {
-        if (j.status !== "completed") return false;
-        // by default only show not_invoiced; if includeExported, also show exported
-        const inv = j.invoiceStatus ?? "not_invoiced";
+        if (!isCompletedStatus(j.status)) return false;
+        const inv = (j.invoiceStatus ?? "not_invoiced").toLowerCase().trim();
         if (inv === "invoiced") return false;
         if (inv === "exported" && includeExported !== "true") return false;
         return true;
       });
 
-      if (from)  { const d = new Date(from);  jobs = jobs.filter((j: any) => new Date(j.scheduledDate) >= d); }
-      if (to)    { const d = new Date(to); d.setHours(23,59,59); jobs = jobs.filter((j: any) => new Date(j.scheduledDate) <= d); }
-      if (departmentId) jobs = jobs.filter((j: any) => j.departmentId === departmentId);
-      if (workerId)     jobs = jobs.filter((j: any) => j.workerId === workerId);
-      if (clientId)     jobs = jobs.filter((j: any) => j.clientId === clientId);
+      // Step 2: date range (applied AFTER status so debug counts are accurate)
+      if (from) { const d = new Date(from); jobs = jobs.filter((j: any) => new Date(j.scheduledDate) >= d); }
+      if (to)   { const d = new Date(to); d.setHours(23,59,59,999); jobs = jobs.filter((j: any) => new Date(j.scheduledDate) <= d); }
 
-      const result = jobs.map((j: any) => {
-        const client = clientMap.get(j.clientId) as any;
-        const worker = workerMap.get(j.workerId) as any;
-        const dept   = deptMap.get(j.departmentId) as any;
-        const priceEx = parseFloat(String(j.price ?? j.pricePerUnit ?? 0)) || 0;
-        const qty     = 1;
-        const vat     = 0.15;
-        const vatAmt  = priceEx * qty * vat;
-        const total   = priceEx * qty + vatAmt;
-        return {
-          id: j.id,
-          jobNumber:    j.jobNumber ?? j.id,
-          jobDate:      j.scheduledDate,
-          clientName:   client?.name ?? "",
-          sageCode:     (client as any)?.sageCustomerCode ?? "",
-          department:   dept?.name ?? "",
-          technician:   worker?.name ?? "",
-          description:  j.title ?? j.service ?? j.serviceType ?? "",
-          quantity:     qty,
-          unitPriceEx:  priceEx,
-          vatPct:       15,
-          vatAmount:    vatAmt,
-          totalIncl:    total,
-          invoiceNotes: j.notes ?? j.completionNotes ?? "",
-          invoiceStatus: j.invoiceStatus ?? "not_invoiced",
-        };
+      // Step 3: optional filters
+      if (departmentId && departmentId !== "all") jobs = jobs.filter((j: any) => j.departmentId === departmentId);
+      if (workerId     && workerId     !== "all") jobs = jobs.filter((j: any) => j.workerId === workerId);
+      if (clientId     && clientId     !== "all") jobs = jobs.filter((j: any) => j.clientId === clientId);
+
+      res.json(jobs.map((j: any) => toExportRow(j, clientMap, workerMap, deptMap)));
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Debug summary + recent completed jobs
+  app.get("/api/sage-export/summary", async (req, res) => {
+    try {
+      const { from, to } = req.query as Record<string, string>;
+      const allJobs    = await storage.getJobs();
+      const allClients = await storage.getClients();
+      const allWorkers = await storage.getWorkers();
+      const allDepts   = await storage.getDepartments();
+
+      const clientMap = new Map(allClients.map((c: any) => [c.id, c]));
+      const workerMap = new Map(allWorkers.map((w: any) => [w.id, w]));
+      const deptMap   = new Map(allDepts.map((d: any) => [d.id, d]));
+
+      const totalJobs = allJobs.length;
+
+      // Jobs in date range (all statuses)
+      let inRange = allJobs;
+      if (from) { const d = new Date(from); inRange = inRange.filter((j: any) => new Date(j.scheduledDate) >= d); }
+      if (to)   { const d = new Date(to); d.setHours(23,59,59,999); inRange = inRange.filter((j: any) => new Date(j.scheduledDate) <= d); }
+
+      const completedInRange = inRange.filter((j: any) => isCompletedStatus(j.status));
+      const alreadyInvoiced  = completedInRange.filter((j: any) => (j.invoiceStatus ?? "").toLowerCase() === "invoiced");
+      const alreadyExported  = completedInRange.filter((j: any) => (j.invoiceStatus ?? "").toLowerCase() === "exported");
+      const availableForExport = completedInRange.filter((j: any) => {
+        const inv = (j.invoiceStatus ?? "not_invoiced").toLowerCase();
+        return inv !== "invoiced";
       });
 
-      res.json(result);
+      // All completed jobs, sorted newest first, last 10
+      const allCompleted = allJobs
+        .filter((j: any) => isCompletedStatus(j.status))
+        .sort((a: any, b: any) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime())
+        .slice(0, 10);
+
+      res.json({
+        totalJobs,
+        inDateRange:      inRange.length,
+        completedInRange: completedInRange.length,
+        alreadyInvoiced:  alreadyInvoiced.length,
+        alreadyExported:  alreadyExported.length,
+        availableForExport: availableForExport.length,
+        recentCompleted:  allCompleted.map((j: any) => toExportRow(j, clientMap, workerMap, deptMap)),
+      });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
