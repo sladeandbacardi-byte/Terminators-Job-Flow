@@ -2648,7 +2648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Recipient override is intentionally not supported here to prevent
       // backup data exfiltration to arbitrary addresses. Test always sends
-      // to the configured BACKUP_EMAIL_RECIPIENT (default info@terminators.co.za).
+      // to the configured BACKUP_EMAIL_TO (default info@terminators.co.za).
       const result = await runDailyBackupEmail("test");
       const logs = await storage.getBackupLogs();
       const latest = logs[0] ?? null;

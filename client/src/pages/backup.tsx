@@ -94,7 +94,11 @@ interface BackupLog {
 interface EmailConfigResponse {
   recipient: string;
   sender: string;
+  provider: string;
+  brevoConfigured: boolean;
   sendgridConfigured: boolean;
+  emailConfigured: boolean;
+  maxAttachmentBytes: number;
 }
 
 const TYPE_LABEL: Record<BackupType, string> = {
@@ -327,18 +331,18 @@ export default function BackupPage() {
             </Card>
 
             {/* ── Email Backup ──────────────────────────────────────────────── */}
-            <Card className={emailConfig?.sendgridConfigured ? "border-blue-200" : "border-amber-200"}>
+            <Card className={emailConfig?.emailConfigured ? "border-blue-200" : "border-amber-200"}>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${emailConfig?.sendgridConfigured ? "bg-blue-100" : "bg-amber-100"}`}>
-                    <Mail className={`h-5 w-5 ${emailConfig?.sendgridConfigured ? "text-blue-600" : "text-amber-600"}`} />
+                  <div className={`p-2 rounded-lg ${emailConfig?.emailConfigured ? "bg-blue-100" : "bg-amber-100"}`}>
+                    <Mail className={`h-5 w-5 ${emailConfig?.emailConfigured ? "text-blue-600" : "text-amber-600"}`} />
                   </div>
                   <div>
                     <CardTitle>Daily Backup Email</CardTitle>
                     <CardDescription>
-                      {emailConfig?.sendgridConfigured
-                        ? <>Sends JSON + Excel attachments to <strong>{emailConfig.recipient}</strong> every night at 23:30 SAST</>
-                        : "SendGrid not configured — set SENDGRID_API_KEY to enable email backups"}
+                      {emailConfig?.emailConfigured
+                        ? <>Sends JSON + Excel attachments via <strong>{emailConfig.provider === "brevo" ? "Brevo" : emailConfig?.provider}</strong> to <strong>{emailConfig.recipient}</strong> every night at 23:30 SAST</>
+                        : `${emailConfig?.provider === "brevo" ? "Brevo" : "Email provider"} not configured — set ${emailConfig?.provider === "brevo" ? "BREVO_API_KEY" : "SENDGRID_API_KEY"} to enable email backups`}
                     </CardDescription>
                   </div>
                 </div>
@@ -375,12 +379,24 @@ export default function BackupPage() {
                   </div>
                 </div>
 
-                {!emailConfig?.sendgridConfigured && (
+                {!emailConfig?.emailConfigured && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-1">
                     <p className="font-semibold flex items-center gap-2">
-                      <Info className="h-4 w-4" /> SendGrid not configured
+                      <Info className="h-4 w-4" /> Email provider not configured
                     </p>
-                    <p>Set the <code className="bg-amber-100 px-1 rounded">SENDGRID_API_KEY</code> environment variable. Optionally set <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_FROM</code> and <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_RECIPIENT</code> to override defaults. Manual buttons will simulate-send (no real email) until configured.</p>
+                    <p>
+                      Set <code className="bg-amber-100 px-1 rounded">EMAIL_PROVIDER=brevo</code> and{" "}
+                      <code className="bg-amber-100 px-1 rounded">BREVO_API_KEY</code> in environment secrets.
+                      Optionally set <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_TO</code> and{" "}
+                      <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_FROM</code> to override defaults.
+                    </p>
+                  </div>
+                )}
+
+                {lastEmailFailed?.errorMessage?.toLowerCase().includes("too large") && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <p>Backup files are too large to email. Please download manually or set up cloud backup.</p>
                   </div>
                 )}
 
