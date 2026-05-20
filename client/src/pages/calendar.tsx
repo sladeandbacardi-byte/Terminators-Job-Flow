@@ -17,7 +17,7 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Calendar as CalendarIcon, 
@@ -101,7 +101,8 @@ export default function Calendar() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
-  const [teamFilter, setTeamFilter] = useState("all");
+  // assigneeFilter value is "all" | `worker:<id>` | `team:<id>`
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
@@ -177,16 +178,51 @@ export default function Calendar() {
     return map;
   }, [teamMembers]);
 
-  const teamOptions = useMemo(() => {
-    if (departmentFilter === "all") return teams;
-    return teams.filter(t => t.departmentId === departmentFilter);
-  }, [teams, departmentFilter]);
+  // Departments where the user wants individual workers as filter options
+  // (instead of grouping into a single team). Pest Control = div-1.
+  const INDIVIDUAL_WORKER_DEPTS = new Set(["div-1"]);
+
+  // Build assignee dropdown groups: per department, either workers (for
+  // INDIVIDUAL_WORKER_DEPTS) or teams.
+  type AssigneeOption =
+    | { kind: "worker"; id: string; label: string; departmentId: string }
+    | { kind: "team"; id: string; label: string; departmentId: string };
+
+  const ALLOWED_DEPT_IDS = ["div-1","div-2","div-3","div-4"] as const;
+
+  const assigneeGroups = useMemo(() => {
+    const groups: { department: Department; options: AssigneeOption[] }[] = [];
+    const sortedDepts = [...departments]
+      .filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    sortedDepts.forEach(dept => {
+      if (departmentFilter !== "all" && departmentFilter !== dept.id) return;
+      let options: AssigneeOption[] = [];
+      if (INDIVIDUAL_WORKER_DEPTS.has(dept.id)) {
+        options = workers
+          .filter(w => w.departmentId === dept.id && w.isActive !== false)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(w => ({ kind: "worker" as const, id: w.id, label: w.name, departmentId: dept.id }));
+      } else {
+        options = teams
+          .filter(t => t.departmentId === dept.id && t.isActive !== false)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(t => ({ kind: "team" as const, id: t.id, label: t.name, departmentId: dept.id }));
+      }
+      if (options.length > 0) groups.push({ department: dept, options });
+    });
+    return groups;
+  }, [departments, workers, teams, departmentFilter]);
 
   const onDepartmentChange = (val: string) => {
     setDepartmentFilter(val);
-    if (val !== "all" && teamFilter !== "all") {
-      const t = teams.find(t => t.id === teamFilter);
-      if (!t || t.departmentId !== val) setTeamFilter("all");
+    // Clear assignee if it no longer belongs to the selected department
+    if (val !== "all" && assigneeFilter !== "all") {
+      const [kind, id] = assigneeFilter.split(":");
+      const belongs =
+        (kind === "worker" && workers.find(w => w.id === id)?.departmentId === val) ||
+        (kind === "team" && teams.find(t => t.id === id)?.departmentId === val);
+      if (!belongs) setAssigneeFilter("all");
     }
   };
 
@@ -364,13 +400,20 @@ export default function Calendar() {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
-    const matchesTeam = teamFilter === "all" ||
-      (event.workerId ? !!workerTeamsMap.get(event.workerId)?.has(teamFilter) : false);
+    let matchesAssignee = true;
+    if (assigneeFilter !== "all") {
+      const [kind, id] = assigneeFilter.split(":");
+      if (kind === "worker") {
+        matchesAssignee = event.workerId === id;
+      } else if (kind === "team") {
+        matchesAssignee = event.workerId ? !!workerTeamsMap.get(event.workerId)?.has(id) : false;
+      }
+    }
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
     // Technicians only see their own jobs
     const matchesWorker = !isTechnician || !myWorker || event.workerId === myWorker.id;
 
-    return matchesSearch && matchesDepartment && matchesTeam && matchesStatus && matchesWorker;
+    return matchesSearch && matchesDepartment && matchesAssignee && matchesStatus && matchesWorker;
   });
 
   function getPriorityColor(priority: string): string {
@@ -1182,7 +1225,7 @@ export default function Calendar() {
               onClick={() => {
                 setViewType('month');
                 setDepartmentFilter('all');
-                setTeamFilter('all');
+                setAssigneeFilter('all');
                 setStatusFilter('all');
               }}
               variant="outline"
@@ -1343,7 +1386,7 @@ export default function Calendar() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map(department => (
+                  {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
                     <SelectItem key={department.id} value={department.id}>
                       {department.name}
                     </SelectItem>
@@ -1351,20 +1394,24 @@ export default function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger className="w-48" data-testid="team-filter">
-                  <SelectValue placeholder="All Teams" />
+              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                <SelectTrigger className="w-56" data-testid="assignee-filter">
+                  <SelectValue placeholder="All People & Teams" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Teams</SelectItem>
-                  {teamOptions.map(t => {
-                    const dept = departments.find(d => d.id === t.departmentId);
-                    return (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}{departmentFilter === "all" && dept ? ` (${dept.name})` : ""}
-                      </SelectItem>
-                    );
-                  })}
+                  <SelectItem value="all">All People &amp; Teams</SelectItem>
+                  {assigneeGroups.map(group => (
+                    <SelectGroup key={group.department.id}>
+                      <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {group.department.name}
+                      </SelectLabel>
+                      {group.options.map(opt => (
+                        <SelectItem key={`${opt.kind}:${opt.id}`} value={`${opt.kind}:${opt.id}`}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -1578,7 +1625,7 @@ export default function Calendar() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map(department => (
+                            {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
                               <SelectItem key={department.id} value={department.id}>
                                 {department.name}
                               </SelectItem>
@@ -1834,7 +1881,7 @@ export default function Calendar() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {departments.filter(d => ["div-1","div-2","div-3","div-4"].includes(d.id)).map(department => (
+                              {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
                                 <SelectItem key={department.id} value={department.id}>
                                   {department.name}
                                 </SelectItem>
