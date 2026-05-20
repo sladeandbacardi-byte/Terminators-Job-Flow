@@ -74,7 +74,7 @@ import { ClientForm } from "@/components/forms/client-form";
 import { ExportButton } from "@/components/export-button";
 import { apiRequest } from "@/lib/queryClient";
 import { exportClients } from "@/lib/data-export";
-import type { Client, Department } from "@shared/schema";
+import { formatClientAddress, hasStructuredAddress, type Client, type Department } from "@shared/schema";
 
 export default function ClientsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -118,17 +118,25 @@ export default function ClientsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest("PATCH", `/api/clients/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      setEditingClient(null);
-      toast({ description: "Client updated successfully" });
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/clients/${id}`, data);
+      // Parse the saved record from the server so we can verify the write
+      const saved: Client = await res.json();
+      return saved;
     },
-    onError: () => {
-      toast({ 
-        description: "Failed to update client", 
-        variant: "destructive" 
+    // Only confirm after the cache has been refetched with the new data.
+    onSuccess: async (saved: Client) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
+      setEditingClient(null);
+      // If the just-updated client is currently being viewed, refresh that view too
+      setViewingClient((prev) => (prev && prev.id === saved.id ? saved : prev));
+      toast({ description: "Customer updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        description: `Failed to update client: ${error.message}`,
+        variant: "destructive",
       });
     },
   });
@@ -250,6 +258,7 @@ export default function ClientsPage() {
                 <ClientForm
                   onSubmit={(data) => createMutation.mutate(data)}
                   onCancel={() => setIsCreateDialogOpen(false)}
+                  isSubmitting={createMutation.isPending}
                 />
               </DialogContent>
             </Dialog>
@@ -503,14 +512,13 @@ export default function ClientsPage() {
           </DialogHeader>
           {viewingClient && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-semibold mb-2">Company Information</h3>
                   <div className="space-y-2 text-sm">
                     <div><strong>Name:</strong> {viewingClient.name}</div>
                     <div><strong>Business Type:</strong> {viewingClient.businessType || "Not specified"}</div>
                     <div><strong>Status:</strong> {getStatusBadge(viewingClient.status)}</div>
-                    <div><strong>Department:</strong> {getDepartmentName(viewingClient.departmentId)}</div>
                   </div>
                 </div>
                 <div>
@@ -519,12 +527,54 @@ export default function ClientsPage() {
                     <div><strong>Contact Person:</strong> {viewingClient.contactPerson || "Not specified"}</div>
                     <div><strong>Email:</strong> {viewingClient.email || "Not provided"}</div>
                     <div><strong>Phone:</strong> {viewingClient.phone || "Not provided"}</div>
-                    <div><strong>Address:</strong> {viewingClient.address || "Not provided"}</div>
                   </div>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Address block */}
+              <div>
+                <h3 className="font-semibold mb-2">Address</h3>
+                <div className="space-y-2 text-sm">
+                  {hasStructuredAddress(viewingClient) ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <div><span className="text-muted-foreground">Street Number:</span> {viewingClient.streetNumber || "—"}</div>
+                        <div><span className="text-muted-foreground">Street Name:</span> {viewingClient.streetName || "—"}</div>
+                        <div><span className="text-muted-foreground">Suburb / Area:</span> {viewingClient.suburb || "—"}</div>
+                        <div><span className="text-muted-foreground">City / Town:</span> {viewingClient.city || "—"}</div>
+                        <div><span className="text-muted-foreground">Province:</span> {viewingClient.province || "—"}</div>
+                        <div><span className="text-muted-foreground">Postal Code:</span> {viewingClient.postalCode || "—"}</div>
+                      </div>
+                      <div className="pt-2 border-t mt-2">
+                        <span className="text-muted-foreground text-xs uppercase tracking-wide">Full Address</span>
+                        <p className="whitespace-pre-line mt-1">{formatClientAddress(viewingClient)}</p>
+                      </div>
+                    </>
+                  ) : viewingClient.address ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
+                      <div className="font-semibold text-xs uppercase tracking-wide mb-1">Old Address (legacy)</div>
+                      <p className="whitespace-pre-line">{viewingClient.address}</p>
+                      <p className="text-xs text-amber-600 mt-2 italic">Edit this customer to fill in the structured address fields.</p>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground italic">No address on file</p>
+                  )}
+                  {viewingClient.googleMapsLink && (
+                    <div>
+                      <a
+                        href={viewingClient.googleMapsLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-green-700 hover:text-green-800 underline"
+                      >
+                        <MapPin className="h-3.5 w-3.5" /> Open in Google Maps
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-semibold mb-2">Financial Information</h3>
                   <div className="space-y-2 text-sm">
@@ -568,6 +618,7 @@ export default function ClientsPage() {
               client={editingClient}
               onSubmit={(data) => updateMutation.mutate({ id: editingClient.id, data })}
               onCancel={() => setEditingClient(null)}
+              isSubmitting={updateMutation.isPending}
             />
           )}
         </DialogContent>

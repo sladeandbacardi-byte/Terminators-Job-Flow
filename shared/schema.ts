@@ -34,7 +34,16 @@ export const clients = pgTable("clients", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  // Legacy single-line address — kept for backwards compatibility.
+  // New structured address fields below should be used going forward.
   address: text("address"),
+  streetNumber: text("street_number"),
+  streetName: text("street_name"),
+  suburb: text("suburb"),
+  city: text("city"),
+  province: text("province"),
+  postalCode: text("postal_code"),
+  googleMapsLink: text("google_maps_link"),
   contactPerson: text("contact_person"),
   businessType: text("business_type"),
   status: text("status").notNull().default('active'), // active, inactive, suspended
@@ -326,6 +335,45 @@ export type Worker = typeof workers.$inferSelect;
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+
+/**
+ * Render the structured address as a clean multi-line string.
+ * Falls back to the legacy single-line `address` field when the new
+ * structured fields are all blank.
+ *
+ * Format (blank lines are skipped):
+ *   streetNumber streetName
+ *   suburb
+ *   city
+ *   province
+ *   postalCode
+ */
+export function formatClientAddress(
+  client: Pick<Client, "streetNumber" | "streetName" | "suburb" | "city" | "province" | "postalCode" | "address">,
+): string {
+  const streetLine = [client.streetNumber, client.streetName].filter(Boolean).join(" ").trim();
+  const lines = [
+    streetLine,
+    client.suburb ?? "",
+    client.city ?? "",
+    client.province ?? "",
+    client.postalCode ?? "",
+  ]
+    .map((l) => (l ?? "").trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.length > 0) return lines.join("\n");
+  return (client.address ?? "").trim();
+}
+
+export function hasStructuredAddress(
+  client: Pick<Client, "streetNumber" | "streetName" | "suburb" | "city" | "province" | "postalCode">,
+): boolean {
+  return Boolean(
+    client.streetNumber || client.streetName || client.suburb ||
+    client.city || client.province || client.postalCode,
+  );
+}
 
 export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
 export type InventoryItem = typeof inventoryItems.$inferSelect;

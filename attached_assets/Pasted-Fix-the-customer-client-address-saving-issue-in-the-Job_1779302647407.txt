@@ -1,0 +1,114 @@
+Fix the customer/client address saving issue in the Job Flow app.
+
+There is currently a bug where editing a client address shows "updated successfully", but when the client is opened again, the updated address is not saved or displayed correctly.
+
+Please inspect and fix the full customer update flow.
+
+Requirements:
+
+1. Customer Address Fields
+Replace the old single-line address field with separate address fields:
+
+- streetNumber
+- streetName
+- suburb
+- city
+- province
+- postalCode
+- googleMapsLink
+
+Keep googleMapsLink optional.
+
+2. Database / Storage
+Update the customer/client data model so these fields are saved permanently.
+
+Make sure the edit customer form saves these exact fields:
+
+streetNumber
+streetName
+suburb
+city
+province
+postalCode
+googleMapsLink
+
+Make sure the customer details page reads and displays these same exact fields.
+
+Do not save the address only in local component state.
+Do not show "updated successfully" unless the database/storage update has actually completed successfully.
+
+3. Backwards Compatibility
+If there are existing customers with an old single-line address field called address, physicalAddress, customerAddress, or similar, do not delete it immediately.
+
+Instead:
+- keep the old address data if it exists
+- show it as "Old Address" only if the new address fields are blank
+- allow admin to replace it with the new structured address fields when editing the customer
+
+4. Customer Details Page
+Remove "Department" from the main customer/client details page.
+
+The customer profile should show:
+- Customer name
+- Contact person
+- Phone number
+- Email address
+- Street number
+- Street name
+- Suburb / Area
+- City / Town
+- Province
+- Postal code
+- Google Maps Link if available
+- Notes
+
+Do not show department on the main customer details page.
+
+5. Department Placement
+Department must only be used on:
+- Job cards
+- Service records
+- Contracts/service setup
+- Reports
+
+Department options:
+- Pest Control
+- Hygiene
+- Sanitary Bins
+- Deep Cleaning
+- Other
+
+6. Display Address
+Create a helper function to display the full address from the separate fields.
+
+The display format should be:
+
+streetNumber streetName
+suburb
+city
+province
+postalCode
+
+If some fields are blank, skip the blank lines cleanly.
+
+7. Edit Customer Form
+Update the edit customer form so each address part has its own input field:
+
+Street Number
+Street Name
+Suburb / Area
+City / Town
+Province
+Postal Code
+Google Maps Link
+
+8. Save Confirmation
+Only show "Customer updated successfully" after the update function has successfully written the changes and the customer data has been refreshed.
+
+After saving, reload or refetch the customer record so the user immediately sees the updated saved data.
+
+9. Testing
+Test specifically with this customer:
+Volkswagen SA
+
+Update the address, save it, close the customer, open it again, and confirm the new structured address fields are still correct.

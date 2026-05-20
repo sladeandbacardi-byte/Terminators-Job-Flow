@@ -325,7 +325,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/clients/:id", async (req, res) => {
+  // Support both PUT and PATCH for updating a client. The frontend uses PATCH;
+  // PUT is kept for backwards compatibility with older integrations.
+  const updateClientHandler = async (req: any, res: any) => {
     try {
       console.log(`Updating client ${req.params.id} with data:`, JSON.stringify(req.body));
       const updateData = insertClientSchema.partial().parse(req.body);
@@ -335,7 +337,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Client update error:", error);
       res.status(400).json({ error: "Invalid client data", details: error instanceof Error ? error.message : String(error) });
     }
-  });
+  };
+  app.put("/api/clients/:id", updateClientHandler);
+  app.patch("/api/clients/:id", updateClientHandler);
 
   app.patch("/api/clients/:id/status", async (req, res) => {
     try {
