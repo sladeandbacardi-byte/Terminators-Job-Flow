@@ -1,5 +1,4 @@
-import logoImage from "@assets/job-flow-header-logo_1779307679615.png";
-import bannerImage from "@assets/job-flow-dashboard-banner_1779307679615.png";
+import logoImage from "@assets/termlogobig_1775739810095.jpg";
 
 interface TerminatorsLogoProps {
   className?: string;
@@ -16,8 +15,8 @@ export function TerminatorsLogo({ className = "", size = 'md' }: TerminatorsLogo
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <img
-        src={size === 'lg' ? bannerImage : logoImage}
-        alt="Job Flow Field Service Management"
+        src={logoImage}
+        alt="The Terminators"
         className={`${sizeClasses[size]} object-contain`}
         data-testid="terminators-logo"
       />
