@@ -288,6 +288,7 @@ export interface IStorage {
   getOrCreateAttendance(teamId: string, date: string): Promise<AttendanceRecord>;
   updateAttendanceRecord(id: string, data: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord>;
   getAttendanceMemberRecords(attendanceId: string): Promise<AttendanceMemberRecord[]>;
+  getAllAttendanceMemberRecords(): Promise<AttendanceMemberRecord[]>;
   upsertAttendanceMemberRecord(record: InsertAttendanceMemberRecord & { attendanceId: string }): Promise<AttendanceMemberRecord>;
   submitAttendance(attendanceId: string, submittedBy: string): Promise<AttendanceRecord>;
 
@@ -4267,6 +4268,10 @@ export class MemStorage implements IStorage {
 
   async getAttendanceMemberRecords(attendanceId: string): Promise<AttendanceMemberRecord[]> {
     return Array.from(this.attendanceMemberRecordsMap.values()).filter(r => r.attendanceId === attendanceId);
+  }
+
+  async getAllAttendanceMemberRecords(): Promise<AttendanceMemberRecord[]> {
+    return Array.from(this.attendanceMemberRecordsMap.values());
   }
 
   async upsertAttendanceMemberRecord(record: InsertAttendanceMemberRecord & { attendanceId: string }): Promise<AttendanceMemberRecord> {
