@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { runDailyBackupEmail, getBackupEmailConfig } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
-import { sendWhatsAppBackupTest } from "./whatsapp-service";
 import { 
   insertDepartmentSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
@@ -2619,18 +2618,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) {
       const logs = await storage.getBackupLogs().catch(() => []);
       res.status(500).json({ error: e.message, log: logs[0] ?? null });
-    }
-  });
-
-  app.post("/api/backup/whatsapp-test", async (_req, res) => {
-    try {
-      const result = await sendWhatsAppBackupTest();
-      if (!result.success) return res.status(500).json({ ...result, error: result.message });
-      res.json(result);
-    } catch (e: any) {
-      console.error("[whatsapp-backup] route crashed:", e);
-      const msg = e?.message ?? "WhatsApp test crashed";
-      res.status(500).json({ success: false, recipient: "", message: msg, error: msg });
     }
   });
 
