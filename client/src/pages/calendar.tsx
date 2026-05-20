@@ -37,7 +37,7 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { formatClientAddress, type Job, type Client, type Worker, type Department } from "@shared/schema";
+import { formatClientAddress, type Job, type Client, type Worker, type Department, type Team, type TeamMember } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
 
@@ -101,6 +101,7 @@ export default function Calendar() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
@@ -161,6 +162,33 @@ export default function Calendar() {
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
   });
+
+  const { data: teams = [] } = useQuery<Team[]>({ queryKey: ['/api/teams'] });
+  const { data: teamMembers = [] } = useQuery<TeamMember[]>({ queryKey: ['/api/team-members'] });
+
+  // worker -> set of team ids
+  const workerTeamsMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    teamMembers.forEach(tm => {
+      const set = map.get(tm.workerId) ?? new Set<string>();
+      set.add(tm.teamId);
+      map.set(tm.workerId, set);
+    });
+    return map;
+  }, [teamMembers]);
+
+  const teamOptions = useMemo(() => {
+    if (departmentFilter === "all") return teams;
+    return teams.filter(t => t.departmentId === departmentFilter);
+  }, [teams, departmentFilter]);
+
+  const onDepartmentChange = (val: string) => {
+    setDepartmentFilter(val);
+    if (val !== "all" && teamFilter !== "all") {
+      const t = teams.find(t => t.id === teamFilter);
+      if (!t || t.departmentId !== val) setTeamFilter("all");
+    }
+  };
 
   // Resolve the logged-in technician's worker record
   const myWorker = useMemo(() => {
@@ -336,11 +364,13 @@ export default function Calendar() {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
+    const matchesTeam = teamFilter === "all" ||
+      (event.workerId ? !!workerTeamsMap.get(event.workerId)?.has(teamFilter) : false);
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
     // Technicians only see their own jobs
     const matchesWorker = !isTechnician || !myWorker || event.workerId === myWorker.id;
 
-    return matchesSearch && matchesDepartment && matchesStatus && matchesWorker;
+    return matchesSearch && matchesDepartment && matchesTeam && matchesStatus && matchesWorker;
   });
 
   function getPriorityColor(priority: string): string {
@@ -1152,6 +1182,7 @@ export default function Calendar() {
               onClick={() => {
                 setViewType('month');
                 setDepartmentFilter('all');
+                setTeamFilter('all');
                 setStatusFilter('all');
               }}
               variant="outline"
@@ -1306,7 +1337,7 @@ export default function Calendar() {
                 />
               </div>
 
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <Select value={departmentFilter} onValueChange={onDepartmentChange}>
                 <SelectTrigger className="w-48" data-testid="department-filter">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
@@ -1317,6 +1348,23 @@ export default function Calendar() {
                       {department.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={teamFilter} onValueChange={setTeamFilter}>
+                <SelectTrigger className="w-48" data-testid="team-filter">
+                  <SelectValue placeholder="All Teams" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {teamOptions.map(t => {
+                    const dept = departments.find(d => d.id === t.departmentId);
+                    return (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}{departmentFilter === "all" && dept ? ` (${dept.name})` : ""}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
 
