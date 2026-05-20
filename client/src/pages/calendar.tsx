@@ -37,7 +37,7 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Job, Client, Worker, Department } from "@shared/schema";
+import { formatClientAddress, type Job, type Client, type Worker, type Department } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
 
@@ -312,7 +312,7 @@ export default function Calendar() {
       clientId: job.clientId,
       workerId: job.workerId || undefined,
       departmentId: job.departmentId,
-      location: job.location || (client ? client.address : '') || undefined,
+      location: job.location || (client ? formatClientAddress(client) : '') || undefined,
       status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending',
       color: jobColor,
     };

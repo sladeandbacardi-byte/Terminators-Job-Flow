@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertJobSchema } from "@shared/schema";
+import { insertJobSchema, formatClientAddress } from "@shared/schema";
 import { SERVICE_TYPES, RECURRENCE_PERIODS, DAYS_OF_WEEK, DIARY_OPTIONS } from "@/lib/constants";
 import type { Job, Client, Worker, Department } from "@shared/schema";
 import { z } from "zod";
@@ -237,7 +237,8 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                     const client = clients.find(c => c.id === val);
                     if (client) {
                       form.setValue("email", client.email || "");
-                      form.setValue("location", client.address || "");
+                      form.setValue("location", formatClientAddress(client) || "");
+                      form.setValue("googleMapsLink", client.googleMapsLink || "");
                     }
                   }} value={field.value || ""}>
                     <FormControl>

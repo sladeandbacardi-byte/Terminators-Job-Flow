@@ -6,7 +6,7 @@ import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Briefcase, Package, TrendingUp, ChevronRight, Phone, Mail, MapPin, Calendar } from "lucide-react";
-import type { Worker, Job, InventoryItem, Client, Department } from "@shared/schema";
+import { formatClientAddress, type Worker, type Job, type InventoryItem, type Client, type Department } from "@shared/schema";
 
 interface DepartmentOverviewProps {
   className?: string;
@@ -319,9 +319,10 @@ export function DepartmentOverview({ className = "", defaultSelection, compact =
                       <div key={client.id} className="flex items-center justify-between border rounded-lg px-3 py-2">
                         <div>
                           <p className="font-medium text-sm">{client.name}</p>
-                          {client.address && (
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
-                              <MapPin className="h-3 w-3" /> {client.address}
+                          {formatClientAddress(client) && (
+                            <p className="text-xs text-gray-500 flex items-start gap-1">
+                              <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                              <span className="whitespace-pre-line">{formatClientAddress(client)}</span>
                             </p>
                           )}
                         </div>

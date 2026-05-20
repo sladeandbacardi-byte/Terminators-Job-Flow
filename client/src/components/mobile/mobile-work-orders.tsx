@@ -17,7 +17,7 @@ import {
   Menu,
   X
 } from "lucide-react";
-import type { Job, Client, Worker } from '@shared/schema';
+import { formatClientAddress, type Job, type Client, type Worker } from '@shared/schema';
 
 interface MobileWorkOrdersProps {
   worker: Worker;
@@ -280,7 +280,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                   </div>
                   <div className="flex items-start space-x-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4 mt-0.5" />
-                    <span className="flex-1">{job.location || job.client.address}</span>
+                    <span className="flex-1 whitespace-pre-line">{job.location || formatClientAddress(job.client)}</span>
                   </div>
 
                   {job.googleMapsLink ? (
@@ -359,7 +359,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => openMaps(job.location || job.client.address || '')}
+                      onClick={() => openMaps(job.location || formatClientAddress(job.client) || '')}
                       className="flex items-center justify-center space-x-1"
                       data-testid={`button-navigate-${job.id}`}
                     >

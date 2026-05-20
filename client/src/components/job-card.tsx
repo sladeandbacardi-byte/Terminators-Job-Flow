@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { MapPin, Clock, User, Phone, Mail, FileText, Package, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getStatusColor, formatDateTime } from "@/lib/utils";
-import type { Job, Client, Worker, Department, JobInventoryItem, InventoryItem } from "@shared/schema";
+import { formatClientAddress, type Job, type Client, type Worker, type Department, type JobInventoryItem, type InventoryItem } from "@shared/schema";
 import termLogoPath from "@assets/termlogobig_1755598359265.jpg";
 
 interface JobCardData extends Job {
@@ -196,10 +196,20 @@ export function JobCard({ jobId, className = "" }: JobCardProps) {
                 </div>
               </div>
             )}
-            {jobData.client.address && (
+            {formatClientAddress(jobData.client) && (
               <div>
                 <p className="text-sm font-medium text-gray-700">Address</p>
-                <p className="text-base">{jobData.client.address}</p>
+                <p className="text-base whitespace-pre-line">{formatClientAddress(jobData.client)}</p>
+                {jobData.client.googleMapsLink && (
+                  <a
+                    href={jobData.client.googleMapsLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-green-700 hover:underline"
+                  >
+                    Open in Google Maps
+                  </a>
+                )}
               </div>
             )}
           </div>

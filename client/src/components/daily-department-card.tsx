@@ -4,7 +4,7 @@ import { MapPin, Clock, User, Phone, Mail, FileText, Package, AlertTriangle, Cal
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getStatusColor } from "@/lib/utils";
-import type { Job, Client, Worker, Department, JobInventoryItem, InventoryItem } from "@shared/schema";
+import { formatClientAddress, type Job, type Client, type Worker, type Department, type JobInventoryItem, type InventoryItem } from "@shared/schema";
 import termLogoPath from "@assets/termlogobig_1755598359265.jpg";
 
 interface JobWithDetails extends Job {
@@ -166,7 +166,7 @@ export function DailyDepartmentCard({ departmentId, date, className = "" }: Dail
 
                 {/* Location */}
                 <div className="truncate">
-                  {job.location || job.client?.address || '-'}
+                  {job.location || (job.client ? formatClientAddress(job.client) : '') || '-'}
                 </div>
 
                 {/* Status */}
