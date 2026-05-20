@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getOneDriveConfig, runDailyBackupToOneDrive } from "./onedrive";
 import { runDailyBackupEmail, getBackupEmailConfig } from "./email-backup";
+import { sendBrevoTestEmail } from "./smtp-service";
 import { 
   insertDepartmentSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
@@ -2645,6 +2646,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) {
       const logs = await storage.getBackupLogs().catch(() => []);
       res.status(500).json({ error: e.message, log: logs[0] ?? null });
+    }
+  });
+
+  app.post("/api/backup/smtp-test", async (_req, res) => {
+    try {
+      const result = await sendBrevoTestEmail();
+      if (!result.success) return res.status(500).json(result);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ success: false, recipient: "", message: e?.message ?? "SMTP test crashed" });
     }
   });
 

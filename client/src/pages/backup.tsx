@@ -172,6 +172,27 @@ export default function BackupPage() {
     },
   });
 
+  const smtpTestMutation = useMutation<{ success: boolean; recipient: string; message: string }, Error, void>({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/backup/smtp-test");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "SMTP test sent", description: `Sent to ${data.recipient}.` });
+    },
+    onError: (e: any) => {
+      toast({ title: "SMTP test failed", description: e?.message ?? "Send failed", variant: "destructive" });
+    },
+  });
+
+  const handleSendSmtpTest = () => {
+    if (isDemoMode) {
+      toast({ title: "Demo Mode", description: "This action is disabled in Demo Mode.", variant: "destructive" });
+      return;
+    }
+    smtpTestMutation.mutate();
+  };
+
   const emailTestMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/backup/email-test"),
     onSuccess: async (res: any) => {
@@ -500,6 +521,34 @@ export default function BackupPage() {
                   Both buttons always send to <strong>{emailConfig?.recipient ?? "info@terminators.co.za"}</strong>.
                   The test email is identical to the daily email but clearly labelled as a TEST.
                 </p>
+
+                <div className="pt-3 mt-3 border-t border-dashed">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Brevo SMTP connection test</p>
+                  <Button
+                    onClick={handleSendSmtpTest}
+                    disabled={isDemoMode || smtpTestMutation.isPending}
+                    variant="outline"
+                    className="w-full border-purple-300 hover:bg-purple-50"
+                  >
+                    {smtpTestMutation.isPending
+                      ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Sending SMTP test…</>
+                      : <><Send className="mr-2 h-4 w-4" />Send Test Backup Email (Brevo SMTP)</>}
+                  </Button>
+                  {smtpTestMutation.data && (
+                    <div className={`mt-2 rounded-lg p-3 flex items-start gap-2 text-sm ${smtpTestMutation.data.success ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"}`}>
+                      {smtpTestMutation.data.success
+                        ? <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        : <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />}
+                      <p>{smtpTestMutation.data.message}</p>
+                    </div>
+                  )}
+                  {smtpTestMutation.isError && (
+                    <div className="mt-2 rounded-lg p-3 flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-800">
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p>{(smtpTestMutation.error as any)?.message ?? "SMTP test failed"}</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
