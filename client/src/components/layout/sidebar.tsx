@@ -91,7 +91,6 @@ const ALL_CATEGORIES = [
       { name: "Team Management",   href: "/team-management",   icon: Users,         roles: ["admin", "manager"] },
       { name: "Reports",           href: "/reports",           icon: BarChart,      roles: ["admin", "manager", "coordinator", "accounts"] },
       { name: "Custom Reports",    href: "/custom-reports",    icon: BarChart3,     roles: ["admin", "manager"] },
-      { name: "Testing Checklist", href: "/testing-checklist", icon: ClipboardList, roles: ["admin", "manager", "coordinator"] },
       { name: "Backup & Restore",  href: "/backup",            icon: Database,      roles: ["admin"] },
     ],
   },
