@@ -32,8 +32,7 @@ const ALL_CATEGORIES = [
     roles: ["admin", "manager", "coordinator"],
     items: [
       { name: "Calendar",         href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
-      { name: "Staff Schedule",    href: "/field-diaries",   icon: ClipboardList,roles: ["admin", "manager", "coordinator"] },
-      { name: "Job Scheduling",   href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
+      { name: "Jobs",             href: "/jobs",            icon: Briefcase,    roles: ["admin", "manager", "coordinator"] },
       { name: "Team Attendance",  href: "/attendance",      icon: UserCheck,    roles: ["admin", "manager", "coordinator"] },
       { name: "Clients",          href: "/clients",         icon: Shield,       roles: ["admin", "manager", "coordinator"] },
       { name: "Staff",            href: "/workers",         icon: Users,        roles: ["admin", "manager", "coordinator"] },
@@ -64,7 +63,7 @@ const ALL_CATEGORIES = [
     roles: ["accounts"],
     items: [
       { name: "Calendar",        href: "/calendar",        icon: Calendar,     roles: ["accounts"] },
-      { name: "Job Scheduling",  href: "/jobs",            icon: Calendar,     roles: ["accounts"] },
+      { name: "Jobs",            href: "/jobs",            icon: Briefcase,    roles: ["accounts"] },
       { name: "Clients",         href: "/clients",         icon: Shield,       roles: ["accounts"] },
       { name: "Suppliers",       href: "/suppliers",       icon: Building2,    roles: ["accounts"] },
       { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["accounts"] },
