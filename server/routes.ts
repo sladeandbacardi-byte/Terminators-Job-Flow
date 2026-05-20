@@ -2111,6 +2111,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Sage Export ──────────────────────────────────────────────────────────
+
+  // Query jobs eligible for Sage export
+  app.get("/api/sage-export/jobs", async (req, res) => {
+    try {
+      const { from, to, departmentId, workerId, clientId, includeExported } = req.query as Record<string, string>;
+      const allJobs = await storage.getJobs();
+      const allClients = await storage.getClients();
+      const allWorkers = await storage.getWorkers();
+      const allDepts = await storage.getDepartments();
+
+      const clientMap = new Map(allClients.map((c: any) => [c.id, c]));
+      const workerMap = new Map(allWorkers.map((w: any) => [w.id, w]));
+      const deptMap   = new Map(allDepts.map((d: any) => [d.id, d]));
+
+      let jobs = allJobs.filter((j: any) => {
+        if (j.status !== "completed") return false;
+        // by default only show not_invoiced; if includeExported, also show exported
+        const inv = j.invoiceStatus ?? "not_invoiced";
+        if (inv === "invoiced") return false;
+        if (inv === "exported" && includeExported !== "true") return false;
+        return true;
+      });
+
+      if (from)  { const d = new Date(from);  jobs = jobs.filter((j: any) => new Date(j.scheduledDate) >= d); }
+      if (to)    { const d = new Date(to); d.setHours(23,59,59); jobs = jobs.filter((j: any) => new Date(j.scheduledDate) <= d); }
+      if (departmentId) jobs = jobs.filter((j: any) => j.departmentId === departmentId);
+      if (workerId)     jobs = jobs.filter((j: any) => j.workerId === workerId);
+      if (clientId)     jobs = jobs.filter((j: any) => j.clientId === clientId);
+
+      const result = jobs.map((j: any) => {
+        const client = clientMap.get(j.clientId) as any;
+        const worker = workerMap.get(j.workerId) as any;
+        const dept   = deptMap.get(j.departmentId) as any;
+        const priceEx = parseFloat(String(j.price ?? j.pricePerUnit ?? 0)) || 0;
+        const qty     = 1;
+        const vat     = 0.15;
+        const vatAmt  = priceEx * qty * vat;
+        const total   = priceEx * qty + vatAmt;
+        return {
+          id: j.id,
+          jobNumber:    j.jobNumber ?? j.id,
+          jobDate:      j.scheduledDate,
+          clientName:   client?.name ?? "",
+          sageCode:     (client as any)?.sageCustomerCode ?? "",
+          department:   dept?.name ?? "",
+          technician:   worker?.name ?? "",
+          description:  j.title ?? j.service ?? j.serviceType ?? "",
+          quantity:     qty,
+          unitPriceEx:  priceEx,
+          vatPct:       15,
+          vatAmount:    vatAmt,
+          totalIncl:    total,
+          invoiceNotes: j.notes ?? j.completionNotes ?? "",
+          invoiceStatus: j.invoiceStatus ?? "not_invoiced",
+        };
+      });
+
+      res.json(result);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Bulk mark jobs as exported / invoiced
+  app.post("/api/sage-export/mark", async (req, res) => {
+    try {
+      const { jobIds, status } = req.body as { jobIds: string[]; status: "exported" | "invoiced" };
+      if (!Array.isArray(jobIds) || !status) return res.status(400).json({ error: "jobIds array and status required" });
+      for (const id of jobIds) {
+        await storage.updateJob(id, { invoiceStatus: status } as any);
+      }
+      res.json({ updated: jobIds.length });
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  // Generate Excel download for Sage export
+  app.post("/api/sage-export/download", async (req, res) => {
+    try {
+      const XLSX = await import("xlsx");
+      const { jobs } = req.body as { jobs: any[] };
+      if (!Array.isArray(jobs)) return res.status(400).json({ error: "jobs array required" });
+
+      const fmt = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "";
+
+      const rows = [
+        ["Job Date", "Job Number", "Customer Name", "Sage Customer Code", "Department", "Technician",
+         "Service Description", "Quantity", "Unit Price Ex VAT", "VAT %", "VAT Amount", "Total Incl VAT",
+         "Invoice Notes", "Internal Job ID"],
+        ...jobs.map((j: any) => [
+          fmt(j.jobDate),
+          j.jobNumber,
+          j.clientName,
+          j.sageCode,
+          j.department,
+          j.technician,
+          j.description,
+          j.quantity,
+          parseFloat(j.unitPriceEx).toFixed(2),
+          j.vatPct,
+          parseFloat(j.vatAmount).toFixed(2),
+          parseFloat(j.totalIncl).toFixed(2),
+          j.invoiceNotes,
+          j.id,
+        ]),
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sage Export");
+
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      const filename = `sage-export-${new Date().toISOString().split("T")[0]}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("Sage Excel error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Backup & Restore
   app.get("/api/backup/export", async (req, res) => {
     try {

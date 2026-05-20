@@ -36,6 +36,7 @@ const clientFormSchema = z.object({
   paymentTerms: z.string().optional(),
   creditLimit: z.number().min(0).optional(),
   notes: z.string().optional(),
+  sageCustomerCode: z.string().optional(),
 });
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
@@ -66,6 +67,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
       paymentTerms: client?.paymentTerms || "",
       creditLimit: client?.creditLimit ? parseFloat(String(client.creditLimit)) : undefined,
       notes: client?.notes || "",
+      sageCustomerCode: (client as any)?.sageCustomerCode || "",
     },
   });
 
@@ -81,6 +83,7 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
       paymentTerms: data.paymentTerms || undefined,
       creditLimit: data.creditLimit !== undefined ? String(data.creditLimit) : undefined,
       notes: data.notes || undefined,
+      sageCustomerCode: data.sageCustomerCode || undefined,
     };
     onSubmit(submitData);
   };
@@ -246,6 +249,22 @@ export function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
             )}
           />
 
+          <FormField
+            control={form.control}
+            name="sageCustomerCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm">Sage Customer Code</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., CUST001" {...field} className="h-8 text-sm" />
+                </FormControl>
+                <FormMessage className="text-xs" />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="creditLimit"

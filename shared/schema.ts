@@ -43,6 +43,7 @@ export const clients = pgTable("clients", {
   paymentTerms: text("payment_terms"),
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
   notes: text("notes"),
+  sageCustomerCode: text("sage_customer_code"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
@@ -130,6 +131,7 @@ export const jobs = pgTable("jobs", {
   recurrenceYears: integer("recurrence_years"),
   jobNumber: text("job_number"),
   linkedQuoteId: varchar("linked_quote_id"),
+  invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | exported | invoiced
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

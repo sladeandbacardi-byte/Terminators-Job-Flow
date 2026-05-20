@@ -38,6 +38,7 @@ import FleetVehicleMaintenance from "@/pages/fleet-vehicle-maintenance";
 import FleetVehicleProfile from "@/pages/fleet-vehicle-profile";
 import Attendance from "@/pages/attendance";
 import TeamManagement from "@/pages/team-management";
+import SageExport from "@/pages/sage-export";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -91,6 +92,7 @@ function AuthenticatedApp() {
       <Route path="/fleet/maintenance" component={FleetMaintenance} />
       <Route path="/attendance" component={Attendance} />
       <Route path="/team-management" component={TeamManagement} />
+      <Route path="/sage-export" component={SageExport} />
       <Route component={NotFound} />
     </Switch>
   );

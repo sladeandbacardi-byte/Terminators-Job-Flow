@@ -4,7 +4,7 @@ import {
   BarChart3, Calendar, Users, Shield, Box, FileText, Receipt, Mail,
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
   Settings, TrendingUp, ExternalLink, Database, ClipboardList, Briefcase,
-  Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck,
+  Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck, FileSpreadsheet,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -77,7 +77,8 @@ const ALL_CATEGORIES = [
     icon: CreditCard,
     roles: ["admin", "manager", "accounts", "coordinator"],
     items: [
-      { name: "Invoices", href: "/invoices", icon: Receipt, roles: ["admin", "manager", "accounts", "coordinator"] },
+      { name: "Invoices",    href: "/invoices",    icon: Receipt,   roles: ["admin", "manager", "accounts", "coordinator"] },
+      { name: "Sage Export", href: "/sage-export", icon: FileSpreadsheet, roles: ["admin", "manager", "accounts"] },
     ],
   },
 

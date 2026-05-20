@@ -531,6 +531,7 @@ export default function ClientsPage() {
                     <div><strong>Tax Number:</strong> {viewingClient.taxNumber || "Not provided"}</div>
                     <div><strong>Credit Limit:</strong> {viewingClient.creditLimit ? `R${viewingClient.creditLimit}` : "Not set"}</div>
                     <div><strong>Payment Terms:</strong> {viewingClient.paymentTerms || "Not specified"}</div>
+                    <div><strong>Sage Customer Code:</strong> {(viewingClient as any).sageCustomerCode || <span className="text-gray-400 italic">Not set</span>}</div>
                   </div>
                 </div>
                 <div>
