@@ -138,6 +138,8 @@ export function AccountsDashboard() {
     alerts.push({ msg: `${creditorsBySupplier.length} supplier${creditorsBySupplier.length > 1 ? "s" : ""} with outstanding payments — ${fmt(totalOwed)} owed`, color: "border-purple-200 bg-purple-50 text-purple-800", icon: Building2 });
   if (expiringSoon.length > 0)
     alerts.push({ msg: `${expiringSoon.length} contract${expiringSoon.length > 1 ? "s" : ""} expiring within 30 days`, color: "border-blue-200 bg-blue-50 text-blue-800", icon: Clock });
+  if (salesMonth > 0 && collectionRate < 60)
+    alerts.push({ msg: `Low collection rate — only ${collectionRate}% of revenue collected this month`, color: "border-red-200 bg-red-50 text-red-800", icon: Percent });
 
   // ── Lists (capped at 5) ──
   const topDebtors      = [...overdue, ...outstanding]
@@ -167,8 +169,8 @@ export function AccountsDashboard() {
       {/* ── 1. Finance Snapshot ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <SnapCard label="Debtors Outstanding" value={fmt(totalDebtors)}    sub={`${outstanding.length + overdue.length} invoices`}        icon={TrendingDown}  color="bg-red-50 text-red-500"    valueColor="text-red-600" />
-        <SnapCard label="Sales This Month"    value={fmt(salesMonth)}       sub={`${invoices.filter(i => new Date(i.issueDate) >= monthStart).length} invoices issued`} icon={DollarSign} color="bg-blue-50 text-blue-500"   valueColor="text-blue-600" />
-        <SnapCard label="Collection Rate"     value={`${collectionRate}%`}  sub="of sales collected"                                        icon={Percent}       color="bg-green-50 text-green-500" valueColor={collectionRate >= 75 ? "text-green-600" : "text-amber-600"} />
+        <SnapCard label="Revenue This Month"   value={fmt(salesMonth)}       sub={`${invoices.filter(i => new Date(i.issueDate) >= monthStart).length} invoices issued`} icon={DollarSign} color="bg-blue-50 text-blue-500"   valueColor="text-blue-600" />
+        <SnapCard label="Collection Rate"     value={`${collectionRate}%`}  sub="of revenue collected"                                      icon={Percent}       color="bg-green-50 text-green-500" valueColor={collectionRate >= 75 ? "text-green-600" : "text-amber-600"} />
         <SnapCard label="Outstanding POs"     value={fmt(totalOwed)}        sub={`${creditorPOs.length} purchase orders`}                   icon={ShoppingCart}  color="bg-orange-50 text-orange-500" valueColor="text-orange-600" />
         <SnapCard label="Suppliers Owed"      value={`${creditorsBySupplier.length}`} sub="with open balances"                             icon={Building2}     color="bg-purple-50 text-purple-500" valueColor="text-purple-600" />
         <SnapCard label="POs Received / Paid" value={fmt(totalPOPaid)}      sub={`${receivedPOs.length} orders fulfilled`}                  icon={CheckCircle}   color="bg-teal-50 text-teal-500"   valueColor="text-teal-600" />
