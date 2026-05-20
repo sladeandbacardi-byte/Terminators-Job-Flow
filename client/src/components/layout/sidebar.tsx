@@ -4,7 +4,7 @@ import {
   BarChart3, Calendar, Users, Shield, Box, FileText, Receipt, Mail,
   Building2, ShoppingCart, BarChart, DollarSign, Wrench, CreditCard,
   Settings, TrendingUp, ExternalLink, Database, ClipboardList, Briefcase,
-  Truck, Gauge, Fuel, ClipboardCheck, AlertCircle,
+  Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -34,6 +34,7 @@ const ALL_CATEGORIES = [
       { name: "Calendar",         href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
       { name: "Staff Schedule",    href: "/field-diaries",   icon: ClipboardList,roles: ["admin", "manager", "coordinator"] },
       { name: "Job Scheduling",   href: "/jobs",            icon: Calendar,     roles: ["admin", "manager", "coordinator"] },
+      { name: "Team Attendance",  href: "/attendance",      icon: UserCheck,    roles: ["admin", "manager", "coordinator"] },
       { name: "Clients",          href: "/clients",         icon: Shield,       roles: ["admin", "manager", "coordinator"] },
       { name: "Staff",            href: "/workers",         icon: Users,        roles: ["admin", "manager", "coordinator"] },
       { name: "Stock Management", href: "/inventory",       icon: Box,          roles: ["admin", "manager", "coordinator"] },
@@ -49,9 +50,10 @@ const ALL_CATEGORIES = [
     icon: Wrench,
     roles: ["service"],
     items: [
-      { name: "Calendar",      href: "/calendar",      icon: Calendar,      roles: ["service"], tooltip: "View your assigned jobs by date." },
-      { name: "My Jobs",       href: "/jobs",          icon: Briefcase,     roles: ["service"], tooltip: "Your main job list and daily work sheet." },
-      { name: "Field Diaries", href: "/field-diaries", icon: ClipboardList, roles: ["service"], tooltip: "Submit and view job reports linked to completed work." },
+      { name: "Calendar",        href: "/calendar",      icon: Calendar,      roles: ["service"], tooltip: "View your assigned jobs by date." },
+      { name: "My Jobs",         href: "/jobs",          icon: Briefcase,     roles: ["service"], tooltip: "Your main job list and daily work sheet." },
+      { name: "Field Diaries",   href: "/field-diaries", icon: ClipboardList, roles: ["service"], tooltip: "Submit and view job reports linked to completed work." },
+      { name: "Team Attendance", href: "/attendance",    icon: UserCheck,     roles: ["service"], tooltip: "Mark your team's attendance for today." },
     ],
   },
 
@@ -85,6 +87,7 @@ const ALL_CATEGORIES = [
     icon: Settings,
     roles: ["admin", "manager", "coordinator", "accounts"],
     items: [
+      { name: "Team Management",   href: "/team-management",   icon: Users,         roles: ["admin", "manager"] },
       { name: "Reports",           href: "/reports",           icon: BarChart,      roles: ["admin", "manager", "coordinator", "accounts"] },
       { name: "Custom Reports",    href: "/custom-reports",    icon: BarChart3,     roles: ["admin", "manager"] },
       { name: "Testing Checklist", href: "/testing-checklist", icon: ClipboardList, roles: ["admin", "manager", "coordinator"] },

@@ -2494,6 +2494,129 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
+  // ── TEAMS ──────────────────────────────────────────────────────────────────
+
+  app.get("/api/teams", async (_req, res) => {
+    try { res.json(await storage.getTeams()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/teams/:id", async (req, res) => {
+    try {
+      const team = await storage.getTeam(req.params.id);
+      if (!team) return res.status(404).json({ error: "Team not found" });
+      res.json(team);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/api/teams", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const team = await storage.createTeam(req.body);
+      res.status(201).json(team);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  app.patch("/api/teams/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const team = await storage.updateTeam(req.params.id, req.body);
+      res.json(team);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  app.delete("/api/teams/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteTeam(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/teams/:id/members", async (req, res) => {
+    try { res.json(await storage.getTeamMembers(req.params.id)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/api/teams/:id/members", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const member = await storage.addTeamMember({ teamId: req.params.id, workerId: req.body.workerId });
+      res.status(201).json(member);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  app.delete("/api/teams/:id/members/:workerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.removeTeamMember(req.params.id, req.params.workerId);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/teams/by-worker/:workerId", async (req, res) => {
+    try { res.json(await storage.getTeamsForWorker(req.params.workerId)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/teams/by-supervisor/:supervisorId", async (req, res) => {
+    try { res.json(await storage.getTeamsForSupervisor(req.params.supervisorId)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── ATTENDANCE ─────────────────────────────────────────────────────────────
+
+  app.get("/api/attendance", async (req, res) => {
+    try {
+      const { date, teamId, departmentId } = req.query as Record<string, string>;
+      res.json(await storage.getAttendanceRecords({ date, teamId, departmentId }));
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/attendance/:id", async (req, res) => {
+    try {
+      const record = await storage.getAttendanceRecord(req.params.id);
+      if (!record) return res.status(404).json({ error: "Attendance record not found" });
+      res.json(record);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get("/api/attendance/:id/members", async (req, res) => {
+    try { res.json(await storage.getAttendanceMemberRecords(req.params.id)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Get or create attendance for a team on a specific date
+  app.post("/api/attendance/open", async (req, res) => {
+    try {
+      const { teamId, date } = req.body;
+      if (!teamId || !date) return res.status(400).json({ error: "teamId and date required" });
+      const record = await storage.getOrCreateAttendance(teamId, date);
+      res.json(record);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  // Update a single member's status
+  app.patch("/api/attendance/:id/member", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { workerId, employeeName, role, status, absenceReason, notes } = req.body;
+      const updated = await storage.upsertAttendanceMemberRecord({
+        attendanceId: req.params.id,
+        workerId,
+        employeeName,
+        role,
+        status,
+        absenceReason: absenceReason ?? null,
+        notes: notes ?? null,
+      });
+      res.json(updated);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
+  // Submit attendance
+  app.post("/api/attendance/:id/submit", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const submittedBy = req.body.submittedBy ?? req.user?.id ?? "unknown";
+      const record = await storage.submitAttendance(req.params.id, submittedBy);
+      res.json(record);
+    } catch (err: any) { res.status(400).json({ error: err.message }); }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

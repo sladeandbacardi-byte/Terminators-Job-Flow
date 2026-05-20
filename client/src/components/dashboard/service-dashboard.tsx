@@ -8,10 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   Briefcase, CheckCircle, Clock, AlertTriangle, MapPin,
   Gauge, ClipboardCheck, Fuel, AlertCircle, FileWarning,
-  Play, ChevronRight, CalendarDays,
+  Play, ChevronRight, CalendarDays, UserCheck,
 } from "lucide-react";
 import { format, isValid, startOfWeek, endOfWeek } from "date-fns";
-import type { Job, Worker, Client, Department } from "@shared/schema";
+import type { Job, Worker, Client, Department, Team, AttendanceRecord } from "@shared/schema";
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -103,6 +103,12 @@ export function ServiceDashboard() {
   const { data: workers     = [] } = useQuery<Worker[]>({    queryKey: ["/api/workers"] });
   const { data: clients     = [] } = useQuery<Client[]>({    queryKey: ["/api/clients"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: allTeams    = [] } = useQuery<Team[]>({      queryKey: ["/api/teams"] });
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const { data: todayAttendance = [] } = useQuery<AttendanceRecord[]>({
+    queryKey: ["/api/attendance", { date: todayStr }],
+    queryFn: () => fetch(`/api/attendance?date=${todayStr}`).then(r => r.json()),
+  });
 
   /* ── Resolve which worker this user is ────────────────────────────────────
      Priority: direct ID match → email match → worker with most assigned jobs
@@ -148,8 +154,47 @@ export function ServiceDashboard() {
   const weekTotal   = myWeek.length;
   const weekUpcoming = myWeek.filter(j => j.status === "scheduled" || j.status === "pending").length;
 
+  /* ── Attendance alert ───────────────────────────────────────────────────── */
+  // Teams where this worker is the supervisor
+  const mySupervised = allTeams.filter(t => t.isActive && t.supervisorId === myWorker?.id);
+  // Of those, which have already been submitted today?
+  const supervisedSubmitted = mySupervised.filter(t =>
+    todayAttendance.some(a => a.teamId === t.id && a.status === "submitted")
+  );
+  const attendancePending = mySupervised.length > 0 && supervisedSubmitted.length < mySupervised.length;
+  const attendanceDone    = mySupervised.length > 0 && supervisedSubmitted.length === mySupervised.length;
+
   return (
     <div className="space-y-5">
+
+      {/* ── Attendance prompt ───────────────────────────────────────────────── */}
+      {attendancePending && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-amber-800 text-sm">Team Attendance Required</p>
+                <p className="text-xs text-amber-700 mt-0.5">Please confirm who is present today.</p>
+              </div>
+            </div>
+            <Link href="/attendance">
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white whitespace-nowrap flex-shrink-0">
+                <UserCheck className="h-4 w-4 mr-1.5" /> Open Attendance
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {attendanceDone && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-3 flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+            <p className="text-sm font-medium text-green-800">Team Attendance Submitted</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Current Job (if any in-progress) ────────────────────────────────── */}
       {currentJob && (

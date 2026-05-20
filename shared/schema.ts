@@ -700,3 +700,60 @@ export type InsertServiceRecord = z.infer<typeof insertServiceRecordSchema>;
 export type ServiceRecord = typeof serviceRecords.$inferSelect;
 export type InsertWorkshopJob = z.infer<typeof insertWorkshopJobSchema>;
 export type WorkshopJob = typeof workshopJobs.$inferSelect;
+
+// ─── TEAM ATTENDANCE MODULE ──────────────────────────────────────────────────
+
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  departmentId: varchar("department_id").notNull(),
+  supervisorId: varchar("supervisor_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+});
+
+export const attendanceRecords = pgTable("attendance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),           // YYYY-MM-DD
+  teamId: varchar("team_id").notNull(),
+  teamName: text("team_name").notNull(),
+  departmentId: varchar("department_id").notNull(),
+  supervisorId: varchar("supervisor_id").notNull(),
+  supervisorName: text("supervisor_name").notNull(),
+  submittedBy: varchar("submitted_by"),
+  submittedAt: timestamp("submitted_at"),
+  status: text("status").notNull().default("not_submitted"), // not_submitted | submitted
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const attendanceMemberRecords = pgTable("attendance_member_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attendanceId: varchar("attendance_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  role: text("role"),
+  status: text("status").notNull().default("not_confirmed"), // present | absent | not_confirmed
+  absenceReason: text("absence_reason"), // sick | leave | no_show | off_duty | other
+  notes: text("notes"),
+});
+
+export const insertTeamSchema = createInsertSchema(teams).omit({ id: true, createdAt: true });
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({ id: true });
+export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true });
+export const insertAttendanceMemberRecordSchema = createInsertSchema(attendanceMemberRecords).omit({ id: true });
+
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type Team = typeof teams.$inferSelect;
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+export type InsertAttendanceMemberRecord = z.infer<typeof insertAttendanceMemberRecordSchema>;
+export type AttendanceMemberRecord = typeof attendanceMemberRecords.$inferSelect;

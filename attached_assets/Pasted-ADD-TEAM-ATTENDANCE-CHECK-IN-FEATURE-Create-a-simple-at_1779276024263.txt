@@ -1,0 +1,293 @@
+ADD TEAM ATTENDANCE CHECK-IN FEATURE
+
+Create a simple attendance section for mobile technicians and supervisors.
+
+Purpose:
+Each morning, the technician/team leader must confirm which team members are present for work.
+
+This attendance information must be visible to HR/Admin users on their dashboard.
+
+Add sidebar item for relevant users
+
+For Technician / Team Leader / Supervisor users, add under SERVICE:
+
+Team Attendance
+
+Only show this to users who are responsible for a team.
+
+For normal individual technicians with no team, hide Team Attendance unless assigned.
+
+Team setup
+
+Create a simple Team Management section for Admin / Managing Member / HR users.
+
+Admin must be able to create and manage:
+
+Team name
+Supervisor / team leader
+Department
+Team members
+
+Example:
+
+Team Name: Sanitary Bin Team 1
+Department: Sanitary Bins
+Supervisor: Jackie Roelfse
+Members:
+
+Worker 1
+Worker 2
+Worker 3
+
+Team Name: Pest Control Team 1
+Department: Pest Control
+Supervisor: Reece Ebrahim
+Members:
+
+Assistant 1
+Assistant 2
+Attendance check-in screen
+
+When a team leader logs in, show a simple Team Attendance screen.
+
+The screen must show:
+
+Team Attendance
+Today’s date
+Team name
+Supervisor name
+Department
+
+Then list team members.
+
+Each team member must have a simple present/absent toggle:
+
+Green tick = Present
+Red cross = Absent
+
+Default state:
+Not confirmed
+
+Once the team leader taps a member:
+
+Present shows green tick
+Absent shows red cross
+
+Add optional reason if absent:
+
+Sick
+Leave
+No show
+Off duty
+Other
+
+Keep reason optional at first.
+
+Simple mobile layout
+
+Each team member row should show:
+
+Name
+Role
+Present button
+Absent button
+
+Example:
+
+John Smith
+Assistant
+[✓ Present] [✕ Absent]
+
+Use large buttons because this will be used on phones.
+
+Submit attendance
+
+Add button:
+
+Submit Attendance
+
+When submitted:
+
+Save attendance date
+Save team name
+Save supervisor
+Save department
+Save each member’s status
+Save submitted time
+Save submitted by user
+
+After submission, show:
+
+Attendance submitted for today.
+
+Allow editing only on the same day, unless user is Admin / HR.
+
+Daily reminder / dashboard prompt
+
+On Technician / Team Leader dashboard, if attendance has not been submitted today, show an alert card:
+
+Team Attendance Required
+Please confirm who is present today.
+
+Button:
+Open Team Attendance
+
+Once submitted, show:
+Team Attendance Submitted
+
+HR dashboard attendance section
+
+For HR / Finance & HR Manager / Admin users, add an Attendance section on the dashboard.
+
+Show:
+
+Attendance Today
+
+Total staff expected
+Present
+Absent
+Not submitted
+Teams not submitted
+
+Add filters:
+
+Date
+Department
+Team
+Supervisor
+
+Show a simple table:
+
+Date
+Team
+Supervisor
+Department
+Present
+Absent
+Not confirmed
+Submitted time
+Status
+
+Status examples:
+Submitted
+Not Submitted
+Partially Submitted
+
+HR attendance detail page
+
+When HR clicks a team/date, show:
+
+Team Attendance Detail
+
+Date
+Team
+Supervisor
+Department
+Submitted by
+Submitted time
+
+Then list team members:
+
+Name
+Role
+Status
+Reason
+Notes
+
+Status colours:
+Present = green tick
+Absent = red cross
+Not confirmed = grey
+
+Attendance reports
+
+Add basic attendance reports for HR/Admin:
+
+Attendance by date
+Attendance by team
+Attendance by employee
+Absentee list
+Teams not submitted
+
+Allow export to CSV or PDF later.
+
+Permissions
+
+Managing Member:
+Can view and edit all attendance.
+
+HR / Finance & HR Manager:
+Can view all attendance and export reports.
+
+Service Coordinator:
+Can view attendance for service teams.
+
+Team Leader / Supervisor:
+Can submit attendance for their assigned team only.
+
+Technician:
+Can only submit attendance if assigned as a team leader.
+
+Normal worker:
+No attendance management access.
+
+Data model
+
+Create attendance records with these fields:
+
+attendanceId
+date
+teamId
+teamName
+department
+supervisorId
+supervisorName
+submittedBy
+submittedAt
+status
+
+Attendance member records:
+
+attendanceId
+employeeId
+employeeName
+role
+status: present / absent / not_confirmed
+absenceReason
+notes
+
+Important rules
+
+One attendance record per team per date.
+
+If attendance already exists for today, load it instead of creating a duplicate.
+
+If a team member is not ticked present, they should show as absent or not confirmed depending on the chosen logic.
+
+Preferred logic:
+Before submission = Not confirmed
+After submission:
+
+Ticked present = Present
+Ticked absent = Absent
+Unticked = Absent
+
+Add confirmation before submitting if some members are not ticked:
+
+Some team members are not marked present. They will be saved as absent. Continue?
+
+Keep it simple
+
+Do not make this complicated.
+
+The main technician screen should be:
+Team name
+Today’s date
+List of members
+Green tick for present
+Red cross for absent
+Submit Attendance
+
+HR can see the summaries and reports.
+
+END

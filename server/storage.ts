@@ -27,6 +27,10 @@ import {
   type VehicleIssue, type InsertVehicleIssue,
   type ServiceRecord, type InsertServiceRecord,
   type WorkshopJob, type InsertWorkshopJob,
+  type Team, type InsertTeam,
+  type TeamMember, type InsertTeamMember,
+  type AttendanceRecord, type InsertAttendanceRecord,
+  type AttendanceMemberRecord, type InsertAttendanceMemberRecord,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -266,6 +270,27 @@ export interface IStorage {
   deleteWorkshopJob(id: string): Promise<boolean>;
   getFleetNotifications(): Promise<any[]>;
 
+  // Teams
+  getTeams(): Promise<Team[]>;
+  getTeam(id: string): Promise<Team | undefined>;
+  createTeam(team: InsertTeam): Promise<Team>;
+  updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team>;
+  deleteTeam(id: string): Promise<boolean>;
+  getTeamMembers(teamId: string): Promise<TeamMember[]>;
+  addTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  removeTeamMember(teamId: string, workerId: string): Promise<boolean>;
+  getTeamsForWorker(workerId: string): Promise<Team[]>;
+  getTeamsForSupervisor(supervisorId: string): Promise<Team[]>;
+
+  // Attendance
+  getAttendanceRecords(filters?: { date?: string; teamId?: string; departmentId?: string }): Promise<AttendanceRecord[]>;
+  getAttendanceRecord(id: string): Promise<AttendanceRecord | undefined>;
+  getOrCreateAttendance(teamId: string, date: string): Promise<AttendanceRecord>;
+  updateAttendanceRecord(id: string, data: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord>;
+  getAttendanceMemberRecords(attendanceId: string): Promise<AttendanceMemberRecord[]>;
+  upsertAttendanceMemberRecord(record: InsertAttendanceMemberRecord & { attendanceId: string }): Promise<AttendanceMemberRecord>;
+  submitAttendance(attendanceId: string, submittedBy: string): Promise<AttendanceRecord>;
+
   // Backup & Restore
   exportBackup(): Promise<Record<string, any>>;
   restoreBackup(data: Record<string, any>): Promise<void>;
@@ -299,6 +324,10 @@ export class MemStorage implements IStorage {
   private vehicleIssues: Map<string, VehicleIssue> = new Map();
   private serviceRecords: Map<string, ServiceRecord> = new Map();
   private workshopJobs: Map<string, WorkshopJob> = new Map();
+  private teamsMap: Map<string, Team> = new Map();
+  private teamMembersMap: Map<string, TeamMember> = new Map();
+  private attendanceRecordsMap: Map<string, AttendanceRecord> = new Map();
+  private attendanceMemberRecordsMap: Map<string, AttendanceMemberRecord> = new Map();
   private activityLogs: any[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 9;
@@ -310,6 +339,7 @@ export class MemStorage implements IStorage {
     this.initializeData();
     this.createExampleData();
     this.initializeFleetData();
+    this.initializeTeamData();
   }
 
   private async createExampleData() {
@@ -3983,6 +4013,230 @@ export class MemStorage implements IStorage {
       totalServiceCost, recentServices: allServiceRecords.slice(0, 5),
       vehiclesWithIssues: allVehicles.filter(v => openIssues.some(i => i.vehicleId === v.id)).length,
     };
+  }
+
+  private initializeTeamData() {
+    // Seed two demo teams using real worker IDs from initializeData()
+    const teams: Team[] = [
+      {
+        id: "team-1",
+        name: "Pest Control Team 1",
+        departmentId: "div-1",
+        supervisorId: "worker-2",
+        isActive: true,
+        notes: "Main pest control field team",
+        createdAt: new Date(),
+      },
+      {
+        id: "team-2",
+        name: "Sanitary Bins Team A",
+        departmentId: "div-2",
+        supervisorId: "worker-5",
+        isActive: true,
+        notes: "Sanitary bins collection team A",
+        createdAt: new Date(),
+      },
+      {
+        id: "team-3",
+        name: "Washroom Team 1",
+        departmentId: "div-3",
+        supervisorId: "worker-8",
+        isActive: true,
+        notes: "Washroom services team 1",
+        createdAt: new Date(),
+      },
+    ];
+    teams.forEach(t => this.teamsMap.set(t.id, t));
+
+    const members: TeamMember[] = [
+      { id: "tm-1",  teamId: "team-1", workerId: "worker-2"  },
+      { id: "tm-2",  teamId: "team-1", workerId: "worker-3"  },
+      { id: "tm-3",  teamId: "team-1", workerId: "worker-10" },
+      { id: "tm-4",  teamId: "team-1", workerId: "worker-11" },
+      { id: "tm-5",  teamId: "team-2", workerId: "worker-5"  },
+      { id: "tm-6",  teamId: "team-2", workerId: "worker-6"  },
+      { id: "tm-7",  teamId: "team-2", workerId: "worker-7"  },
+      { id: "tm-8",  teamId: "team-3", workerId: "worker-8"  },
+      { id: "tm-9",  teamId: "team-3", workerId: "worker-9"  },
+      { id: "tm-10", teamId: "team-3", workerId: "worker-12" },
+    ];
+    members.forEach(m => this.teamMembersMap.set(m.id, m));
+  }
+
+  // ── Teams ─────────────────────────────────────────────────────────────────
+
+  async getTeams(): Promise<Team[]> {
+    return Array.from(this.teamsMap.values());
+  }
+
+  async getTeam(id: string): Promise<Team | undefined> {
+    return this.teamsMap.get(id);
+  }
+
+  async createTeam(team: InsertTeam): Promise<Team> {
+    const id = randomUUID();
+    const record: Team = { ...team, id, createdAt: new Date() };
+    this.teamsMap.set(id, record);
+    return record;
+  }
+
+  async updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team> {
+    const existing = this.teamsMap.get(id);
+    if (!existing) throw new Error(`Team ${id} not found`);
+    const updated = { ...existing, ...team };
+    this.teamsMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    return this.teamsMap.delete(id);
+  }
+
+  async getTeamMembers(teamId: string): Promise<TeamMember[]> {
+    return Array.from(this.teamMembersMap.values()).filter(m => m.teamId === teamId);
+  }
+
+  async addTeamMember(member: InsertTeamMember): Promise<TeamMember> {
+    const existing = Array.from(this.teamMembersMap.values()).find(
+      m => m.teamId === member.teamId && m.workerId === member.workerId
+    );
+    if (existing) return existing;
+    const id = randomUUID();
+    const record: TeamMember = { ...member, id };
+    this.teamMembersMap.set(id, record);
+    return record;
+  }
+
+  async removeTeamMember(teamId: string, workerId: string): Promise<boolean> {
+    const entry = Array.from(this.teamMembersMap.entries()).find(
+      ([, m]) => m.teamId === teamId && m.workerId === workerId
+    );
+    if (!entry) return false;
+    return this.teamMembersMap.delete(entry[0]);
+  }
+
+  async getTeamsForWorker(workerId: string): Promise<Team[]> {
+    const teamIds = Array.from(this.teamMembersMap.values())
+      .filter(m => m.workerId === workerId)
+      .map(m => m.teamId);
+    return teamIds.map(id => this.teamsMap.get(id)).filter(Boolean) as Team[];
+  }
+
+  async getTeamsForSupervisor(supervisorId: string): Promise<Team[]> {
+    return Array.from(this.teamsMap.values()).filter(t => t.supervisorId === supervisorId && t.isActive);
+  }
+
+  // ── Attendance ────────────────────────────────────────────────────────────
+
+  async getAttendanceRecords(filters?: { date?: string; teamId?: string; departmentId?: string }): Promise<AttendanceRecord[]> {
+    let records = Array.from(this.attendanceRecordsMap.values());
+    if (filters?.date) records = records.filter(r => r.date === filters.date);
+    if (filters?.teamId) records = records.filter(r => r.teamId === filters.teamId);
+    if (filters?.departmentId) records = records.filter(r => r.departmentId === filters.departmentId);
+    return records.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async getAttendanceRecord(id: string): Promise<AttendanceRecord | undefined> {
+    return this.attendanceRecordsMap.get(id);
+  }
+
+  async getOrCreateAttendance(teamId: string, date: string): Promise<AttendanceRecord> {
+    // Return existing record for this team+date if it exists
+    const existing = Array.from(this.attendanceRecordsMap.values()).find(
+      r => r.teamId === teamId && r.date === date
+    );
+    if (existing) return existing;
+
+    // Build a fresh record from team data
+    const team = this.teamsMap.get(teamId);
+    if (!team) throw new Error(`Team ${teamId} not found`);
+    const supervisor = this.workers.get(team.supervisorId);
+    const department = this.departments.get(team.departmentId);
+
+    const id = randomUUID();
+    const record: AttendanceRecord = {
+      id,
+      date,
+      teamId,
+      teamName: team.name,
+      departmentId: team.departmentId,
+      supervisorId: team.supervisorId,
+      supervisorName: supervisor?.name ?? "Unknown",
+      submittedBy: null,
+      submittedAt: null,
+      status: "not_submitted",
+      createdAt: new Date(),
+    };
+    this.attendanceRecordsMap.set(id, record);
+
+    // Pre-create not_confirmed entries for each team member
+    const members = Array.from(this.teamMembersMap.values()).filter(m => m.teamId === teamId);
+    for (const m of members) {
+      const worker = this.workers.get(m.workerId);
+      if (!worker) continue;
+      const memberId = randomUUID();
+      this.attendanceMemberRecordsMap.set(memberId, {
+        id: memberId,
+        attendanceId: id,
+        workerId: m.workerId,
+        employeeName: worker.name,
+        role: worker.role ?? null,
+        status: "not_confirmed",
+        absenceReason: null,
+        notes: null,
+      });
+    }
+
+    return record;
+  }
+
+  async updateAttendanceRecord(id: string, data: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord> {
+    const existing = this.attendanceRecordsMap.get(id);
+    if (!existing) throw new Error(`Attendance record ${id} not found`);
+    const updated = { ...existing, ...data };
+    this.attendanceRecordsMap.set(id, updated);
+    return updated;
+  }
+
+  async getAttendanceMemberRecords(attendanceId: string): Promise<AttendanceMemberRecord[]> {
+    return Array.from(this.attendanceMemberRecordsMap.values()).filter(r => r.attendanceId === attendanceId);
+  }
+
+  async upsertAttendanceMemberRecord(record: InsertAttendanceMemberRecord & { attendanceId: string }): Promise<AttendanceMemberRecord> {
+    const existing = Array.from(this.attendanceMemberRecordsMap.values()).find(
+      r => r.attendanceId === record.attendanceId && r.workerId === record.workerId
+    );
+    if (existing) {
+      const updated: AttendanceMemberRecord = { ...existing, ...record };
+      this.attendanceMemberRecordsMap.set(existing.id, updated);
+      return updated;
+    }
+    const id = randomUUID();
+    const newRecord: AttendanceMemberRecord = { ...record, id };
+    this.attendanceMemberRecordsMap.set(id, newRecord);
+    return newRecord;
+  }
+
+  async submitAttendance(attendanceId: string, submittedBy: string): Promise<AttendanceRecord> {
+    const existing = this.attendanceRecordsMap.get(attendanceId);
+    if (!existing) throw new Error(`Attendance record ${attendanceId} not found`);
+    // Any member still "not_confirmed" becomes "absent"
+    const memberRecords = Array.from(this.attendanceMemberRecordsMap.values()).filter(
+      r => r.attendanceId === attendanceId
+    );
+    for (const mr of memberRecords) {
+      if (mr.status === "not_confirmed") {
+        this.attendanceMemberRecordsMap.set(mr.id, { ...mr, status: "absent" });
+      }
+    }
+    const updated: AttendanceRecord = {
+      ...existing,
+      status: "submitted",
+      submittedBy,
+      submittedAt: new Date(),
+    };
+    this.attendanceRecordsMap.set(attendanceId, updated);
+    return updated;
   }
 
   async exportBackup(): Promise<Record<string, any>> {
