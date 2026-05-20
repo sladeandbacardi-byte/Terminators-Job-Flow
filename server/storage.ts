@@ -304,12 +304,13 @@ export interface IStorage {
 export interface BackupLog {
   id: string;
   datetime: string;
-  backupType: "onedrive-auto" | "onedrive-manual";
+  backupType: "onedrive-auto" | "onedrive-manual" | "email-auto" | "email-manual" | "email-test";
   fileNames: string[];
   fileSizesBytes: number[];
   destination: string;
   status: "success" | "failed";
   errorMessage?: string;
+  recipientEmail?: string;
 }
 
 export class MemStorage implements IStorage {

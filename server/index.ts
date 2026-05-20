@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
 import { runDailyBackupToOneDrive, getOneDriveConfig } from "./onedrive";
+import { runDailyBackupEmail } from "./email-backup";
 
 const app = express();
 app.use(express.json());
@@ -84,22 +85,38 @@ app.use((req, res, next) => {
     if (saTime.getUTCDay() === 2) weeklySummarySentThisWeek = false;
   }, 60 * 60 * 1000);
 
-  // ── Daily OneDrive backup scheduler ───────────────────────────────────────
-  // Fires every minute; runs backup once per day at 21:30 UTC (23:30 SAST)
-  let lastDailyBackupDate = "";
+  // ── Daily backup scheduler (OneDrive + Email) ─────────────────────────────
+  // Fires every minute; runs at 21:30 UTC (23:30 SAST) once per day
+  let lastDailyOneDriveDate = "";
+  let lastDailyEmailDate = "";
   setInterval(async () => {
-    if (!getOneDriveConfig()) return;
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
     const utcHours = now.getUTCHours();
     const utcMins = now.getUTCMinutes();
-    if (utcHours === 21 && utcMins >= 30 && lastDailyBackupDate !== todayStr) {
-      lastDailyBackupDate = todayStr;
+    if (!(utcHours === 21 && utcMins >= 30)) return;
+
+    if (getOneDriveConfig() && lastDailyOneDriveDate !== todayStr) {
+      lastDailyOneDriveDate = todayStr;
       try {
         await runDailyBackupToOneDrive(false);
         log("Daily OneDrive backup completed successfully");
       } catch (e: any) {
         console.error("Daily OneDrive backup failed:", e.message);
+      }
+    }
+
+    if (lastDailyEmailDate !== todayStr) {
+      lastDailyEmailDate = todayStr;
+      try {
+        const result = await runDailyBackupEmail("auto");
+        if (result.status === "success") {
+          log(`Daily backup email sent to ${result.recipient}`);
+        } else {
+          console.error(`Daily backup email failed: ${result.errorMessage}`);
+        }
+      } catch (e: any) {
+        console.error("Daily backup email crashed:", e.message);
       }
     }
   }, 60 * 1000);

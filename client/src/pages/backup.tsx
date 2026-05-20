@@ -26,6 +26,9 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Mail,
+  Send,
+  TestTube2,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -75,21 +78,38 @@ function nextScheduledBackup(): string {
   });
 }
 
+type BackupType = "onedrive-auto" | "onedrive-manual" | "email-auto" | "email-manual" | "email-test";
+
 interface BackupLog {
   id: string;
   datetime: string;
-  backupType: "onedrive-auto" | "onedrive-manual";
+  backupType: BackupType;
   fileNames: string[];
   fileSizesBytes: number[];
   destination: string;
   status: "success" | "failed";
   errorMessage?: string;
+  recipientEmail?: string;
 }
 
 interface OneDriveConfigResponse {
   configured: boolean;
   folder: string | null;
 }
+
+interface EmailConfigResponse {
+  recipient: string;
+  sender: string;
+  sendgridConfigured: boolean;
+}
+
+const TYPE_LABEL: Record<BackupType, string> = {
+  "onedrive-auto": "OneDrive Auto",
+  "onedrive-manual": "OneDrive Manual",
+  "email-auto": "Email Auto",
+  "email-manual": "Email Manual",
+  "email-test": "Email Test",
+};
 
 export default function BackupPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -109,6 +129,10 @@ export default function BackupPage() {
     queryKey: ["/api/backup/onedrive-config"],
   });
 
+  const { data: emailConfig } = useQuery<EmailConfigResponse>({
+    queryKey: ["/api/backup/email-config"],
+  });
+
   const { data: backupLogs = [], refetch: refetchLogs } = useQuery<BackupLog[]>({
     queryKey: ["/api/backup/logs"],
     refetchInterval: 30_000,
@@ -116,6 +140,9 @@ export default function BackupPage() {
 
   const lastSuccess = backupLogs.find((l) => l.status === "success");
   const lastFailed = backupLogs.find((l) => l.status === "failed");
+  const emailLogs = backupLogs.filter((l) => l.backupType.startsWith("email"));
+  const lastEmailSuccess = emailLogs.find((l) => l.status === "success");
+  const lastEmailFailed = emailLogs.find((l) => l.status === "failed");
 
   const runMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/backup/onedrive-run"),
@@ -128,6 +155,54 @@ export default function BackupPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
     },
   });
+
+  const emailSendMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/backup/email-send"),
+    onSuccess: async (res: any) => {
+      const json = await res.json().catch(() => ({}));
+      toast({
+        title: "Backup email sent",
+        description: `Sent to ${json?.result?.recipient ?? emailConfig?.recipient ?? "recipient"}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "Backup email failed", description: e.message, variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
+    },
+  });
+
+  const emailTestMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/backup/email-test"),
+    onSuccess: async (res: any) => {
+      const json = await res.json().catch(() => ({}));
+      toast({
+        title: "Test email sent",
+        description: `Sent to ${json?.result?.recipient ?? emailConfig?.recipient ?? "recipient"}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "Test email failed", description: e.message, variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
+    },
+  });
+
+  const handleSendBackupEmail = () => {
+    if (isDemoMode) {
+      toast({ title: "Demo Mode", description: "This action is disabled in Demo Mode.", variant: "destructive" });
+      return;
+    }
+    emailSendMutation.mutate();
+  };
+
+  const handleSendTestEmail = () => {
+    if (isDemoMode) {
+      toast({ title: "Demo Mode", description: "This action is disabled in Demo Mode.", variant: "destructive" });
+      return;
+    }
+    emailTestMutation.mutate();
+  };
 
   const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -333,6 +408,101 @@ export default function BackupPage() {
               </CardContent>
             </Card>
 
+            {/* ── Email Backup ──────────────────────────────────────────────── */}
+            <Card className={emailConfig?.sendgridConfigured ? "border-blue-200" : "border-amber-200"}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${emailConfig?.sendgridConfigured ? "bg-blue-100" : "bg-amber-100"}`}>
+                    <Mail className={`h-5 w-5 ${emailConfig?.sendgridConfigured ? "text-blue-600" : "text-amber-600"}`} />
+                  </div>
+                  <div>
+                    <CardTitle>Daily Backup Email</CardTitle>
+                    <CardDescription>
+                      {emailConfig?.sendgridConfigured
+                        ? <>Sends JSON + Excel attachments to <strong>{emailConfig.recipient}</strong> every night at 23:30 SAST</>
+                        : "SendGrid not configured — set SENDGRID_API_KEY to enable email backups"}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+
+                {/* Status row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Last successful email
+                    </p>
+                    {lastEmailSuccess ? (
+                      <p className="text-sm font-medium">{formatDatetime(lastEmailSuccess.datetime)}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No successful emails yet</p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Last failed email
+                    </p>
+                    {lastEmailFailed ? (
+                      <p className="text-sm font-medium text-red-600">{formatDatetime(lastEmailFailed.datetime)}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No failures</p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5 text-blue-500" /> Next scheduled email
+                    </p>
+                    <p className="text-sm font-medium">{nextScheduledBackup()}</p>
+                  </div>
+                </div>
+
+                {!emailConfig?.sendgridConfigured && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-1">
+                    <p className="font-semibold flex items-center gap-2">
+                      <Info className="h-4 w-4" /> SendGrid not configured
+                    </p>
+                    <p>Set the <code className="bg-amber-100 px-1 rounded">SENDGRID_API_KEY</code> environment variable. Optionally set <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_FROM</code> and <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_RECIPIENT</code> to override defaults. Manual buttons will simulate-send (no real email) until configured.</p>
+                  </div>
+                )}
+
+                {isDemoMode && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    <Info className="h-4 w-4 shrink-0" />
+                    This action is disabled in Demo Mode.
+                  </div>
+                )}
+
+                {/* Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button
+                    onClick={handleSendBackupEmail}
+                    disabled={isDemoMode || emailSendMutation.isPending}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {emailSendMutation.isPending
+                      ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Sending backup email…</>
+                      : <><Send className="mr-2 h-4 w-4" />Send Backup Email Now</>}
+                  </Button>
+                  <Button
+                    onClick={handleSendTestEmail}
+                    disabled={isDemoMode || emailTestMutation.isPending}
+                    variant="outline"
+                    className="w-full border-blue-300 hover:bg-blue-50"
+                  >
+                    {emailTestMutation.isPending
+                      ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Sending test email…</>
+                      : <><TestTube2 className="mr-2 h-4 w-4" />Send Test Backup Email</>}
+                  </Button>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Both buttons always send to <strong>{emailConfig?.recipient ?? "info@terminators.co.za"}</strong>.
+                  The test email is identical to the daily email but clearly labelled as a TEST.
+                </p>
+              </CardContent>
+            </Card>
+
             {/* ── JSON Restore Backup ───────────────────────────────────────── */}
             <Card>
               <CardHeader>
@@ -516,7 +686,7 @@ export default function BackupPage() {
                             <TableHead className="text-xs font-semibold">Status</TableHead>
                             <TableHead className="text-xs font-semibold">Files</TableHead>
                             <TableHead className="text-xs font-semibold">Sizes</TableHead>
-                            <TableHead className="text-xs font-semibold">Destination</TableHead>
+                            <TableHead className="text-xs font-semibold">Destination / Recipient</TableHead>
                             <TableHead className="text-xs font-semibold">Error</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -525,8 +695,11 @@ export default function BackupPage() {
                             <TableRow key={log.id} className="hover:bg-muted/20">
                               <TableCell className="text-xs whitespace-nowrap">{formatDatetime(log.datetime)}</TableCell>
                               <TableCell className="text-xs">
-                                <Badge variant="outline" className="text-xs font-normal">
-                                  {log.backupType === "onedrive-manual" ? "Manual" : "Auto"}
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs font-normal ${log.backupType.startsWith("email") ? "border-blue-300 text-blue-700 bg-blue-50" : ""}`}
+                                >
+                                  {TYPE_LABEL[log.backupType] ?? log.backupType}
                                 </Badge>
                               </TableCell>
                               <TableCell>
@@ -558,8 +731,8 @@ export default function BackupPage() {
                                   </div>
                                 ) : <span className="text-muted-foreground">—</span>}
                               </TableCell>
-                              <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[150px]">
-                                {log.destination || "—"}
+                              <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[200px]">
+                                {log.recipientEmail ?? log.destination ?? "—"}
                               </TableCell>
                               <TableCell className="text-xs text-red-600 max-w-[200px]">
                                 {log.errorMessage ? (

@@ -259,6 +259,19 @@ export async function generateExcelBackupBuffer(): Promise<{
     ]),
   ]);
 
+  const fieldDiaries: any[] = Array.isArray((backup as any).fieldDiaries) ? (backup as any).fieldDiaries : [];
+  addSheet("Field Diaries", [
+    ["Date", "Worker", "Job #", "Client", "Entry", "Notes"],
+    ...fieldDiaries.map((d: any) => [
+      dateStr(d.date ?? d.createdAt),
+      workerMap.get(d.workerId) ?? d.workerName ?? "",
+      d.jobNumber ?? d.jobId ?? "",
+      clientMap.get(d.clientId) ?? d.clientName ?? "",
+      d.entry ?? d.description ?? "",
+      d.notes ?? "",
+    ]),
+  ]);
+
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const filename = `job-flow-excel-backup-${new Date().toISOString().split("T")[0]}.xlsx`;
   return { buffer, filename, sizeBytes: buffer.length };

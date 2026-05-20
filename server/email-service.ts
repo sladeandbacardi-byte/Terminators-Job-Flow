@@ -10,12 +10,20 @@ if (mailService && process.env.SENDGRID_API_KEY) {
   mailService.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
+interface EmailAttachment {
+  content: string; // base64
+  filename: string;
+  type: string;
+  disposition?: string;
+}
+
 interface EmailParams {
   to: string;
   from: string;
   subject: string;
   text?: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
@@ -25,17 +33,27 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 
   try {
-    await mailService.send({
+    const message: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
       text: params.text || '',
       html: params.html || '',
-    });
+    };
+    if (params.attachments && params.attachments.length > 0) {
+      message.attachments = params.attachments.map(a => ({
+        content: a.content,
+        filename: a.filename,
+        type: a.type,
+        disposition: a.disposition ?? 'attachment',
+      }));
+    }
+    await mailService.send(message);
     return true;
-  } catch (error) {
-    console.error('SendGrid email error:', error);
-    return false;
+  } catch (error: any) {
+    console.error('SendGrid email error:', error?.response?.body ?? error);
+    const msg = error?.response?.body?.errors?.[0]?.message ?? error?.message ?? 'SendGrid send failed';
+    throw new Error(msg);
   }
 }
 

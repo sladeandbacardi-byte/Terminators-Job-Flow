@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getOneDriveConfig, runDailyBackupToOneDrive } from "./onedrive";
+import { runDailyBackupEmail, getBackupEmailConfig } from "./email-backup";
 import { 
   insertDepartmentSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
@@ -2625,6 +2626,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const logs = await storage.getBackupLogs().catch(() => []);
       const latest = logs[0] ?? null;
       res.status(500).json({ error: e.message, log: latest });
+    }
+  });
+
+  app.get("/api/backup/email-config", async (_req, res) => {
+    res.json(getBackupEmailConfig());
+  });
+
+  app.post("/api/backup/email-send", async (_req, res) => {
+    try {
+      const result = await runDailyBackupEmail("manual");
+      const logs = await storage.getBackupLogs();
+      const latest = logs[0] ?? null;
+      if (result.status === "failed") {
+        return res.status(500).json({ error: result.errorMessage ?? "Email backup failed", log: latest, result });
+      }
+      res.json({ success: true, log: latest, result });
+    } catch (e: any) {
+      const logs = await storage.getBackupLogs().catch(() => []);
+      res.status(500).json({ error: e.message, log: logs[0] ?? null });
+    }
+  });
+
+  app.post("/api/backup/email-test", async (_req, res) => {
+    try {
+      // Recipient override is intentionally not supported here to prevent
+      // backup data exfiltration to arbitrary addresses. Test always sends
+      // to the configured BACKUP_EMAIL_RECIPIENT (default info@terminators.co.za).
+      const result = await runDailyBackupEmail("test");
+      const logs = await storage.getBackupLogs();
+      const latest = logs[0] ?? null;
+      if (result.status === "failed") {
+        return res.status(500).json({ error: result.errorMessage ?? "Test email failed", log: latest, result });
+      }
+      res.json({ success: true, log: latest, result });
+    } catch (e: any) {
+      const logs = await storage.getBackupLogs().catch(() => []);
+      res.status(500).json({ error: e.message, log: logs[0] ?? null });
     }
   });
 
