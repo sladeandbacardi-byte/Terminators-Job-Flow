@@ -316,59 +316,58 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
 
                 <Separator />
 
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openMaps(job.location || job.client.address || '')}
-                    className="flex items-center space-x-1"
-                    data-testid={`button-navigate-${job.id}`}
-                  >
-                    <Navigation className="h-4 w-4" />
-                    <span>Navigate</span>
-                  </Button>
-                  
-                  {job.client.phone && (
+                {/* Primary actions — ordered by importance for technicians */}
+                <div className="space-y-2">
+                  {/* 1. Start Job (only when scheduled) */}
+                  {job.status === 'scheduled' && (
+                    <Button
+                      size="lg"
+                      onClick={() => updateJobStatus(job.id, 'in_progress')}
+                      className="w-full bg-blue-600 hover:bg-blue-700 font-semibold"
+                      data-testid={`button-start-${job.id}`}
+                    >
+                      Start Job
+                    </Button>
+                  )}
+
+                  {/* 5. Complete Job (only when in progress) */}
+                  {job.status === 'in_progress' && (
+                    <Button
+                      size="lg"
+                      onClick={() => updateJobStatus(job.id, 'completed')}
+                      className="w-full bg-green-600 hover:bg-green-700 font-semibold"
+                      data-testid={`button-complete-${job.id}`}
+                    >
+                      Complete Job
+                    </Button>
+                  )}
+
+                  {/* Secondary actions */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {job.client.phone && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => callClient(job.client.phone!)}
+                        className="flex items-center justify-center space-x-1"
+                        data-testid={`button-call-${job.id}`}
+                      >
+                        <Phone className="h-4 w-4" />
+                        <span>Call</span>
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => callClient(job.client.phone!)}
-                      className="flex items-center space-x-1"
-                      data-testid={`button-call-${job.id}`}
+                      onClick={() => openMaps(job.location || job.client.address || '')}
+                      className="flex items-center justify-center space-x-1"
+                      data-testid={`button-navigate-${job.id}`}
                     >
-                      <Phone className="h-4 w-4" />
-                      <span>Call</span>
+                      <Navigation className="h-4 w-4" />
+                      <span>Address Search</span>
                     </Button>
-                  )}
-                </div>
-
-                {/* Status Update Buttons */}
-                {job.status !== 'completed' && job.status !== 'cancelled' && (
-                  <div className="grid grid-cols-2 gap-2 mt-3">
-                    {job.status === 'scheduled' && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateJobStatus(job.id, 'in_progress')}
-                        className="bg-blue-600 hover:bg-blue-700"
-                        data-testid={`button-start-${job.id}`}
-                      >
-                        Start Job
-                      </Button>
-                    )}
-                    
-                    {job.status === 'in_progress' && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateJobStatus(job.id, 'completed')}
-                        className="bg-green-600 hover:bg-green-700"
-                        data-testid={`button-complete-${job.id}`}
-                      >
-                        Complete Job
-                      </Button>
-                    )}
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           ))

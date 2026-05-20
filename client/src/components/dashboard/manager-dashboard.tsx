@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +8,7 @@ import { DepartmentOverview } from "./department-overview";
 import { WorkerJobsSummary } from "./worker-jobs-summary";
 import {
   Users, Briefcase, ClipboardList, AlertTriangle, Package,
-  ShoppingCart, CheckCircle, CalendarDays,
+  ShoppingCart, CheckCircle, CalendarDays, MapPin, Eye, Clock,
 } from "lucide-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -113,9 +114,15 @@ export function ManagerDashboard() {
   const { data: inventory = [] } = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
 
-  const today = new Date().toDateString();
+  const todayDate = new Date();
+  const today = todayDate.toDateString();
   const todaysJobs = jobs.filter(j => j.scheduledDate && new Date(j.scheduledDate).toDateString() === today);
   const completedToday = todaysJobs.filter(j => j.status === "completed");
+  const notCompletedToday = todaysJobs.filter(j => j.status !== "completed" && j.status !== "cancelled");
+  const overdueJobs = jobs.filter(j => {
+    if (!j.scheduledDate || j.status === "completed" || j.status === "cancelled") return false;
+    return new Date(j.scheduledDate) < new Date(todayDate.toDateString());
+  });
   const unassignedJobs = jobs.filter(j => !j.workerId && j.status === "pending");
   const activeWorkers = workers.filter(w => w.isActive !== false);
   const pendingPOs = purchaseOrders.filter(po => po.status === "pending");
@@ -153,18 +160,10 @@ export function ManagerDashboard() {
         </div>
       </div>
 
-      {/* Alerts */}
-      {(unassignedJobs.length > 0 || pendingPOs.length > 0 || lowStock.length > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {unassignedJobs.length > 0 && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-              <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-red-700">{unassignedJobs.length} Unassigned Job{unassignedJobs.length > 1 ? "s" : ""}</p>
-                <p className="text-xs text-red-500">Assign workers before scheduled date</p>
-              </div>
-            </div>
-          )}
+      {/* ─── 2. Alert Cards (urgent operational items) ─────────────────────── */}
+      {(pendingPOs.length > 0 || lowStock.length > 0 || overdueJobs.length > 0 ||
+        notCompletedToday.length > 0 || unassignedJobs.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {pendingPOs.length > 0 && (
             <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
               <ShoppingCart className="h-5 w-5 text-amber-500 flex-shrink-0" />
@@ -178,15 +177,108 @@ export function ManagerDashboard() {
             <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
               <Package className="h-5 w-5 text-orange-500 flex-shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-orange-700">{lowStock.length} Item{lowStock.length > 1 ? "s" : ""} Low on Stock</p>
+                <p className="text-sm font-semibold text-orange-700">{lowStock.length} Low Stock Item{lowStock.length > 1 ? "s" : ""}</p>
                 <p className="text-xs text-orange-500">Reorder before stock runs out</p>
+              </div>
+            </div>
+          )}
+          {overdueJobs.length > 0 && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+              <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-red-700">{overdueJobs.length} Overdue Job{overdueJobs.length > 1 ? "s" : ""}</p>
+                <p className="text-xs text-red-500">Scheduled before today and not completed</p>
+              </div>
+            </div>
+          )}
+          {notCompletedToday.length > 0 && (
+            <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+              <Clock className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-800">{notCompletedToday.length} Job{notCompletedToday.length > 1 ? "s" : ""} Not Completed Today</p>
+                <p className="text-xs text-yellow-700">{completedToday.length} of {todaysJobs.length} done so far</p>
+              </div>
+            </div>
+          )}
+          {unassignedJobs.length > 0 && (
+            <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-xl p-4">
+              <Users className="h-5 w-5 text-rose-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-rose-700">{unassignedJobs.length} Unassigned Job{unassignedJobs.length > 1 ? "s" : ""}</p>
+                <p className="text-xs text-rose-500">Assign workers before scheduled date</p>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Chart 1: Jobs per day */}
+      {/* ─── 3. Today's Schedule (with per-row actions) ─────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-blue-500" /> Today's Schedule
+            <span className="ml-auto text-xs font-normal text-gray-400">
+              {completedToday.length}/{todaysJobs.length} completed
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {todaysJobs.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No jobs scheduled for today</p>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {todaysJobs.map(job => {
+                const worker = workers.find(w => w.id === job.workerId);
+                const client = clients.find(c => c.id === job.clientId);
+                const timeStr = job.scheduledDate
+                  ? new Date(job.scheduledDate).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
+                  : "—";
+                return (
+                  <div key={job.id} className="flex flex-col sm:flex-row sm:items-center gap-2 border rounded-lg px-3 py-2.5 hover:bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate">{client?.name ?? "Unknown Client"}</p>
+                        <Badge className={`text-xs ${jobStatusColor[job.status ?? "pending"] ?? "bg-gray-100 text-gray-600"}`}>
+                          {job.status?.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        <span className="font-medium">{timeStr}</span>
+                        {" · "}
+                        {worker ? worker.name : <span className="text-red-500">Unassigned</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Link href={`/jobs?id=${job.id}`}>
+                        <Button size="sm" variant="outline" className="h-8 text-xs">
+                          <Eye className="h-3.5 w-3.5 mr-1" /> View Job
+                        </Button>
+                      </Link>
+                      {job.googleMapsLink ? (
+                        <a href={job.googleMapsLink} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="h-8 text-xs border-green-400 text-green-700 hover:bg-green-50">
+                            <MapPin className="h-3.5 w-3.5 mr-1" /> Open Map
+                          </Button>
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">No map link</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ─── 4. Jobs Per Worker ────────────────────────────────────────────── */}
+      <WorkerJobsSummary />
+
+      {/* ─── 5. Department Overview ────────────────────────────────────────── */}
+      <DepartmentOverview />
+
+      {/* ─── 6. Charts (moved to the bottom) ───────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Jobs Per Day — Last {range} Days</CardTitle>
@@ -206,7 +298,6 @@ export function ManagerDashboard() {
         </CardContent>
       </Card>
 
-      {/* Chart 2: Revenue & Profit over time */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Revenue & Profit — Last {range} Days</CardTitle>
@@ -235,7 +326,6 @@ export function ManagerDashboard() {
         </CardContent>
       </Card>
 
-      {/* Chart 3: Revenue per job */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Revenue Per Completed Job</CardTitle>
@@ -256,84 +346,6 @@ export function ManagerDashboard() {
           )}
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today's Schedule */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-blue-400" /> Today's Schedule
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {todaysJobs.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No jobs scheduled for today</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {todaysJobs.map(job => {
-                  const worker = workers.find(w => w.id === job.workerId);
-                  const client = clients.find(c => c.id === job.clientId);
-                  return (
-                    <div key={job.id} className="flex items-center justify-between border rounded-lg px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{client?.name ?? "Unknown Client"}</p>
-                        <p className="text-xs text-gray-400 truncate">
-                          {worker ? worker.name : <span className="text-red-400">Unassigned</span>}
-                          {job.scheduledDate ? ` · ${new Date(job.scheduledDate).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}` : ""}
-                        </p>
-                      </div>
-                      <Badge className={`text-xs ml-2 flex-shrink-0 ${jobStatusColor[job.status ?? "pending"] ?? "bg-gray-100 text-gray-600"}`}>
-                        {job.status?.replace("_", " ")}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Pending POs */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4 text-amber-400" /> Purchase Orders Pending Approval
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {pendingPOs.length === 0 ? (
-              <div className="flex items-center gap-2 text-green-600 py-6 justify-center">
-                <CheckCircle className="h-4 w-4" />
-                <p className="text-sm">No pending approvals</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {pendingPOs.map(po => (
-                  <div key={po.id} className="flex items-center justify-between border rounded-lg px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{po.poNumber}</p>
-                      <p className="text-xs text-gray-400">
-                        {po.requestDate ? new Date(po.requestDate).toLocaleDateString("en-ZA") : ""}
-                        {po.notes ? ` · ${po.notes.substring(0, 40)}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                      <span className="text-sm font-semibold text-amber-700">R{parseFloat(po.totalAmount ?? "0").toLocaleString()}</span>
-                      <Badge className="bg-amber-100 text-amber-800 text-xs">pending</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Department Overview */}
-      <DepartmentOverview />
-
-      {/* Worker Jobs Summary */}
-      <WorkerJobsSummary />
     </div>
   );
 }
