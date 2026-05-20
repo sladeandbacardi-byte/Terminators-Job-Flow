@@ -295,6 +295,21 @@ export interface IStorage {
   // Backup & Restore
   exportBackup(): Promise<Record<string, any>>;
   restoreBackup(data: Record<string, any>): Promise<void>;
+
+  // Backup Logs
+  getBackupLogs(): Promise<BackupLog[]>;
+  addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog>;
+}
+
+export interface BackupLog {
+  id: string;
+  datetime: string;
+  backupType: "onedrive-auto" | "onedrive-manual";
+  fileNames: string[];
+  fileSizesBytes: number[];
+  destination: string;
+  status: "success" | "failed";
+  errorMessage?: string;
 }
 
 export class MemStorage implements IStorage {
@@ -330,6 +345,7 @@ export class MemStorage implements IStorage {
   private attendanceRecordsMap: Map<string, AttendanceRecord> = new Map();
   private attendanceMemberRecordsMap: Map<string, AttendanceMemberRecord> = new Map();
   private activityLogs: any[] = [];
+  private backupLogs: BackupLog[] = [];
   private invoiceCounter: number = 1;
   private poCounter: number = 9;
   private jobCounter: number = 16;
@@ -4370,6 +4386,19 @@ export class MemStorage implements IStorage {
     if (typeof data.jobCounter === "number") this.jobCounter = data.jobCounter;
     if (typeof data.contractCounter === "number") this.contractCounter = data.contractCounter;
     if (typeof data.quoteCounter === "number") this.quoteCounter = data.quoteCounter;
+  }
+
+  async getBackupLogs(): Promise<BackupLog[]> {
+    return [...this.backupLogs].sort((a, b) => b.datetime.localeCompare(a.datetime));
+  }
+
+  async addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog> {
+    const newLog: BackupLog = { ...log, id: `bl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+    this.backupLogs.push(newLog);
+    if (this.backupLogs.length > 200) {
+      this.backupLogs = this.backupLogs.slice(-200);
+    }
+    return newLog;
   }
 }
 

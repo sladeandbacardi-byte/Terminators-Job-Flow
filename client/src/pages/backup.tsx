@@ -1,12 +1,15 @@
 import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient as useQC } from "@tanstack/react-query";
 import {
   Download,
   Upload,
@@ -17,6 +20,12 @@ import {
   RefreshCw,
   FileJson,
   FileSpreadsheet,
+  Cloud,
+  CloudOff,
+  Play,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -28,8 +37,59 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const TODAY = new Date().toISOString().split("T")[0];
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatDatetime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("en-ZA", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+}
+
+function nextScheduledBackup(): string {
+  const now = new Date();
+  const next = new Date(now);
+  next.setUTCHours(21, 30, 0, 0);
+  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+  return next.toLocaleString("en-ZA", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+    timeZoneName: "short",
+  });
+}
+
+interface BackupLog {
+  id: string;
+  datetime: string;
+  backupType: "onedrive-auto" | "onedrive-manual";
+  fileNames: string[];
+  fileSizesBytes: number[];
+  destination: string;
+  status: "success" | "failed";
+  errorMessage?: string;
+}
+
+interface OneDriveConfigResponse {
+  configured: boolean;
+  folder: string | null;
+}
 
 export default function BackupPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -39,9 +99,35 @@ export default function BackupPage() {
   const [restoreResult, setRestoreResult] = useState<{ success: boolean; message: string } | null>(null);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [showLogs, setShowLogs] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { isDemoMode } = useAuth();
   const queryClient = useQueryClient();
+
+  const { data: odConfig } = useQuery<OneDriveConfigResponse>({
+    queryKey: ["/api/backup/onedrive-config"],
+  });
+
+  const { data: backupLogs = [], refetch: refetchLogs } = useQuery<BackupLog[]>({
+    queryKey: ["/api/backup/logs"],
+    refetchInterval: 30_000,
+  });
+
+  const lastSuccess = backupLogs.find((l) => l.status === "success");
+  const lastFailed = backupLogs.find((l) => l.status === "failed");
+
+  const runMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/backup/onedrive-run"),
+    onSuccess: async () => {
+      toast({ title: "Backup uploaded to OneDrive", description: "Both files were saved successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "Backup failed", description: e.message, variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
+    },
+  });
 
   const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -58,9 +144,8 @@ export default function BackupPage() {
       const response = await fetch("/api/backup/export");
       if (!response.ok) throw new Error("Export failed");
       const blob = await response.blob();
-      const filename = `job-flow-restore-backup-${TODAY}.json`;
-      triggerDownload(blob, filename);
-      toast({ title: "Restore backup downloaded", description: `Saved as ${filename}` });
+      triggerDownload(blob, `job-flow-restore-backup-${TODAY}.json`);
+      toast({ title: "Restore backup downloaded", description: `Saved as job-flow-restore-backup-${TODAY}.json` });
     } catch {
       toast({ title: "Download failed", description: "Could not export the backup.", variant: "destructive" });
     } finally {
@@ -74,9 +159,8 @@ export default function BackupPage() {
       const response = await fetch("/api/backup/export-excel");
       if (!response.ok) throw new Error("Export failed");
       const blob = await response.blob();
-      const filename = `job-flow-excel-backup-${TODAY}.xlsx`;
-      triggerDownload(blob, filename);
-      toast({ title: "Excel backup downloaded", description: `Saved as ${filename}` });
+      triggerDownload(blob, `job-flow-excel-backup-${TODAY}.xlsx`);
+      toast({ title: "Excel backup downloaded", description: `Saved as job-flow-excel-backup-${TODAY}.xlsx` });
     } catch {
       toast({ title: "Download failed", description: "Could not export the Excel backup.", variant: "destructive" });
     } finally {
@@ -119,6 +203,14 @@ export default function BackupPage() {
     }
   };
 
+  const handleRunBackup = () => {
+    if (isDemoMode) {
+      toast({ title: "Demo Mode", description: "This action is disabled in Demo Mode.", variant: "destructive" });
+      return;
+    }
+    runMutation.mutate();
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -132,7 +224,7 @@ export default function BackupPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Backup & Restore</h1>
               <p className="text-muted-foreground mt-1">
-                Download a full snapshot of your data or open business records in Excel.
+                Download, auto-upload to OneDrive, or restore your data.
               </p>
             </div>
 
@@ -141,13 +233,103 @@ export default function BackupPage() {
               <CardContent className="flex items-start gap-3 pt-5">
                 <ShieldCheck className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
                 <div className="text-sm text-blue-800 space-y-1">
-                  <p className="font-semibold">Two export types available</p>
+                  <p className="font-semibold">Two backup types</p>
                   <p>
-                    The <strong>Restore Backup</strong> (.json) captures all data for full system restore.
-                    The <strong>Excel Backup</strong> (.xlsx) creates a workbook with one sheet per data type —
-                    open it in Excel or Google Sheets to review, filter, print, and share records.
+                    The <strong>Restore Backup</strong> (.json) captures all data for a full system restore.
+                    The <strong>Excel Backup</strong> (.xlsx) creates a workbook you can open in Excel or Google Sheets.
+                    Both are uploaded to OneDrive automatically each night.
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* ── OneDrive Backup Settings ──────────────────────────────────── */}
+            <Card className={odConfig?.configured ? "border-green-200" : "border-amber-200"}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${odConfig?.configured ? "bg-green-100" : "bg-amber-100"}`}>
+                    {odConfig?.configured
+                      ? <Cloud className="h-5 w-5 text-green-600" />
+                      : <CloudOff className="h-5 w-5 text-amber-600" />}
+                  </div>
+                  <div>
+                    <CardTitle>OneDrive Backup Settings</CardTitle>
+                    <CardDescription>
+                      {odConfig?.configured
+                        ? `Auto-backup enabled — saving to ${odConfig.folder}`
+                        : "Not configured — set environment variables to enable"}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+
+                {/* Status row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Last successful backup
+                    </p>
+                    {lastSuccess ? (
+                      <p className="text-sm font-medium">{formatDatetime(lastSuccess.datetime)}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No successful backups yet</p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Last failed backup
+                    </p>
+                    {lastFailed ? (
+                      <p className="text-sm font-medium text-red-600">{formatDatetime(lastFailed.datetime)}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No failures</p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5 text-blue-500" /> Next scheduled backup
+                    </p>
+                    {odConfig?.configured ? (
+                      <p className="text-sm font-medium">{nextScheduledBackup()}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Not scheduled</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Manual run button */}
+                {isDemoMode ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    <Info className="h-4 w-4 shrink-0" />
+                    This action is disabled in Demo Mode.
+                  </div>
+                ) : odConfig?.configured ? (
+                  <Button
+                    onClick={handleRunBackup}
+                    disabled={runMutation.isPending}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {runMutation.isPending
+                      ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Running backup…</>
+                      : <><Play className="mr-2 h-4 w-4" />Run Backup Now</>}
+                  </Button>
+                ) : (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-2 text-sm text-amber-800">
+                    <p className="font-semibold flex items-center gap-2">
+                      <Info className="h-4 w-4" /> OneDrive not configured
+                    </p>
+                    <p>Set these environment variables to enable automatic daily backups:</p>
+                    <ul className="font-mono text-xs space-y-1 bg-amber-100 rounded p-2">
+                      <li>ONEDRIVE_TENANT_ID</li>
+                      <li>ONEDRIVE_CLIENT_ID</li>
+                      <li>ONEDRIVE_CLIENT_SECRET</li>
+                      <li>ONEDRIVE_USER_ID</li>
+                      <li>ONEDRIVE_BACKUP_FOLDER (optional, default: /Job Flow Backups/Daily Backups)</li>
+                    </ul>
+                    <p className="text-xs">Use a Microsoft Azure App Registration with <strong>Files.ReadWrite.All</strong> application permission on the Microsoft Graph API.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -205,7 +387,7 @@ export default function BackupPage() {
                   <div>
                     <CardTitle>Download Excel Backup</CardTitle>
                     <CardDescription>
-                      Exports an <code>.xlsx</code> workbook — use this to open and review business records in Excel.
+                      Exports an <code>.xlsx</code> workbook — open and review business records in Excel.
                     </CardDescription>
                   </div>
                 </div>
@@ -284,6 +466,116 @@ export default function BackupPage() {
               </CardContent>
             </Card>
 
+            {/* ── Backup Logs ───────────────────────────────────────────────── */}
+            <Card>
+              <CardHeader
+                className="pb-3 cursor-pointer select-none"
+                onClick={() => setShowLogs(p => !p)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-slate-100">
+                      <Clock className="h-5 w-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <CardTitle>Backup Logs</CardTitle>
+                      <CardDescription>
+                        {backupLogs.length === 0
+                          ? "No OneDrive backup attempts yet"
+                          : `${backupLogs.length} record${backupLogs.length !== 1 ? "s" : ""}`}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => { e.stopPropagation(); refetchLogs(); }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                    {showLogs ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </div>
+              </CardHeader>
+              {showLogs && (
+                <CardContent className="p-0">
+                  {backupLogs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2 text-sm">
+                      <Cloud className="h-8 w-8 text-muted-foreground/30" />
+                      <p>No backup logs yet. Run a manual backup or wait for the nightly schedule.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30">
+                            <TableHead className="text-xs font-semibold">Date &amp; Time</TableHead>
+                            <TableHead className="text-xs font-semibold">Type</TableHead>
+                            <TableHead className="text-xs font-semibold">Status</TableHead>
+                            <TableHead className="text-xs font-semibold">Files</TableHead>
+                            <TableHead className="text-xs font-semibold">Sizes</TableHead>
+                            <TableHead className="text-xs font-semibold">Destination</TableHead>
+                            <TableHead className="text-xs font-semibold">Error</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {backupLogs.map((log) => (
+                            <TableRow key={log.id} className="hover:bg-muted/20">
+                              <TableCell className="text-xs whitespace-nowrap">{formatDatetime(log.datetime)}</TableCell>
+                              <TableCell className="text-xs">
+                                <Badge variant="outline" className="text-xs font-normal">
+                                  {log.backupType === "onedrive-manual" ? "Manual" : "Auto"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {log.status === "success" ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                                    <CheckCircle className="h-3.5 w-3.5" /> Success
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
+                                    <AlertTriangle className="h-3.5 w-3.5" /> Failed
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {log.fileNames.length > 0 ? (
+                                  <div className="space-y-0.5">
+                                    {log.fileNames.map((fn) => (
+                                      <div key={fn} className="font-mono text-xs text-muted-foreground truncate max-w-[180px]">{fn}</div>
+                                    ))}
+                                  </div>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </TableCell>
+                              <TableCell className="text-xs whitespace-nowrap">
+                                {log.fileSizesBytes.length > 0 ? (
+                                  <div className="space-y-0.5">
+                                    {log.fileSizesBytes.map((sz, i) => (
+                                      <div key={i}>{formatBytes(sz)}</div>
+                                    ))}
+                                  </div>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </TableCell>
+                              <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[150px]">
+                                {log.destination || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs text-red-600 max-w-[200px]">
+                                {log.errorMessage ? (
+                                  <span title={log.errorMessage} className="truncate block">{log.errorMessage}</span>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+
             {/* Tips */}
             <Card className="border-gray-200">
               <CardHeader>
@@ -295,8 +587,9 @@ export default function BackupPage() {
               <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>• Download a <strong>Restore Backup</strong> before making large changes — it can be used to undo everything.</p>
                 <p>• Use the <strong>Excel Backup</strong> to share records with staff, do admin checks, or print reports.</p>
+                <p>• OneDrive backups run automatically at <strong>23:30 South Africa time</strong> every night.</p>
+                <p>• Retention policy: daily backups kept for <strong>30 days</strong>; month-end backups kept for <strong>12 months</strong>.</p>
                 <p>• Keep backups in a secure location — they contain all client and financial data.</p>
-                <p>• Files are named with today's date for easy versioning.</p>
                 <p>• Because data is stored in memory, a server restart clears all changes — back up regularly.</p>
               </CardContent>
             </Card>

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
+import { runDailyBackupToOneDrive, getOneDriveConfig } from "./onedrive";
 
 const app = express();
 app.use(express.json());
@@ -82,6 +83,26 @@ app.use((req, res, next) => {
     // Reset flag on Tuesday so it fires again next Monday
     if (saTime.getUTCDay() === 2) weeklySummarySentThisWeek = false;
   }, 60 * 60 * 1000);
+
+  // ── Daily OneDrive backup scheduler ───────────────────────────────────────
+  // Fires every minute; runs backup once per day at 21:30 UTC (23:30 SAST)
+  let lastDailyBackupDate = "";
+  setInterval(async () => {
+    if (!getOneDriveConfig()) return;
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const utcHours = now.getUTCHours();
+    const utcMins = now.getUTCMinutes();
+    if (utcHours === 21 && utcMins >= 30 && lastDailyBackupDate !== todayStr) {
+      lastDailyBackupDate = todayStr;
+      try {
+        await runDailyBackupToOneDrive(false);
+        log("Daily OneDrive backup completed successfully");
+      } catch (e: any) {
+        console.error("Daily OneDrive backup failed:", e.message);
+      }
+    }
+  }, 60 * 1000);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
