@@ -29,6 +29,7 @@ import {
   Mail,
   Send,
   TestTube2,
+  MessageCircle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -171,6 +172,27 @@ export default function BackupPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/backup/logs"] });
     },
   });
+
+  const whatsappTestMutation = useMutation<{ success: boolean; recipient: string; message: string; messageId?: string }, Error, void>({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/backup/whatsapp-test");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "WhatsApp test sent", description: `Sent to ${data.recipient}.` });
+    },
+    onError: (e: any) => {
+      toast({ title: "WhatsApp test failed", description: e?.message ?? "Send failed", variant: "destructive" });
+    },
+  });
+
+  const handleSendWhatsAppTest = () => {
+    if (isDemoMode) {
+      toast({ title: "Demo Mode", description: "This action is disabled in Demo Mode.", variant: "destructive" });
+      return;
+    }
+    whatsappTestMutation.mutate();
+  };
 
   const smtpTestMutation = useMutation<{ success: boolean; recipient: string; message: string }, Error, void>({
     mutationFn: async () => {
@@ -546,6 +568,34 @@ export default function BackupPage() {
                     <div className="mt-2 rounded-lg p-3 flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-800">
                       <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                       <p>{(smtpTestMutation.error as any)?.message ?? "SMTP test failed"}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-dashed">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">WhatsApp backup test</p>
+                  <Button
+                    onClick={handleSendWhatsAppTest}
+                    disabled={isDemoMode || whatsappTestMutation.isPending}
+                    variant="outline"
+                    className="w-full border-green-400 hover:bg-green-50"
+                  >
+                    {whatsappTestMutation.isPending
+                      ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Sending WhatsApp test…</>
+                      : <><MessageCircle className="mr-2 h-4 w-4" />Send Test WhatsApp Backup</>}
+                  </Button>
+                  {whatsappTestMutation.data && (
+                    <div className={`mt-2 rounded-lg p-3 flex items-start gap-2 text-sm ${whatsappTestMutation.data.success ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"}`}>
+                      {whatsappTestMutation.data.success
+                        ? <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        : <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />}
+                      <p>{whatsappTestMutation.data.message}</p>
+                    </div>
+                  )}
+                  {whatsappTestMutation.isError && (
+                    <div className="mt-2 rounded-lg p-3 flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-800">
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p>{(whatsappTestMutation.error as any)?.message ?? "WhatsApp test failed"}</p>
                     </div>
                   )}
                 </div>
