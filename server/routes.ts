@@ -3017,6 +3017,14 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
+  app.get("/api/team-members", async (_req, res) => {
+    try {
+      const teams = await storage.getTeams();
+      const all = (await Promise.all(teams.map(t => storage.getTeamMembers(t.id)))).flat();
+      res.json(all);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
   app.get("/api/teams/:id", async (req, res) => {
     try {
       const team = await storage.getTeam(req.params.id);
