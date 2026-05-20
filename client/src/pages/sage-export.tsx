@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import Sidebar from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,6 +86,7 @@ export default function SageExport() {
   const [showDebug, setShowDebug]           = useState(true);
   const [markDialog, setMarkDialog]         = useState(false);
   const [pendingExport, setPendingExport]   = useState<SageJob[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // ── Reference data ────────────────────────────────────────────────────────
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
@@ -218,9 +221,26 @@ export default function SageExport() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-[1400px] mx-auto space-y-5">
+    <div className="min-h-screen flex bg-gray-50">
+      <Sidebar />
 
-      {/* Header */}
+      {/* Mobile sidebar overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="relative bg-white w-64 shadow-lg">
+            <Sidebar />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header title="Sage Export" onMobileMenuToggle={() => setIsMobileMenuOpen(true)} />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 lg:pb-6">
+          <div className="max-w-[1400px] mx-auto space-y-5">
+
+      {/* Page title row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -589,6 +609,10 @@ export default function SageExport() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+          </div>{/* /max-w container */}
+        </main>
+      </div>{/* /flex-1 column */}
     </div>
   );
 }
