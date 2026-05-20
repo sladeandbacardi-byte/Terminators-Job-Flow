@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import jobFlowLogo from "@assets/job-flow-header-logo_1779017630067.png";
+import jobFlowLogo from "@assets/job-flow-header-logo_1779307679615.png";
 
 interface HeaderProps {
   title?: string;
@@ -148,8 +148,8 @@ export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
           <div className="flex items-center gap-3">
             <img
               src={jobFlowLogo}
-              alt="Job Flow"
-              className="h-[38px] sm:h-[52px] w-auto object-contain pointer-events-none flex-shrink-0"
+              alt="Job Flow Field Service Management"
+              className="h-[38px] sm:h-[45px] w-auto object-contain pointer-events-none flex-shrink-0"
             />
             <button
               className="lg:hidden p-2 text-gray-600 hover:text-gray-900"

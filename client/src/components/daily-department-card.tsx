@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getStatusColor } from "@/lib/utils";
 import { formatClientAddress, type Job, type Client, type Worker, type Department, type JobInventoryItem, type InventoryItem } from "@shared/schema";
-import termLogoPath from "@assets/termlogobig_1755598359265.jpg";
+import termLogoPath from "@assets/job-flow-dashboard-banner_1779307679615.png";
 
 interface JobWithDetails extends Job {
   client: Client;
@@ -88,7 +88,7 @@ export function DailyDepartmentCard({ departmentId, date, className = "" }: Dail
           <div className="flex items-center gap-3 print:gap-2">
             <img 
               src={termLogoPath} 
-              alt="The Terminators Logo" 
+              alt="Job Flow Field Service Management" 
               className="h-10 w-auto print:h-6"
             />
             <div>

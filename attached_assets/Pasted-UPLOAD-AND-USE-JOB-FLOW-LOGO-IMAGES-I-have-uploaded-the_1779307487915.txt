@@ -1,0 +1,130 @@
+UPLOAD AND USE JOB FLOW LOGO IMAGES
+
+I have uploaded the red Job Flow logo files.
+
+Use these exact file names:
+
+job-flow-header-logo.png
+job-flow-full-logo.png
+job-flow-icon.png
+job-flow-dashboard-banner.png
+
+Store them in the app assets folder, preferably:
+
+public/images/
+
+or if the app already has an assets folder, use the existing image/logo folder.
+
+Do not rename the files.
+
+Use the images like this:
+
+job-flow-header-logo.png
+
+Use this in the main app header / top navigation bar.
+
+Where:
+
+Top left of the app header
+Next to the page title
+On desktop dashboard pages
+On logged-in app pages
+
+Recommended display:
+Small horizontal logo
+Height around 32px to 45px
+Keep aspect ratio
+Do not stretch
+
+job-flow-full-logo.png
+
+Use this on the login screen.
+
+Where:
+
+Login card
+Demo access screen
+Any welcome/start screen
+
+Recommended display:
+Larger logo
+Centred
+Width around 280px to 360px on desktop
+Width around 220px to 280px on mobile
+Keep aspect ratio
+
+job-flow-icon.png
+
+Use this as the app icon / favicon.
+
+Where:
+
+Browser favicon
+Mobile home screen icon if PWA is enabled
+Small collapsed sidebar logo if needed
+Loading screen icon
+Notification/logo icon if needed
+
+Recommended display:
+Square icon
+Use for favicon and app icon
+Do not crop badly
+Keep centred
+
+job-flow-dashboard-banner.png
+
+Use this as the larger dashboard/banner logo.
+
+Where:
+
+Dashboard top card if a wide brand logo is needed
+Reports cover/header if needed
+Backup/export branding if needed
+Print Daily Schedule header if needed
+PDF/export headers if the wide logo fits
+
+Recommended display:
+Wide banner logo
+Use only where there is enough horizontal space
+Do not use this in the small top navigation because it may be too wide
+
+Update all old blue Job Flow images to use the new red versions.
+
+Search the app for old logo references and replace them with:
+
+/images/job-flow-header-logo.png
+/images/job-flow-full-logo.png
+/images/job-flow-icon.png
+/images/job-flow-dashboard-banner.png
+
+Usage rules:
+
+Login page:
+Use job-flow-full-logo.png
+
+Main app header:
+Use job-flow-header-logo.png
+
+Favicon:
+Use job-flow-icon.png
+
+Dashboard large branding / print headers:
+Use job-flow-dashboard-banner.png
+
+Reports / exports:
+Use job-flow-dashboard-banner.png if there is enough space.
+Use job-flow-header-logo.png if the space is narrow.
+
+Mobile:
+Use job-flow-header-logo.png in the top header if it fits.
+If not, use job-flow-icon.png.
+
+Do not stretch any logo.
+Always preserve aspect ratio.
+Use object-fit: contain.
+Use alt text:
+Job Flow Field Service Management
+
+Make sure the red logo appears everywhere the old blue logo was used.
+
+END

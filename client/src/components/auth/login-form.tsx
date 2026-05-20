@@ -12,7 +12,7 @@ import {
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
 import type { Worker } from "@shared/schema";
-import jobFlowFullLogo from "@assets/job-flow-full-logo_1779017630066.png";
+import jobFlowFullLogo from "@assets/job-flow-full-logo_1779307679614.png";
 
 const roleIcons: Record<string, JSX.Element> = {
   admin:       <Shield className="h-3.5 w-3.5" />,
@@ -86,8 +86,8 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
             <div className="flex justify-center -mb-4">
               <img
                 src={jobFlowFullLogo}
-                alt="Job Flow – Field Service Management"
-                className="w-[200px] sm:w-[240px] h-auto object-contain"
+                alt="Job Flow Field Service Management"
+                className="w-[240px] sm:w-[300px] h-auto object-contain"
               />
             </div>
 
