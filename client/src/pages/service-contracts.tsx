@@ -20,6 +20,9 @@ const FREQS = [
   "Daily","2 x a week","Weekly","Twice a month","Monthly",
   "Every 2 months","Quarterly","Every 6 months","Annually","Once-off",
 ] as const;
+const INVOICE_FREQS = [
+  "Per Service","Weekly","Monthly","Quarterly","Every 6 months","Annually",
+] as const;
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const WEEKS_OPTS: { val: number; label: string }[] = [
   { val: 1, label: "1st week" },
@@ -235,7 +238,8 @@ export default function ServiceContractsPage() {
                 <tr className="border-b">
                   <th className="px-3 py-2 font-semibold">Customer</th>
                   <th className="px-3 py-2 font-semibold">Service</th>
-                  <th className="px-3 py-2 font-semibold">Frequency</th>
+                  <th className="px-3 py-2 font-semibold">Service Freq.</th>
+                  <th className="px-3 py-2 font-semibold">Invoicing</th>
                   <th className="px-3 py-2 font-semibold">Schedule</th>
                   <th className="px-3 py-2 font-semibold">Technician / Team</th>
                   <th className="px-3 py-2 font-semibold">Status</th>
@@ -244,10 +248,10 @@ export default function ServiceContractsPage() {
               </thead>
               <tbody>
                 {isLoading && (
-                  <tr><td colSpan={7} className="px-3 py-6 text-center text-gray-400">Loading…</td></tr>
+                  <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-400">Loading…</td></tr>
                 )}
                 {!isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-gray-400">
                     No contracts yet. Click <b>New Contract</b> to add your first one.
                   </td></tr>
                 )}
@@ -262,6 +266,7 @@ export default function ServiceContractsPage() {
                       </td>
                       <td className="px-3 py-2">{c.serviceType}</td>
                       <td className="px-3 py-2"><Badge variant="outline">{c.frequency}</Badge></td>
+                      <td className="px-3 py-2 text-gray-700">{c.invoicingFrequency || "—"}</td>
                       <td className="px-3 py-2 text-gray-700">{scheduleSummary(c)}</td>
                       <td className="px-3 py-2">{assigned}</td>
                       <td className="px-3 py-2">
@@ -291,6 +296,27 @@ export default function ServiceContractsPage() {
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-3 py-2">
+            {/* Frequencies pinned at the top of the form */}
+            <div>
+              <Label>Service Frequency *</Label>
+              <Select value={freq} onValueChange={v => setForm(f => ({ ...f, frequency: v }))}>
+                <SelectTrigger data-testid="f-freq"><SelectValue placeholder="How often the visit happens" /></SelectTrigger>
+                <SelectContent>
+                  {FREQS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Invoicing Frequency</Label>
+              <Select value={form.invoicingFrequency || ""} onValueChange={v => setForm(f => ({ ...f, invoicingFrequency: v }))}>
+                <SelectTrigger data-testid="f-invoice-freq"><SelectValue placeholder="How often the customer is invoiced" /></SelectTrigger>
+                <SelectContent>
+                  {INVOICE_FREQS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 border-t pt-3" />
+
             <div>
               <Label>Customer *</Label>
               <Select value={form.customerId || ""} onValueChange={setCustomer}>
@@ -321,16 +347,6 @@ export default function ServiceContractsPage() {
                   <SelectItem value="_none">— Unassigned —</SelectItem>
                   {workers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                   {teams.map(t => <SelectItem key={t.id} value={`team:${t.id}`}>{t.name} (team)</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-2">
-              <Label>Frequency *</Label>
-              <Select value={freq} onValueChange={v => setForm(f => ({ ...f, frequency: v }))}>
-                <SelectTrigger data-testid="f-freq"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {FREQS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

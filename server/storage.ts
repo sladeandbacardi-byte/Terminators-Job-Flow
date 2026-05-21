@@ -4437,6 +4437,7 @@ export class MemStorage implements IStorage {
       assignedTeamId: c.assignedTeamId ?? null,
       assignedTeamName: c.assignedTeamName ?? null,
       frequency: c.frequency,
+      invoicingFrequency: c.invoicingFrequency ?? null,
       startDate: c.startDate ? new Date(c.startDate) : null,
       endDate: c.endDate ? new Date(c.endDate) : null,
       weekOfMonth: c.weekOfMonth ?? null,

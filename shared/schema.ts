@@ -821,7 +821,8 @@ export const serviceContracts = pgTable("service_contracts", {
   assignedTechnicianName: text("assigned_technician_name"),
   assignedTeamId: varchar("assigned_team_id"),
   assignedTeamName: text("assigned_team_name"),
-  frequency: text("frequency").notNull(),
+  frequency: text("frequency").notNull(),                  // service frequency (how often the visit happens)
+  invoicingFrequency: text("invoicing_frequency"),         // how often the customer is invoiced
   startDate: timestamp("start_date"),                      // first date (for Once-off this IS the date)
   endDate: timestamp("end_date"),                          // optional end
   weekOfMonth: integer("week_of_month"),                   // 1..4 or 5 = Last
