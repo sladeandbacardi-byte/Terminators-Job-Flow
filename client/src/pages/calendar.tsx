@@ -104,6 +104,9 @@ export default function Calendar() {
   // assigneeFilter value is "all" | `worker:<id>` | `team:<id>`
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "oneoff" | "contract">("all");
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [areaFilter, setAreaFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
   const [showAllHours, setShowAllHours] = useState(false);
@@ -455,8 +458,30 @@ export default function Calendar() {
     // Technicians only see their own jobs
     const matchesWorker = !isTechnician || !myWorker || event.workerId === myWorker.id;
 
-    return matchesSearch && matchesDepartment && matchesAssignee && matchesStatus && matchesWorker;
+    // Type filter: contract occurrences have IDs prefixed `occ-`
+    const isContract = event.id.startsWith('occ-');
+    const matchesType =
+      typeFilter === "all" ||
+      (typeFilter === "contract" && isContract) ||
+      (typeFilter === "oneoff" && !isContract);
+
+    const matchesCustomer = customerFilter === "all" || event.clientId === customerFilter;
+
+    let matchesArea = true;
+    if (areaFilter !== "all") {
+      const client = event.clientId ? clients.find(c => c.id === event.clientId) : undefined;
+      const area = (client?.suburb || client?.city || "").trim();
+      matchesArea = area === areaFilter;
+    }
+
+    return matchesSearch && matchesDepartment && matchesAssignee && matchesStatus && matchesWorker
+      && matchesType && matchesCustomer && matchesArea;
   });
+
+  // Build sorted list of unique areas (suburb || city) from clients for the Area filter
+  const areaOptions = Array.from(new Set(
+    clients.map(c => (c.suburb || c.city || "").trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
 
   function getPriorityColor(priority: string): string {
     switch (priority) {
@@ -1414,92 +1439,170 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
-              <div className="flex items-center space-x-2">
-                <Search className="h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search events..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64"
-                  data-testid="search-events"
-                />
+            {/* Filters — each control has a label above it */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Search</label>
+                <div className="relative">
+                  <Search className="h-4 w-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    placeholder="Search events..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-56 pl-8"
+                    data-testid="search-events"
+                  />
+                </div>
               </div>
 
-              <Select value={departmentFilter} onValueChange={onDepartmentChange}>
-                <SelectTrigger className="w-48" data-testid="department-filter">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
-                    <SelectItem key={department.id} value={department.id}>
-                      {department.name}
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Department</label>
+                <Select value={departmentFilter} onValueChange={onDepartmentChange}>
+                  <SelectTrigger className="w-44" data-testid="department-filter">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Person / Team</label>
+                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                  <SelectTrigger className="w-48" data-testid="assignee-filter">
+                    <SelectValue placeholder="All People & Teams" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All People &amp; Teams</SelectItem>
+                    {assigneeGroups.map(group => (
+                      <SelectGroup key={group.department.id}>
+                        <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          {group.department.name}
+                        </SelectLabel>
+                        {group.options.map(opt => (
+                          <SelectItem key={`${opt.kind}:${opt.id}`} value={`${opt.kind}:${opt.id}`}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Job Type</label>
+                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+                  <SelectTrigger className="w-40" data-testid="type-filter">
+                    <SelectValue placeholder="All Job Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Job Types</SelectItem>
+                    <SelectItem value="oneoff">Once-off Jobs</SelectItem>
+                    <SelectItem value="contract">Contract Jobs</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Customer</label>
+                <Select value={customerFilter} onValueChange={setCustomerFilter}>
+                  <SelectTrigger className="w-48" data-testid="customer-filter">
+                    <SelectValue placeholder="All Customers" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="all">All Customers</SelectItem>
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Area</label>
+                <Select value={areaFilter} onValueChange={setAreaFilter}>
+                  <SelectTrigger className="w-44" data-testid="area-filter">
+                    <SelectValue placeholder="All Areas" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="all">All Areas</SelectItem>
+                    {areaOptions.map(a => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-medium text-gray-600 mb-1">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-44" data-testid="status-filter">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="scheduled">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
+                        Scheduled
+                      </span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    <SelectItem value="in_progress">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                        In Progress
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="completed">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                        Completed
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="cancelled">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                        Cancelled
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
+                        Pending
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                <SelectTrigger className="w-56" data-testid="assignee-filter">
-                  <SelectValue placeholder="All People & Teams" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All People &amp; Teams</SelectItem>
-                  {assigneeGroups.map(group => (
-                    <SelectGroup key={group.department.id}>
-                      <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        {group.department.name}
-                      </SelectLabel>
-                      {group.options.map(opt => (
-                        <SelectItem key={`${opt.kind}:${opt.id}`} value={`${opt.kind}:${opt.id}`}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-48" data-testid="status-filter">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="scheduled">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                      Scheduled
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="in_progress">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                      In Progress
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="completed">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                      Completed
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="cancelled">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
-                      Cancelled
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="pending">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
-                      Pending
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {(typeFilter !== "all" || customerFilter !== "all" || areaFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all" || assigneeFilter !== "all" || searchTerm) && (
+                <div className="flex flex-col">
+                  <label className="text-xs font-medium text-transparent mb-1">.</label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setDepartmentFilter("all");
+                      setAssigneeFilter("all");
+                      setTypeFilter("all");
+                      setCustomerFilter("all");
+                      setAreaFilter("all");
+                      setStatusFilter("all");
+                    }}
+                    data-testid="clear-filters"
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              )}
 
               {/* Status Colour Legend */}
               <div className="hidden lg:flex items-center gap-2.5 flex-wrap bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
