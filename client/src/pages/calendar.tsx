@@ -411,7 +411,8 @@ export default function Calendar() {
       description: o.notes || '',
       startTime: start,
       endTime: end,
-      type: 'job' as const,
+      // 'appointment' routes the click to the read-only details dialog instead of the job-edit dialog.
+      type: 'appointment' as const,
       priority: 'medium' as const,
       clientId: o.customerId,
       workerId: o.assignedTechnicianId || undefined,
@@ -479,14 +480,6 @@ export default function Calendar() {
 
   // Event handlers
   const handleEventClick = (event: CalendarEvent) => {
-    // Virtual contract occurrences are not persisted jobs — open the contracts editor instead
-    if (event.id.startsWith('occ-')) {
-      toast({
-        title: "Recurring contract job",
-        description: "This is a scheduled occurrence from a contract. Open Contracts to edit the schedule.",
-      });
-      return;
-    }
     if (event.type === 'job') {
       const job = jobs.find(j => j.id === event.id);
       if (job) {
