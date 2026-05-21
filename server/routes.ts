@@ -852,11 +852,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/invoices/:id", async (req, res) => {
     try {
-      const updateData = insertInvoiceSchema.partial().parse(req.body);
+      // Coerce date strings to Date objects before zod validation (timestamp columns reject strings)
+      const body = { ...req.body };
+      for (const f of ["issueDate", "dueDate", "paymentDate", "sentDate"]) {
+        if (typeof body[f] === "string" && body[f]) body[f] = new Date(body[f]);
+      }
+      const updateData = insertInvoiceSchema.partial().parse(body);
       const updated = await storage.updateInvoice(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
-      res.status(400).json({ error: "Invalid invoice data" });
+      console.error("Invoice update error:", error);
+      res.status(400).json({ error: "Invalid invoice data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
