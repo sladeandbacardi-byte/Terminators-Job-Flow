@@ -768,6 +768,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(items);
   });
 
+  // Create an invoice directly from a completed job — copies client/price/notes forward
+  // and links the new invoice back to the job (and its quote, if any).
+  app.post("/api/jobs/:id/create-invoice", async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+
+      const priceNum = Number((job as any).price ?? 0);
+      const subtotal = Number.isFinite(priceNum) ? priceNum : 0;
+      const taxRate = 0.15; // 15% VAT
+      const taxAmount = +(subtotal * taxRate).toFixed(2);
+      const total = +(subtotal + taxAmount).toFixed(2);
+
+      const now = new Date();
+      const due = new Date(now); due.setDate(due.getDate() + 30);
+
+      const created = await storage.createInvoice({
+        clientId: job.clientId,
+        status: "draft",
+        issueDate: now,
+        dueDate: due,
+        subtotal: subtotal.toFixed(2),
+        taxAmount: taxAmount.toFixed(2),
+        total: total.toFixed(2),
+        paidAmount: "0",
+        notes: [job.title, job.description].filter(Boolean).join(" — ") || null,
+        terms: "Payment due within 30 days.",
+        linkedJobId: job.id,
+        linkedQuoteId: (job as any).linkedQuoteId ?? null,
+      } as any);
+
+      // Seed a single line item from the job
+      try {
+        await storage.createInvoiceItem({
+          invoiceId: created.id,
+          description: `${job.title}${job.serviceType ? ` — ${job.serviceType}` : ""}`,
+          quantity: "1",
+          unitPrice: subtotal.toFixed(2),
+          total: subtotal.toFixed(2),
+          jobId: job.id,
+        } as any);
+      } catch (e) { /* item failure shouldn't block invoice */ }
+
+      await storage.updateJob(job.id, { invoiceStatus: "invoiced" } as any);
+
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Create-invoice-from-job error:", error);
+      res.status(400).json({ error: "Could not create invoice from job", details: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Mark a job as ready to invoice (Finance queue)
+  app.post("/api/jobs/:id/mark-ready-to-invoice", async (req, res) => {
+    try {
+      const updated = await storage.updateJob(req.params.id, { invoiceStatus: "ready_to_invoice" } as any);
+      if (!updated) return res.status(404).json({ error: "Job not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Could not update job" });
+    }
+  });
+
   app.post("/api/invoices", async (req, res) => {
     try {
       // Convert date strings to Date objects

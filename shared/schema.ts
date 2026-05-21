@@ -140,7 +140,7 @@ export const jobs = pgTable("jobs", {
   recurrenceYears: integer("recurrence_years"),
   jobNumber: text("job_number"),
   linkedQuoteId: varchar("linked_quote_id"),
-  invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | exported | invoiced
+  invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | ready_to_invoice | exported | invoiced
   googleMapsLink: text("google_maps_link"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),

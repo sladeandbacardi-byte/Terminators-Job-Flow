@@ -38,6 +38,13 @@ import FleetVehicleProfile from "@/pages/fleet-vehicle-profile";
 import Attendance from "@/pages/attendance";
 import TeamManagement from "@/pages/team-management";
 import SageExport from "@/pages/sage-export";
+import Debtors from "@/pages/debtors";
+import Creditors from "@/pages/creditors";
+import UsersRoles from "@/pages/users-roles";
+import Permissions from "@/pages/permissions";
+import Settings from "@/pages/settings";
+import SystemLogs from "@/pages/system-logs";
+import TestingChecklist from "@/pages/testing-checklist";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -91,6 +98,13 @@ function AuthenticatedApp() {
       <Route path="/attendance" component={Attendance} />
       <Route path="/team-management" component={TeamManagement} />
       <Route path="/sage-export" component={SageExport} />
+      <Route path="/debtors" component={Debtors} />
+      <Route path="/creditors" component={Creditors} />
+      <Route path="/users-roles" component={UsersRoles} />
+      <Route path="/permissions" component={Permissions} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/system-logs" component={SystemLogs} />
+      <Route path="/testing-checklist" component={TestingChecklist} />
       <Route component={NotFound} />
     </Switch>
   );

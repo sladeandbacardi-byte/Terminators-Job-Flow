@@ -11,18 +11,54 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Calendar, Search, Plus, Printer, Edit, X } from "lucide-react";
+import { Calendar, Search, Plus, Printer, Edit, X, CheckCircle2, Receipt } from "lucide-react";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
 import type { Job, QuoteSubmission, Worker, Client, Department, Team, TeamMember } from "@shared/schema";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Jobs() {
   const { user } = useAuth();
-  const isTechnician = getDashboardRole({ departmentId: user?.departmentId, role: user?.role }) === "service";
+  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const isTechnician = role === "service";
+  // Only Admin/Manager/Coordinator/Accounts can move jobs into the invoicing pipeline
+  const canInvoice = role === "admin" || role === "manager" || role === "coordinator" || role === "accounts";
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+
+  const markReady = useMutation({
+    mutationFn: async (jobId: string) => {
+      const r = await apiRequest("POST", `/api/jobs/${jobId}/mark-ready-to-invoice`);
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: "Marked ready to invoice", description: "Finance will see this job in the invoicing queue." });
+    },
+    onError: () => toast({ title: "Could not update job", variant: "destructive" }),
+  });
+
+  const createInvoiceFromJob = useMutation({
+    mutationFn: async (jobId: string) => {
+      const r = await apiRequest("POST", `/api/jobs/${jobId}/create-invoice`);
+      return r.json();
+    },
+    onSuccess: (inv: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      toast({
+        title: "Invoice created",
+        description: `${inv?.invoiceNumber ?? "Invoice"} created and linked. View it on the Invoices page.`,
+      });
+    },
+    onError: () => toast({ title: "Could not create invoice", variant: "destructive" }),
+  });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [addressFilter, setAddressFilter] = useState("");
@@ -482,11 +518,52 @@ export default function Jobs() {
                             <h4 className="font-semibold text-gray-900" data-testid={`job-title-${job.id}`}>{job.title}</h4>
                             {client && <p className="text-xs text-gray-500 mt-0.5">{client.name}</p>}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap justify-end">
                             <Badge variant="secondary" className={getStatusColor(job.status)} data-testid={`job-status-${job.id}`}>
                               {job.status.replace('_', ' ')}
                             </Badge>
+                            {job.invoiceStatus && job.invoiceStatus !== 'not_invoiced' && (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  job.invoiceStatus === 'invoiced'
+                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                    : job.invoiceStatus === 'ready_to_invoice'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }
+                                data-testid={`job-invoice-status-${job.id}`}
+                              >
+                                {job.invoiceStatus.replace(/_/g, ' ')}
+                              </Badge>
+                            )}
                             <div className="flex gap-1">
+                              {/* Conversion actions on completed jobs — only for invoicing roles */}
+                              {canInvoice && job.status === 'completed' && (job.invoiceStatus ?? 'not_invoiced') === 'not_invoiced' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => markReady.mutate(job.id)}
+                                  disabled={markReady.isPending}
+                                  data-testid={`button-mark-ready-${job.id}`}
+                                  title="Mark this job ready for Finance to invoice"
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-1" /> Mark Ready
+                                </Button>
+                              )}
+                              {canInvoice && job.status === 'completed' &&
+                                ((job.invoiceStatus ?? 'not_invoiced') === 'not_invoiced' ||
+                                 job.invoiceStatus === 'ready_to_invoice') && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => createInvoiceFromJob.mutate(job.id)}
+                                  disabled={createInvoiceFromJob.isPending}
+                                  data-testid={`button-create-invoice-${job.id}`}
+                                  title="Create an invoice from this job"
+                                >
+                                  <Receipt className="h-3 w-3 mr-1" /> Create Invoice
+                                </Button>
+                              )}
                               {!isTechnician && (
                                 <Button
                                   size="sm"
