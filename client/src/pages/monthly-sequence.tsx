@@ -82,8 +82,10 @@ export default function MonthlySequencePage() {
       if (!dayMap.has(s.serviceDay)) dayMap.set(s.serviceDay, []);
       dayMap.get(s.serviceDay)!.push(s);
     }
-    for (const dayMap of map.values()) {
-      for (const arr of dayMap.values()) arr.sort((a, b) => a.jobSequence - b.jobSequence);
+    for (const dayMap of Array.from(map.values())) {
+      for (const arr of Array.from(dayMap.values())) {
+        arr.sort((a: MonthlyServiceSequence, b: MonthlyServiceSequence) => a.jobSequence - b.jobSequence);
+      }
     }
     return map;
   }, [filtered]);

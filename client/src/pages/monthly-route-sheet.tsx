@@ -56,8 +56,11 @@ export default function MonthlyRouteSheet() {
       if (!dayMap.has(s.serviceDay)) dayMap.set(s.serviceDay, []);
       dayMap.get(s.serviceDay)!.push(s);
     }
-    for (const dm of m.values())
-      for (const arr of dm.values()) arr.sort((a, b) => a.jobSequence - b.jobSequence);
+    for (const dm of Array.from(m.values())) {
+      for (const arr of Array.from(dm.values())) {
+        arr.sort((a: MonthlyServiceSequence, b: MonthlyServiceSequence) => a.jobSequence - b.jobSequence);
+      }
+    }
     return m;
   }, [filtered]);
 
