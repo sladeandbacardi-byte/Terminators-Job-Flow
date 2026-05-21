@@ -220,6 +220,18 @@ export default function MonthlySequencePage() {
         <Header title="Monthly Service Sequence" />
         <main className="flex-1 overflow-y-auto p-6 space-y-4">
 
+          {/* How it works */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+            <div className="font-semibold mb-1">How this page works</div>
+            <ol className="list-decimal ml-5 space-y-1">
+              <li><b>Add a customer to a slot.</b> Pick the Week of the month (1–5), the Day, and a Sequence # (the order you'll visit on that day). Leave Sequence blank to auto-add the next number.</li>
+              <li><b>Set the frequency.</b> Weekly / Fortnightly / Monthly / Every 2 Months / Quarterly / Once-off — this controls which months and weeks the customer actually gets a visit.</li>
+              <li><b>Reorder visits.</b> Use the Up / Down arrows to change the order of customers on the same day. Use Deactivate to pause a customer without deleting them.</li>
+              <li><b>Generate Monthly Jobs.</b> Pick a month and click Generate — the system creates real jobs on the calendar for every active sequence that falls in that month. Duplicates are skipped automatically, so it's safe to re-run.</li>
+              <li><b>Print the Monthly Route Sheet.</b> A clean printable list of every customer for the month, grouped by Week → Day → Sequence.</li>
+            </ol>
+          </div>
+
           {/* Toolbar */}
           <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
             <div className="flex gap-2 items-center flex-wrap">
