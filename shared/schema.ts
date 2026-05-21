@@ -808,3 +808,36 @@ export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type InsertAttendanceMemberRecord = z.infer<typeof insertAttendanceMemberRecordSchema>;
 export type AttendanceMemberRecord = typeof attendanceMemberRecords.$inferSelect;
+
+// Monthly Service Sequence — recurring jobs in fixed week/day/sequence order
+export const monthlyServiceSequences = pgTable("monthly_service_sequences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull(),
+  customerName: text("customer_name").notNull(),
+  departmentId: varchar("department_id").notNull(),
+  serviceType: text("service_type").notNull(),
+  assignedTechnicianId: varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  assignedTeamId: varchar("assigned_team_id"),
+  assignedTeamName: text("assigned_team_name"),
+  serviceFrequency: text("service_frequency").notNull(), // Weekly | Fortnightly | Monthly | Every 2 Months | Quarterly | Once-off
+  serviceWeek: integer("service_week").notNull(),         // 1..5
+  serviceDay: text("service_day").notNull(),              // Monday..Sunday
+  jobSequence: integer("job_sequence").notNull().default(1),
+  estimatedDuration: integer("estimated_duration"),       // minutes
+  defaultStartTime: text("default_start_time"),           // HH:MM
+  googleMapsLink: text("google_maps_link"),
+  address: text("address"),
+  notes: text("notes"),
+  activeStatus: boolean("active_status").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertMonthlyServiceSequenceSchema = createInsertSchema(monthlyServiceSequences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMonthlyServiceSequence = z.infer<typeof insertMonthlyServiceSequenceSchema>;
+export type MonthlyServiceSequence = typeof monthlyServiceSequences.$inferSelect;

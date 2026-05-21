@@ -1,0 +1,161 @@
+Add a Monthly Service Sequence system to the Job Flow app.
+
+The purpose is to allow the service coordinator to load recurring service jobs in a fixed sequence for each month.
+
+This must not be treated as a normal random calendar list.
+Jobs must follow a set order based on:
+- week of the month
+- day of the week
+- job sequence number
+
+Create a new section inside Service called:
+Monthly Service Sequence
+
+Each recurring service setup must include:
+
+- customerId
+- customerName
+- department
+- serviceType
+- assignedTechnician
+- assignedTeam
+- serviceFrequency
+- serviceWeek
+- serviceDay
+- jobSequence
+- estimatedDuration
+- defaultStartTime
+- googleMapsLink
+- notes
+- activeStatus
+
+serviceFrequency options:
+- Weekly
+- Fortnightly
+- Monthly
+- Every 2 Months
+- Quarterly
+- Once-off
+
+serviceWeek options:
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Week 5
+
+serviceDay options:
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+jobSequence must be a number.
+The lower number must appear first on that day.
+
+Example:
+Week 1, Monday, Sequence 1
+Week 1, Monday, Sequence 2
+Week 1, Tuesday, Sequence 1
+Week 1, Tuesday, Sequence 2
+Week 2, Monday, Sequence 1
+
+Create a Monthly Sequence View that groups jobs like this:
+
+Week 1
+  Monday
+    1. Customer A
+    2. Customer B
+    3. Customer C
+  Tuesday
+    1. Customer D
+    2. Customer E
+
+Week 2
+  Monday
+    1. Customer F
+    2. Customer G
+
+The service coordinator must be able to:
+- add a customer to the sequence
+- edit the sequence
+- move a job up or down
+- change the service week
+- change the service day
+- change the assigned technician/team
+- deactivate a recurring service
+- search by customer
+- filter by department
+- filter by technician/team
+
+Add drag-and-drop ordering if possible.
+If drag-and-drop is too complex, add simple buttons:
+Move Up
+Move Down
+
+When moving a job up or down, update the jobSequence numbers automatically.
+
+Add a button:
+Generate Monthly Jobs
+
+When clicked, the user chooses:
+- month
+- year
+- department
+- technician/team optional
+
+The app must generate actual job cards from the Monthly Service Sequence.
+
+Generated job cards must include:
+- customer
+- department
+- service type
+- assigned technician/team
+- scheduled date
+- sequence number
+- status: Scheduled
+- googleMapsLink
+- notes
+
+Important:
+Do not create duplicate jobs if the same month has already been generated.
+Before generating, check whether jobs already exist for that customer, department, service week, service day, and month.
+
+If jobs already exist, show:
+"Some jobs have already been generated for this month. Do you want to skip duplicates?"
+
+Sorting rules:
+Always sort jobs by:
+1. serviceWeek
+2. serviceDay
+3. jobSequence
+
+Technician view:
+Technicians must see their jobs in the correct sequence order for the day.
+Show:
+1. Customer name
+2. Address
+3. Job status
+4. Open in Google Maps
+5. Start Job
+6. Complete Job
+
+Admin calendar:
+The calendar must also respect the service sequence.
+Jobs for a day must display in sequence order, not alphabetical order.
+
+Add a print/export option:
+Monthly Route Sheet
+
+The Monthly Route Sheet must show:
+- week
+- day
+- sequence number
+- customer
+- address
+- technician/team
+- department
+- Google Maps link if available

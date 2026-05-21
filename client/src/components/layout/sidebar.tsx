@@ -7,7 +7,7 @@ import {
   Settings, TrendingUp, ExternalLink, Database, ClipboardList, Briefcase,
   Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck, FileSpreadsheet,
   ChevronDown, ChevronRight, UserCog, Lock, ScrollText, HandCoins, Wallet,
-  CheckSquare, Cog,
+  CheckSquare, Cog, ListOrdered,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -59,6 +59,7 @@ const ALL_SECTIONS: NavSection[] = [
       { name: "Jobs",              href: "/jobs",            icon: Briefcase,    roles: ["admin", "manager", "coordinator", "accounts"] },
       { name: "My Jobs",           href: "/jobs",            icon: Briefcase,    roles: ["service"], tooltip: "Your main job list and daily work sheet." },
       { name: "Calendar",          href: "/calendar",        icon: Calendar,     roles: ["admin", "manager", "coordinator", "service", "accounts"] },
+      { name: "Monthly Sequence",  href: "/monthly-sequence", icon: ListOrdered, roles: ["admin", "manager", "coordinator"] },
       { name: "Field Diaries",     href: "/field-diaries",   icon: ClipboardList, roles: ["admin", "manager", "coordinator", "service"] },
       { name: "Stock Management",  href: "/inventory",       icon: Box,          roles: ["admin", "manager", "coordinator"] },
       { name: "Stock Manager Pro", href: "https://stock-manager-pro-sladeandbacardi.replit.app/login", icon: ExternalLink, roles: ["admin", "manager", "coordinator"], external: true },

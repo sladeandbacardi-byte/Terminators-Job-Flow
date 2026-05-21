@@ -3210,6 +3210,68 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
+  // ─── Monthly Service Sequence ───────────────────────────────────────────
+  app.get("/api/monthly-service-sequences", async (_req, res) => {
+    res.json(await storage.getMonthlyServiceSequences());
+  });
+
+  app.post("/api/monthly-service-sequences", async (req, res) => {
+    try {
+      const { insertMonthlyServiceSequenceSchema } = await import("@shared/schema");
+      const data = insertMonthlyServiceSequenceSchema.parse(req.body);
+      const created = await storage.createMonthlyServiceSequence(data);
+      res.status(201).json(created);
+    } catch (err: any) {
+      console.error("Sequence create error:", err);
+      res.status(400).json({ error: "Invalid sequence data", details: err?.message });
+    }
+  });
+
+  app.put("/api/monthly-service-sequences/:id", async (req, res) => {
+    try {
+      const { insertMonthlyServiceSequenceSchema } = await import("@shared/schema");
+      const data = insertMonthlyServiceSequenceSchema.partial().parse(req.body);
+      const updated = await storage.updateMonthlyServiceSequence(req.params.id, data);
+      if (!updated) return res.status(404).json({ error: "Sequence not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: "Invalid sequence data", details: err?.message });
+    }
+  });
+
+  app.delete("/api/monthly-service-sequences/:id", async (req, res) => {
+    const ok = await storage.deleteMonthlyServiceSequence(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Sequence not found" });
+    res.status(204).send();
+  });
+
+  app.post("/api/monthly-service-sequences/:id/move", async (req, res) => {
+    const direction = req.body?.direction === "down" ? "down" : "up";
+    const list = await storage.reorderMonthlyServiceSequence(req.params.id, direction);
+    res.json(list);
+  });
+
+  app.post("/api/monthly-service-sequences/generate", async (req, res) => {
+    try {
+      const year = Number(req.body?.year);
+      const month = Number(req.body?.month);
+      if (!year || !month || month < 1 || month > 12) {
+        return res.status(400).json({ error: "year and month (1-12) are required" });
+      }
+      const result = await storage.generateJobsFromMonthlySequences({
+        year, month,
+        departmentId: req.body?.departmentId || undefined,
+        technicianId: req.body?.technicianId || undefined,
+        teamId: req.body?.teamId || undefined,
+        skipDuplicates: req.body?.skipDuplicates !== false,
+      });
+      res.json({ createdCount: result.created.length, skipped: result.skipped, created: result.created });
+    } catch (err: any) {
+      console.error("Generate error:", err);
+      res.status(400).json({ error: "Failed to generate", details: err?.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

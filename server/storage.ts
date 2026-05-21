@@ -31,6 +31,7 @@ import {
   type TeamMember, type InsertTeamMember,
   type AttendanceRecord, type InsertAttendanceRecord,
   type AttendanceMemberRecord, type InsertAttendanceMemberRecord,
+  type MonthlyServiceSequence, type InsertMonthlyServiceSequence,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -299,6 +300,15 @@ export interface IStorage {
   // Backup Logs
   getBackupLogs(): Promise<BackupLog[]>;
   addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog>;
+
+  // Monthly Service Sequence
+  getMonthlyServiceSequences(): Promise<MonthlyServiceSequence[]>;
+  getMonthlyServiceSequence(id: string): Promise<MonthlyServiceSequence | undefined>;
+  createMonthlyServiceSequence(seq: InsertMonthlyServiceSequence): Promise<MonthlyServiceSequence>;
+  updateMonthlyServiceSequence(id: string, seq: Partial<InsertMonthlyServiceSequence>): Promise<MonthlyServiceSequence | undefined>;
+  deleteMonthlyServiceSequence(id: string): Promise<boolean>;
+  reorderMonthlyServiceSequence(id: string, direction: "up" | "down"): Promise<MonthlyServiceSequence[]>;
+  generateJobsFromMonthlySequences(opts: { year: number; month: number; departmentId?: string; technicianId?: string; teamId?: string; skipDuplicates: boolean }): Promise<{ created: Job[]; skipped: number }>;
 }
 
 export interface BackupLog {
@@ -345,6 +355,7 @@ export class MemStorage implements IStorage {
   private teamMembersMap: Map<string, TeamMember> = new Map();
   private attendanceRecordsMap: Map<string, AttendanceRecord> = new Map();
   private attendanceMemberRecordsMap: Map<string, AttendanceMemberRecord> = new Map();
+  private monthlyServiceSequencesMap: Map<string, MonthlyServiceSequence> = new Map();
   private activityLogs: any[] = [];
   private backupLogs: BackupLog[] = [];
   private invoiceCounter: number = 1;
@@ -4349,6 +4360,7 @@ export class MemStorage implements IStorage {
       emailTemplates: Array.from(this.emailTemplates.values()),
       emailLogs: Array.from(this.emailLogs.values()),
       notifications: Array.from(this.notifications.values()),
+      monthlyServiceSequences: Array.from(this.monthlyServiceSequencesMap.values()),
       activityLogs: this.activityLogs,
       invoiceCounter: this.invoiceCounter,
       poCounter: this.poCounter,
@@ -4381,6 +4393,7 @@ export class MemStorage implements IStorage {
     if (data.emailTemplates) this.emailTemplates = toMap(data.emailTemplates);
     if (data.emailLogs) this.emailLogs = toMap(data.emailLogs);
     if (data.notifications) this.notifications = toMap(data.notifications);
+    if (data.monthlyServiceSequences) this.monthlyServiceSequencesMap = toMap(data.monthlyServiceSequences);
     if (Array.isArray(data.activityLogs)) this.activityLogs = data.activityLogs;
     if (typeof data.invoiceCounter === "number") this.invoiceCounter = data.invoiceCounter;
     if (typeof data.poCounter === "number") this.poCounter = data.poCounter;
@@ -4400,6 +4413,233 @@ export class MemStorage implements IStorage {
       this.backupLogs = this.backupLogs.slice(-200);
     }
     return newLog;
+  }
+
+  // ─── Monthly Service Sequence ─────────────────────────────────────────────
+  async getMonthlyServiceSequences(): Promise<MonthlyServiceSequence[]> {
+    return Array.from(this.monthlyServiceSequencesMap.values()).sort((a, b) => {
+      if (a.serviceWeek !== b.serviceWeek) return a.serviceWeek - b.serviceWeek;
+      const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+      const da = days.indexOf(a.serviceDay), db = days.indexOf(b.serviceDay);
+      if (da !== db) return da - db;
+      return a.jobSequence - b.jobSequence;
+    });
+  }
+
+  async getMonthlyServiceSequence(id: string): Promise<MonthlyServiceSequence | undefined> {
+    return this.monthlyServiceSequencesMap.get(id);
+  }
+
+  async createMonthlyServiceSequence(seq: InsertMonthlyServiceSequence): Promise<MonthlyServiceSequence> {
+    const now = new Date();
+    // Auto-assign jobSequence: if missing, <1, or already taken in same week+day, bump to next free
+    const peers = Array.from(this.monthlyServiceSequencesMap.values())
+      .filter(s => s.serviceWeek === seq.serviceWeek && s.serviceDay === seq.serviceDay);
+    const taken = new Set(peers.map(p => p.jobSequence));
+    let jobSequence = seq.jobSequence ?? 0;
+    if (!jobSequence || jobSequence < 1 || taken.has(jobSequence)) {
+      jobSequence = (peers.reduce((m, p) => Math.max(m, p.jobSequence), 0)) + 1;
+    }
+    const row: MonthlyServiceSequence = {
+      id: `mss-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      customerId: seq.customerId,
+      customerName: seq.customerName,
+      departmentId: seq.departmentId,
+      serviceType: seq.serviceType,
+      assignedTechnicianId: seq.assignedTechnicianId ?? null,
+      assignedTechnicianName: seq.assignedTechnicianName ?? null,
+      assignedTeamId: seq.assignedTeamId ?? null,
+      assignedTeamName: seq.assignedTeamName ?? null,
+      serviceFrequency: seq.serviceFrequency,
+      serviceWeek: seq.serviceWeek,
+      serviceDay: seq.serviceDay,
+      jobSequence,
+      estimatedDuration: seq.estimatedDuration ?? null,
+      defaultStartTime: seq.defaultStartTime ?? null,
+      googleMapsLink: seq.googleMapsLink ?? null,
+      address: seq.address ?? null,
+      notes: seq.notes ?? null,
+      activeStatus: seq.activeStatus ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.monthlyServiceSequencesMap.set(row.id, row);
+    return row;
+  }
+
+  async updateMonthlyServiceSequence(id: string, patch: Partial<InsertMonthlyServiceSequence>): Promise<MonthlyServiceSequence | undefined> {
+    const cur = this.monthlyServiceSequencesMap.get(id);
+    if (!cur) return undefined;
+    const next: MonthlyServiceSequence = { ...cur, ...patch, id, updatedAt: new Date() } as MonthlyServiceSequence;
+    this.monthlyServiceSequencesMap.set(id, next);
+    return next;
+  }
+
+  async deleteMonthlyServiceSequence(id: string): Promise<boolean> {
+    return this.monthlyServiceSequencesMap.delete(id);
+  }
+
+  async reorderMonthlyServiceSequence(id: string, direction: "up" | "down"): Promise<MonthlyServiceSequence[]> {
+    const target = this.monthlyServiceSequencesMap.get(id);
+    if (!target) return this.getMonthlyServiceSequences();
+    // Peers in same week + day, sorted by sequence
+    const peers = Array.from(this.monthlyServiceSequencesMap.values())
+      .filter(s => s.serviceWeek === target.serviceWeek && s.serviceDay === target.serviceDay)
+      .sort((a, b) => a.jobSequence - b.jobSequence);
+    const idx = peers.findIndex(p => p.id === id);
+    const swapWith = direction === "up" ? peers[idx - 1] : peers[idx + 1];
+    if (!swapWith) return this.getMonthlyServiceSequences();
+    const a = target.jobSequence, b = swapWith.jobSequence;
+    this.monthlyServiceSequencesMap.set(target.id, { ...target, jobSequence: b, updatedAt: new Date() });
+    this.monthlyServiceSequencesMap.set(swapWith.id, { ...swapWith, jobSequence: a, updatedAt: new Date() });
+    // Renumber tightly 1..N to keep gaps closed
+    const fresh = Array.from(this.monthlyServiceSequencesMap.values())
+      .filter(s => s.serviceWeek === target.serviceWeek && s.serviceDay === target.serviceDay)
+      .sort((p, q) => p.jobSequence - q.jobSequence);
+    fresh.forEach((p, i) => {
+      this.monthlyServiceSequencesMap.set(p.id, { ...p, jobSequence: i + 1, updatedAt: new Date() });
+    });
+    return this.getMonthlyServiceSequences();
+  }
+
+  async generateJobsFromMonthlySequences(opts: { year: number; month: number; departmentId?: string; technicianId?: string; teamId?: string; skipDuplicates: boolean }): Promise<{ created: Job[]; skipped: number }> {
+    const { year, month, departmentId, technicianId, teamId, skipDuplicates } = opts;
+    const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const dayIndex = (d: string) => dayNames.indexOf(d);
+
+    // Get all weekday occurrences in a month -> for each weekday, an array of dates
+    function weekDates(weekdayIdx: number): Date[] {
+      const out: Date[] = [];
+      const first = new Date(year, month - 1, 1);
+      const offset = (weekdayIdx - first.getDay() + 7) % 7;
+      let d = new Date(year, month - 1, 1 + offset);
+      while (d.getMonth() === month - 1) {
+        out.push(new Date(d));
+        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+      }
+      return out;
+    }
+
+    const allSeqs = Array.from(this.monthlyServiceSequencesMap.values())
+      .filter(s => s.activeStatus !== false)
+      .filter(s => !departmentId || s.departmentId === departmentId)
+      .filter(s => !technicianId || s.assignedTechnicianId === technicianId)
+      .filter(s => !teamId || s.assignedTeamId === teamId);
+
+    const created: Job[] = [];
+    let skipped = 0;
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59);
+    const jobsThisMonth = Array.from(this.jobs.values())
+      .filter(j => j.scheduledDate && new Date(j.scheduledDate) >= monthStart && new Date(j.scheduledDate) <= monthEnd);
+
+    for (const seq of allSeqs) {
+      if (seq.serviceFrequency === "Once-off") continue;
+      const wkIdx = dayIndex(seq.serviceDay);
+      if (wkIdx < 0) continue;
+      const allDates = weekDates(wkIdx);
+      // pick dates based on frequency + serviceWeek
+      let targetDates: Date[] = [];
+      switch (seq.serviceFrequency) {
+        case "Weekly":
+          targetDates = allDates; break;
+        case "Fortnightly":
+          // every other week starting at serviceWeek
+          targetDates = allDates.filter((_, i) => ((i + 1) - seq.serviceWeek) % 2 === 0 && (i + 1) >= seq.serviceWeek);
+          break;
+        case "Monthly":
+          targetDates = allDates[seq.serviceWeek - 1] ? [allDates[seq.serviceWeek - 1]] : [];
+          break;
+        case "Every 2 Months":
+          // MVP gating: fire only on odd-indexed months (Jan, Mar, May, Jul, Sep, Nov)
+          if (month % 2 === 1) {
+            targetDates = allDates[seq.serviceWeek - 1] ? [allDates[seq.serviceWeek - 1]] : [];
+          }
+          break;
+        case "Quarterly":
+          // MVP gating: fire only on quarter-start months (Jan, Apr, Jul, Oct)
+          if (month % 3 === 1) {
+            targetDates = allDates[seq.serviceWeek - 1] ? [allDates[seq.serviceWeek - 1]] : [];
+          }
+          break;
+      }
+
+      // start time
+      const [hh, mm] = (seq.defaultStartTime ?? "07:00").split(":").map(n => parseInt(n, 10) || 0);
+      // tiny sequence offset to preserve order within the same day even if start times equal
+      const seqOffsetMin = Math.min(seq.jobSequence, 59);
+
+      for (const date of targetDates) {
+        const scheduled = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hh, mm + seqOffsetMin);
+
+        // Duplicate check: same customer + dept + week + day + month
+        if (skipDuplicates) {
+          const dup = jobsThisMonth.find(j =>
+            j.clientId === seq.customerId &&
+            j.departmentId === seq.departmentId &&
+            j.scheduledDate &&
+            new Date(j.scheduledDate).getDate() === scheduled.getDate()
+          );
+          if (dup) { skipped++; continue; }
+        }
+
+        const jobNumber = await this.generateJobNumber();
+        const job: Job = {
+          id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          title: `${seq.serviceType} — ${seq.customerName}`,
+          description: seq.notes ?? null,
+          clientId: seq.customerId,
+          workerId: seq.assignedTechnicianId ?? null,
+          departmentId: seq.departmentId,
+          serviceType: seq.serviceType,
+          status: "scheduled",
+          scheduledDate: scheduled,
+          scheduledTime: seq.defaultStartTime ?? null,
+          startTime: null,
+          endTime: null,
+          priority: "medium",
+          estimatedDuration: seq.estimatedDuration ?? null,
+          actualDuration: null,
+          location: seq.address ?? null,
+          notes: `Seq ${seq.jobSequence} (Week ${seq.serviceWeek}, ${seq.serviceDay})${seq.notes ? " — " + seq.notes : ""}`,
+          completionNotes: null,
+          isRecurring: true,
+          recurringPattern: seq.serviceFrequency,
+          parentJobId: seq.id,
+          diary: null,
+          howInvoiced: null,
+          email: null,
+          areaCode: null,
+          salesperson: null,
+          contractNo: null,
+          isContract: false,
+          service: seq.serviceType,
+          insects: null,
+          price: null,
+          pricePerUnit: null,
+          increaseDate: null,
+          specialInstructions: null,
+          internalInstructions: null,
+          isFixed: false,
+          orderNo: null,
+          recurrenceInterval: null,
+          recurrencePeriod: null,
+          recurrenceDay: seq.serviceDay,
+          recurrenceCount: null,
+          recurrenceYears: null,
+          jobNumber,
+          linkedQuoteId: null,
+          invoiceStatus: "not_invoiced",
+          googleMapsLink: seq.googleMapsLink ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Job;
+        this.jobs.set(job.id, job);
+        jobsThisMonth.push(job);
+        created.push(job);
+      }
+    }
+    return { created, skipped };
   }
 }
 
