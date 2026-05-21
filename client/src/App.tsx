@@ -45,8 +45,7 @@ import Permissions from "@/pages/permissions";
 import Settings from "@/pages/settings";
 import SystemLogs from "@/pages/system-logs";
 import TestingChecklist from "@/pages/testing-checklist";
-import MonthlySequence from "@/pages/monthly-sequence";
-import MonthlyRouteSheet from "@/pages/monthly-route-sheet";
+import ServiceContractsPage from "@/pages/service-contracts";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -107,8 +106,7 @@ function AuthenticatedApp() {
       <Route path="/settings" component={Settings} />
       <Route path="/system-logs" component={SystemLogs} />
       <Route path="/testing-checklist" component={TestingChecklist} />
-      <Route path="/monthly-sequence" component={MonthlySequence} />
-      <Route path="/monthly-route-sheet" component={MonthlyRouteSheet} />
+      <Route path="/service-contracts" component={ServiceContractsPage} />
       <Route component={NotFound} />
     </Switch>
   );

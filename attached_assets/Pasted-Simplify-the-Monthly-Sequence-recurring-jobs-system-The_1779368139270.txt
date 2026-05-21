@@ -1,0 +1,228 @@
+Simplify the Monthly Sequence / recurring jobs system.
+
+The current page is too complicated.
+
+Rename "Monthly Sequence" to:
+Contracts
+
+The Job Flow app must have two types of jobs:
+
+1. Once-off Jobs
+2. Contract / Recurring Jobs
+
+A once-off job is a single job booked for one date and time.
+
+A contract job is a recurring job that repeats according to a selected frequency, similar to Microsoft Outlook recurring appointments.
+
+Update the Service menu to show:
+
+Service
+- Jobs
+- Calendar
+- Contracts
+- Field Diaries
+- Stock Management
+- Suppliers
+- Purchase Orders
+
+Remove complicated wording like:
+- Monthly Service Sequence
+- Route sequence
+- Slot
+- Sequence number
+- Generate Monthly Route Sheet
+
+Replace it with simpler contract scheduling language.
+
+CONTRACT FORM
+
+When adding or editing a contract, show these fields:
+
+Customer
+Service Type
+Department
+Assigned Technician / Team
+Frequency
+Start Date
+End Date optional
+Week of Month
+Day of Week
+Second Day of Week if needed
+Start Time
+Estimated Duration
+Google Maps Link
+Notes
+Active / Inactive
+
+Frequency options must be:
+
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+
+Rules:
+
+If Frequency is Once-off:
+Show:
+- Date
+- Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+Hide:
+- Week of Month
+- Day of Week
+- Second Day of Week
+- End Date
+
+If Frequency is Daily:
+Show:
+- Start Date
+- Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+If Frequency is 2 x a week:
+Show:
+- Start Date
+- First Day of Week
+- Second Day of Week
+- Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+Example:
+Monday and Thursday at 08:00
+
+If Frequency is Weekly:
+Show:
+- Day of Week
+- Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+If Frequency is Twice a month:
+Show:
+- First Week of Month
+- First Day of Week
+- First Start Time
+- Second Week of Month
+- Second Day of Week
+- Second Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+Example:
+1st Monday at 08:00 and 3rd Monday at 08:00
+
+If Frequency is Monthly:
+Show:
+- Week of Month
+- Day of Week
+- Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+Example:
+1st week, Monday, 08:00
+
+If Frequency is Every 2 months:
+Show the same fields as Monthly, but repeat every 2 months.
+
+If Frequency is Quarterly:
+Show the same fields as Monthly, but repeat every 3 months.
+
+If Frequency is Every 6 months:
+Show the same fields as Monthly, but repeat every 6 months.
+
+If Frequency is Annually:
+Show:
+- Month
+- Week of Month
+- Day of Week
+- Start Time
+- Estimated Duration
+- Assigned Technician / Team
+
+Week of Month options:
+
+- 1st week
+- 2nd week
+- 3rd week
+- 4th week
+- Last week
+
+Day of Week options:
+
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+CONTRACT LIST VIEW
+
+The Contracts page must show a simple list of contracts.
+
+Each contract row must show:
+
+Customer
+Service Type
+Frequency
+Schedule Summary
+Assigned Technician / Team
+Status
+Edit button
+
+Example schedule summaries:
+
+Monthly - 1st Monday at 08:00
+Weekly - Every Tuesday at 10:00
+2 x a week - Monday and Thursday at 08:00
+Twice a month - 1st Monday and 3rd Monday at 08:00
+Quarterly - 1st Wednesday at 09:00
+Once-off - 25 May 2026 at 14:00
+
+CALENDAR
+
+The calendar must display both:
+- Once-off jobs
+- Contract recurring jobs
+
+The calendar must feel similar to Microsoft Outlook.
+
+Jobs must appear on the correct day and time.
+
+When the service coordinator opens a calendar day, they must see the jobs in time order.
+
+TECHNICIAN VIEW
+
+Technicians must see their jobs for the day in time order.
+
+Each job card must show:
+
+Customer
+Address
+Start Time
+Estimated Duration
+Service Type
+Open in Google Maps button
+Start Job button
+Complete Job button
+
+IMPORTANT
+
+Do not make the user manually generate monthly jobs at this stage.
+
+The calendar should automatically display the recurring contract jobs based on the contract frequency.
+
+Later we can add a "Create actual job cards for the month" button if needed, but for now keep it simple and Outlook-style.

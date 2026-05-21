@@ -167,6 +167,24 @@ export default function Calendar() {
   const { data: teams = [] } = useQuery<Team[]>({ queryKey: ['/api/teams'] });
   const { data: teamMembers = [] } = useQuery<TeamMember[]>({ queryKey: ['/api/team-members'] });
 
+  // Contract occurrences for the visible window (auto-expand recurring contracts)
+  const occWindow = useMemo(() => {
+    const s = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    s.setDate(s.getDate() - 7);
+    const e = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    e.setDate(e.getDate() + 7);
+    e.setHours(23, 59, 59, 999);
+    return { start: s.toISOString(), end: e.toISOString() };
+  }, [currentDate]);
+  const { data: contractOccurrences = [] } = useQuery<any[]>({
+    queryKey: ['/api/service-contracts/occurrences', occWindow.start, occWindow.end],
+    queryFn: async () => {
+      const r = await fetch(`/api/service-contracts/occurrences?start=${encodeURIComponent(occWindow.start)}&end=${encodeURIComponent(occWindow.end)}`, { credentials: 'include' });
+      if (!r.ok) return [];
+      return r.json();
+    },
+  });
+
   // worker -> set of team ids
   const workerTeamsMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -382,7 +400,30 @@ export default function Calendar() {
     };
   }).filter(Boolean) as CalendarEvent[];
 
-  const allEvents = [...events, ...jobEvents];
+  // Convert contract occurrences (virtual recurring jobs) into calendar events
+  const contractEvents: CalendarEvent[] = contractOccurrences.map((o: any) => {
+    const start = new Date(o.scheduledDate);
+    if (isNaN(start.getTime())) return null;
+    const end = new Date(start.getTime() + (o.estimatedDuration || 60) * 60000);
+    return {
+      id: o.id,
+      title: `${o.serviceType} - ${o.customerName} (Contract)`,
+      description: o.notes || '',
+      startTime: start,
+      endTime: end,
+      type: 'job' as const,
+      priority: 'medium' as const,
+      clientId: o.customerId,
+      workerId: o.assignedTechnicianId || undefined,
+      departmentId: o.departmentId,
+      location: o.address || undefined,
+      status: 'scheduled' as const,
+      color: '#0d9488', // teal — distinct from one-off jobs
+      estimatedDuration: o.estimatedDuration ?? undefined,
+    };
+  }).filter(Boolean) as CalendarEvent[];
+
+  const allEvents = [...events, ...jobEvents, ...contractEvents];
 
   const filteredEvents = allEvents.filter(event => {
     // Safety check for event validity
@@ -438,6 +479,14 @@ export default function Calendar() {
 
   // Event handlers
   const handleEventClick = (event: CalendarEvent) => {
+    // Virtual contract occurrences are not persisted jobs — open the contracts editor instead
+    if (event.id.startsWith('occ-')) {
+      toast({
+        title: "Recurring contract job",
+        description: "This is a scheduled occurrence from a contract. Open Contracts to edit the schedule.",
+      });
+      return;
+    }
     if (event.type === 'job') {
       const job = jobs.find(j => j.id === event.id);
       if (job) {
@@ -484,6 +533,11 @@ export default function Calendar() {
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
+    // Contract occurrences are virtual — can't be moved without persisting the contract
+    if (event.id.startsWith('occ-')) {
+      e.preventDefault();
+      return;
+    }
     setDraggedEvent(event);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', event.id);

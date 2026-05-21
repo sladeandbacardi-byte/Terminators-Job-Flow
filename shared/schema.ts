@@ -809,8 +809,9 @@ export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type InsertAttendanceMemberRecord = z.infer<typeof insertAttendanceMemberRecordSchema>;
 export type AttendanceMemberRecord = typeof attendanceMemberRecords.$inferSelect;
 
-// Monthly Service Sequence — recurring jobs in fixed week/day/sequence order
-export const monthlyServiceSequences = pgTable("monthly_service_sequences", {
+// Service Contracts — recurring jobs (Outlook-style)
+// Frequency: Daily | 2 x a week | Weekly | Twice a month | Monthly | Every 2 months | Quarterly | Every 6 months | Annually | Once-off
+export const serviceContracts = pgTable("service_contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").notNull(),
   customerName: text("customer_name").notNull(),
@@ -820,12 +821,17 @@ export const monthlyServiceSequences = pgTable("monthly_service_sequences", {
   assignedTechnicianName: text("assigned_technician_name"),
   assignedTeamId: varchar("assigned_team_id"),
   assignedTeamName: text("assigned_team_name"),
-  serviceFrequency: text("service_frequency").notNull(), // Weekly | Fortnightly | Monthly | Every 2 Months | Quarterly | Once-off
-  serviceWeek: integer("service_week").notNull(),         // 1..5
-  serviceDay: text("service_day").notNull(),              // Monday..Sunday
-  jobSequence: integer("job_sequence").notNull().default(1),
-  estimatedDuration: integer("estimated_duration"),       // minutes
-  defaultStartTime: text("default_start_time"),           // HH:MM
+  frequency: text("frequency").notNull(),
+  startDate: timestamp("start_date"),                      // first date (for Once-off this IS the date)
+  endDate: timestamp("end_date"),                          // optional end
+  weekOfMonth: integer("week_of_month"),                   // 1..4 or 5 = Last
+  dayOfWeek: text("day_of_week"),                          // Monday..Sunday
+  secondWeekOfMonth: integer("second_week_of_month"),      // Twice-a-month
+  secondDayOfWeek: text("second_day_of_week"),             // 2x-a-week / Twice-a-month
+  secondStartTime: text("second_start_time"),              // Twice-a-month
+  annualMonth: integer("annual_month"),                    // 1..12 for Annually
+  startTime: text("start_time"),                           // HH:MM
+  estimatedDuration: integer("estimated_duration"),        // minutes
   googleMapsLink: text("google_maps_link"),
   address: text("address"),
   notes: text("notes"),
@@ -834,10 +840,13 @@ export const monthlyServiceSequences = pgTable("monthly_service_sequences", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
-export const insertMonthlyServiceSequenceSchema = createInsertSchema(monthlyServiceSequences).omit({
+export const insertServiceContractSchema = createInsertSchema(serviceContracts, {
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
-export type InsertMonthlyServiceSequence = z.infer<typeof insertMonthlyServiceSequenceSchema>;
-export type MonthlyServiceSequence = typeof monthlyServiceSequences.$inferSelect;
+export type InsertServiceContract = z.infer<typeof insertServiceContractSchema>;
+export type ServiceContract = typeof serviceContracts.$inferSelect;

@@ -3210,65 +3210,58 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  // ─── Monthly Service Sequence ───────────────────────────────────────────
-  app.get("/api/monthly-service-sequences", async (_req, res) => {
-    res.json(await storage.getMonthlyServiceSequences());
+  // ─── Service Contracts (recurring jobs, Outlook-style) ──────────────────
+  app.get("/api/service-contracts", async (_req, res) => {
+    res.json(await storage.getServiceContracts());
   });
 
-  app.post("/api/monthly-service-sequences", async (req, res) => {
+  app.post("/api/service-contracts", async (req, res) => {
     try {
-      const { insertMonthlyServiceSequenceSchema } = await import("@shared/schema");
-      const data = insertMonthlyServiceSequenceSchema.parse(req.body);
-      const created = await storage.createMonthlyServiceSequence(data);
+      const { insertServiceContractSchema } = await import("@shared/schema");
+      const data = insertServiceContractSchema.parse(req.body);
+      const created = await storage.createServiceContract(data);
       res.status(201).json(created);
     } catch (err: any) {
-      console.error("Sequence create error:", err);
-      res.status(400).json({ error: "Invalid sequence data", details: err?.message });
+      console.error("Contract create error:", err);
+      res.status(400).json({ error: "Invalid contract data", details: err?.message });
     }
   });
 
-  app.put("/api/monthly-service-sequences/:id", async (req, res) => {
+  app.put("/api/service-contracts/:id", async (req, res) => {
     try {
-      const { insertMonthlyServiceSequenceSchema } = await import("@shared/schema");
-      const data = insertMonthlyServiceSequenceSchema.partial().parse(req.body);
-      const updated = await storage.updateMonthlyServiceSequence(req.params.id, data);
-      if (!updated) return res.status(404).json({ error: "Sequence not found" });
+      const { insertServiceContractSchema } = await import("@shared/schema");
+      const data = insertServiceContractSchema.partial().parse(req.body);
+      const updated = await storage.updateServiceContract(req.params.id, data);
+      if (!updated) return res.status(404).json({ error: "Contract not found" });
       res.json(updated);
     } catch (err: any) {
-      res.status(400).json({ error: "Invalid sequence data", details: err?.message });
+      res.status(400).json({ error: "Invalid contract data", details: err?.message });
     }
   });
 
-  app.delete("/api/monthly-service-sequences/:id", async (req, res) => {
-    const ok = await storage.deleteMonthlyServiceSequence(req.params.id);
-    if (!ok) return res.status(404).json({ error: "Sequence not found" });
+  app.delete("/api/service-contracts/:id", async (req, res) => {
+    const ok = await storage.deleteServiceContract(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Contract not found" });
     res.status(204).send();
   });
 
-  app.post("/api/monthly-service-sequences/:id/move", async (req, res) => {
-    const direction = req.body?.direction === "down" ? "down" : "up";
-    const list = await storage.reorderMonthlyServiceSequence(req.params.id, direction);
-    res.json(list);
-  });
-
-  app.post("/api/monthly-service-sequences/generate", async (req, res) => {
+  // Expand contracts into virtual calendar occurrences for a date range
+  app.get("/api/service-contracts/occurrences", async (req, res) => {
     try {
-      const year = Number(req.body?.year);
-      const month = Number(req.body?.month);
-      if (!year || !month || month < 1 || month > 12) {
-        return res.status(400).json({ error: "year and month (1-12) are required" });
+      const start = req.query.start ? new Date(String(req.query.start)) : null;
+      const end = req.query.end ? new Date(String(req.query.end)) : null;
+      if (!start || !end || isNaN(+start) || isNaN(+end)) {
+        return res.status(400).json({ error: "start and end query params (ISO dates) are required" });
       }
-      const result = await storage.generateJobsFromMonthlySequences({
-        year, month,
-        departmentId: req.body?.departmentId || undefined,
-        technicianId: req.body?.technicianId || undefined,
-        teamId: req.body?.teamId || undefined,
-        skipDuplicates: req.body?.skipDuplicates !== false,
+      const occ = await storage.getContractOccurrences(start, end, {
+        departmentId: req.query.departmentId ? String(req.query.departmentId) : undefined,
+        technicianId: req.query.technicianId ? String(req.query.technicianId) : undefined,
+        teamId: req.query.teamId ? String(req.query.teamId) : undefined,
       });
-      res.json({ createdCount: result.created.length, skipped: result.skipped, created: result.created });
+      res.json(occ);
     } catch (err: any) {
-      console.error("Generate error:", err);
-      res.status(400).json({ error: "Failed to generate", details: err?.message });
+      console.error("Occurrences error:", err);
+      res.status(400).json({ error: "Failed to compute occurrences", details: err?.message });
     }
   });
 

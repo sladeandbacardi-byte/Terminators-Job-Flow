@@ -31,7 +31,7 @@ import {
   type TeamMember, type InsertTeamMember,
   type AttendanceRecord, type InsertAttendanceRecord,
   type AttendanceMemberRecord, type InsertAttendanceMemberRecord,
-  type MonthlyServiceSequence, type InsertMonthlyServiceSequence,
+  type ServiceContract, type InsertServiceContract,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -301,14 +301,13 @@ export interface IStorage {
   getBackupLogs(): Promise<BackupLog[]>;
   addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog>;
 
-  // Monthly Service Sequence
-  getMonthlyServiceSequences(): Promise<MonthlyServiceSequence[]>;
-  getMonthlyServiceSequence(id: string): Promise<MonthlyServiceSequence | undefined>;
-  createMonthlyServiceSequence(seq: InsertMonthlyServiceSequence): Promise<MonthlyServiceSequence>;
-  updateMonthlyServiceSequence(id: string, seq: Partial<InsertMonthlyServiceSequence>): Promise<MonthlyServiceSequence | undefined>;
-  deleteMonthlyServiceSequence(id: string): Promise<boolean>;
-  reorderMonthlyServiceSequence(id: string, direction: "up" | "down"): Promise<MonthlyServiceSequence[]>;
-  generateJobsFromMonthlySequences(opts: { year: number; month: number; departmentId?: string; technicianId?: string; teamId?: string; skipDuplicates: boolean }): Promise<{ created: Job[]; skipped: number }>;
+  // Service Contracts (recurring jobs)
+  getServiceContracts(): Promise<ServiceContract[]>;
+  getServiceContract(id: string): Promise<ServiceContract | undefined>;
+  createServiceContract(c: InsertServiceContract): Promise<ServiceContract>;
+  updateServiceContract(id: string, c: Partial<InsertServiceContract>): Promise<ServiceContract | undefined>;
+  deleteServiceContract(id: string): Promise<boolean>;
+  getContractOccurrences(start: Date, end: Date, opts?: { departmentId?: string; technicianId?: string; teamId?: string }): Promise<ContractOccurrence[]>;
 }
 
 export interface BackupLog {
@@ -355,7 +354,7 @@ export class MemStorage implements IStorage {
   private teamMembersMap: Map<string, TeamMember> = new Map();
   private attendanceRecordsMap: Map<string, AttendanceRecord> = new Map();
   private attendanceMemberRecordsMap: Map<string, AttendanceMemberRecord> = new Map();
-  private monthlyServiceSequencesMap: Map<string, MonthlyServiceSequence> = new Map();
+  private serviceContractsMap: Map<string, ServiceContract> = new Map();
   private activityLogs: any[] = [];
   private backupLogs: BackupLog[] = [];
   private invoiceCounter: number = 1;
@@ -4360,7 +4359,7 @@ export class MemStorage implements IStorage {
       emailTemplates: Array.from(this.emailTemplates.values()),
       emailLogs: Array.from(this.emailLogs.values()),
       notifications: Array.from(this.notifications.values()),
-      monthlyServiceSequences: Array.from(this.monthlyServiceSequencesMap.values()),
+      serviceContracts: Array.from(this.serviceContractsMap.values()),
       activityLogs: this.activityLogs,
       invoiceCounter: this.invoiceCounter,
       poCounter: this.poCounter,
@@ -4393,7 +4392,7 @@ export class MemStorage implements IStorage {
     if (data.emailTemplates) this.emailTemplates = toMap(data.emailTemplates);
     if (data.emailLogs) this.emailLogs = toMap(data.emailLogs);
     if (data.notifications) this.notifications = toMap(data.notifications);
-    if (data.monthlyServiceSequences) this.monthlyServiceSequencesMap = toMap(data.monthlyServiceSequences);
+    if (data.serviceContracts) this.serviceContractsMap = toMap(data.serviceContracts);
     if (Array.isArray(data.activityLogs)) this.activityLogs = data.activityLogs;
     if (typeof data.invoiceCounter === "number") this.invoiceCounter = data.invoiceCounter;
     if (typeof data.poCounter === "number") this.poCounter = data.poCounter;
@@ -4415,232 +4414,246 @@ export class MemStorage implements IStorage {
     return newLog;
   }
 
-  // ─── Monthly Service Sequence ─────────────────────────────────────────────
-  async getMonthlyServiceSequences(): Promise<MonthlyServiceSequence[]> {
-    return Array.from(this.monthlyServiceSequencesMap.values()).sort((a, b) => {
-      if (a.serviceWeek !== b.serviceWeek) return a.serviceWeek - b.serviceWeek;
-      const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-      const da = days.indexOf(a.serviceDay), db = days.indexOf(b.serviceDay);
-      if (da !== db) return da - db;
-      return a.jobSequence - b.jobSequence;
-    });
+  // ─── Service Contracts (recurring jobs, Outlook-style) ──────────────────
+  async getServiceContracts(): Promise<ServiceContract[]> {
+    return Array.from(this.serviceContractsMap.values())
+      .sort((a, b) => a.customerName.localeCompare(b.customerName));
   }
 
-  async getMonthlyServiceSequence(id: string): Promise<MonthlyServiceSequence | undefined> {
-    return this.monthlyServiceSequencesMap.get(id);
+  async getServiceContract(id: string): Promise<ServiceContract | undefined> {
+    return this.serviceContractsMap.get(id);
   }
 
-  async createMonthlyServiceSequence(seq: InsertMonthlyServiceSequence): Promise<MonthlyServiceSequence> {
+  async createServiceContract(c: InsertServiceContract): Promise<ServiceContract> {
     const now = new Date();
-    // Auto-assign jobSequence: if missing, <1, or already taken in same week+day, bump to next free
-    const peers = Array.from(this.monthlyServiceSequencesMap.values())
-      .filter(s => s.serviceWeek === seq.serviceWeek && s.serviceDay === seq.serviceDay);
-    const taken = new Set(peers.map(p => p.jobSequence));
-    let jobSequence = seq.jobSequence ?? 0;
-    if (!jobSequence || jobSequence < 1 || taken.has(jobSequence)) {
-      jobSequence = (peers.reduce((m, p) => Math.max(m, p.jobSequence), 0)) + 1;
-    }
-    const row: MonthlyServiceSequence = {
-      id: `mss-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      customerId: seq.customerId,
-      customerName: seq.customerName,
-      departmentId: seq.departmentId,
-      serviceType: seq.serviceType,
-      assignedTechnicianId: seq.assignedTechnicianId ?? null,
-      assignedTechnicianName: seq.assignedTechnicianName ?? null,
-      assignedTeamId: seq.assignedTeamId ?? null,
-      assignedTeamName: seq.assignedTeamName ?? null,
-      serviceFrequency: seq.serviceFrequency,
-      serviceWeek: seq.serviceWeek,
-      serviceDay: seq.serviceDay,
-      jobSequence,
-      estimatedDuration: seq.estimatedDuration ?? null,
-      defaultStartTime: seq.defaultStartTime ?? null,
-      googleMapsLink: seq.googleMapsLink ?? null,
-      address: seq.address ?? null,
-      notes: seq.notes ?? null,
-      activeStatus: seq.activeStatus ?? true,
+    const row: ServiceContract = {
+      id: `sc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      customerId: c.customerId,
+      customerName: c.customerName,
+      departmentId: c.departmentId,
+      serviceType: c.serviceType,
+      assignedTechnicianId: c.assignedTechnicianId ?? null,
+      assignedTechnicianName: c.assignedTechnicianName ?? null,
+      assignedTeamId: c.assignedTeamId ?? null,
+      assignedTeamName: c.assignedTeamName ?? null,
+      frequency: c.frequency,
+      startDate: c.startDate ? new Date(c.startDate) : null,
+      endDate: c.endDate ? new Date(c.endDate) : null,
+      weekOfMonth: c.weekOfMonth ?? null,
+      dayOfWeek: c.dayOfWeek ?? null,
+      secondWeekOfMonth: c.secondWeekOfMonth ?? null,
+      secondDayOfWeek: c.secondDayOfWeek ?? null,
+      secondStartTime: c.secondStartTime ?? null,
+      annualMonth: c.annualMonth ?? null,
+      startTime: c.startTime ?? null,
+      estimatedDuration: c.estimatedDuration ?? null,
+      googleMapsLink: c.googleMapsLink ?? null,
+      address: c.address ?? null,
+      notes: c.notes ?? null,
+      activeStatus: c.activeStatus ?? true,
       createdAt: now,
       updatedAt: now,
     };
-    this.monthlyServiceSequencesMap.set(row.id, row);
+    this.serviceContractsMap.set(row.id, row);
     return row;
   }
 
-  async updateMonthlyServiceSequence(id: string, patch: Partial<InsertMonthlyServiceSequence>): Promise<MonthlyServiceSequence | undefined> {
-    const cur = this.monthlyServiceSequencesMap.get(id);
+  async updateServiceContract(id: string, patch: Partial<InsertServiceContract>): Promise<ServiceContract | undefined> {
+    const cur = this.serviceContractsMap.get(id);
     if (!cur) return undefined;
-    const next: MonthlyServiceSequence = { ...cur, ...patch, id, updatedAt: new Date() } as MonthlyServiceSequence;
-    this.monthlyServiceSequencesMap.set(id, next);
+    const next: ServiceContract = {
+      ...cur,
+      ...patch,
+      startDate: patch.startDate !== undefined ? (patch.startDate ? new Date(patch.startDate) : null) : cur.startDate,
+      endDate: patch.endDate !== undefined ? (patch.endDate ? new Date(patch.endDate) : null) : cur.endDate,
+      id,
+      updatedAt: new Date(),
+    } as ServiceContract;
+    this.serviceContractsMap.set(id, next);
     return next;
   }
 
-  async deleteMonthlyServiceSequence(id: string): Promise<boolean> {
-    return this.monthlyServiceSequencesMap.delete(id);
+  async deleteServiceContract(id: string): Promise<boolean> {
+    return this.serviceContractsMap.delete(id);
   }
 
-  async reorderMonthlyServiceSequence(id: string, direction: "up" | "down"): Promise<MonthlyServiceSequence[]> {
-    const target = this.monthlyServiceSequencesMap.get(id);
-    if (!target) return this.getMonthlyServiceSequences();
-    // Peers in same week + day, sorted by sequence
-    const peers = Array.from(this.monthlyServiceSequencesMap.values())
-      .filter(s => s.serviceWeek === target.serviceWeek && s.serviceDay === target.serviceDay)
-      .sort((a, b) => a.jobSequence - b.jobSequence);
-    const idx = peers.findIndex(p => p.id === id);
-    const swapWith = direction === "up" ? peers[idx - 1] : peers[idx + 1];
-    if (!swapWith) return this.getMonthlyServiceSequences();
-    const a = target.jobSequence, b = swapWith.jobSequence;
-    this.monthlyServiceSequencesMap.set(target.id, { ...target, jobSequence: b, updatedAt: new Date() });
-    this.monthlyServiceSequencesMap.set(swapWith.id, { ...swapWith, jobSequence: a, updatedAt: new Date() });
-    // Renumber tightly 1..N to keep gaps closed
-    const fresh = Array.from(this.monthlyServiceSequencesMap.values())
-      .filter(s => s.serviceWeek === target.serviceWeek && s.serviceDay === target.serviceDay)
-      .sort((p, q) => p.jobSequence - q.jobSequence);
-    fresh.forEach((p, i) => {
-      this.monthlyServiceSequencesMap.set(p.id, { ...p, jobSequence: i + 1, updatedAt: new Date() });
-    });
-    return this.getMonthlyServiceSequences();
-  }
-
-  async generateJobsFromMonthlySequences(opts: { year: number; month: number; departmentId?: string; technicianId?: string; teamId?: string; skipDuplicates: boolean }): Promise<{ created: Job[]; skipped: number }> {
-    const { year, month, departmentId, technicianId, teamId, skipDuplicates } = opts;
-    const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-    const dayIndex = (d: string) => dayNames.indexOf(d);
-
-    // Get all weekday occurrences in a month -> for each weekday, an array of dates
-    function weekDates(weekdayIdx: number): Date[] {
-      const out: Date[] = [];
-      const first = new Date(year, month - 1, 1);
-      const offset = (weekdayIdx - first.getDay() + 7) % 7;
-      let d = new Date(year, month - 1, 1 + offset);
-      while (d.getMonth() === month - 1) {
-        out.push(new Date(d));
-        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
-      }
-      return out;
+  async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {
+    const contracts = Array.from(this.serviceContractsMap.values())
+      .filter(c => c.activeStatus !== false)
+      .filter(c => !opts.departmentId || c.departmentId === opts.departmentId)
+      .filter(c => !opts.technicianId || c.assignedTechnicianId === opts.technicianId)
+      .filter(c => !opts.teamId || c.assignedTeamId === opts.teamId);
+    const out: ContractOccurrence[] = [];
+    for (const c of contracts) {
+      for (const occ of expandContract(c, start, end)) out.push(occ);
     }
+    return out.sort((a, b) => +a.scheduledDate - +b.scheduledDate);
+  }
+}
 
-    const allSeqs = Array.from(this.monthlyServiceSequencesMap.values())
-      .filter(s => s.activeStatus !== false)
-      .filter(s => !departmentId || s.departmentId === departmentId)
-      .filter(s => !technicianId || s.assignedTechnicianId === technicianId)
-      .filter(s => !teamId || s.assignedTeamId === teamId);
+// ─── Contract occurrence expander ──────────────────────────────────────────
+export interface ContractOccurrence {
+  id: string;                    // virtual id: `occ-<contractId>-<isoDate>`
+  contractId: string;
+  customerId: string;
+  customerName: string;
+  departmentId: string;
+  serviceType: string;
+  assignedTechnicianId: string | null;
+  assignedTechnicianName: string | null;
+  assignedTeamId: string | null;
+  assignedTeamName: string | null;
+  scheduledDate: Date;
+  estimatedDuration: number | null;
+  startTime: string | null;
+  googleMapsLink: string | null;
+  address: string | null;
+  notes: string | null;
+  frequency: string;
+}
 
-    const created: Job[] = [];
-    let skipped = 0;
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0, 23, 59, 59);
-    const jobsThisMonth = Array.from(this.jobs.values())
-      .filter(j => j.scheduledDate && new Date(j.scheduledDate) >= monthStart && new Date(j.scheduledDate) <= monthEnd);
+const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+function dayIdx(name: string | null): number { return name ? DAY_NAMES.indexOf(name) : -1; }
+function applyTime(d: Date, hhmm: string | null): Date {
+  if (!hhmm) return d;
+  const [h, m] = hhmm.split(":").map(n => parseInt(n, 10) || 0);
+  const r = new Date(d);
+  r.setHours(h, m, 0, 0);
+  return r;
+}
+function nthWeekdayOf(year: number, monthZero: number, weekOfMonth: number, dayName: string): Date | null {
+  const di = dayIdx(dayName);
+  if (di < 0) return null;
+  if (weekOfMonth >= 5) {
+    // last weekday of month
+    const last = new Date(year, monthZero + 1, 0);
+    const offset = (last.getDay() - di + 7) % 7;
+    return new Date(year, monthZero, last.getDate() - offset);
+  }
+  const first = new Date(year, monthZero, 1);
+  const offset = (di - first.getDay() + 7) % 7;
+  const day = 1 + offset + (weekOfMonth - 1) * 7;
+  const r = new Date(year, monthZero, day);
+  return r.getMonth() === monthZero ? r : null;
+}
+function expandContract(c: ServiceContract, start: Date, end: Date): ContractOccurrence[] {
+  const out: ContractOccurrence[] = [];
+  const cStart = c.startDate ? new Date(c.startDate) : null;
+  const cEnd = c.endDate ? new Date(c.endDate) : null;
+  const winStart = new Date(start); winStart.setHours(0,0,0,0);
+  const winEnd = new Date(end); winEnd.setHours(23,59,59,999);
+  const inWin = (d: Date) =>
+    d >= winStart && d <= winEnd && (!cStart || d >= new Date(cStart.getFullYear(), cStart.getMonth(), cStart.getDate())) && (!cEnd || d <= cEnd);
 
-    for (const seq of allSeqs) {
-      if (seq.serviceFrequency === "Once-off") continue;
-      const wkIdx = dayIndex(seq.serviceDay);
-      if (wkIdx < 0) continue;
-      const allDates = weekDates(wkIdx);
-      // pick dates based on frequency + serviceWeek
-      let targetDates: Date[] = [];
-      switch (seq.serviceFrequency) {
-        case "Weekly":
-          targetDates = allDates; break;
-        case "Fortnightly":
-          // every other week starting at serviceWeek
-          targetDates = allDates.filter((_, i) => ((i + 1) - seq.serviceWeek) % 2 === 0 && (i + 1) >= seq.serviceWeek);
-          break;
-        case "Monthly":
-          targetDates = allDates[seq.serviceWeek - 1] ? [allDates[seq.serviceWeek - 1]] : [];
-          break;
-        case "Every 2 Months":
-          // MVP gating: fire only on odd-indexed months (Jan, Mar, May, Jul, Sep, Nov)
-          if (month % 2 === 1) {
-            targetDates = allDates[seq.serviceWeek - 1] ? [allDates[seq.serviceWeek - 1]] : [];
-          }
-          break;
-        case "Quarterly":
-          // MVP gating: fire only on quarter-start months (Jan, Apr, Jul, Oct)
-          if (month % 3 === 1) {
-            targetDates = allDates[seq.serviceWeek - 1] ? [allDates[seq.serviceWeek - 1]] : [];
-          }
-          break;
-      }
+  const make = (date: Date, time: string | null): ContractOccurrence => {
+    const sd = applyTime(date, time);
+    return {
+      id: `occ-${c.id}-${sd.toISOString()}`,
+      contractId: c.id,
+      customerId: c.customerId,
+      customerName: c.customerName,
+      departmentId: c.departmentId,
+      serviceType: c.serviceType,
+      assignedTechnicianId: c.assignedTechnicianId,
+      assignedTechnicianName: c.assignedTechnicianName,
+      assignedTeamId: c.assignedTeamId,
+      assignedTeamName: c.assignedTeamName,
+      scheduledDate: sd,
+      estimatedDuration: c.estimatedDuration,
+      startTime: time,
+      googleMapsLink: c.googleMapsLink,
+      address: c.address,
+      notes: c.notes,
+      frequency: c.frequency,
+    };
+  };
 
-      // start time
-      const [hh, mm] = (seq.defaultStartTime ?? "07:00").split(":").map(n => parseInt(n, 10) || 0);
-      // tiny sequence offset to preserve order within the same day even if start times equal
-      const seqOffsetMin = Math.min(seq.jobSequence, 59);
+  const freq = c.frequency;
 
-      for (const date of targetDates) {
-        const scheduled = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hh, mm + seqOffsetMin);
+  if (freq === "Once-off") {
+    if (cStart) {
+      const d = new Date(cStart.getFullYear(), cStart.getMonth(), cStart.getDate());
+      if (inWin(d)) out.push(make(d, c.startTime));
+    }
+    return out;
+  }
 
-        // Duplicate check: same customer + dept + week + day + month
-        if (skipDuplicates) {
-          const dup = jobsThisMonth.find(j =>
-            j.clientId === seq.customerId &&
-            j.departmentId === seq.departmentId &&
-            j.scheduledDate &&
-            new Date(j.scheduledDate).getDate() === scheduled.getDate()
-          );
-          if (dup) { skipped++; continue; }
-        }
+  if (freq === "Daily") {
+    const from = cStart && cStart > winStart ? new Date(cStart.getFullYear(), cStart.getMonth(), cStart.getDate()) : new Date(winStart);
+    const to = cEnd && cEnd < winEnd ? cEnd : winEnd;
+    const d = new Date(from);
+    while (d <= to) {
+      out.push(make(new Date(d), c.startTime));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
 
-        const jobNumber = await this.generateJobNumber();
-        const job: Job = {
-          id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          title: `${seq.serviceType} — ${seq.customerName}`,
-          description: seq.notes ?? null,
-          clientId: seq.customerId,
-          workerId: seq.assignedTechnicianId ?? null,
-          departmentId: seq.departmentId,
-          serviceType: seq.serviceType,
-          status: "scheduled",
-          scheduledDate: scheduled,
-          scheduledTime: seq.defaultStartTime ?? null,
-          startTime: null,
-          endTime: null,
-          priority: "medium",
-          estimatedDuration: seq.estimatedDuration ?? null,
-          actualDuration: null,
-          location: seq.address ?? null,
-          notes: `Seq ${seq.jobSequence} (Week ${seq.serviceWeek}, ${seq.serviceDay})${seq.notes ? " — " + seq.notes : ""}`,
-          completionNotes: null,
-          isRecurring: true,
-          recurringPattern: seq.serviceFrequency,
-          parentJobId: seq.id,
-          diary: null,
-          howInvoiced: null,
-          email: null,
-          areaCode: null,
-          salesperson: null,
-          contractNo: null,
-          isContract: false,
-          service: seq.serviceType,
-          insects: null,
-          price: null,
-          pricePerUnit: null,
-          increaseDate: null,
-          specialInstructions: null,
-          internalInstructions: null,
-          isFixed: false,
-          orderNo: null,
-          recurrenceInterval: null,
-          recurrencePeriod: null,
-          recurrenceDay: seq.serviceDay,
-          recurrenceCount: null,
-          recurrenceYears: null,
-          jobNumber,
-          linkedQuoteId: null,
-          invoiceStatus: "not_invoiced",
-          googleMapsLink: seq.googleMapsLink ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as Job;
-        this.jobs.set(job.id, job);
-        jobsThisMonth.push(job);
-        created.push(job);
+  if (freq === "2 x a week") {
+    const days = [dayIdx(c.dayOfWeek), dayIdx(c.secondDayOfWeek)].filter(i => i >= 0);
+    if (!days.length) return out;
+    const from = cStart && cStart > winStart ? new Date(cStart.getFullYear(), cStart.getMonth(), cStart.getDate()) : new Date(winStart);
+    const to = cEnd && cEnd < winEnd ? cEnd : winEnd;
+    const d = new Date(from);
+    while (d <= to) {
+      if (days.includes(d.getDay())) out.push(make(new Date(d), c.startTime));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+
+  if (freq === "Weekly") {
+    const di = dayIdx(c.dayOfWeek);
+    if (di < 0) return out;
+    const from = cStart && cStart > winStart ? new Date(cStart.getFullYear(), cStart.getMonth(), cStart.getDate()) : new Date(winStart);
+    const to = cEnd && cEnd < winEnd ? cEnd : winEnd;
+    const d = new Date(from);
+    while (d <= to) {
+      if (d.getDay() === di) out.push(make(new Date(d), c.startTime));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+
+  // Monthly variants — iterate month by month with step
+  const monthlyStep: Record<string, number> = {
+    "Monthly": 1, "Twice a month": 1, "Every 2 months": 2, "Quarterly": 3, "Every 6 months": 6,
+  };
+  if (freq in monthlyStep) {
+    const step = monthlyStep[freq];
+    // Use contract startDate as cadence anchor (deterministic). Fall back to epoch (Jan 1970) so the
+    // step pattern is stable across query windows when startDate is missing for plain "Monthly"/"Twice a month".
+    const anchor = cStart ?? new Date(1970, 0, 1);
+    const anchorIdx = anchor.getFullYear() * 12 + anchor.getMonth();
+    const startIdx = winStart.getFullYear() * 12 + winStart.getMonth();
+    const endIdx = winEnd.getFullYear() * 12 + winEnd.getMonth();
+    for (let mi = startIdx; mi <= endIdx; mi++) {
+      if (mi < anchorIdx) continue;
+      if ((mi - anchorIdx) % step !== 0) continue;
+      const y = Math.floor(mi / 12);
+      const mz = mi % 12;
+      const first = nthWeekdayOf(y, mz, c.weekOfMonth ?? 1, c.dayOfWeek ?? "");
+      if (first && inWin(first)) out.push(make(first, c.startTime));
+      if (freq === "Twice a month" && c.secondWeekOfMonth && c.secondDayOfWeek) {
+        const second = nthWeekdayOf(y, mz, c.secondWeekOfMonth, c.secondDayOfWeek);
+        if (second && inWin(second)) out.push(make(second, c.secondStartTime || c.startTime));
       }
     }
-    return { created, skipped };
+    return out;
   }
+
+  if (freq === "Annually") {
+    const targetMz = (c.annualMonth ?? 1) - 1;
+    const ys = winStart.getFullYear();
+    const ye = winEnd.getFullYear();
+    for (let y = ys; y <= ye; y++) {
+      const d = nthWeekdayOf(y, targetMz, c.weekOfMonth ?? 1, c.dayOfWeek ?? "");
+      if (d && inWin(d)) out.push(make(d, c.startTime));
+    }
+    return out;
+  }
+
+  return out;
 }
 
 export const storage = new MemStorage();
