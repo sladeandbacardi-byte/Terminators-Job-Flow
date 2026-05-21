@@ -1,0 +1,326 @@
+RESTRUCTURE JOB FLOW MENU AND BUSINESS PROCESS
+
+I want to simplify the left-hand sidebar and make the app follow the actual business process flow.
+
+The sidebar is currently too busy.
+
+Change it to a simpler linear menu structure with main sections.
+
+Use these main sidebar sections:
+
+DASHBOARD
+Dashboard
+SALES
+
+Sales is for bringing in and converting new work.
+
+Under Sales show:
+
+Leads
+Quotes
+Clients
+Rental Contracts
+Email Center
+
+Sales process:
+A potential client becomes a lead.
+Any staff member with permission can create a lead.
+The lead can be assigned to a sales rep.
+The sales rep contacts the client, adds notes, clarifies needs and creates a quote.
+If the quote is accepted, it must convert to a job.
+
+SERVICE
+
+Service is for work that must be planned, scheduled and completed.
+
+Under Service show:
+
+Jobs
+Calendar
+Field Diaries
+Stock Management
+Stock Manager Pro
+Suppliers
+Purchase Orders
+
+Service process:
+When a quote is accepted, create a linked job.
+The job moves from Sales to Service.
+The job appears in the Service > Jobs section.
+Service coordinators assign the worker/team, date, time, department and job details.
+Technicians complete the work.
+Technicians submit field diaries, notes, photos and signatures if needed.
+Completed jobs can then be sent to Finance for invoicing.
+
+FINANCE
+
+Finance is for invoicing, money owing to us, money we owe, and financial exports.
+
+Under Finance show:
+
+Invoices
+Debtors
+Creditors
+Sage Export
+Backup & Restore
+Reports
+
+Finance process:
+When a job is completed and ready to bill, it can be converted to an invoice.
+The invoice must keep links to:
+
+Original lead if available
+Quote document number
+Job document number
+Client
+Service details
+
+Finance users can view invoices, debtors, creditors, exports and backup tools.
+
+OPERATIONS
+
+Operations is for staff, attendance, fleet and business support.
+
+Under Operations show:
+
+Staff
+Team Attendance
+Teams
+Fleet Dashboard
+Maintenance
+Report Issue
+Log KMs
+Vehicle Inspection
+Fuel Fill-up
+Testing Checklist
+
+Operations process:
+Operations manages people, vehicles, attendance and general support.
+Team leaders can submit daily team attendance.
+HR/Admin can view attendance by date, team, department and supervisor.
+Fleet records include vehicle checks, issues, kilometres, fuel and maintenance.
+
+ADMIN
+
+Admin is for system settings and management only.
+
+Under Admin show:
+
+Users & Roles
+Permissions
+Settings
+System Logs
+Backup & Restore
+
+Only Managing Member/Admin users should see full Admin.
+
+ROLE-BASED SIDEBAR RULES
+
+Managing Member:
+Show all main sections:
+Dashboard
+Sales
+Service
+Finance
+Operations
+Admin
+
+Service Manager / Service Coordinator:
+Show:
+Dashboard
+Service
+Finance, only Invoices if they do invoicing
+Operations, only Team Attendance and relevant Fleet items
+
+Sales User:
+Show:
+Dashboard
+Sales
+
+Finance User:
+Show:
+Dashboard
+Finance
+Operations, only Staff/Attendance if HR role is included
+
+Technician:
+Show a simplified menu only:
+Dashboard
+Service:
+
+Calendar
+My Jobs
+Field Diaries
+
+Operations/Fleet:
+
+Report Issue
+Log KMs
+Vehicle Inspection
+Fuel Fill-up
+
+Do not show Sales, Finance, Admin, Staff, Suppliers, Purchase Orders or full Operations to normal technicians.
+
+MENU BEHAVIOUR
+
+Make the sidebar less busy by using collapsible sections.
+
+Default:
+Only show section headings.
+
+Example:
+Dashboard
+Sales
+Service
+Finance
+Operations
+Admin
+
+When the user clicks Sales, expand:
+Leads
+Quotes
+Clients
+Rental Contracts
+Email Center
+
+When the user clicks Service, expand:
+Jobs
+Calendar
+Field Diaries
+Stock Management
+Stock Manager Pro
+Suppliers
+Purchase Orders
+
+When the user clicks Finance, expand:
+Invoices
+Debtors
+Creditors
+Sage Export
+Backup & Restore
+Reports
+
+When the user clicks Operations, expand:
+Staff
+Team Attendance
+Teams
+Fleet Dashboard
+Maintenance
+Report Issue
+Log KMs
+Vehicle Inspection
+Fuel Fill-up
+Testing Checklist
+
+Keep only one section expanded at a time if possible, so the sidebar stays clean.
+
+BUSINESS WORKFLOW
+
+Create a clear document flow:
+
+Lead
+↓
+Quote
+↓
+Job
+↓
+Field Diary / Completion
+↓
+Invoice
+↓
+Finance / Debtors / Sage Export
+
+Document links:
+Lead can link to Quote.
+Quote can link to Job.
+Job can link to Field Diary.
+Job can link to Invoice.
+Invoice must show linked Job and Quote document numbers.
+
+Example:
+Lead: LEAD-2026-0001
+Quote: QT-2026-0004
+Job: JOB-2026-0021
+Field Diary: FD-2026-0034
+Invoice: INV-2026-0015
+
+On each document detail page, show linked documents.
+
+Example on Job:
+Linked Quote: QT-2026-0004
+Linked Invoice: INV-2026-0015
+Field Diary: FD-2026-0034
+
+Example on Invoice:
+Linked Job: JOB-2026-0021
+Linked Quote: QT-2026-0004
+
+CONVERSION BUTTONS
+
+On Lead:
+Add button:
+Create Quote
+
+On Quote:
+Add button:
+Convert to Job
+
+On Job:
+Add button:
+Mark Ready to Invoice
+
+On completed Job:
+Add button:
+Create Invoice
+
+When converting:
+Copy relevant details forward:
+
+Client
+Site address
+Contact person
+Department
+Service type
+Job scope/description
+Notes
+Attachments
+Pricing if permission allows
+
+Do not duplicate data unnecessarily.
+Keep linked document numbers.
+
+DASHBOARD LOGIC
+
+Dashboard should change by role.
+
+Managing Member:
+Business overview across Sales, Service, Finance and Operations.
+
+Sales:
+Leads, quotes, follow-ups, accepted quotes.
+
+Service:
+Today’s jobs, scheduling, job completion, workers, diaries due.
+
+Finance:
+Invoices, debtors, creditors, recurring income, Sage export.
+
+Operations:
+Staff, attendance, fleet, inspections, issues, maintenance.
+
+Technician:
+My jobs today, current job, field diaries due, fleet actions.
+
+DESIGN GOAL
+
+Make the sidebar cleaner and less busy.
+
+The user should understand the app by the business flow:
+
+Sales brings work in.
+Service gets the work done.
+Finance bills and tracks money.
+Operations supports staff, attendance and vehicles.
+Admin controls the system.
+
+END
