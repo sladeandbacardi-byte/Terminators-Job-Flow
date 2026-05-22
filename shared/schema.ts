@@ -53,6 +53,11 @@ export const clients = pgTable("clients", {
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
   notes: text("notes"),
   sageCustomerCode: text("sage_customer_code"),
+  // ── Rental Contract flags (separate from service contracts) ──
+  hasRentalContract: boolean("has_rental_contract").notNull().default(false),
+  rentalContractStatus: text("rental_contract_status").notNull().default("None"), // Active | Inactive | None
+  rentalContractType: text("rental_contract_type"),
+  rentalNotes: text("rental_notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

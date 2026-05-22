@@ -43,6 +43,10 @@ const clientFormSchema = z.object({
   creditLimit: z.number().min(0).optional(),
   notes: z.string().optional(),
   sageCustomerCode: z.string().optional(),
+  hasRentalContract: z.boolean().optional().default(false),
+  rentalContractStatus: z.enum(["Active", "Inactive", "None"]).optional().default("None"),
+  rentalContractType: z.string().optional(),
+  rentalNotes: z.string().optional(),
 });
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
@@ -81,6 +85,10 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
       creditLimit: client?.creditLimit ? parseFloat(String(client.creditLimit)) : undefined,
       notes: client?.notes || "",
       sageCustomerCode: (client as any)?.sageCustomerCode || "",
+      hasRentalContract: (client as any)?.hasRentalContract ?? false,
+      rentalContractStatus: ((client as any)?.rentalContractStatus as "Active" | "Inactive" | "None") || "None",
+      rentalContractType: (client as any)?.rentalContractType || "",
+      rentalNotes: (client as any)?.rentalNotes || "",
     },
   });
 
@@ -104,9 +112,15 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
       creditLimit: data.creditLimit !== undefined ? String(data.creditLimit) : undefined,
       notes: data.notes || undefined,
       sageCustomerCode: data.sageCustomerCode || undefined,
+      hasRentalContract: !!data.hasRentalContract,
+      rentalContractStatus: data.hasRentalContract ? (data.rentalContractStatus === "None" ? "Active" : data.rentalContractStatus) : "None",
+      rentalContractType: data.hasRentalContract ? (data.rentalContractType || undefined) : undefined,
+      rentalNotes: data.hasRentalContract ? (data.rentalNotes || undefined) : undefined,
     };
     onSubmit(submitData);
   };
+
+  const hasRental = form.watch("hasRentalContract");
 
   const legacyAddress = client?.address?.trim();
   const hasStructured =
@@ -426,6 +440,106 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
               </FormItem>
             )}
           />
+        </div>
+
+        {/* ── Rental Contract Section ────────────────────────────────── */}
+        <div className="border rounded-lg p-3 space-y-3 bg-blue-50/40">
+          <h4 className="text-sm font-semibold text-gray-700">Rental Contract</h4>
+          <p className="text-xs text-gray-500 -mt-2">
+            Does this customer rent equipment (e.g. sanitary bins, dispensers) from us? This is separate from regular service contracts.
+          </p>
+
+          <FormField
+            control={form.control}
+            name="hasRentalContract"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm">Has Rental Contract?</FormLabel>
+                <Select
+                  value={field.value ? "yes" : "no"}
+                  onValueChange={(v) => {
+                    const yes = v === "yes";
+                    field.onChange(yes);
+                    if (!yes) {
+                      form.setValue("rentalContractStatus", "None");
+                      form.setValue("rentalContractType", "");
+                      form.setValue("rentalNotes", "");
+                    } else if (form.getValues("rentalContractStatus") === "None") {
+                      form.setValue("rentalContractStatus", "Active");
+                    }
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-has-rental" className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="no">No</SelectItem>
+                    <SelectItem value="yes">Yes</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage className="text-xs" />
+              </FormItem>
+            )}
+          />
+
+          {hasRental && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="rentalContractStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Rental Contract Status</FormLabel>
+                      <Select
+                        value={field.value === "None" ? "Active" : field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-rental-status" className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Active">Active</SelectItem>
+                          <SelectItem value="Inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="rentalContractType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Rental Contract Type</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Sanitary bins, Soap dispensers" {...field} data-testid="input-rental-type" className="h-8 text-sm" />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="rentalNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Rental Notes</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Anything relevant about the rental arrangement" {...field} data-testid="textarea-rental-notes" className="min-h-[50px] text-sm py-1" />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
         </div>
 
         <FormField

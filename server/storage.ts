@@ -2192,6 +2192,10 @@ export class MemStorage implements IStorage {
       notes: insertClient.notes || null,
       website: (insertClient as any).website || null,
       category: (insertClient as any).category || null,
+      hasRentalContract: insertClient.hasRentalContract ?? false,
+      rentalContractStatus: insertClient.rentalContractStatus || (insertClient.hasRentalContract ? "Active" : "None"),
+      rentalContractType: insertClient.rentalContractType || null,
+      rentalNotes: insertClient.rentalNotes || null,
       updatedAt: new Date()
     };
     this.clients.set(id, client);

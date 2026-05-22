@@ -1,0 +1,123 @@
+Add a rental contract filter to the Clients / Customers section of the Job Flow app.
+
+The service admin must be able to view clients and filter them by whether they have rental contracts or not.
+
+Keep this simple.
+
+CLIENT DATA
+
+Add the following fields to each client/customer:
+
+hasRentalContract: true/false
+rentalContractStatus: Active / Inactive / None
+rentalContractType: optional text
+rentalNotes: optional text
+
+CLIENT FORM
+
+When adding or editing a client, show a simple section called:
+
+Rental Contract
+
+Fields:
+
+Has Rental Contract?
+- Yes
+- No
+
+If Yes is selected, show:
+- Rental Contract Status: Active / Inactive
+- Rental Contract Type
+- Rental Notes
+
+If No is selected, hide the extra rental fields and set rentalContractStatus to None.
+
+CLIENT LIST FILTERS
+
+On the Clients / Customers list page, add a filter dropdown:
+
+Rental Contract
+
+Options:
+- All Clients
+- With Rental Contracts
+- Without Rental Contracts
+- Active Rental Contracts
+- Inactive Rental Contracts
+
+The filter must work as follows:
+
+All Clients:
+Show all clients.
+
+With Rental Contracts:
+Show clients where hasRentalContract = true.
+
+Without Rental Contracts:
+Show clients where hasRentalContract = false or missing.
+
+Active Rental Contracts:
+Show clients where hasRentalContract = true and rentalContractStatus = Active.
+
+Inactive Rental Contracts:
+Show clients where hasRentalContract = true and rentalContractStatus = Inactive.
+
+CLIENT LIST COLUMNS
+
+Update the client list to show:
+
+- Client Name
+- Contact Person
+- Phone
+- Email
+- Suburb / Area
+- City / Town
+- Rental Contract
+- Status
+- Actions
+
+The Rental Contract column must show:
+Yes / No
+
+If Yes, show a small badge:
+Rental
+
+If No, show:
+No Rental
+
+CLIENT DETAILS PAGE
+
+On the client details page, show a clear section:
+
+Rental Contract
+
+Display:
+- Has Rental Contract: Yes / No
+- Status
+- Type
+- Notes
+
+Do not show rental details if the client has no rental contract.
+
+SEARCH
+
+The rental contract filter must work together with the normal client search.
+
+Example:
+If the user searches "Volkswagen" and selects "With Rental Contracts", only matching Volkswagen clients with rental contracts must show.
+
+IMPORTANT
+
+Do not confuse rental contracts with normal service contracts.
+
+A normal service contract means the client receives regular service work.
+
+A rental contract means the client has rented equipment/items from the business.
+
+These must be separate fields.
+
+Use simple wording in the app:
+- Service Contract
+- Rental Contract
+
+Do not use complicated wording like recurring sequence or monthly route sequence on the client screen.

@@ -84,6 +84,7 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [rentalFilter, setRentalFilter] = useState<string>("all"); // all | with | without | active | inactive
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { user } = useAuth();
@@ -175,8 +176,19 @@ export default function ClientsPage() {
     
     const matchesStatus = statusFilter === "all" || client.status === statusFilter;
     const matchesDepartment = departmentFilter === "all" || client.departmentId === departmentFilter;
-    
-    return matchesSearch && matchesStatus && matchesDepartment;
+
+    const hasRental = !!(client as any).hasRentalContract;
+    const rentalStatus = (client as any).rentalContractStatus as string | undefined;
+    let matchesRental = true;
+    switch (rentalFilter) {
+      case "with": matchesRental = hasRental; break;
+      case "without": matchesRental = !hasRental; break;
+      case "active": matchesRental = hasRental && rentalStatus === "Active"; break;
+      case "inactive": matchesRental = hasRental && rentalStatus === "Inactive"; break;
+      default: matchesRental = true;
+    }
+
+    return matchesSearch && matchesStatus && matchesDepartment && matchesRental;
   });
 
   const statusStats = clients.reduce((acc: any, client: Client) => {
@@ -356,6 +368,19 @@ export default function ClientsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Select value={rentalFilter} onValueChange={setRentalFilter}>
+          <SelectTrigger className="w-[220px]" data-testid="select-rental-filter">
+            <SelectValue placeholder="Rental Contract" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Clients</SelectItem>
+            <SelectItem value="with">With Rental Contracts</SelectItem>
+            <SelectItem value="without">Without Rental Contracts</SelectItem>
+            <SelectItem value="active">Active Rental Contracts</SelectItem>
+            <SelectItem value="inactive">Inactive Rental Contracts</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Clients Table */}
@@ -363,11 +388,13 @@ export default function ClientsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Company</TableHead>
+              <TableHead>Client Name</TableHead>
               <TableHead>Contact Person</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Department</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Suburb / Area</TableHead>
+              <TableHead>City / Town</TableHead>
+              <TableHead>Rental Contract</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -375,13 +402,13 @@ export default function ClientsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   Loading clients...
                 </TableCell>
               </TableRow>
             ) : filteredClients.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   No clients found
                 </TableCell>
               </TableRow>
@@ -402,18 +429,29 @@ export default function ClientsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center">
-                      <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
-                      {client.email || "Not provided"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
                       <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
                       {client.phone || "Not provided"}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{getDepartmentName(client.departmentId)}</Badge>
+                    <div className="flex items-center">
+                      <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
+                      {client.email || "Not provided"}
+                    </div>
+                  </TableCell>
+                  <TableCell>{client.suburb || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell>{client.city || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell>
+                    {(client as any).hasRentalContract ? (
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Rental</Badge>
+                        {(client as any).rentalContractStatus === "Inactive" && (
+                          <span className="text-xs text-muted-foreground">Inactive</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No Rental</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(client.status)}
@@ -590,6 +628,30 @@ export default function ClientsPage() {
                     <div><strong>Created:</strong> {new Date(viewingClient.createdAt).toLocaleDateString()}</div>
                     <div><strong>Updated:</strong> {new Date(viewingClient.updatedAt).toLocaleDateString()}</div>
                   </div>
+                </div>
+              </div>
+
+              {/* Rental Contract section */}
+              <div>
+                <h3 className="font-semibold mb-2">Rental Contract</h3>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <strong>Has Rental Contract:</strong>{" "}
+                    {(viewingClient as any).hasRentalContract ? (
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 ml-1">Yes</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">No</span>
+                    )}
+                  </div>
+                  {(viewingClient as any).hasRentalContract && (
+                    <>
+                      <div><strong>Status:</strong> {(viewingClient as any).rentalContractStatus || "Active"}</div>
+                      <div><strong>Type:</strong> {(viewingClient as any).rentalContractType || <span className="text-muted-foreground">Not specified</span>}</div>
+                      {(viewingClient as any).rentalNotes && (
+                        <div><strong>Notes:</strong> <span className="text-muted-foreground">{(viewingClient as any).rentalNotes}</span></div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 
