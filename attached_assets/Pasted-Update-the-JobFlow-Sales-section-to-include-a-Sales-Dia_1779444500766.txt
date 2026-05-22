@@ -1,0 +1,106 @@
+Update the JobFlow Sales section to include a Sales Diary / Appointment Calendar.
+
+Sales reps must be able to load their meetings, site visits, appointments, follow-ups and client visits into a diary so that management and admin can view their work day like the other departments.
+
+Add a new menu item under Sales:
+- Sales Diary
+
+The Sales Diary must have calendar views:
+- Day view
+- Week view
+- Month view
+- List view
+
+Each sales diary entry must include:
+- Appointment title
+- Client / lead name
+- Contact person
+- Phone number
+- Site address
+- Appointment type
+- Assigned sales rep
+- Date
+- Start time
+- End time
+- Estimated duration
+- Status
+- Notes
+
+Appointment type dropdown:
+- New lead meeting
+- Site visit
+- Quote follow-up
+- Contract renewal
+- Existing client visit
+- Complaint / issue visit
+- Internal sales meeting
+- Other
+
+Status dropdown:
+- Planned
+- Confirmed
+- Completed
+- Cancelled
+- Rescheduled
+- No show
+
+If “Other” is selected for appointment type, show a field called:
+- Other appointment details
+
+The Sales Diary must link to leads and quotes:
+- From a Lead, the user must be able to click “Schedule Appointment”
+- From a Quote, the user must be able to click “Schedule Follow-up”
+- The appointment must then appear in the Sales Diary
+- The diary entry must also appear on the Lead or Quote history
+
+The Sales Diary must allow filtering by:
+- Sales rep
+- Appointment type
+- Status
+- Date range
+- Client / lead
+- Department
+
+The diary must show each sales rep’s work day clearly:
+- What appointments they have
+- What time each appointment starts
+- How long each appointment is expected to take
+- Which client/site they are visiting
+- Whether the appointment is completed or still planned
+
+Add a daily sales rep view:
+For each sales rep, show their full day in time order:
+- 08:00 - New lead meeting - Client name
+- 09:30 - Site visit - Client name
+- 11:00 - Quote follow-up - Client name
+- 14:00 - Existing client visit - Client name
+
+Add a manager view:
+Management/admin must be able to view all sales reps’ diaries in one screen, grouped by sales rep.
+
+The Sales Diary must be mobile-friendly so sales reps can add or update appointments from their phone.
+
+Add quick actions on each diary entry:
+- Mark completed
+- Reschedule
+- Add note
+- Create quote
+- Link to lead
+- Link to client
+- Cancel appointment
+
+When an appointment is marked completed, allow the sales rep to add a completion note:
+- What happened
+- Client feedback
+- Next action required
+- Follow-up date if needed
+
+If a follow-up date is added, automatically create a follow-up task in the Sales Follow-ups section.
+
+Design:
+Keep it clean and simple.
+The Sales Diary should look and feel similar to an Outlook calendar.
+Use a simple top menu:
+Sales Dashboard | Leads | Quotes | Follow-ups | Sales Diary | Clients | Reports
+
+The goal is for sales appointments to be visible and trackable, the same way service jobs are visible in the service calendar.

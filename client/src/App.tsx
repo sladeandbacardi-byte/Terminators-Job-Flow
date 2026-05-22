@@ -27,6 +27,7 @@ import Leads from "@/pages/leads";
 import Backup from "@/pages/backup";
 import FieldDiaries from "@/pages/field-diaries";
 import Quotes from "@/pages/quotes";
+import SalesDiary from "@/pages/sales-diary";
 import Fleet from "@/pages/fleet";
 import FleetKmLog from "@/pages/fleet-km-log";
 import FleetInspection from "@/pages/fleet-inspection";
@@ -85,6 +86,7 @@ function AuthenticatedApp() {
       <Route path="/jobs/:id/card" component={JobCard} />
       <Route path="/daily-department-card" component={DailyDepartmentCard} />
       <Route path="/leads" component={Leads} />
+      <Route path="/sales-diary" component={SalesDiary} />
       <Route path="/backup" component={Backup} />
       <Route path="/field-diaries" component={FieldDiaries} />
       <Route path="/quotes" component={Quotes} />

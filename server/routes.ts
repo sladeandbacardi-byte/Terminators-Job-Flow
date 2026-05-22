@@ -3265,6 +3265,53 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
+  // ─── Sales Appointments (Diary) ────────────────────────────────────────────
+  app.get("/api/sales-appointments", async (_req, res) => {
+    try {
+      const appts = await storage.getSalesAppointments();
+      res.json(appts);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch appointments", details: err.message });
+    }
+  });
+
+  app.get("/api/sales-appointments/:id", async (req, res) => {
+    const appt = await storage.getSalesAppointment(req.params.id);
+    if (!appt) return res.status(404).json({ error: "Appointment not found" });
+    res.json(appt);
+  });
+
+  app.get("/api/sales-appointments/by-lead/:leadId", async (req, res) => {
+    const appts = await storage.getSalesAppointmentsByLead(req.params.leadId);
+    res.json(appts);
+  });
+
+  app.post("/api/sales-appointments", async (req, res) => {
+    try {
+      const { insertSalesAppointmentSchema } = await import("@shared/schema");
+      const data = insertSalesAppointmentSchema.parse(req.body);
+      const appt = await storage.createSalesAppointment(data);
+      res.status(201).json(appt);
+    } catch (err: any) {
+      res.status(400).json({ error: "Failed to create appointment", details: err.message });
+    }
+  });
+
+  app.patch("/api/sales-appointments/:id", async (req, res) => {
+    try {
+      const appt = await storage.updateSalesAppointment(req.params.id, req.body);
+      res.json(appt);
+    } catch (err: any) {
+      res.status(400).json({ error: "Failed to update appointment", details: err.message });
+    }
+  });
+
+  app.delete("/api/sales-appointments/:id", async (req, res) => {
+    const ok = await storage.deleteSalesAppointment(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Appointment not found" });
+    res.status(204).send();
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

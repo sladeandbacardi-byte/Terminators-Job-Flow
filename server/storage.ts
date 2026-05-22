@@ -32,6 +32,7 @@ import {
   type AttendanceRecord, type InsertAttendanceRecord,
   type AttendanceMemberRecord, type InsertAttendanceMemberRecord,
   type ServiceContract, type InsertServiceContract,
+  type SalesAppointment, type InsertSalesAppointment,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -191,6 +192,16 @@ export interface IStorage {
   deleteCustomReport(id: string): Promise<boolean>;
   runCustomReport(id: string): Promise<any>;
 
+  // Sales Appointments
+  getSalesAppointments(): Promise<SalesAppointment[]>;
+  getSalesAppointment(id: string): Promise<SalesAppointment | undefined>;
+  getSalesAppointmentsByDate(date: string): Promise<SalesAppointment[]>;
+  getSalesAppointmentsByRep(workerId: string): Promise<SalesAppointment[]>;
+  getSalesAppointmentsByLead(leadId: string): Promise<SalesAppointment[]>;
+  createSalesAppointment(appt: InsertSalesAppointment): Promise<SalesAppointment>;
+  updateSalesAppointment(id: string, appt: Partial<InsertSalesAppointment>): Promise<SalesAppointment>;
+  deleteSalesAppointment(id: string): Promise<boolean>;
+
   // Quote Submissions
   getQuoteSubmissions(): Promise<QuoteSubmission[]>;
   getQuoteSubmission(id: string): Promise<QuoteSubmission | undefined>;
@@ -340,6 +351,7 @@ export class MemStorage implements IStorage {
   private purchaseOrders: Map<string, PurchaseOrder> = new Map();
   private purchaseOrderItems: Map<string, PurchaseOrderItem> = new Map();
   private calendarEvents: Map<string, CalendarEvent> = new Map();
+  private salesAppointments: Map<string, SalesAppointment> = new Map();
   private customReports: Map<string, CustomReport> = new Map();
   private quoteSubmissions: Map<string, QuoteSubmission> = new Map();
   private vehicles: Map<string, Vehicle> = new Map();
@@ -2077,6 +2089,22 @@ export class MemStorage implements IStorage {
       this.quoteSubmissions.set(q.id, { ...q, quoteNumber: `QT-2026-${String(qi).padStart(4, '0')}` });
     });
 
+    // Seed Sales Appointments
+    const today = new Date();
+    const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
+    const relDay = (n: number) => {
+      const d2 = new Date(today); d2.setDate(d2.getDate() + n); return fmtDate(d2);
+    };
+    const seedAppts: SalesAppointment[] = [
+      { id: "sa-1", title: "New lead meeting - Greenfield Office Park", clientName: "Greenfield Office Park", contactPerson: "Mr. Patel", phone: "082 111 2233", siteAddress: "12 Greenfield Rd, Summerstrand", appointmentType: "new_lead_meeting", appointmentTypeOther: null, assignedToId: "worker-6", date: relDay(0), startTime: "09:00", endTime: "10:00", estimatedDuration: 60, status: "planned", notes: "Prospect from Google ad. Interested in pest control + washroom.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: "quote-1", quoteId: null, departmentId: "div-5", createdAt: new Date() },
+      { id: "sa-2", title: "Site visit - Blue Waters Hotel", clientName: "Blue Waters Hotel", contactPerson: "Ms. Botha", phone: "041 580 9000", siteAddress: "Blue Waters Hotel, Beach Rd, PE", appointmentType: "site_visit", appointmentTypeOther: null, assignedToId: "worker-6", date: relDay(0), startTime: "11:30", endTime: "12:30", estimatedDuration: 60, status: "confirmed", notes: "Check current pest situation and quote for monthly contract.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
+      { id: "sa-3", title: "Quote follow-up - Medicross Clinic", clientName: "Medicross Clinic", contactPerson: "Admin Manager", phone: "041 365 5000", siteAddress: "Medicross, Lorraine, PE", appointmentType: "quote_followup", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(0), startTime: "14:00", endTime: "14:30", estimatedDuration: 30, status: "confirmed", notes: "Follow up on washroom services quote sent 3 days ago.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: "quote-3", quoteId: null, departmentId: "div-5", createdAt: new Date() },
+      { id: "sa-4", title: "Existing client visit - Spar Group PE", clientName: "Spar Group PE", contactPerson: "Mr. van Wyk", phone: "082 500 1234", siteAddress: "Spar DC, Target Field Rd, PE", appointmentType: "existing_client_visit", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(1), startTime: "09:00", endTime: "10:00", estimatedDuration: 60, status: "planned", notes: "Monthly check-in. Discuss contract renewal for next quarter.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
+      { id: "sa-5", title: "Contract renewal - Murray & Roberts", clientName: "Murray & Roberts", contactPerson: "Facilities Manager", phone: "011 301 0000", siteAddress: "M&R Head Office, Bedfordview", appointmentType: "contract_renewal", appointmentTypeOther: null, assignedToId: "worker-6", date: relDay(1), startTime: "13:00", endTime: "14:00", estimatedDuration: 60, status: "planned", notes: "Annual review and contract renewal for deep cleaning services.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
+      { id: "sa-6", title: "Internal sales meeting - Q2 targets", clientName: "Internal", contactPerson: "Management", phone: "", siteAddress: "Head Office", appointmentType: "internal_meeting", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(2), startTime: "08:00", endTime: "09:00", estimatedDuration: 60, status: "confirmed", notes: "Q2 pipeline review and target setting with Sheryl-Lyn and Chane.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
+    ];
+    seedAppts.forEach(a => this.salesAppointments.set(a.id, a));
+
     // Seed current-period purchase orders (expenses)
     const samplePOs: PurchaseOrder[] = [
       // Today
@@ -3198,6 +3226,49 @@ export class MemStorage implements IStorage {
 
   async deleteCalendarEvent(id: string): Promise<boolean> {
     return this.calendarEvents.delete(id);
+  }
+
+  // Sales Appointments
+  async getSalesAppointments(): Promise<SalesAppointment[]> {
+    return Array.from(this.salesAppointments.values()).sort((a, b) =>
+      a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+    );
+  }
+
+  async getSalesAppointment(id: string): Promise<SalesAppointment | undefined> {
+    return this.salesAppointments.get(id);
+  }
+
+  async getSalesAppointmentsByDate(date: string): Promise<SalesAppointment[]> {
+    return Array.from(this.salesAppointments.values()).filter(a => a.date === date)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+
+  async getSalesAppointmentsByRep(workerId: string): Promise<SalesAppointment[]> {
+    return Array.from(this.salesAppointments.values()).filter(a => a.assignedToId === workerId);
+  }
+
+  async getSalesAppointmentsByLead(leadId: string): Promise<SalesAppointment[]> {
+    return Array.from(this.salesAppointments.values()).filter(a => a.leadId === leadId);
+  }
+
+  async createSalesAppointment(appt: InsertSalesAppointment): Promise<SalesAppointment> {
+    const id = randomUUID();
+    const record: SalesAppointment = { ...appt, id, createdAt: new Date() };
+    this.salesAppointments.set(id, record);
+    return record;
+  }
+
+  async updateSalesAppointment(id: string, appt: Partial<InsertSalesAppointment>): Promise<SalesAppointment> {
+    const existing = this.salesAppointments.get(id);
+    if (!existing) throw new Error(`Sales appointment ${id} not found`);
+    const updated = { ...existing, ...appt };
+    this.salesAppointments.set(id, updated);
+    return updated;
+  }
+
+  async deleteSalesAppointment(id: string): Promise<boolean> {
+    return this.salesAppointments.delete(id);
   }
 
   // Custom Reports

@@ -14,8 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase,
   XCircle, ArrowRight, Calendar, User, Building2, AlertCircle,
-  Send, Search, X, Megaphone, Download,
+  Send, Search, X, Megaphone, Download, BookOpen,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { QuoteSubmission, Worker, Department } from "@shared/schema";
@@ -64,6 +65,7 @@ function followUpLabel(date: any) {
 
 export default function Leads() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNewLead, setShowNewLead] = useState(false);
   const [quoteLead, setQuoteLead] = useState<QuoteSubmission | null>(null);
@@ -342,6 +344,17 @@ export default function Leads() {
                         setEditOriginationOther(lead.originationOther ?? "");
                       }}
                       onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
+                      onSchedule={() => {
+                        const p = new URLSearchParams({
+                          clientName: lead.companyName,
+                          contactPerson: lead.contactPerson,
+                          phone: lead.phone,
+                          siteAddress: lead.address || "",
+                          leadId: lead.id,
+                          appointmentType: "new_lead_meeting",
+                        });
+                        navigate(`/sales-diary?${p.toString()}`);
+                      }}
                     />
                   ))}
                   {colLeads.length === 0 && (
@@ -493,6 +506,7 @@ function LeadCard({
   onQuote,
   onNotes,
   onDecline,
+  onSchedule,
 }: {
   lead: QuoteSubmission;
   workers: Worker[];
@@ -500,6 +514,7 @@ function LeadCard({
   onQuote: () => void;
   onNotes: () => void;
   onDecline: () => void;
+  onSchedule: () => void;
 }) {
   const fu = followUpLabel(lead.followUpDate);
   const assignedWorker = lead.assignedTo ? workers.find(w => w.id === lead.assignedTo) : null;
@@ -566,6 +581,10 @@ function LeadCard({
             <Send className="h-3 w-3 mr-0.5" /> Send Quote
           </Button>
         )}
+
+        <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50" onClick={onSchedule}>
+          <BookOpen className="h-3 w-3 mr-0.5" /> Schedule
+        </Button>
 
         <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-gray-500" onClick={onNotes}>
           Notes

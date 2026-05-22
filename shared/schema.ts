@@ -873,6 +873,64 @@ export const serviceContracts = pgTable("service_contracts", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+// ─── SALES DIARY ────────────────────────────────────────────────────────────
+
+export const SALES_APPT_TYPES = [
+  { value: "new_lead_meeting",       label: "New Lead Meeting" },
+  { value: "site_visit",             label: "Site Visit" },
+  { value: "quote_followup",         label: "Quote Follow-up" },
+  { value: "contract_renewal",       label: "Contract Renewal" },
+  { value: "existing_client_visit",  label: "Existing Client Visit" },
+  { value: "complaint_visit",        label: "Complaint / Issue Visit" },
+  { value: "internal_meeting",       label: "Internal Sales Meeting" },
+  { value: "other",                  label: "Other" },
+] as const;
+
+export const SALES_APPT_STATUSES = [
+  { value: "planned",     label: "Planned",     color: "blue" },
+  { value: "confirmed",   label: "Confirmed",   color: "green" },
+  { value: "completed",   label: "Completed",   color: "gray" },
+  { value: "cancelled",   label: "Cancelled",   color: "red" },
+  { value: "rescheduled", label: "Rescheduled", color: "yellow" },
+  { value: "no_show",     label: "No Show",     color: "orange" },
+] as const;
+
+export type SalesApptType   = typeof SALES_APPT_TYPES[number]["value"];
+export type SalesApptStatus = typeof SALES_APPT_STATUSES[number]["value"];
+
+export const salesAppointments = pgTable("sales_appointments", {
+  id:                   varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title:                text("title").notNull(),
+  clientName:           text("client_name").notNull(),
+  contactPerson:        text("contact_person"),
+  phone:                text("phone"),
+  siteAddress:          text("site_address"),
+  appointmentType:      text("appointment_type").notNull().default("new_lead_meeting"),
+  appointmentTypeOther: text("appointment_type_other"),
+  assignedToId:         varchar("assigned_to_id").references(() => workers.id),
+  date:                 text("date").notNull(),          // "YYYY-MM-DD"
+  startTime:            text("start_time").notNull(),    // "HH:MM"
+  endTime:              text("end_time").notNull(),      // "HH:MM"
+  estimatedDuration:    integer("estimated_duration"),   // minutes
+  status:               text("status").notNull().default("planned"),
+  notes:                text("notes"),
+  completionNote:       text("completion_note"),
+  clientFeedback:       text("client_feedback"),
+  nextAction:           text("next_action"),
+  followUpDate:         text("follow_up_date"),          // "YYYY-MM-DD"
+  leadId:               varchar("lead_id").references(() => quoteSubmissions.id),
+  quoteId:              varchar("quote_id"),
+  departmentId:         varchar("department_id").references(() => departments.id),
+  createdAt:            timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertSalesAppointmentSchema = createInsertSchema(salesAppointments).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSalesAppointment = z.infer<typeof insertSalesAppointmentSchema>;
+export type SalesAppointment = typeof salesAppointments.$inferSelect;
+
 export const insertServiceContractSchema = createInsertSchema(serviceContracts, {
   startDate: z.coerce.date().optional().nullable(),
   endDate: z.coerce.date().optional().nullable(),
