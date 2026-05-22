@@ -1,7 +1,9 @@
 import type { 
   Job, Worker, Client, InventoryItem, RentalContract, Invoice, InvoiceItem,
-  Supplier, PurchaseOrder, PurchaseOrderItem, EmailLog, Notification
+  Supplier, PurchaseOrder, PurchaseOrderItem, EmailLog, Notification,
+  QuoteSubmission
 } from "@shared/schema";
+import { ORIGINATION_LABELS } from "@shared/schema";
 import JSZip from 'jszip';
 
 // Helper function to generate CSV content
@@ -275,6 +277,36 @@ export function exportPurchaseOrders(purchaseOrders: PurchaseOrder[], purchaseOr
   });
   
   exportToCSV(exportData, 'purchase-orders-export');
+}
+
+export function exportLeads(leads: QuoteSubmission[]) {
+  const exportData = leads.map(lead => {
+    const originationKey = lead.origination ?? "other";
+    return {
+      id: lead.id,
+      quoteNumber: lead.quoteNumber || '',
+      companyName: lead.companyName,
+      contactPerson: lead.contactPerson,
+      email: lead.email,
+      phone: lead.phone,
+      serviceType: lead.serviceType,
+      status: lead.status,
+      origination: ORIGINATION_LABELS[originationKey] ?? originationKey,
+      originationOther: lead.originationOther || '',
+      preferredContactMethod: lead.preferredContactMethod || '',
+      address: lead.address || '',
+      description: lead.description || '',
+      assignedTo: lead.assignedTo || '',
+      notes: lead.notes || '',
+      quoteAmount: lead.quoteAmount || '',
+      frequency: lead.frequency || '',
+      submittedAt: lead.submittedAt ? new Date(lead.submittedAt).toLocaleString() : '',
+      followUpDate: lead.followUpDate ? new Date(lead.followUpDate).toLocaleDateString() : '',
+      quoteSentAt: lead.quoteSentAt ? new Date(lead.quoteSentAt).toLocaleString() : '',
+    };
+  });
+
+  exportToCSV(exportData, 'leads-export');
 }
 
 export function exportEmailLogs(emailLogs: EmailLog[]) {

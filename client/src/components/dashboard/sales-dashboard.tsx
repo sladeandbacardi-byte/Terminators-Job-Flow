@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, FileText, TrendingUp, DollarSign, Phone, Calendar, ClipboardList, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Users, FileText, TrendingUp, DollarSign, Phone, Calendar, ClipboardList, AlertCircle, Clock, CheckCircle2, Megaphone } from "lucide-react";
 import type { Client, RentalContract, Invoice, Job, QuoteSubmission } from "@shared/schema";
+import { ORIGINATION_OPTIONS } from "@shared/schema";
 
 function thisMonth(date: any) {
   if (!date) return false;
@@ -49,6 +50,13 @@ export function SalesDashboard() {
   const openQuotes = quotes.filter(q => q.status === "new" || q.status === "contacted" || q.status === "quoted");
   const newQuotes = quotes.filter(q => q.status === "new");
   const overdueFollowUp = openQuotes.filter(q => q.followUpDate && new Date(q.followUpDate) < new Date());
+
+  // Leads by Origination (counts all leads, including converted/declined for marketing analysis)
+  const leadsByOrigination = ORIGINATION_OPTIONS.map(opt => ({
+    ...opt,
+    count: quotes.filter(q => (q.origination ?? "other") === opt.value).length,
+  }));
+  const totalLeadsTracked = leadsByOrigination.reduce((s, o) => s + o.count, 0);
 
   return (
     <div className="space-y-6">
@@ -104,6 +112,43 @@ export function SalesDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Leads by Origination */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Megaphone className="h-4 w-4 text-gray-400" /> Leads by Origination
+            </span>
+            <span className="text-xs text-gray-400 font-normal">
+              {totalLeadsTracked} lead{totalLeadsTracked !== 1 ? "s" : ""} tracked
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {totalLeadsTracked === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No leads tracked yet</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {leadsByOrigination.map(o => {
+                const pct = totalLeadsTracked > 0 ? Math.round((o.count / totalLeadsTracked) * 100) : 0;
+                return (
+                  <div
+                    key={o.value}
+                    className={`border rounded-lg p-2.5 ${o.count > 0 ? "bg-indigo-50 border-indigo-100" : "bg-gray-50 border-gray-100"}`}
+                  >
+                    <p className="text-xs text-gray-500 truncate" title={o.label}>{o.label}</p>
+                    <div className="flex items-baseline justify-between mt-0.5">
+                      <p className={`text-lg font-bold ${o.count > 0 ? "text-indigo-700" : "text-gray-400"}`}>{o.count}</p>
+                      <p className="text-xs text-gray-400">{pct}%</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pending Quotes */}
       <Card>

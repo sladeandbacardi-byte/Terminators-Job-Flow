@@ -30,6 +30,8 @@ export const documentFormSchema = z.object({
   vatAmount: z.string().default("0.00"),
   totalAmount: z.string().default("0.00"),
   notes: z.string().optional(),
+  origination: z.string().optional(),
+  originationOther: z.string().optional(),
 });
 
 export type DocumentFormValues = z.infer<typeof documentFormSchema>;

@@ -595,12 +595,39 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   quoteNumber: text("quote_number"),
   frequency: text("frequency"), // e.g. "monthly", "weekly", "once_off"
   specialInstructions: text("special_instructions"),
+  origination: text("origination").notNull().default("other"), // marketing channel — see ORIGINATION_OPTIONS
+  originationOther: text("origination_other"), // free text when origination === "other"
 });
+
+// Marketing channel options for the Origination field on every lead
+export const ORIGINATION_OPTIONS = [
+  { value: "facebook",        label: "Facebook" },
+  { value: "google",          label: "Google" },
+  { value: "vehicles",        label: "Vehicles" },
+  { value: "phone",           label: "Phone" },
+  { value: "referral",        label: "Word of Mouth / Referral" },
+  { value: "website",         label: "Website" },
+  { value: "existing_client", label: "Existing Client" },
+  { value: "walk_in",         label: "Walk-in" },
+  { value: "email",           label: "Email" },
+  { value: "other",           label: "Other" },
+] as const;
+
+export type OriginationValue = typeof ORIGINATION_OPTIONS[number]["value"];
+
+export const ORIGINATION_LABELS: Record<string, string> =
+  Object.fromEntries(ORIGINATION_OPTIONS.map(o => [o.value, o.label]));
 
 export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).omit({
   id: true,
   submittedAt: true,
   quoteNumber: true,
+}).extend({
+  origination: z.enum([
+    "facebook","google","vehicles","phone","referral",
+    "website","existing_client","walk_in","email","other",
+  ], { required_error: "Origination is required" }),
+  originationOther: z.string().optional().nullable(),
 });
 
 export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;

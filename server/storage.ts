@@ -1969,6 +1969,8 @@ export class MemStorage implements IStorage {
         notes: null,
         submittedAt: d(-1),
         followUpDate: d(2),
+        origination: "google",
+        originationOther: null,
       },
       {
         id: "quote-2",
@@ -1985,6 +1987,8 @@ export class MemStorage implements IStorage {
         notes: "Spoke with Dr Botha on Monday. Sending quote by Wednesday.",
         submittedAt: d(-4),
         followUpDate: d(1),
+        origination: "referral",
+        originationOther: null,
       },
       {
         id: "quote-3",
@@ -2010,6 +2014,8 @@ export class MemStorage implements IStorage {
         ]),
         submittedAt: d(-7),
         followUpDate: d(3),
+        origination: "website",
+        originationOther: null,
       },
       {
         id: "quote-4",
@@ -2035,6 +2041,8 @@ export class MemStorage implements IStorage {
         ]),
         submittedAt: d(0),
         followUpDate: d(5),
+        origination: "email",
+        originationOther: null,
       },
       {
         id: "quote-5",
@@ -2059,6 +2067,8 @@ export class MemStorage implements IStorage {
         ]),
         submittedAt: d(-3),
         followUpDate: d(4),
+        origination: "existing_client",
+        originationOther: null,
       },
     ];
 

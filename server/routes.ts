@@ -1846,7 +1846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Quote Submission Routes (public-facing)
   app.post("/api/quote-submissions", async (req, res) => {
     try {
-      const submissionData = insertQuoteSubmissionSchema.parse(req.body);
+      const submissionData = insertQuoteSubmissionSchema.parse({ ...req.body, origination: req.body?.origination ?? "website" });
       const submission = await storage.createQuoteSubmission(submissionData);
       res.status(201).json(submission);
     } catch (error: any) {
@@ -1886,7 +1886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public endpoint for quote submission (no auth required)
   app.post("/api/public/quote-request", async (req, res) => {
     try {
-      const submissionData = insertQuoteSubmissionSchema.parse(req.body);
+      const submissionData = insertQuoteSubmissionSchema.parse({ ...req.body, origination: req.body?.origination ?? "website" });
       const submission = await storage.createQuoteSubmission(submissionData);
       
       // Send email notification to admin/sales team

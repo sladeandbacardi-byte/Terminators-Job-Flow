@@ -14,11 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase,
   XCircle, ArrowRight, Calendar, User, Building2, AlertCircle,
-  Send, Search, X,
+  Send, Search, X, Megaphone, Download,
 } from "lucide-react";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { QuoteSubmission, Worker, Department } from "@shared/schema";
+import { ORIGINATION_OPTIONS, ORIGINATION_LABELS } from "@shared/schema";
+import { exportLeads } from "@/lib/data-export";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +75,7 @@ export default function Leads() {
   const [search, setSearch]             = useState("");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [salespersonFilter, setSalespersonFilter] = useState("all");
+  const [originationFilter, setOriginationFilter] = useState("all");
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
@@ -94,6 +97,8 @@ export default function Leads() {
       assignedTo: data.assignedTo && data.assignedTo !== "unassigned" ? data.assignedTo : null,
       lineItemsJson: JSON.stringify(data.lineItems),
       quoteAmount: data.totalAmount,
+      origination: data.origination,
+      originationOther: data.origination === "other" ? (data.originationOther || null) : null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
@@ -113,15 +118,18 @@ export default function Leads() {
     onError: () => toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" }),
   });
 
-  const saveNotes = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes: string }) =>
-      apiRequest("PATCH", `/api/quote-submissions/${id}`, { notes }),
+  const saveLeadEdits = useMutation({
+    mutationFn: ({ id, notes, origination, originationOther }: { id: string; notes: string; origination: string; originationOther: string | null }) =>
+      apiRequest("PATCH", `/api/quote-submissions/${id}`, { notes, origination, originationOther }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       setNotesLead(null);
-      toast({ title: "Notes saved" });
+      toast({ title: "Lead updated" });
     },
   });
+
+  const [editOrigination, setEditOrigination] = useState<string>("other");
+  const [editOriginationOther, setEditOriginationOther] = useState<string>("");
 
   const sendQuote = useMutation({
     mutationFn: async (data: DocumentFormValues) => {
@@ -154,17 +162,18 @@ export default function Leads() {
       if (q && !l.companyName.toLowerCase().includes(q) && !l.contactPerson.toLowerCase().includes(q)) return false;
       if (serviceFilter !== "all" && l.serviceType !== serviceFilter) return false;
       if (salespersonFilter !== "all" && l.assignedTo !== salespersonFilter) return false;
+      if (originationFilter !== "all" && (l.origination ?? "other") !== originationFilter) return false;
       return true;
     });
-  }, [leads, search, serviceFilter, salespersonFilter]);
+  }, [leads, search, serviceFilter, salespersonFilter, originationFilter]);
 
   const totals = PIPELINE.reduce((acc, col) => {
     acc[col.status] = filteredLeads.filter(l => l.status === col.status).length;
     return acc;
   }, {} as Record<string, number>);
 
-  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all";
-  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); };
+  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all";
+  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); };
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -256,6 +265,36 @@ export default function Leads() {
           </SelectContent>
         </Select>
 
+        {/* Origination */}
+        <Select value={originationFilter} onValueChange={setOriginationFilter}>
+          <SelectTrigger className="h-8 text-sm w-44">
+            <SelectValue placeholder="All Originations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Originations</SelectItem>
+            {ORIGINATION_OPTIONS.map(o => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Export */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs gap-1"
+          onClick={() => {
+            try {
+              exportLeads(filteredLeads);
+              toast({ title: "Leads exported", description: `${filteredLeads.length} lead(s) downloaded as CSV.` });
+            } catch (e: any) {
+              toast({ title: "Nothing to export", description: e?.message ?? "No leads match the current filters.", variant: "destructive" });
+            }
+          }}
+        >
+          <Download className="h-3.5 w-3.5" /> Export
+        </Button>
+
         {/* Clear filters */}
         {hasFilters && (
           <button
@@ -296,7 +335,12 @@ export default function Leads() {
                       workers={workers}
                       onAdvance={(status) => advanceLead.mutate({ id: lead.id, status })}
                       onQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
-                      onNotes={() => { setNotesLead(lead); setNotesText(lead.notes ?? ""); }}
+                      onNotes={() => {
+                        setNotesLead(lead);
+                        setNotesText(lead.notes ?? "");
+                        setEditOrigination(lead.origination ?? "other");
+                        setEditOriginationOther(lead.originationOther ?? "");
+                      }}
                       onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
                     />
                   ))}
@@ -355,18 +399,79 @@ export default function Leads() {
         </Dialog>
       )}
 
-      {/* ── Notes dialog ── */}
+      {/* ── Edit Lead dialog (origination + notes) ── */}
       {notesLead && (
         <Dialog open={!!notesLead} onOpenChange={() => setNotesLead(null)}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Notes — {notesLead.companyName}</DialogTitle>
+              <DialogTitle>Edit Lead — {notesLead.companyName}</DialogTitle>
             </DialogHeader>
-            <Textarea rows={5} value={notesText} onChange={e => setNotesText(e.target.value)} placeholder="Internal notes, call summary, quote amount, etc." />
+
+            <div className="space-y-4">
+              {/* Origination */}
+              <div>
+                <label className="text-sm font-medium block mb-1">
+                  Origination <span className="text-red-500">*</span>
+                </label>
+                <Select value={editOrigination} onValueChange={setEditOrigination}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="How did they find us?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORIGINATION_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editOrigination === "other" && (
+                <div>
+                  <label className="text-sm font-medium block mb-1">Other Origination Details</label>
+                  <Input
+                    value={editOriginationOther}
+                    onChange={e => setEditOriginationOther(e.target.value)}
+                    placeholder="e.g. Trade show, magazine ad..."
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Notes */}
+              <div>
+                <label className="text-sm font-medium block mb-1">Notes</label>
+                <Textarea
+                  rows={5}
+                  value={notesText}
+                  onChange={e => setNotesText(e.target.value)}
+                  placeholder="Internal notes, call summary, quote amount, etc."
+                />
+              </div>
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setNotesLead(null)}>Cancel</Button>
-              <Button onClick={() => saveNotes.mutate({ id: notesLead.id, notes: notesText })} disabled={saveNotes.isPending}>
-                {saveNotes.isPending ? "Saving..." : "Save Notes"}
+              <Button
+                onClick={() => {
+                  const validValues = ORIGINATION_OPTIONS.map(o => o.value) as string[];
+                  if (!editOrigination || !validValues.includes(editOrigination)) {
+                    toast({ title: "Origination required", description: "Please select how this lead came in.", variant: "destructive" });
+                    return;
+                  }
+                  if (editOrigination === "other" && !editOriginationOther.trim()) {
+                    toast({ title: "Details required", description: "Please describe the origination.", variant: "destructive" });
+                    return;
+                  }
+                  saveLeadEdits.mutate({
+                    id: notesLead.id,
+                    notes: notesText,
+                    origination: editOrigination,
+                    originationOther: editOrigination === "other" ? editOriginationOther.trim() : null,
+                  });
+                }}
+                disabled={saveLeadEdits.isPending}
+              >
+                {saveLeadEdits.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -407,6 +512,15 @@ function LeadCard({
           <p className="text-xs text-gray-500 flex items-center gap-1"><User className="h-3 w-3" />{lead.contactPerson}</p>
         </div>
         <Badge variant="outline" className="text-xs flex-shrink-0">{SERVICE_LABELS[lead.serviceType] ?? lead.serviceType}</Badge>
+      </div>
+
+      {/* Origination */}
+      <div>
+        <Badge variant="secondary" className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100">
+          <Megaphone className="h-3 w-3 mr-1" />
+          {ORIGINATION_LABELS[lead.origination ?? "other"] ?? "Other"}
+          {lead.origination === "other" && lead.originationOther ? `: ${lead.originationOther}` : ""}
+        </Badge>
       </div>
 
       {/* Contact info */}

@@ -12,6 +12,7 @@ import { Plus, Trash2, FileText, Receipt, Briefcase, CalendarIcon } from "lucide
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Worker, Client } from "@shared/schema";
+import { ORIGINATION_OPTIONS } from "@shared/schema";
 import { documentFormSchema, type DocumentFormValues, type DocType } from "./document-form-schema";
 
 // ── service catalogue ─────────────────────────────────────────────────────────
@@ -152,9 +153,13 @@ export default function DocumentForm({
       vatAmount: "0.00",
       totalAmount: "0.00",
       notes: "",
+      origination: defaultValues?.origination ?? "",
+      originationOther: defaultValues?.originationOther ?? "",
       ...defaultValues,
     },
   });
+
+  const watchedOrigination = form.watch("origination");
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lineItems" });
 
@@ -207,7 +212,20 @@ export default function DocumentForm({
         ))}
       </datalist>
 
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit((data) => {
+        if (docType === "lead") {
+          const validValues = ORIGINATION_OPTIONS.map(o => o.value) as string[];
+          if (!data.origination || !validValues.includes(data.origination)) {
+            form.setError("origination", { type: "manual", message: "Please select how this lead came in" });
+            return;
+          }
+          if (data.origination === "other" && !data.originationOther?.trim()) {
+            form.setError("originationOther", { type: "manual", message: "Please describe the origination" });
+            return;
+          }
+        }
+        onSubmit(data);
+      })}>
 
         {/* ── document header banner ── */}
         <div className={`rounded-t-lg px-5 py-3 ${cfg.bg} border ${cfg.border} flex items-center justify-between gap-3`}>
@@ -446,6 +464,34 @@ export default function DocumentForm({
                       </Select>
                     </FormItem>
                   )} />
+                )}
+
+                {/* Origination (lead only) */}
+                {docType === "lead" && (
+                  <>
+                    <FormField control={form.control} name="origination" render={({ field }) => (
+                      <FormItem className={watchedOrigination === "other" ? "col-span-1" : "col-span-2"}>
+                        <FormLabel>Origination <span className="text-red-500">*</span></FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="How did they find us?" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {ORIGINATION_OPTIONS.map(o => (
+                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    {watchedOrigination === "other" && (
+                      <FormField control={form.control} name="originationOther" render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Other Origination Details</FormLabel>
+                          <FormControl><Input placeholder="e.g. Trade show, magazine ad..." {...field} value={field.value ?? ""} /></FormControl>
+                        </FormItem>
+                      )} />
+                    )}
+                  </>
                 )}
               </div>
             )}
