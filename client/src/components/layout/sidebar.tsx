@@ -7,7 +7,7 @@ import {
   Settings, TrendingUp, ExternalLink, Database, ClipboardList, Briefcase,
   Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck, FileSpreadsheet,
   ChevronDown, ChevronRight, UserCog, Lock, ScrollText, HandCoins, Wallet,
-  CheckSquare, Cog, ListOrdered, BookOpen,
+  CheckSquare, Cog, ListOrdered, BookOpen, LayoutDashboard, Heart,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -74,12 +74,12 @@ const ALL_SECTIONS: NavSection[] = [
     icon: CreditCard,
     roles: ["admin", "manager", "accounts", "coordinator"],
     items: [
-      { name: "Invoices",         href: "/invoices",    icon: Receipt,         roles: ["admin", "manager", "accounts", "coordinator"] },
-      { name: "Debtors",          href: "/debtors",     icon: HandCoins,       roles: ["admin", "manager", "accounts"] },
-      { name: "Creditors",        href: "/creditors",   icon: Wallet,          roles: ["admin", "manager", "accounts"] },
-      { name: "Sage Export",      href: "/sage-export", icon: FileSpreadsheet, roles: ["admin", "manager", "accounts"] },
-      { name: "Backup & Restore", href: "/backup",      icon: Database,        roles: ["admin", "manager", "accounts"] },
-      { name: "Reports",          href: "/reports",     icon: BarChart,        roles: ["admin", "manager", "accounts"] },
+      { name: "Finance Overview",  href: "/finance-dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "accounts"] },
+      { name: "Invoices",          href: "/invoices",    icon: Receipt,         roles: ["admin", "manager", "accounts", "coordinator"] },
+      { name: "Debtors",           href: "/debtors",     icon: HandCoins,       roles: ["admin", "manager", "accounts"] },
+      { name: "Creditors",         href: "/creditors",   icon: Wallet,          roles: ["admin", "manager", "accounts"] },
+      { name: "Sage Export",       href: "/sage-export", icon: FileSpreadsheet, roles: ["admin", "manager", "accounts"] },
+      { name: "Reports",           href: "/reports",     icon: BarChart,        roles: ["admin", "manager", "accounts"] },
     ],
   },
   {
@@ -88,6 +88,7 @@ const ALL_SECTIONS: NavSection[] = [
     icon: Users,
     roles: ["admin", "manager", "coordinator", "accounts", "service"],
     items: [
+      { name: "HR Dashboard",       href: "/hr-dashboard",       icon: Heart,         roles: ["admin", "manager", "accounts"] },
       { name: "Staff",              href: "/workers",            icon: Users,         roles: ["admin", "manager", "coordinator", "accounts"] },
       { name: "Team Attendance",    href: "/attendance",         icon: UserCheck,     roles: ["admin", "manager", "coordinator", "accounts"] },
       { name: "Teams",              href: "/team-management",    icon: Users,         roles: ["admin", "manager"] },

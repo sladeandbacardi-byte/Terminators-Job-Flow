@@ -9,9 +9,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
   HandCoins, Search, AlertTriangle, CheckCircle2, FileText,
-  TrendingDown, Mail, Calendar as CalIcon,
+  TrendingDown, Mail, Calendar as CalIcon, Ban, RefreshCw, ShieldAlert,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Invoice, Client } from "@shared/schema";
@@ -45,6 +49,8 @@ export default function Debtors() {
   const [searchTerm, setSearchTerm] = useState("");
   const [bucketFilter, setBucketFilter] = useState<"all" | Bucket>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [suspendDialogClient, setSuspendDialogClient] = useState<Client | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
@@ -135,6 +141,34 @@ export default function Debtors() {
     onError: () => toast({ title: "Could not update invoice", variant: "destructive" }),
   });
 
+  const suspendMut = useMutation({
+    mutationFn: async ({ clientId }: { clientId: string }) => {
+      const r = await apiRequest("PUT", `/api/clients/${clientId}`, { status: "suspended" });
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setSuspendDialogClient(null);
+      setSuspendReason("");
+      toast({ title: "Account suspended", description: "Client account has been suspended." });
+    },
+    onError: () => toast({ title: "Failed to suspend account", variant: "destructive" }),
+  });
+
+  const reactivateMut = useMutation({
+    mutationFn: async (clientId: string) => {
+      const r = await apiRequest("PUT", `/api/clients/${clientId}`, { status: "active" });
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({ title: "Account reactivated", description: "Client account is now active." });
+    },
+    onError: () => toast({ title: "Failed to reactivate account", variant: "destructive" }),
+  });
+
+  const suspendedClients = clients.filter(c => c.status === "suspended");
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -189,22 +223,51 @@ export default function Debtors() {
                 ) : perClient.slice(0, 50).map(p => {
                   const c = clientMap.get(p.clientId);
                   const isActive = clientFilter === p.clientId;
+                  const isSuspended = c?.status === "suspended";
                   return (
-                    <button
+                    <div
                       key={p.clientId}
-                      onClick={() => setClientFilter(isActive ? "all" : p.clientId)}
-                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-gray-50 ${isActive ? "bg-blue-50" : ""}`}
+                      className={`px-4 py-2.5 ${isActive ? "bg-blue-50" : isSuspended ? "bg-red-50" : ""}`}
                       data-testid={`client-row-${p.clientId}`}
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{c?.name ?? p.clientId}</p>
-                        <p className="text-xs text-gray-500">
-                          {p.count} invoice{p.count !== 1 ? "s" : ""}
-                          {p.oldest > 0 && <span className="text-red-600 ml-2">· oldest {p.oldest}d</span>}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-rose-700 shrink-0">{fmtR(p.balance)}</p>
-                    </button>
+                      <button
+                        onClick={() => setClientFilter(isActive ? "all" : p.clientId)}
+                        className="w-full text-left flex items-center justify-between gap-3 hover:opacity-80"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {isSuspended && <Ban className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />}
+                            <p className="text-sm font-medium text-gray-900 truncate">{c?.name ?? p.clientId}</p>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {p.count} invoice{p.count !== 1 ? "s" : ""}
+                            {p.oldest > 0 && <span className="text-red-600 ml-2">· oldest {p.oldest}d</span>}
+                            {isSuspended && <span className="text-red-600 ml-2 font-semibold">· SUSPENDED</span>}
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold text-rose-700 shrink-0">{fmtR(p.balance)}</p>
+                      </button>
+                      {c && (
+                        <div className="mt-1.5 flex gap-1.5">
+                          {isSuspended ? (
+                            <button
+                              onClick={() => reactivateMut.mutate(p.clientId)}
+                              disabled={reactivateMut.isPending}
+                              className="text-[11px] flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5 hover:bg-green-100 transition"
+                            >
+                              <RefreshCw className="h-2.5 w-2.5" /> Reactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setSuspendDialogClient(c); setSuspendReason(""); }}
+                              className="text-[11px] flex items-center gap-1 text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5 hover:bg-red-100 transition"
+                            >
+                              <Ban className="h-2.5 w-2.5" /> Suspend
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -310,6 +373,55 @@ export default function Debtors() {
           </div>
         </main>
       </div>
+
+      {/* Suspend Account Dialog */}
+      <Dialog open={!!suspendDialogClient} onOpenChange={open => { if (!open) { setSuspendDialogClient(null); setSuspendReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <ShieldAlert className="h-5 w-5" /> Suspend Account
+            </DialogTitle>
+            <DialogDescription>
+              This will mark <strong>{suspendDialogClient?.name}</strong> as suspended.
+              Service coordinators and sales staff will see this status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              <p className="font-medium">Outstanding balance: {fmtR(
+                outstandingInvoices
+                  .filter(x => x.inv.clientId === suspendDialogClient?.id)
+                  .reduce((s, x) => s + x.outstanding, 0)
+              )}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Reason for suspension (optional)
+              </label>
+              <Textarea
+                placeholder="e.g. Non-payment of invoices over 90 days…"
+                value={suspendReason}
+                onChange={e => setSuspendReason(e.target.value)}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setSuspendDialogClient(null); setSuspendReason(""); }}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white gap-1.5"
+              onClick={() => suspendMut.mutate({ clientId: suspendDialogClient!.id })}
+              disabled={suspendMut.isPending}
+            >
+              <Ban className="h-4 w-4" />
+              {suspendMut.isPending ? "Suspending…" : "Suspend Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

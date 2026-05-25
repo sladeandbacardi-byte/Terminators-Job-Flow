@@ -47,6 +47,8 @@ import Settings from "@/pages/settings";
 import SystemLogs from "@/pages/system-logs";
 import TestingChecklist from "@/pages/testing-checklist";
 import ServiceContractsPage from "@/pages/service-contracts";
+import FinanceDashboard from "@/pages/finance-dashboard";
+import HRDashboard from "@/pages/hr-dashboard";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -109,6 +111,8 @@ function AuthenticatedApp() {
       <Route path="/system-logs" component={SystemLogs} />
       <Route path="/testing-checklist" component={TestingChecklist} />
       <Route path="/service-contracts" component={ServiceContractsPage} />
+      <Route path="/finance-dashboard" component={FinanceDashboard} />
+      <Route path="/hr-dashboard" component={HRDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

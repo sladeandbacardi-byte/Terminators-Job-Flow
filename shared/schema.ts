@@ -26,6 +26,12 @@ export const workers = pgTable("workers", {
   employeeId: text("employee_id").unique(), // For mobile login
   pin: text("pin"), // 4-digit PIN for mobile login (hashed)
   isActive: boolean("is_active").notNull().default(true),
+  // HR Profile fields
+  idNumber: text("id_number"),
+  startDate: text("start_date"), // YYYY-MM-DD
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  leaveBalance: integer("leave_balance").default(15), // remaining annual leave days
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
