@@ -1,0 +1,102 @@
+Update the Service Scheduling page wording and add flow.
+
+The page currently looks good, but the wording must be simpler for service admin users.
+
+Change the main button from:
+Add Entry
+
+To:
+Add Service
+
+Change the form heading to:
+Add Service to Schedule
+
+Change the small page description under the title from:
+0 active · 0 inactive · grouped by day, ordered by route
+
+To:
+Schedule recurring contract services by day and route order.
+
+The Service Scheduling page must be used to place contract services into a simple weekly route layout.
+
+When the user clicks Add Service, show a simple form with these fields:
+
+- Client
+- Contract
+- Service Type
+- Frequency
+- Day
+- Time
+- Estimated Duration
+- Route Order
+- Assigned Team
+- Notes
+- Active / Inactive
+
+The Client field must search existing clients.
+
+The Contract field must show contracts linked to the selected client.
+
+The Service Type options must be:
+- Sanitary Bins
+- Washroom Contracts
+- Washroom Ad-Hoc
+- Dustmats
+- Pest Control
+- Deep Cleaning
+- Other
+
+Frequency options must be:
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+
+The schedule must be grouped by day:
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+Within each day, services must be ordered by Route Order.
+
+If Route Order is left blank, automatically add the next available number for that day and service type.
+
+Each scheduled service row must display:
+
+- Route Order
+- Client Name
+- Service Type
+- Frequency
+- Time
+- Assigned Team
+- Contract Status
+- Active / Inactive
+- Edit button
+- Move Up button
+- Move Down button
+
+Allow users to filter by:
+
+- All Services
+- Sanitary Bins
+- Washroom Contracts
+- Washroom Ad-Hoc
+- Dustmats
+- Pest Control
+- Deep Cleaning
+- Other
+
+Important:
+This page is for scheduling recurring contract services.
+Use simple wording.
+Do not use the word "entry" on this page.
