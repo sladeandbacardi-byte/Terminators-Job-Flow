@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MobileNavigation from "@/components/layout/mobile-nav";
@@ -20,8 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus } from "lucide-react";
-import type { Worker, QuoteSubmission, Invoice, Job } from "@shared/schema";
+import { UserPlus, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, ArrowRight } from "lucide-react";
+import type { Worker, QuoteSubmission, Invoice, Job, Expense } from "@shared/schema";
 
 interface DashboardMetrics {
   activeJobs: number;
@@ -70,6 +71,7 @@ export default function Dashboard() {
   const { data: allQuotes = [] } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: allInvoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: allJobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
+  const { data: allExpenses = [] } = useQuery<Expense[]>({ queryKey: ["/api/expenses"] });
 
   const { data: metrics } = useQuery<DashboardMetrics>({
     queryKey: ["/api/dashboard/metrics"],
@@ -102,6 +104,37 @@ export default function Dashboard() {
     .filter(i => new Date(i.issueDate) >= monthStart && i.status === "paid")
     .reduce((s, i) => s + parseFloat(String(i.total)), 0);
   const collectedPct = salesThisMonth > 0 ? Math.round((paidThisMonth / salesThisMonth) * 100) : 0;
+
+  // ── Profit Position & Cash Flow cards ─────────────────────────────────────
+  const thisMonthStr = format(now, "yyyy-MM");
+
+  // Profitability: invoiced sales vs ALL captured expenses this month
+  const profitSales    = allInvoices
+    .filter(i => format(new Date(i.issueDate), "yyyy-MM") === thisMonthStr)
+    .reduce((s, i) => s + parseFloat(String(i.total || 0)), 0);
+  const profitExpenses = allExpenses
+    .filter(e => e.date.startsWith(thisMonthStr))
+    .reduce((s, e) => s + parseFloat(String(e.amount || 0)), 0);
+  const profitNet   = profitSales - profitExpenses;
+  const profitRatio = profitExpenses === 0
+    ? (profitSales > 0 ? 100 : 0)
+    : Math.min(100, Math.round((profitSales / (profitSales + profitExpenses)) * 100));
+  const profitStatus = profitNet > 0 ? "ahead" : profitNet < 0 ? "behind" : "breakeven";
+
+  // Cash Flow: receipts collected vs PAID expenses this month
+  const cashReceipts  = allInvoices
+    .filter(i => i.status === "paid" && format(new Date(i.paymentDate ?? i.issueDate), "yyyy-MM") === thisMonthStr)
+    .reduce((s, i) => s + parseFloat(String(i.paidAmount || i.total || 0)), 0);
+  const cashExpenses  = allExpenses
+    .filter(e => e.paymentStatus === "paid" && e.date.startsWith(thisMonthStr))
+    .reduce((s, e) => s + parseFloat(String(e.amount || 0)), 0);
+  const cashNet    = cashReceipts - cashExpenses;
+  const cashRatio  = cashExpenses === 0
+    ? (cashReceipts > 0 ? 100 : 0)
+    : Math.min(100, Math.round((cashReceipts / (cashReceipts + cashExpenses)) * 100));
+  const cashStatus = cashNet > 0 ? "ahead" : cashNet < 0 ? "behind" : "breakeven";
+
+  const fmtR = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
   // Service stats
   const jobsCompletedThisMonth = allJobs.filter(j => {
@@ -357,6 +390,146 @@ export default function Dashboard() {
 
             </div>
             {/* ── End company strip ──────────────────────────────── */}
+
+            {/* ── Profit Position + Cash Flow summary cards ──────── */}
+            {(dashboardRole === "admin" || dashboardRole === "accounts" || dashboardRole === "manager") && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                {/* Profit Position card */}
+                <Link href="/finance">
+                  <div className={`rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                    profitStatus === "ahead"     ? "bg-emerald-50 border-emerald-300"
+                    : profitStatus === "behind"  ? "bg-red-50 border-red-300"
+                    :                              "bg-amber-50 border-amber-300"
+                  }`}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-1.5">
+                        {profitStatus === "ahead"
+                          ? <TrendingUp className="h-4 w-4 text-emerald-600" />
+                          : profitStatus === "behind"
+                          ? <TrendingDown className="h-4 w-4 text-red-600" />
+                          : <Minus className="h-4 w-4 text-amber-600" />}
+                        <span className="text-sm font-bold text-gray-800">Profit Position</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-400 font-medium">{format(now, "MMMM yyyy")}</span>
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                      </div>
+                    </div>
+
+                    {/* Net figure */}
+                    <p className={`text-3xl font-extrabold tracking-tight mb-1 ${
+                      profitStatus === "ahead"  ? "text-emerald-700"
+                      : profitStatus === "behind" ? "text-red-700"
+                      :                             "text-amber-700"
+                    }`}>
+                      {profitNet >= 0 ? "+" : ""}{fmtR(profitNet)}
+                    </p>
+
+                    {/* Sales / Expenses row */}
+                    <div className="flex gap-3 mb-3 text-xs text-gray-500">
+                      <span><span className="font-semibold text-gray-700">{fmtR(profitSales)}</span> invoiced</span>
+                      <span className="text-gray-300">·</span>
+                      <span><span className="font-semibold text-gray-700">{fmtR(profitExpenses)}</span> expenses</span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full h-2 bg-white/70 rounded-full overflow-hidden mb-2">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          profitStatus === "ahead"  ? "bg-emerald-500"
+                          : profitStatus === "behind" ? "bg-red-500"
+                          :                             "bg-amber-500"
+                        }`}
+                        style={{ width: `${profitRatio}%` }}
+                      />
+                    </div>
+
+                    {/* Status badge */}
+                    <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      profitStatus === "ahead"  ? "bg-emerald-200 text-emerald-800"
+                      : profitStatus === "behind" ? "bg-red-200 text-red-800"
+                      :                             "bg-amber-200 text-amber-800"
+                    }`}>
+                      {profitStatus === "ahead"
+                        ? <><ArrowUpRight className="h-3 w-3" /> Ahead</>
+                        : profitStatus === "behind"
+                        ? <><ArrowDownRight className="h-3 w-3" /> Behind</>
+                        : <><Minus className="h-3 w-3" /> Break-even</>}
+                    </div>
+                  </div>
+                </Link>
+
+                {/* Cash Flow card */}
+                <Link href="/finance">
+                  <div className={`rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                    cashStatus === "ahead"    ? "bg-emerald-50 border-emerald-300"
+                    : cashStatus === "behind" ? "bg-red-50 border-red-300"
+                    :                           "bg-amber-50 border-amber-300"
+                  }`}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-1.5">
+                        {cashStatus === "ahead"
+                          ? <TrendingUp className="h-4 w-4 text-emerald-600" />
+                          : cashStatus === "behind"
+                          ? <TrendingDown className="h-4 w-4 text-red-600" />
+                          : <Minus className="h-4 w-4 text-amber-600" />}
+                        <span className="text-sm font-bold text-gray-800">Cash Flow Position</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-400 font-medium">{format(now, "MMMM yyyy")}</span>
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                      </div>
+                    </div>
+
+                    {/* Net figure */}
+                    <p className={`text-3xl font-extrabold tracking-tight mb-1 ${
+                      cashStatus === "ahead"  ? "text-emerald-700"
+                      : cashStatus === "behind" ? "text-red-700"
+                      :                           "text-amber-700"
+                    }`}>
+                      {cashNet >= 0 ? "+" : ""}{fmtR(cashNet)}
+                    </p>
+
+                    {/* Receipts / Paid expenses row */}
+                    <div className="flex gap-3 mb-3 text-xs text-gray-500">
+                      <span><span className="font-semibold text-gray-700">{fmtR(cashReceipts)}</span> collected</span>
+                      <span className="text-gray-300">·</span>
+                      <span><span className="font-semibold text-gray-700">{fmtR(cashExpenses)}</span> paid out</span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full h-2 bg-white/70 rounded-full overflow-hidden mb-2">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          cashStatus === "ahead"  ? "bg-emerald-500"
+                          : cashStatus === "behind" ? "bg-red-500"
+                          :                           "bg-amber-500"
+                        }`}
+                        style={{ width: `${cashRatio}%` }}
+                      />
+                    </div>
+
+                    {/* Status badge */}
+                    <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      cashStatus === "ahead"  ? "bg-emerald-200 text-emerald-800"
+                      : cashStatus === "behind" ? "bg-red-200 text-red-800"
+                      :                           "bg-amber-200 text-amber-800"
+                    }`}>
+                      {cashStatus === "ahead"
+                        ? <><ArrowUpRight className="h-3 w-3" /> Ahead</>
+                        : cashStatus === "behind"
+                        ? <><ArrowDownRight className="h-3 w-3" /> Behind</>
+                        : <><Minus className="h-3 w-3" /> Break-even</>}
+                    </div>
+                  </div>
+                </Link>
+
+              </div>
+            )}
+            {/* ── End Profit / Cash Flow cards ───────────────────── */}
 
             {/* Suspended services — its own standalone alert card */}
             <SuspendedServices />
