@@ -392,7 +392,7 @@ export default function Dashboard() {
             {/* ── End company strip ──────────────────────────────── */}
 
             {/* ── Profit Position + Cash Flow summary cards ──────── */}
-            {(dashboardRole === "admin" || dashboardRole === "accounts" || dashboardRole === "manager") && (
+            {dashboardRole === "admin" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                 {/* Profit Position card */}
