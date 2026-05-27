@@ -11,22 +11,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
-  MapPin, Plus, Pencil, ArrowUp, ArrowDown, EyeOff, Eye,
-  ChevronDown, ChevronRight, ClipboardList, Search, CheckCircle2, XCircle,
+  Plus, Pencil, ArrowUp, ArrowDown, EyeOff, Eye,
+  ChevronDown, ChevronRight, ClipboardList, Search,
+  CheckCircle2, XCircle, MapPin,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   SERVICE_SCHEDULE_SERVICE_TYPES,
   SERVICE_SCHEDULE_DAYS,
+  SERVICE_SCHEDULE_WEEKS,
   type ServiceScheduleEntry,
   type InsertServiceScheduleEntry,
   type Client,
 } from "@shared/schema";
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Display constants ────────────────────────────────────────────────────────
 
-const SERVICE_TYPE_MAP = Object.fromEntries(
+const SERVICE_TYPE_LABELS = Object.fromEntries(
   SERVICE_SCHEDULE_SERVICE_TYPES.map(t => [t.value, t.label])
 );
 
@@ -53,76 +55,86 @@ const FREQUENCY_OPTIONS = [
 ];
 
 const DURATION_OPTIONS = [
-  { label: "15 min",  value: 15 },
-  { label: "30 min",  value: 30 },
-  { label: "45 min",  value: 45 },
-  { label: "1 hour",  value: 60 },
-  { label: "1.5 hrs", value: 90 },
-  { label: "2 hrs",   value: 120 },
-  { label: "3 hrs",   value: 180 },
-  { label: "4 hrs",   value: 240 },
-  { label: "Full day",value: 480 },
+  { label: "15 min",   value: 15 },
+  { label: "30 min",   value: 30 },
+  { label: "45 min",   value: 45 },
+  { label: "1 hour",   value: 60 },
+  { label: "1.5 hrs",  value: 90 },
+  { label: "2 hrs",    value: 120 },
+  { label: "3 hrs",    value: 180 },
+  { label: "4 hrs",    value: 240 },
+  { label: "Full day", value: 480 },
 ];
 
-const makeEmpty = (): InsertServiceScheduleEntry => ({
-  clientId: undefined,
-  clientName: "",
-  contractId: undefined,
-  contractRef: "",
-  address: "",
-  suburb: "",
-  serviceType: "sanitary_bins",
-  frequency: "Monthly",
-  assignedTeam: "",
-  serviceTime: "",
-  estimatedDuration: undefined,
-  dayOfWeek: "Monday",
-  routeOrder: undefined as any,
-  contractStatus: "active",
-  jobStatus: "",
-  googleMapsLink: "",
-  notes: "",
-  isActive: true,
-});
+// Weeks shown in the filter (excludes "Every Week" — those are shown separately)
+const FILTER_WEEKS = ["All Weeks", "Week 1", "Week 2", "Week 3", "Week 4", "Last Week"] as const;
+type FilterWeek = typeof FILTER_WEEKS[number];
 
-// ── ServiceContract minimal type ─────────────────────────────────────────────
+// Week order for grouped display
+const WEEK_ORDER = ["Week 1", "Week 2", "Week 3", "Week 4", "Last Week", "Every Week"];
+
+// ── Minimal service contract type ─────────────────────────────────────────────
 interface ServiceContract {
   id: string;
   customerId: string;
-  customerName: string;
   serviceType: string;
   frequency: string;
   activeStatus: boolean;
 }
 
-// ── Client search combobox ───────────────────────────────────────────────────
-function ClientSearchInput({
+// ── Empty form factory ────────────────────────────────────────────────────────
+const makeEmpty = (): InsertServiceScheduleEntry => ({
+  clientId:          undefined,
+  clientName:        "",
+  contractId:        undefined,
+  contractRef:       "",
+  address:           "",
+  suburb:            "",
+  serviceType:       "sanitary_bins",
+  frequency:         "Monthly",
+  weekOfMonth:       "Week 1",
+  dayOfWeek:         "Monday",
+  serviceTime:       "",
+  secondWeekOfMonth: "",
+  secondDayOfWeek:   "",
+  secondServiceTime: "",
+  onceOffDate:       "",
+  estimatedDuration: undefined,
+  assignedTeam:      "",
+  routeOrder:        undefined as any,
+  contractStatus:    "active",
+  jobStatus:         "",
+  googleMapsLink:    "",
+  notes:             "",
+  isActive:          true,
+});
+
+// ── Client search combobox ─────────────────────────────────────────────────────
+function ClientSearch({
   clients,
   value,
   onChange,
 }: {
   clients: Client[];
   value: string;
-  onChange: (client: Client | null) => void;
+  onChange: (c: Client | null) => void;
 }) {
   const [q, setQ] = useState(value);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setQ(value); }, [value]);
-
   useEffect(() => {
-    function handler(e: MouseEvent) {
+    const h = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
   }, []);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return clients.slice(0, 30);
     const lo = q.toLowerCase();
-    return clients.filter(c => c.name.toLowerCase().includes(lo)).slice(0, 30);
+    return (lo ? clients.filter(c => c.name.toLowerCase().includes(lo)) : clients).slice(0, 40);
   }, [clients, q]);
 
   return (
@@ -138,17 +150,13 @@ function ClientSearchInput({
         />
       </div>
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl">
           {filtered.map(c => (
             <button
               key={c.id}
               type="button"
               className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition"
-              onMouseDown={() => {
-                setQ(c.name);
-                setOpen(false);
-                onChange(c);
-              }}
+              onMouseDown={() => { setQ(c.name); setOpen(false); onChange(c); }}
             >
               <div className="font-medium text-gray-900">{c.name}</div>
               {(c.suburb || c.address) && (
@@ -162,77 +170,49 @@ function ClientSearchInput({
   );
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
+// ── Main page ──────────────────────────────────────────────────────────────────
 export default function ServiceScheduling() {
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
+  const [filterWeek, setFilterWeek] = useState<FilterWeek>("All Weeks");
   const [searchQ, setSearchQ] = useState("");
-  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceScheduleEntry | null>(null);
   const [form, setForm] = useState<InsertServiceScheduleEntry>(makeEmpty());
-
   const [deactivateTarget, setDeactivateTarget] = useState<ServiceScheduleEntry | null>(null);
 
-  // ── Data queries ─────────────────────────────────────────────────────────
+  // ── Queries ─────────────────────────────────────────────────────────────────
   const { data: scheduled = [], isLoading } = useQuery<ServiceScheduleEntry[]>({
     queryKey: ["/api/service-schedule"],
   });
-
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
-
   const { data: allContracts = [] } = useQuery<ServiceContract[]>({
     queryKey: ["/api/service-contracts"],
   });
 
-  // Contracts filtered to the selected client
-  const clientContracts = useMemo(() => {
-    if (!form.clientId) return [];
-    return allContracts.filter(c => c.customerId === form.clientId && c.activeStatus !== false);
-  }, [allContracts, form.clientId]);
+  const clientContracts = useMemo(
+    () => allContracts.filter(c => c.customerId === form.clientId && c.activeStatus !== false),
+    [allContracts, form.clientId]
+  );
 
-  // ── Auto route order ──────────────────────────────────────────────────────
-  function nextRouteOrder(day: string): number {
-    const sameDay = scheduled.filter(e => e.dayOfWeek === day);
-    if (!sameDay.length) return 1;
-    return Math.max(...sameDay.map(e => e.routeOrder)) + 1;
+  // ── Form helpers ─────────────────────────────────────────────────────────────
+  const freq = form.frequency ?? "Monthly";
+  const showWeekOfMonth   = ["Monthly","Every 2 months","Quarterly","Every 6 months","Annually","Twice a month"].includes(freq);
+  const showSecondDay     = freq === "2 x a week";
+  const showTwiceAMonth   = freq === "Twice a month";
+  const showOnceOff       = freq === "Once-off";
+  const weeklyOrDaily     = freq === "Weekly" || freq === "Daily";
+
+  function nextRouteOrder(week: string, day: string): number {
+    const same = scheduled.filter(e => (e.weekOfMonth ?? "Every Week") === week && e.dayOfWeek === day);
+    return same.length ? Math.max(...same.map(e => e.routeOrder)) + 1 : 1;
   }
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
-  const saveMutation = useMutation({
-    mutationFn: (data: { id?: string; body: InsertServiceScheduleEntry }) =>
-      data.id
-        ? apiRequest("PUT", `/api/service-schedule/${data.id}`, data.body)
-        : apiRequest("POST", "/api/service-schedule", data.body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-schedule"] });
-      setDialogOpen(false);
-      toast({ title: editing ? "Service updated" : "Service added to schedule" });
-    },
-    onError: () => toast({ title: "Error", description: "Could not save service.", variant: "destructive" }),
-  });
-
-  const moveMutation = useMutation({
-    mutationFn: ({ id, routeOrder }: { id: string; routeOrder: number }) =>
-      apiRequest("PUT", `/api/service-schedule/${id}`, { routeOrder }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/service-schedule"] }),
-  });
-
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      apiRequest("PUT", `/api/service-schedule/${id}`, { isActive }),
-    onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-schedule"] });
-      setDeactivateTarget(null);
-      toast({ title: vars.isActive ? "Service activated" : "Service deactivated" });
-    },
-  });
-
-  // ── Dialog helpers ────────────────────────────────────────────────────────
   function openAdd() {
     setEditing(null);
     setForm(makeEmpty());
@@ -250,10 +230,15 @@ export default function ServiceScheduling() {
       suburb:            e.suburb ?? "",
       serviceType:       e.serviceType,
       frequency:         e.frequency ?? "Monthly",
-      assignedTeam:      e.assignedTeam ?? "",
-      serviceTime:       e.serviceTime ?? "",
-      estimatedDuration: e.estimatedDuration ?? undefined,
+      weekOfMonth:       e.weekOfMonth ?? "Week 1",
       dayOfWeek:         e.dayOfWeek,
+      serviceTime:       e.serviceTime ?? "",
+      secondWeekOfMonth: e.secondWeekOfMonth ?? "",
+      secondDayOfWeek:   e.secondDayOfWeek ?? "",
+      secondServiceTime: e.secondServiceTime ?? "",
+      onceOffDate:       e.onceOffDate ?? "",
+      estimatedDuration: e.estimatedDuration ?? undefined,
+      assignedTeam:      e.assignedTeam ?? "",
       routeOrder:        e.routeOrder,
       contractStatus:    e.contractStatus ?? "active",
       jobStatus:         e.jobStatus ?? "",
@@ -268,12 +253,12 @@ export default function ServiceScheduling() {
     if (client) {
       setForm(f => ({
         ...f,
-        clientId:    client.id,
-        clientName:  client.name,
-        address:     client.address ?? f.address,
-        suburb:      client.suburb ?? f.suburb,
+        clientId: client.id,
+        clientName: client.name,
+        address: client.address ?? f.address,
+        suburb: client.suburb ?? f.suburb,
         googleMapsLink: client.googleMapsLink ?? f.googleMapsLink,
-        contractId:  undefined,
+        contractId: undefined,
         contractRef: "",
       }));
     } else {
@@ -295,67 +280,124 @@ export default function ServiceScheduling() {
     }
   }
 
+  // ── Mutations ────────────────────────────────────────────────────────────────
+  const saveMutation = useMutation({
+    mutationFn: (d: { id?: string; body: InsertServiceScheduleEntry }) =>
+      d.id
+        ? apiRequest("PUT", `/api/service-schedule/${d.id}`, d.body)
+        : apiRequest("POST", "/api/service-schedule", d.body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-schedule"] });
+      setDialogOpen(false);
+      toast({ title: editing ? "Service updated" : "Service added to schedule" });
+    },
+    onError: () => toast({ title: "Could not save service.", variant: "destructive" }),
+  });
+
+  const moveMutation = useMutation({
+    mutationFn: ({ id, routeOrder }: { id: string; routeOrder: number }) =>
+      apiRequest("PUT", `/api/service-schedule/${id}`, { routeOrder }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/service-schedule"] }),
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiRequest("PUT", `/api/service-schedule/${id}`, { isActive }),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-schedule"] });
+      setDeactivateTarget(null);
+      toast({ title: vars.isActive ? "Service activated" : "Service deactivated" });
+    },
+  });
+
   function handleSave() {
     if (!form.clientName.trim()) {
       toast({ title: "Please select a client.", variant: "destructive" });
       return;
     }
-    if (!form.dayOfWeek) {
-      toast({ title: "Please select a day.", variant: "destructive" });
-      return;
-    }
-    const body = {
+    const effectiveWeek = weeklyOrDaily ? "Every Week" : (form.weekOfMonth || "Every Week");
+    const body: InsertServiceScheduleEntry = {
       ...form,
-      routeOrder: form.routeOrder || nextRouteOrder(form.dayOfWeek),
+      weekOfMonth: effectiveWeek,
+      routeOrder: form.routeOrder || nextRouteOrder(effectiveWeek, form.dayOfWeek),
     };
     saveMutation.mutate({ id: editing?.id, body });
   }
 
-  // ── Move up/down ──────────────────────────────────────────────────────────
-  function handleMove(entry: ServiceScheduleEntry, direction: "up" | "down") {
-    const sameDay = scheduled
-      .filter(e => e.dayOfWeek === entry.dayOfWeek)
+  function handleMove(svc: ServiceScheduleEntry, dir: "up" | "down") {
+    const week = svc.weekOfMonth ?? "Every Week";
+    const sameGroup = scheduled
+      .filter(e => (e.weekOfMonth ?? "Every Week") === week && e.dayOfWeek === svc.dayOfWeek)
       .sort((a, b) => a.routeOrder - b.routeOrder);
-    const idx = sameDay.findIndex(e => e.id === entry.id);
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sameDay.length) return;
-    const swap = sameDay[swapIdx];
-    moveMutation.mutate({ id: entry.id, routeOrder: swap.routeOrder });
-    moveMutation.mutate({ id: swap.id, routeOrder: entry.routeOrder });
+    const idx = sameGroup.findIndex(e => e.id === svc.id);
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sameGroup.length) return;
+    const swap = sameGroup[swapIdx];
+    moveMutation.mutate({ id: svc.id, routeOrder: swap.routeOrder });
+    moveMutation.mutate({ id: swap.id, routeOrder: svc.routeOrder });
   }
 
-  function toggleDay(day: string) {
-    setCollapsedDays(prev => {
+  function toggleSection(key: string) {
+    setCollapsed(prev => {
       const next = new Set(prev);
-      next.has(day) ? next.delete(day) : next.add(day);
+      next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   }
 
-  // ── Filtering ─────────────────────────────────────────────────────────────
-  const filteredScheduled = useMemo(() => {
+  // ── Filtering ────────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
     return scheduled.filter(e => {
       const typeOk = filterType === "all" || e.serviceType === filterType;
+      const week = e.weekOfMonth ?? "Every Week";
+      const weekOk = filterWeek === "All Weeks" || week === filterWeek || week === "Every Week";
       const q = searchQ.toLowerCase();
       const searchOk = !q
         || e.clientName.toLowerCase().includes(q)
-        || (e.assignedTeam ?? "").toLowerCase().includes(q)
-        || (e.address ?? "").toLowerCase().includes(q);
-      return typeOk && searchOk;
+        || (e.assignedTeam ?? "").toLowerCase().includes(q);
+      return typeOk && weekOk && searchOk;
     });
-  }, [scheduled, filterType, searchQ]);
+  }, [scheduled, filterType, filterWeek, searchQ]);
 
+  // Group: week → day → sorted by routeOrder
   const grouped = useMemo(() => {
-    const map: Record<string, ServiceScheduleEntry[]> = {};
-    SERVICE_SCHEDULE_DAYS.forEach(d => { map[d] = []; });
-    filteredScheduled.forEach(e => { map[e.dayOfWeek]?.push(e); });
-    Object.values(map).forEach(arr => arr.sort((a, b) => a.routeOrder - b.routeOrder));
+    const map: Record<string, Record<string, ServiceScheduleEntry[]>> = {};
+    WEEK_ORDER.forEach(w => {
+      map[w] = {};
+      SERVICE_SCHEDULE_DAYS.forEach(d => { map[w][d] = []; });
+    });
+    filtered.forEach(e => {
+      const w = e.weekOfMonth ?? "Every Week";
+      if (!map[w]) {
+        map[w] = {};
+        SERVICE_SCHEDULE_DAYS.forEach(d => { map[w][d] = []; });
+      }
+      map[w][e.dayOfWeek]?.push(e);
+
+      // If "2 x a week" and has a second day, also add into that day slot
+      if (e.secondDayOfWeek && (e.frequency === "2 x a week")) {
+        map[w][e.secondDayOfWeek]?.push(e);
+      }
+    });
+    // Sort within each slot
+    Object.values(map).forEach(days =>
+      Object.values(days).forEach(arr => arr.sort((a, b) => a.routeOrder - b.routeOrder))
+    );
     return map;
-  }, [filteredScheduled]);
+  }, [filtered]);
+
+  // Which weeks have any services to show
+  const activeWeeks = useMemo(() =>
+    WEEK_ORDER.filter(w => {
+      if (filterWeek !== "All Weeks" && w !== filterWeek && w !== "Every Week") return false;
+      return Object.values(grouped[w] ?? {}).some(arr => arr.length > 0);
+    }),
+    [grouped, filterWeek]
+  );
 
   const totalActive = scheduled.filter(e => e.isActive).length;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex bg-gray-50">
       <Sidebar />
@@ -391,232 +433,248 @@ export default function ServiceScheduling() {
 
             {/* ── Filter bar ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-3">
+
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search by client, team, or address…"
+                  placeholder="Search by client or team…"
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
                   className="pl-9 text-sm"
                 />
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setFilterType("all")}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-full border transition ${
-                    filterType === "all"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                  }`}
-                >
-                  All Services
-                  {totalActive > 0 && (
-                    <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filterType === "all" ? "bg-white/25" : "bg-gray-100"}`}>
-                      {totalActive}
-                    </span>
-                  )}
-                </button>
-                {SERVICE_SCHEDULE_SERVICE_TYPES.map(t => {
-                  const count = scheduled.filter(e => e.serviceType === t.value && e.isActive).length;
-                  return (
+
+              {/* Week filter */}
+              <div>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Week</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {FILTER_WEEKS.map(w => (
                     <button
-                      key={t.value}
-                      onClick={() => setFilterType(t.value)}
+                      key={w}
+                      onClick={() => setFilterWeek(w)}
                       className={`text-xs font-medium px-3 py-1.5 rounded-full border transition ${
-                        filterType === t.value
+                        filterWeek === w
                           ? "bg-blue-600 text-white border-blue-600"
                           : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
                       }`}
                     >
-                      {t.label}
-                      {count > 0 && (
-                        <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filterType === t.value ? "bg-white/25" : "bg-gray-100"}`}>
-                          {count}
-                        </span>
-                      )}
+                      {w}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+
+              {/* Service type filter */}
+              <div>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Service Type</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setFilterType("all")}
+                    className={`text-xs font-medium px-3 py-1.5 rounded-full border transition ${
+                      filterType === "all"
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                    }`}
+                  >
+                    All Services
+                    {totalActive > 0 && (
+                      <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filterType === "all" ? "bg-white/25" : "bg-gray-100"}`}>
+                        {totalActive}
+                      </span>
+                    )}
+                  </button>
+                  {SERVICE_SCHEDULE_SERVICE_TYPES.map(t => {
+                    const cnt = scheduled.filter(e => e.serviceType === t.value && e.isActive).length;
+                    return (
+                      <button
+                        key={t.value}
+                        onClick={() => setFilterType(t.value)}
+                        className={`text-xs font-medium px-3 py-1.5 rounded-full border transition ${
+                          filterType === t.value
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                        }`}
+                      >
+                        {t.label}
+                        {cnt > 0 && (
+                          <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filterType === t.value ? "bg-white/25" : "bg-gray-100"}`}>
+                            {cnt}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* ── Day groups ── */}
+            {/* ── Grouped schedule ── */}
             {isLoading ? (
               <div className="text-center py-16 text-gray-400">Loading schedule…</div>
+            ) : activeWeeks.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 px-6 py-12 text-center">
+                <ClipboardList className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">No services scheduled yet.</p>
+                <p className="text-sm text-gray-400 mt-1">Click <strong>Add Service</strong> to get started.</p>
+              </div>
             ) : (
-              SERVICE_SCHEDULE_DAYS.map(day => {
-                const dayServices = grouped[day] ?? [];
-                const collapsed = collapsedDays.has(day);
-                const activeCount = dayServices.filter(e => e.isActive).length;
-                const inactiveCount = dayServices.filter(e => !e.isActive).length;
+              activeWeeks.map(week => {
+                const weekKey = `w:${week}`;
+                const weekCollapsed = collapsed.has(weekKey);
+                const weekDays = SERVICE_SCHEDULE_DAYS.filter(d => (grouped[week]?.[d]?.length ?? 0) > 0);
+                const weekTotal = weekDays.reduce((sum, d) => sum + (grouped[week]?.[d]?.length ?? 0), 0);
 
                 return (
-                  <div key={day} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    {/* Day header */}
+                  <div key={week} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+                    {/* Week header */}
                     <button
-                      onClick={() => toggleDay(day)}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200 hover:bg-gray-100 transition"
+                      onClick={() => toggleSection(weekKey)}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 border-b border-blue-100 hover:bg-blue-100 transition text-left"
                     >
-                      <div className="flex items-center gap-3">
-                        {collapsed
-                          ? <ChevronRight className="h-4 w-4 text-gray-400" />
-                          : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                        <span className="font-bold text-gray-900">{day}</span>
-                        {dayServices.length > 0 && (
-                          <span className="text-xs text-gray-500">
-                            {activeCount} active
-                            {inactiveCount > 0 && ` · ${inactiveCount} inactive`}
-                          </span>
-                        )}
-                      </div>
-                      {dayServices.length === 0 && (
-                        <span className="text-xs text-gray-400 italic">Nothing scheduled</span>
-                      )}
+                      {weekCollapsed
+                        ? <ChevronRight className="h-4 w-4 text-blue-400 shrink-0" />
+                        : <ChevronDown className="h-4 w-4 text-blue-400 shrink-0" />}
+                      <span className="font-bold text-blue-900 text-sm">{week}</span>
+                      <span className="text-xs text-blue-600">{weekTotal} service{weekTotal !== 1 ? "s" : ""}</span>
                     </button>
 
-                    {/* Services table */}
-                    {!collapsed && dayServices.length > 0 && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-100">
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-10">#</th>
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Client</th>
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Service Type</th>
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Frequency</th>
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Time</th>
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Team</th>
-                              <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Contract</th>
-                              <th className="text-center px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Status</th>
-                              <th className="text-right px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {dayServices.map((svc, idx) => (
-                              <tr
-                                key={svc.id}
-                                className={`border-b border-gray-50 hover:bg-blue-50/30 transition ${!svc.isActive ? "opacity-50" : ""}`}
-                              >
-                                {/* Route # */}
-                                <td className="px-3 py-2.5 font-bold text-gray-500 tabular-nums w-10">
-                                  {svc.routeOrder}
-                                </td>
+                    {/* Days within this week */}
+                    {!weekCollapsed && weekDays.map(day => {
+                      const dayKey = `d:${week}:${day}`;
+                      const dayCollapsed = collapsed.has(dayKey);
+                      const dayServices = grouped[week]?.[day] ?? [];
 
-                                {/* Client */}
-                                <td className="px-3 py-2.5 max-w-[180px]">
-                                  <div className="font-semibold text-gray-900 truncate">{svc.clientName}</div>
-                                  {svc.suburb && (
-                                    <div className="text-[11px] text-gray-400 truncate">{svc.suburb}</div>
-                                  )}
-                                </td>
+                      return (
+                        <div key={day} className="border-b border-gray-100 last:border-b-0">
 
-                                {/* Service type badge */}
-                                <td className="px-3 py-2.5">
-                                  <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${SERVICE_TYPE_COLORS[svc.serviceType] ?? SERVICE_TYPE_COLORS.other}`}>
-                                    {SERVICE_TYPE_MAP[svc.serviceType] ?? svc.serviceType}
-                                  </span>
-                                </td>
+                          {/* Day sub-header */}
+                          <button
+                            onClick={() => toggleSection(dayKey)}
+                            className="w-full flex items-center gap-3 px-6 py-2.5 bg-gray-50 hover:bg-gray-100 transition text-left"
+                          >
+                            {dayCollapsed
+                              ? <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                              : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+                            <span className="font-semibold text-gray-700 text-sm">{day}</span>
+                            <span className="text-xs text-gray-400">{dayServices.length} service{dayServices.length !== 1 ? "s" : ""}</span>
+                          </button>
 
-                                {/* Frequency */}
-                                <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-gray-600 whitespace-nowrap">
-                                  {svc.frequency ?? "—"}
-                                </td>
-
-                                {/* Time */}
-                                <td className="px-3 py-2.5 hidden sm:table-cell text-xs text-gray-600 font-mono whitespace-nowrap">
-                                  {svc.serviceTime ?? "—"}
-                                </td>
-
-                                {/* Team */}
-                                <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-gray-600">
-                                  {svc.assignedTeam ?? "—"}
-                                </td>
-
-                                {/* Contract status */}
-                                <td className="px-3 py-2.5 hidden md:table-cell">
-                                  {svc.contractStatus ? (
-                                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${CONTRACT_STATUS_COLORS[svc.contractStatus] ?? "bg-gray-100 text-gray-600"}`}>
-                                      {svc.contractStatus}
-                                    </span>
-                                  ) : "—"}
-                                </td>
-
-                                {/* Active/Inactive */}
-                                <td className="px-3 py-2.5 hidden md:table-cell text-center">
-                                  {svc.isActive
-                                    ? <CheckCircle2 className="h-4 w-4 text-emerald-500 inline" />
-                                    : <XCircle className="h-4 w-4 text-gray-400 inline" />}
-                                </td>
-
-                                {/* Actions */}
-                                <td className="px-3 py-2.5">
-                                  <div className="flex items-center justify-end gap-0.5">
-                                    <button
-                                      onClick={() => handleMove(svc, "up")}
-                                      disabled={idx === 0 || moveMutation.isPending}
-                                      className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-25 transition"
-                                      title="Move up"
+                          {/* Service rows */}
+                          {!dayCollapsed && (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-gray-100">
+                                    <th className="text-left px-4 pl-8 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-10">#</th>
+                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Client</th>
+                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Service</th>
+                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Frequency</th>
+                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Time</th>
+                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Team</th>
+                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Contract</th>
+                                    <th className="text-center px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Active</th>
+                                    <th className="text-right px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {dayServices.map((svc, idx) => (
+                                    <tr
+                                      key={svc.id}
+                                      className={`border-b border-gray-50 hover:bg-blue-50/30 transition ${!svc.isActive ? "opacity-50" : ""}`}
                                     >
-                                      <ArrowUp className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleMove(svc, "down")}
-                                      disabled={idx === dayServices.length - 1 || moveMutation.isPending}
-                                      className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-25 transition"
-                                      title="Move down"
-                                    >
-                                      <ArrowDown className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => openEdit(svc)}
-                                      className="p-1.5 rounded hover:bg-blue-100 text-blue-500 hover:text-blue-700 transition"
-                                      title="Edit"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </button>
-                                    {svc.googleMapsLink && (
-                                      <a
-                                        href={svc.googleMapsLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-1.5 rounded hover:bg-emerald-100 text-emerald-500 hover:text-emerald-700 transition"
-                                        title="Open in Google Maps"
-                                      >
-                                        <MapPin className="h-3.5 w-3.5" />
-                                      </a>
-                                    )}
-                                    <button
-                                      onClick={() =>
-                                        svc.isActive
-                                          ? setDeactivateTarget(svc)
-                                          : toggleActiveMutation.mutate({ id: svc.id, isActive: true })
-                                      }
-                                      className={`p-1.5 rounded transition ${svc.isActive ? "hover:bg-red-100 text-gray-400 hover:text-red-600" : "hover:bg-emerald-100 text-emerald-500 hover:text-emerald-700"}`}
-                                      title={svc.isActive ? "Deactivate" : "Activate"}
-                                    >
-                                      {svc.isActive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {!collapsed && dayServices.length === 0 && (
-                      <div className="px-4 py-8 text-center text-sm text-gray-400">
-                        Nothing scheduled for {day}
-                        {filterType !== "all" && " with this service type"}.
-                        <button
-                          onClick={openAdd}
-                          className="ml-2 text-blue-500 hover:underline"
-                        >
-                          Add a service
-                        </button>
-                      </div>
-                    )}
+                                      <td className="px-4 pl-8 py-2.5 font-bold text-gray-400 tabular-nums w-10 text-sm">
+                                        {svc.routeOrder}
+                                      </td>
+                                      <td className="px-3 py-2.5 max-w-[170px]">
+                                        <div className="font-semibold text-gray-900 truncate">{svc.clientName}</div>
+                                        {svc.suburb && <div className="text-[11px] text-gray-400 truncate">{svc.suburb}</div>}
+                                      </td>
+                                      <td className="px-3 py-2.5">
+                                        <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${SERVICE_TYPE_COLORS[svc.serviceType] ?? SERVICE_TYPE_COLORS.other}`}>
+                                          {SERVICE_TYPE_LABELS[svc.serviceType] ?? svc.serviceType}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-gray-600 whitespace-nowrap">
+                                        {svc.frequency ?? "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 hidden sm:table-cell text-xs text-gray-600 font-mono whitespace-nowrap">
+                                        {svc.serviceTime ?? "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-gray-600">
+                                        {svc.assignedTeam ?? "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 hidden md:table-cell">
+                                        {svc.contractStatus ? (
+                                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${CONTRACT_STATUS_COLORS[svc.contractStatus] ?? "bg-gray-100 text-gray-600"}`}>
+                                            {svc.contractStatus}
+                                          </span>
+                                        ) : "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 hidden md:table-cell text-center">
+                                        {svc.isActive
+                                          ? <CheckCircle2 className="h-4 w-4 text-emerald-500 inline" />
+                                          : <XCircle className="h-4 w-4 text-gray-400 inline" />}
+                                      </td>
+                                      <td className="px-3 py-2.5">
+                                        <div className="flex items-center justify-end gap-0.5">
+                                          <button
+                                            onClick={() => handleMove(svc, "up")}
+                                            disabled={idx === 0 || moveMutation.isPending}
+                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-25 transition"
+                                            title="Move up"
+                                          >
+                                            <ArrowUp className="h-3.5 w-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleMove(svc, "down")}
+                                            disabled={idx === dayServices.length - 1 || moveMutation.isPending}
+                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-25 transition"
+                                            title="Move down"
+                                          >
+                                            <ArrowDown className="h-3.5 w-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() => openEdit(svc)}
+                                            className="p-1.5 rounded hover:bg-blue-100 text-blue-500 hover:text-blue-700 transition"
+                                            title="Edit"
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </button>
+                                          {svc.googleMapsLink && (
+                                            <a
+                                              href={svc.googleMapsLink}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="p-1.5 rounded hover:bg-emerald-100 text-emerald-500 hover:text-emerald-700 transition"
+                                              title="Open in Google Maps"
+                                            >
+                                              <MapPin className="h-3.5 w-3.5" />
+                                            </a>
+                                          )}
+                                          <button
+                                            onClick={() =>
+                                              svc.isActive
+                                                ? setDeactivateTarget(svc)
+                                                : toggleActiveMutation.mutate({ id: svc.id, isActive: true })
+                                            }
+                                            className={`p-1.5 rounded transition ${svc.isActive ? "hover:bg-red-100 text-gray-400 hover:text-red-600" : "hover:bg-emerald-100 text-emerald-500 hover:text-emerald-700"}`}
+                                            title={svc.isActive ? "Deactivate" : "Activate"}
+                                          >
+                                            {svc.isActive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })
@@ -628,9 +686,9 @@ export default function ServiceScheduling() {
 
       <MobileNavigation />
 
-      {/* ══════════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════════════
           Add / Edit Dialog
-      ══════════════════════════════════════════════════════════════════════ */}
+      ════════════════════════════════════════════════════════════════════════ */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
           <DialogHeader>
@@ -639,19 +697,15 @@ export default function ServiceScheduling() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-1">
 
-            {/* ── Client ── */}
+            {/* Client */}
             <div className="sm:col-span-2">
               <Label>Client *</Label>
-              <ClientSearchInput
-                clients={clients}
-                value={form.clientName}
-                onChange={handleClientSelect}
-              />
+              <ClientSearch clients={clients} value={form.clientName} onChange={handleClientSelect} />
             </div>
 
-            {/* ── Contract ── */}
+            {/* Contract */}
             <div className="sm:col-span-2">
               <Label>Contract</Label>
               <Select
@@ -664,21 +718,17 @@ export default function ServiceScheduling() {
                 </SelectTrigger>
                 <SelectContent>
                   {clientContracts.length === 0
-                    ? <SelectItem value="none" disabled>No contracts found</SelectItem>
+                    ? <SelectItem value="_none" disabled>No active contracts</SelectItem>
                     : clientContracts.map(c => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.serviceType} — {c.frequency}
                       </SelectItem>
-                    ))
-                  }
+                    ))}
                 </SelectContent>
               </Select>
-              {form.clientId && clientContracts.length === 0 && (
-                <p className="text-[11px] text-amber-600 mt-1">No active contracts found for this client.</p>
-              )}
             </div>
 
-            {/* ── Service Type ── */}
+            {/* Service Type */}
             <div>
               <Label>Service Type</Label>
               <Select value={form.serviceType} onValueChange={v => setForm(f => ({ ...f, serviceType: v }))}>
@@ -691,11 +741,14 @@ export default function ServiceScheduling() {
               </Select>
             </div>
 
-            {/* ── Frequency ── */}
+            {/* Frequency */}
             <div>
               <Label>Frequency</Label>
-              <Select value={form.frequency ?? ""} onValueChange={v => setForm(f => ({ ...f, frequency: v }))}>
-                <SelectTrigger className="text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+              <Select
+                value={form.frequency ?? "Monthly"}
+                onValueChange={v => setForm(f => ({ ...f, frequency: v }))}
+              >
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FREQUENCY_OPTIONS.map(o => (
                     <SelectItem key={o} value={o}>{o}</SelectItem>
@@ -704,31 +757,161 @@ export default function ServiceScheduling() {
               </Select>
             </div>
 
-            {/* ── Day ── */}
-            <div>
-              <Label>Day *</Label>
-              <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
-                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SERVICE_SCHEDULE_DAYS.map(d => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* ─── ONCE-OFF: date picker ─── */}
+            {showOnceOff && (
+              <div className="sm:col-span-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={form.onceOffDate ?? ""}
+                  onChange={e => setForm(f => ({ ...f, onceOffDate: e.target.value }))}
+                  className="text-sm"
+                />
+              </div>
+            )}
 
-            {/* ── Time ── */}
-            <div>
-              <Label>Time</Label>
-              <Input
-                type="time"
-                value={form.serviceTime ?? ""}
-                onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))}
-                className="text-sm"
-              />
-            </div>
+            {/* ─── WEEKLY / DAILY: Day + Time ─── */}
+            {(weeklyOrDaily) && (
+              <>
+                <div>
+                  <Label>Day</Label>
+                  <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_SCHEDULE_DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Time</Label>
+                  <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
+                </div>
+              </>
+            )}
 
-            {/* ── Estimated Duration ── */}
+            {/* ─── 2 x A WEEK: Two days + Time ─── */}
+            {showSecondDay && (
+              <>
+                <div>
+                  <Label>First Day</Label>
+                  <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_SCHEDULE_DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Second Day</Label>
+                  <Select value={form.secondDayOfWeek ?? ""} onValueChange={v => setForm(f => ({ ...f, secondDayOfWeek: v }))}>
+                    <SelectTrigger className="text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_SCHEDULE_DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Time</Label>
+                  <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
+                </div>
+              </>
+            )}
+
+            {/* ─── TWICE A MONTH: Two week+day+time combos ─── */}
+            {showTwiceAMonth && (
+              <>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-semibold text-gray-500 mb-2">First visit</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">Week</Label>
+                      <Select value={form.weekOfMonth ?? "Week 1"} onValueChange={v => setForm(f => ({ ...f, weekOfMonth: v }))}>
+                        <SelectTrigger className="text-sm h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {SERVICE_SCHEDULE_WEEKS.filter(w => w !== "Every Week").map(w => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Day</Label>
+                      <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
+                        <SelectTrigger className="text-sm h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {SERVICE_SCHEDULE_DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Time</Label>
+                      <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm h-9" />
+                    </div>
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Second visit</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">Week</Label>
+                      <Select value={form.secondWeekOfMonth ?? ""} onValueChange={v => setForm(f => ({ ...f, secondWeekOfMonth: v }))}>
+                        <SelectTrigger className="text-sm h-9"><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>
+                          {SERVICE_SCHEDULE_WEEKS.filter(w => w !== "Every Week").map(w => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Day</Label>
+                      <Select value={form.secondDayOfWeek ?? ""} onValueChange={v => setForm(f => ({ ...f, secondDayOfWeek: v }))}>
+                        <SelectTrigger className="text-sm h-9"><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>
+                          {SERVICE_SCHEDULE_DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Time</Label>
+                      <Input type="time" value={form.secondServiceTime ?? ""} onChange={e => setForm(f => ({ ...f, secondServiceTime: e.target.value }))} className="text-sm h-9" />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ─── MONTHLY / EVERY N MONTHS: Week + Day + Time ─── */}
+            {showWeekOfMonth && !showTwiceAMonth && (
+              <>
+                <div>
+                  <Label>Week</Label>
+                  <Select value={form.weekOfMonth ?? "Week 1"} onValueChange={v => setForm(f => ({ ...f, weekOfMonth: v }))}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_SCHEDULE_WEEKS.filter(w => w !== "Every Week").map(w => (
+                        <SelectItem key={w} value={w}>{w}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Day</Label>
+                  <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_SCHEDULE_DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Time</Label>
+                  <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
+                </div>
+              </>
+            )}
+
+            {/* Estimated Duration */}
             <div>
               <Label>Estimated Duration</Label>
               <Select
@@ -744,13 +927,13 @@ export default function ServiceScheduling() {
               </Select>
             </div>
 
-            {/* ── Route Order ── */}
+            {/* Route Order */}
             <div>
               <Label>Route Order</Label>
               <Input
                 type="number"
                 min={1}
-                placeholder={`Auto (next: ${nextRouteOrder(form.dayOfWeek)})`}
+                placeholder={`Auto (${nextRouteOrder(weeklyOrDaily ? "Every Week" : (form.weekOfMonth || "Every Week"), form.dayOfWeek)})`}
                 value={form.routeOrder || ""}
                 onChange={e => setForm(f => ({ ...f, routeOrder: e.target.value ? parseInt(e.target.value) : (undefined as any) }))}
                 className="text-sm"
@@ -758,7 +941,7 @@ export default function ServiceScheduling() {
               <p className="text-[11px] text-gray-400 mt-0.5">Leave blank to auto-assign.</p>
             </div>
 
-            {/* ── Assigned Team ── */}
+            {/* Assigned Team */}
             <div>
               <Label>Assigned Team</Label>
               <Input
@@ -769,7 +952,7 @@ export default function ServiceScheduling() {
               />
             </div>
 
-            {/* ── Notes ── */}
+            {/* Notes */}
             <div className="sm:col-span-2">
               <Label>Notes</Label>
               <Input
@@ -780,7 +963,7 @@ export default function ServiceScheduling() {
               />
             </div>
 
-            {/* ── Active ── */}
+            {/* Active / Inactive toggle */}
             <div className="sm:col-span-2 flex items-center gap-3 pt-1">
               <Switch
                 checked={form.isActive ?? true}
@@ -791,7 +974,9 @@ export default function ServiceScheduling() {
                   {form.isActive ? "Active" : "Inactive"}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {form.isActive ? "This service will appear in the route." : "This service is hidden from the route."}
+                  {form.isActive
+                    ? "This service will appear in the route."
+                    : "This service is hidden from the route."}
                 </p>
               </div>
             </div>
@@ -811,9 +996,7 @@ export default function ServiceScheduling() {
         </DialogContent>
       </Dialog>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          Deactivate confirm
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* Deactivate confirm */}
       <AlertDialog open={!!deactivateTarget} onOpenChange={o => { if (!o) setDeactivateTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

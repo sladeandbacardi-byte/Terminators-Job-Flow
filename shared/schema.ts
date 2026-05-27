@@ -1010,28 +1010,42 @@ export const SERVICE_SCHEDULE_DAYS = [
 
 export type ServiceScheduleDay = typeof SERVICE_SCHEDULE_DAYS[number];
 
+// Week-of-month labels used in service scheduling
+export const SERVICE_SCHEDULE_WEEKS = [
+  "Week 1", "Week 2", "Week 3", "Week 4", "Last Week", "Every Week",
+] as const;
+export type ServiceScheduleWeek = typeof SERVICE_SCHEDULE_WEEKS[number];
+
 export const serviceScheduleEntries = pgTable("service_schedule_entries", {
-  id:                varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  clientId:          varchar("client_id"),
-  clientName:        text("client_name").notNull(),
-  contractId:        varchar("contract_id"),
-  contractRef:       text("contract_ref"),                  // display label for the contract
-  address:           text("address"),
-  suburb:            text("suburb"),
-  serviceType:       text("service_type").notNull().default("other"),
-  frequency:         text("frequency"),
-  assignedTeam:      text("assigned_team"),
-  serviceTime:       text("service_time"),                  // HH:MM
-  estimatedDuration: integer("estimated_duration"),         // minutes
-  dayOfWeek:         text("day_of_week").notNull(),         // Monday..Sunday
-  routeOrder:        integer("route_order").notNull().default(0),
-  contractStatus:    text("contract_status").default("active"), // active | inactive | suspended | pending
-  jobStatus:         text("job_status"),
-  googleMapsLink:    text("google_maps_link"),
-  notes:             text("notes"),
-  isActive:          boolean("is_active").notNull().default(true),
-  createdAt:         timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt:         timestamp("updated_at").notNull().default(sql`now()`),
+  id:                  varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId:            varchar("client_id"),
+  clientName:          text("client_name").notNull(),
+  contractId:          varchar("contract_id"),
+  contractRef:         text("contract_ref"),
+  address:             text("address"),
+  suburb:              text("suburb"),
+  serviceType:         text("service_type").notNull().default("other"),
+  frequency:           text("frequency"),
+  // Primary occurrence
+  weekOfMonth:         text("week_of_month"),               // Week 1..4 | Last Week | Every Week
+  dayOfWeek:           text("day_of_week").notNull().default("Monday"),
+  serviceTime:         text("service_time"),                // HH:MM
+  // Second occurrence (2x a week / Twice a month)
+  secondWeekOfMonth:   text("second_week_of_month"),
+  secondDayOfWeek:     text("second_day_of_week"),
+  secondServiceTime:   text("second_service_time"),
+  // Once-off specific date
+  onceOffDate:         text("once_off_date"),               // YYYY-MM-DD
+  estimatedDuration:   integer("estimated_duration"),       // minutes
+  assignedTeam:        text("assigned_team"),
+  routeOrder:          integer("route_order").notNull().default(0),
+  contractStatus:      text("contract_status").default("active"),
+  jobStatus:           text("job_status"),
+  googleMapsLink:      text("google_maps_link"),
+  notes:               text("notes"),
+  isActive:            boolean("is_active").notNull().default(true),
+  createdAt:           timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt:           timestamp("updated_at").notNull().default(sql`now()`),
 });
 
 export const insertServiceScheduleEntrySchema = createInsertSchema(serviceScheduleEntries).omit({
