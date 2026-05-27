@@ -874,6 +874,13 @@ export const serviceContracts = pgTable("service_contracts", {
   googleMapsLink: text("google_maps_link"),
   address: text("address"),
   notes: text("notes"),
+  // Pricing / contract admin
+  contractPrice: text("contract_price"),              // stored as text to allow decimals without precision loss
+  isServiceContract: boolean("is_service_contract").default(true),
+  isRentalContract: boolean("is_rental_contract").default(false),
+  increaseDate: text("increase_date"),                // YYYY-MM-DD
+  increasePercentage: text("increase_percentage"),    // e.g. "10" for 10%
+  routeOrder: integer("route_order"),                 // position within the week/day slot
   activeStatus: boolean("active_status").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),

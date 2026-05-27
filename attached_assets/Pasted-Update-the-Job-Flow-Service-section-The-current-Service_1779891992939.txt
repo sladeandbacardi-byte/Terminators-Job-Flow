@@ -1,0 +1,214 @@
+Update the Job Flow Service section.
+
+The current Service Scheduling page should not be a separate place where users create schedule entries.
+
+Scheduling must belong to the Contract.
+
+The Contract must be the source of truth for recurring service scheduling.
+
+Update the Service menu to:
+
+Service
+- Jobs
+- Calendar
+- Contracts
+- Daily Diaries
+- Stock Management
+- Reports
+
+Remove "Service Scheduling" as a main menu item.
+
+Inside the Contracts section, add tabs:
+
+- Contract List
+- Schedule View
+- Contracts Ending
+- Increase Dates
+
+CONCEPT
+
+A once-off job can be converted into a contract.
+
+Add a button on completed or approved jobs:
+
+Convert to Contract
+
+When clicked, open a contract creation form and pre-fill details from the job:
+
+- client
+- address
+- service type
+- department
+- assigned team if available
+- notes
+- Google Maps link if available
+
+The user must then complete the contract scheduling details.
+
+CONTRACT FORM
+
+Each contract must include:
+
+- clientId
+- clientName
+- serviceType
+- department
+- contractPrice
+- serviceContract: yes/no
+- rentalContract: yes/no
+- frequency
+- contractStartDate
+- contractEndDate
+- increaseDate
+- increasePercentage
+- assignedTeam
+- assignedStaff
+- weekOfMonth
+- dayOfWeek
+- secondDayOfWeek if needed
+- serviceTime
+- estimatedDuration
+- routeOrder
+- googleMapsLink
+- activeStatus
+- notes
+
+FREQUENCY OPTIONS
+
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+
+SCHEDULING RULES
+
+If frequency is Once-off:
+Show date and time only.
+
+If frequency is Daily:
+Show start date, time, estimated duration, assigned team.
+
+If frequency is 2 x a week:
+Show first day of week, second day of week, time, estimated duration, assigned team.
+
+If frequency is Weekly:
+Show day of week, time, estimated duration, assigned team.
+
+If frequency is Twice a month:
+Show:
+- first week of month
+- first day of week
+- first time
+- second week of month
+- second day of week
+- second time
+
+If frequency is Monthly, Every 2 months, Quarterly, Every 6 months:
+Show:
+- week of month
+- day of week
+- time
+- estimated duration
+- assigned team
+- route order
+
+If frequency is Annually:
+Show:
+- month
+- week of month
+- day of week
+- time
+- estimated duration
+- assigned team
+- route order
+
+WEEK OF MONTH OPTIONS
+
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Last Week
+
+DAY OF WEEK OPTIONS
+
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+SCHEDULE VIEW
+
+Inside Contracts, create a tab called Schedule View.
+
+This is only a view of contract schedules.
+Users should not create separate schedule entries here.
+
+The Schedule View must display active contracts grouped by:
+
+1. Week of Month
+2. Day of Week
+3. Time
+4. Route Order
+
+Example:
+
+Week 1
+  Monday
+    08:00 - 1. Volkswagen SA - Washroom Contract
+    09:00 - 2. Client B - Sanitary Bins
+
+  Tuesday
+    08:00 - 1. Client C - Dustmats
+
+Each row must show:
+
+- route order
+- time
+- client
+- service type
+- frequency
+- assigned team
+- contract status
+- edit contract button
+
+When the user clicks Edit, open the actual contract record.
+
+CALENDAR
+
+The Calendar must display recurring jobs based on active contract scheduling.
+
+The Calendar must read from contract data.
+
+Do not require users to manually create schedule entries separately.
+
+DAILY DIARIES
+
+Daily Diaries must also read from active contract schedules.
+
+The diary must show jobs for the selected date in time and route order.
+
+JOBS
+
+Once-off jobs stay in the Jobs section.
+
+Contract jobs come from active contracts.
+
+The user can convert a once-off job into a contract using Convert to Contract.
+
+IMPORTANT
+
+Do not duplicate scheduling data between a separate Service Scheduling table and the Contract table.
+
+The Contract is the source of truth.
+
+The Schedule View is only a visual display of the contracts by week, day, time, and route order.

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Calendar, Search, Plus, Printer, Edit, X, CheckCircle2, Receipt } from "lucide-react";
+import { Calendar, Search, Plus, Printer, Edit, X, CheckCircle2, Receipt, FileSignature } from "lucide-react";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
@@ -562,6 +562,34 @@ export default function Jobs() {
                                   title="Create an invoice from this job"
                                 >
                                   <Receipt className="h-3 w-3 mr-1" /> Create Invoice
+                                </Button>
+                              )}
+                              {/* Convert to Contract — visible on any completed job for admin/manager/coordinator */}
+                              {(role === 'admin' || role === 'manager' || role === 'coordinator') && job.status === 'completed' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                                  data-testid={`button-convert-contract-${job.id}`}
+                                  title="Convert this job into a recurring contract"
+                                  onClick={() => {
+                                    const client = clientMap.get(job.clientId ?? "");
+                                    const worker = workerMap.get(job.workerId ?? "");
+                                    const params = new URLSearchParams({
+                                      newContract: "1",
+                                      ...(job.clientId && { clientId: job.clientId }),
+                                      ...(client?.name && { clientName: client.name }),
+                                      ...(job.serviceType && { serviceType: job.serviceType }),
+                                      ...(job.departmentId && { departmentId: job.departmentId }),
+                                      ...(job.location && { address: job.location }),
+                                      ...(job.googleMapsLink && { googleMapsLink: job.googleMapsLink }),
+                                      ...(job.description && { notes: job.description }),
+                                      ...(worker && { workerId: worker.id, workerName: worker.name }),
+                                    });
+                                    navigate(`/service-contracts?${params.toString()}`);
+                                  }}
+                                >
+                                  <FileSignature className="h-3 w-3 mr-1" /> Convert to Contract
                                 </Button>
                               )}
                               {!isTechnician && (
