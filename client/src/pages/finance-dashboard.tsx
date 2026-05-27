@@ -10,13 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DollarSign, TrendingUp, AlertTriangle, CheckCircle2, Clock,
-  Receipt, ArrowRight, Search, Ban, RefreshCw, FileText,
-  HandCoins, Wallet, BarChart3, XCircle,
+  DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2,
+  Receipt, ArrowRight, Search, Ban, RefreshCw,
+  HandCoins, BarChart3, ArrowUpRight, ArrowDownRight, Minus,
+  ChevronLeft, ChevronRight, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Invoice, Client, Job } from "@shared/schema";
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
+import type { Invoice, Client, Job, PurchaseOrder } from "@shared/schema";
 
 const fmtR = (n: number) =>
   `R${Math.round(n).toLocaleString("en-ZA")}`;
@@ -56,9 +58,14 @@ export default function FinanceDashboard() {
   const [jobSearch, setJobSearch] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Monthly Sales vs Expenses state
+  const [svMonth, setSvMonth] = useState<Date>(startOfMonth(new Date()));
+  const [salesMode, setSalesMode] = useState<"invoiced" | "collected">("invoiced");
+
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
+  const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({ queryKey: ["/api/purchase-orders"] });
 
   const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
 
@@ -91,6 +98,51 @@ export default function FinanceDashboard() {
       return s + Math.max(0, t - p);
     }, 0);
   const collectionRate = totalInvoiced > 0 ? Math.round((totalPaid / totalInvoiced) * 100) : 0;
+
+  // ── Monthly Sales vs Expenses ──────────────────────────────────────────────
+  const svMonthStart = startOfMonth(svMonth);
+  const svMonthEnd   = endOfMonth(svMonth);
+
+  const inRange = (dateStr: string | Date | null | undefined) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d >= svMonthStart && d <= svMonthEnd;
+  };
+
+  const monthlySalesInvoiced = useMemo(() =>
+    invoices
+      .filter(i => inRange(i.issueDate))
+      .reduce((s, i) => s + parseFloat(String(i.total || 0)), 0),
+    [invoices, svMonth]
+  );
+
+  const monthlySalesCollected = useMemo(() =>
+    invoices
+      .filter(i => i.status === "paid" && inRange(i.paymentDate ?? i.issueDate))
+      .reduce((s, i) => s + parseFloat(String(i.paidAmount || i.total || 0)), 0),
+    [invoices, svMonth]
+  );
+
+  const monthlyExpenses = useMemo(() =>
+    purchaseOrders
+      .filter(po => po.status !== "rejected" && po.status !== "cancelled" && inRange(po.requestDate))
+      .reduce((s, po) => s + parseFloat(String(po.totalAmount || 0)), 0),
+    [purchaseOrders, svMonth]
+  );
+
+  const monthlySales = salesMode === "invoiced" ? monthlySalesInvoiced : monthlySalesCollected;
+  const monthlyNet   = monthlySales - monthlyExpenses;
+  const svRatio      = monthlyExpenses === 0
+    ? (monthlySales > 0 ? 100 : 0)
+    : Math.min(100, Math.round((monthlySales / (monthlySales + monthlyExpenses)) * 100));
+
+  const svStatus = monthlyNet > 0
+    ? { label: "Profitable — Ahead", color: "green" }
+    : monthlyNet < 0
+    ? { label: "Loss — Behind", color: "red" }
+    : { label: "Break-even", color: "amber" };
+
+  const svMonthLabel = format(svMonth, "MMMM yyyy");
 
   // Aged debt
   const outstandingInvoices = useMemo(() => {
@@ -242,6 +294,162 @@ export default function FinanceDashboard() {
               icon={BarChart3}
               color={collectionRate >= 80 ? "bg-green-50 border-green-200 text-green-800" : "bg-orange-50 border-orange-200 text-orange-800"}
             />
+          </div>
+
+          {/* ── Monthly Sales vs Expenses Card ─────────────────────────────── */}
+          <div className={`rounded-2xl border-2 p-5 ${
+            svStatus.color === "green" ? "bg-emerald-50 border-emerald-300"
+            : svStatus.color === "red"  ? "bg-red-50 border-red-300"
+            :                             "bg-amber-50 border-amber-300"
+          }`}>
+            {/* Card header row */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  {svStatus.color === "green" ? <TrendingUp className="h-5 w-5 text-emerald-600" />
+                   : svStatus.color === "red"  ? <TrendingDown className="h-5 w-5 text-red-600" />
+                   :                             <Minus className="h-5 w-5 text-amber-600" />}
+                  Monthly Sales vs Expenses
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Showing figures for <strong>{svMonthLabel}</strong>
+                </p>
+              </div>
+
+              {/* Controls: month nav + sales-mode toggle */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* Month navigator */}
+                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1 py-0.5">
+                  <button
+                    onClick={() => setSvMonth(subMonths(svMonth, 1))}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
+                    title="Previous month"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <input
+                    type="month"
+                    value={format(svMonth, "yyyy-MM")}
+                    onChange={e => { if (e.target.value) setSvMonth(startOfMonth(new Date(e.target.value + "-01"))); }}
+                    className="text-xs font-medium text-gray-700 bg-transparent border-0 outline-none cursor-pointer w-28"
+                  />
+                  <button
+                    onClick={() => setSvMonth(addMonths(svMonth, 1))}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
+                    title="Next month"
+                    disabled={svMonth >= startOfMonth(new Date())}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Sales mode toggle */}
+                <button
+                  onClick={() => setSalesMode(m => m === "invoiced" ? "collected" : "invoiced")}
+                  className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${
+                    salesMode === "invoiced"
+                      ? "bg-blue-50 border-blue-300 text-blue-700"
+                      : "bg-purple-50 border-purple-300 text-purple-700"
+                  }`}
+                >
+                  {salesMode === "invoiced"
+                    ? <><ToggleLeft className="h-3.5 w-3.5" /> Invoiced Sales</>
+                    : <><ToggleRight className="h-3.5 w-3.5" /> Collected Cash</>
+                  }
+                </button>
+
+                {/* Quick-jump: current month */}
+                {format(svMonth, "yyyy-MM") !== format(new Date(), "yyyy-MM") && (
+                  <button
+                    onClick={() => setSvMonth(startOfMonth(new Date()))}
+                    className="text-xs text-gray-500 underline hover:text-gray-800"
+                  >
+                    Current month
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Main figures */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              {/* Net Position — big number */}
+              <div className={`sm:col-span-1 rounded-xl p-4 border text-center ${
+                svStatus.color === "green" ? "bg-emerald-100 border-emerald-300"
+                : svStatus.color === "red"  ? "bg-red-100 border-red-300"
+                :                             "bg-amber-100 border-amber-300"
+              }`}>
+                <p className="text-[11px] uppercase tracking-widest font-semibold opacity-60 mb-1">Net Position</p>
+                <p className={`text-3xl font-extrabold tracking-tight ${
+                  svStatus.color === "green" ? "text-emerald-700"
+                  : svStatus.color === "red"  ? "text-red-700"
+                  :                             "text-amber-700"
+                }`}>
+                  {monthlyNet >= 0 ? "+" : ""}{fmtR(monthlyNet)}
+                </p>
+                <div className={`inline-flex items-center gap-1 mt-2 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                  svStatus.color === "green" ? "bg-emerald-200 text-emerald-800"
+                  : svStatus.color === "red"  ? "bg-red-200 text-red-800"
+                  :                             "bg-amber-200 text-amber-800"
+                }`}>
+                  {svStatus.color === "green" ? <ArrowUpRight className="h-3.5 w-3.5" />
+                   : svStatus.color === "red"  ? <ArrowDownRight className="h-3.5 w-3.5" />
+                   :                             <Minus className="h-3.5 w-3.5" />}
+                  {svStatus.label}
+                </div>
+              </div>
+
+              {/* Sales + Expenses breakdown */}
+              <div className="sm:col-span-2 grid grid-cols-2 gap-3">
+                {/* Sales */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1">
+                    {salesMode === "invoiced" ? "Invoiced Sales" : "Collected Cash"}
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{fmtR(monthlySales)}</p>
+                  {salesMode === "invoiced" && monthlySalesCollected !== monthlySalesInvoiced && (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Collected: {fmtR(monthlySalesCollected)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Expenses */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1">
+                    Expenses (POs)
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{fmtR(monthlyExpenses)}</p>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {purchaseOrders.filter(po =>
+                      po.status !== "rejected" && po.status !== "cancelled" && inRange(po.requestDate)
+                    ).length} purchase order(s)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[11px] font-medium text-gray-500">
+                <span>Sales</span>
+                <span>{svRatio}% of total spend</span>
+                <span>Expenses</span>
+              </div>
+              <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    svStatus.color === "green" ? "bg-emerald-500"
+                    : svStatus.color === "red"  ? "bg-red-500"
+                    :                             "bg-amber-500"
+                  }`}
+                  style={{ width: `${svRatio}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Updated from {salesMode === "invoiced" ? "invoiced sales" : "collected receipts"} and supplier purchase orders captured in the system.
+                {" "}Toggle the button above to switch between <em>Invoiced Sales</em> (profitability view) and <em>Collected Cash</em> (cash-flow view).
+              </p>
+            </div>
           </div>
 
           {/* Tabs: Overview / Invoice Queue / Suspended Accounts */}
