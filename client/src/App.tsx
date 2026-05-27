@@ -50,6 +50,7 @@ import ServiceContractsPage from "@/pages/service-contracts";
 import FinanceDashboard from "@/pages/finance-dashboard";
 import HRDashboard from "@/pages/hr-dashboard";
 import Expenses from "@/pages/expenses";
+import ServiceScheduling from "@/pages/service-scheduling";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -115,6 +116,7 @@ function AuthenticatedApp() {
       <Route path="/finance-dashboard" component={FinanceDashboard} />
       <Route path="/hr-dashboard" component={HRDashboard} />
       <Route path="/expenses" component={Expenses} />
+      <Route path="/service-scheduling" component={ServiceScheduling} />
       <Route component={NotFound} />
     </Switch>
   );

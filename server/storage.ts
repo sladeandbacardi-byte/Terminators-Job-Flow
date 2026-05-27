@@ -34,6 +34,7 @@ import {
   type ServiceContract, type InsertServiceContract,
   type SalesAppointment, type InsertSalesAppointment,
   type Expense, type InsertExpense,
+  type ServiceScheduleEntry, type InsertServiceScheduleEntry,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -327,6 +328,13 @@ export interface IStorage {
   createExpense(e: InsertExpense): Promise<Expense>;
   updateExpense(id: string, e: Partial<InsertExpense>): Promise<Expense>;
   deleteExpense(id: string): Promise<boolean>;
+
+  // Service Schedule
+  getServiceScheduleEntries(): Promise<ServiceScheduleEntry[]>;
+  getServiceScheduleEntry(id: string): Promise<ServiceScheduleEntry | undefined>;
+  createServiceScheduleEntry(e: InsertServiceScheduleEntry): Promise<ServiceScheduleEntry>;
+  updateServiceScheduleEntry(id: string, e: Partial<InsertServiceScheduleEntry>): Promise<ServiceScheduleEntry | undefined>;
+  deleteServiceScheduleEntry(id: string): Promise<boolean>;
 }
 
 export interface BackupLog {
@@ -376,6 +384,7 @@ export class MemStorage implements IStorage {
   private attendanceMemberRecordsMap: Map<string, AttendanceMemberRecord> = new Map();
   private serviceContractsMap: Map<string, ServiceContract> = new Map();
   private expensesMap: Map<string, Expense> = new Map();
+  private serviceScheduleMap: Map<string, ServiceScheduleEntry> = new Map();
   private activityLogs: any[] = [];
   private backupLogs: BackupLog[] = [];
   private invoiceCounter: number = 1;
@@ -4615,6 +4624,57 @@ export class MemStorage implements IStorage {
 
   async deleteExpense(id: string): Promise<boolean> {
     return this.expensesMap.delete(id);
+  }
+
+  // ── Service Schedule ──────────────────────────────────────────────────────
+  async getServiceScheduleEntries(): Promise<ServiceScheduleEntry[]> {
+    return Array.from(this.serviceScheduleMap.values())
+      .sort((a, b) => {
+        const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+        const di = days.indexOf(a.dayOfWeek) - days.indexOf(b.dayOfWeek);
+        return di !== 0 ? di : (a.routeOrder ?? 0) - (b.routeOrder ?? 0);
+      });
+  }
+
+  async getServiceScheduleEntry(id: string): Promise<ServiceScheduleEntry | undefined> {
+    return this.serviceScheduleMap.get(id);
+  }
+
+  async createServiceScheduleEntry(e: InsertServiceScheduleEntry): Promise<ServiceScheduleEntry> {
+    const row: ServiceScheduleEntry = {
+      id: `sse-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      clientId: e.clientId ?? null,
+      clientName: e.clientName,
+      address: e.address ?? null,
+      suburb: e.suburb ?? null,
+      serviceType: e.serviceType ?? "other",
+      frequency: e.frequency ?? null,
+      assignedTeam: e.assignedTeam ?? null,
+      serviceTime: e.serviceTime ?? null,
+      dayOfWeek: e.dayOfWeek,
+      routeOrder: e.routeOrder ?? 0,
+      contractStatus: e.contractStatus ?? "active",
+      jobStatus: e.jobStatus ?? null,
+      googleMapsLink: e.googleMapsLink ?? null,
+      notes: e.notes ?? null,
+      isActive: e.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.serviceScheduleMap.set(row.id, row);
+    return row;
+  }
+
+  async updateServiceScheduleEntry(id: string, patch: Partial<InsertServiceScheduleEntry>): Promise<ServiceScheduleEntry | undefined> {
+    const cur = this.serviceScheduleMap.get(id);
+    if (!cur) return undefined;
+    const next: ServiceScheduleEntry = { ...cur, ...patch, id, updatedAt: new Date() };
+    this.serviceScheduleMap.set(id, next);
+    return next;
+  }
+
+  async deleteServiceScheduleEntry(id: string): Promise<boolean> {
+    return this.serviceScheduleMap.delete(id);
   }
 
   async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {

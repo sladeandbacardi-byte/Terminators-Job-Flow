@@ -20,6 +20,7 @@ import {
   insertVehicleIssueSchema,
   insertServiceRecordSchema,
   insertWorkshopJobSchema,
+  insertServiceScheduleEntrySchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -3344,6 +3345,42 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   app.delete("/api/expenses/:id", async (req, res) => {
     const ok = await storage.deleteExpense(req.params.id);
     if (!ok) return res.status(404).json({ error: "Expense not found" });
+    res.status(204).send();
+  });
+
+  // ── Service Schedule ────────────────────────────────────────────────────
+  app.get("/api/service-schedule", async (_req, res) => {
+    res.json(await storage.getServiceScheduleEntries());
+  });
+
+  app.get("/api/service-schedule/:id", async (req, res) => {
+    const e = await storage.getServiceScheduleEntry(req.params.id);
+    if (!e) return res.status(404).json({ error: "Entry not found" });
+    res.json(e);
+  });
+
+  app.post("/api/service-schedule", async (req, res) => {
+    try {
+      const parsed = insertServiceScheduleEntrySchema.parse(req.body);
+      res.status(201).json(await storage.createServiceScheduleEntry(parsed));
+    } catch (err: any) {
+      res.status(400).json({ error: "Validation failed", details: err.message });
+    }
+  });
+
+  app.put("/api/service-schedule/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateServiceScheduleEntry(req.params.id, req.body);
+      if (!updated) return res.status(404).json({ error: "Entry not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: "Failed to update", details: err.message });
+    }
+  });
+
+  app.delete("/api/service-schedule/:id", async (req, res) => {
+    const ok = await storage.deleteServiceScheduleEntry(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Entry not found" });
     res.status(204).send();
   });
 

@@ -989,3 +989,52 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({
 });
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
+
+// ─── SERVICE SCHEDULING ─────────────────────────────────────────────────────
+
+export const SERVICE_SCHEDULE_SERVICE_TYPES = [
+  { value: "sanitary_bins",      label: "Sanitary Bins" },
+  { value: "washroom_contract",  label: "Washroom Contracts" },
+  { value: "washroom_adhoc",     label: "Washroom Ad-Hoc" },
+  { value: "dustmats",           label: "Dustmats" },
+  { value: "pest_control",       label: "Pest Control" },
+  { value: "deep_cleaning",      label: "Deep Cleaning" },
+  { value: "other",              label: "Other" },
+] as const;
+
+export type ServiceScheduleServiceType = typeof SERVICE_SCHEDULE_SERVICE_TYPES[number]["value"];
+
+export const SERVICE_SCHEDULE_DAYS = [
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+] as const;
+
+export type ServiceScheduleDay = typeof SERVICE_SCHEDULE_DAYS[number];
+
+export const serviceScheduleEntries = pgTable("service_schedule_entries", {
+  id:             varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId:       varchar("client_id"),
+  clientName:     text("client_name").notNull(),
+  address:        text("address"),
+  suburb:         text("suburb"),
+  serviceType:    text("service_type").notNull().default("other"),
+  frequency:      text("frequency"),
+  assignedTeam:   text("assigned_team"),
+  serviceTime:    text("service_time"),                    // HH:MM
+  dayOfWeek:      text("day_of_week").notNull(),           // Monday..Sunday
+  routeOrder:     integer("route_order").notNull().default(0),
+  contractStatus: text("contract_status").default("active"), // active | inactive | suspended | pending
+  jobStatus:      text("job_status"),
+  googleMapsLink: text("google_maps_link"),
+  notes:          text("notes"),
+  isActive:       boolean("is_active").notNull().default(true),
+  createdAt:      timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt:      timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertServiceScheduleEntrySchema = createInsertSchema(serviceScheduleEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertServiceScheduleEntry = z.infer<typeof insertServiceScheduleEntrySchema>;
+export type ServiceScheduleEntry = typeof serviceScheduleEntries.$inferSelect;
