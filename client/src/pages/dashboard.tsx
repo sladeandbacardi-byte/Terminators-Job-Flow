@@ -396,7 +396,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                 {/* Profit Position card */}
-                <Link href="/finance">
+                <Link href="/finance-dashboard">
                   <div className={`rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
                     profitStatus === "ahead"     ? "bg-emerald-50 border-emerald-300"
                     : profitStatus === "behind"  ? "bg-red-50 border-red-300"
@@ -462,7 +462,7 @@ export default function Dashboard() {
                 </Link>
 
                 {/* Cash Flow card */}
-                <Link href="/finance">
+                <Link href="/finance-dashboard">
                   <div className={`rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
                     cashStatus === "ahead"    ? "bg-emerald-50 border-emerald-300"
                     : cashStatus === "behind" ? "bg-red-50 border-red-300"
