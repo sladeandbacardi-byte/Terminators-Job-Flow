@@ -33,6 +33,7 @@ import {
   type AttendanceMemberRecord, type InsertAttendanceMemberRecord,
   type ServiceContract, type InsertServiceContract,
   type SalesAppointment, type InsertSalesAppointment,
+  type Expense, type InsertExpense,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -319,6 +320,13 @@ export interface IStorage {
   updateServiceContract(id: string, c: Partial<InsertServiceContract>): Promise<ServiceContract | undefined>;
   deleteServiceContract(id: string): Promise<boolean>;
   getContractOccurrences(start: Date, end: Date, opts?: { departmentId?: string; technicianId?: string; teamId?: string }): Promise<ContractOccurrence[]>;
+
+  // Expenses
+  getExpenses(): Promise<Expense[]>;
+  getExpense(id: string): Promise<Expense | undefined>;
+  createExpense(e: InsertExpense): Promise<Expense>;
+  updateExpense(id: string, e: Partial<InsertExpense>): Promise<Expense>;
+  deleteExpense(id: string): Promise<boolean>;
 }
 
 export interface BackupLog {
@@ -367,6 +375,7 @@ export class MemStorage implements IStorage {
   private attendanceRecordsMap: Map<string, AttendanceRecord> = new Map();
   private attendanceMemberRecordsMap: Map<string, AttendanceMemberRecord> = new Map();
   private serviceContractsMap: Map<string, ServiceContract> = new Map();
+  private expensesMap: Map<string, Expense> = new Map();
   private activityLogs: any[] = [];
   private backupLogs: BackupLog[] = [];
   private invoiceCounter: number = 1;
@@ -4561,6 +4570,51 @@ export class MemStorage implements IStorage {
 
   async deleteServiceContract(id: string): Promise<boolean> {
     return this.serviceContractsMap.delete(id);
+  }
+
+  // ── Expenses ──────────────────────────────────────────────────────────────
+  async getExpenses(): Promise<Expense[]> {
+    return Array.from(this.expensesMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    return this.expensesMap.get(id);
+  }
+
+  async createExpense(e: InsertExpense): Promise<Expense> {
+    const row: Expense = {
+      id: `exp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      date: e.date,
+      supplier: e.supplier,
+      category: e.category,
+      description: e.description,
+      amount: String(e.amount),
+      vatIncluded: e.vatIncluded ?? false,
+      departmentId: e.departmentId ?? null,
+      invoiceUrl: e.invoiceUrl ?? null,
+      paymentStatus: e.paymentStatus ?? "unpaid",
+      notes: e.notes ?? null,
+      createdAt: new Date(),
+    };
+    this.expensesMap.set(row.id, row);
+    return row;
+  }
+
+  async updateExpense(id: string, patch: Partial<InsertExpense>): Promise<Expense> {
+    const cur = this.expensesMap.get(id);
+    if (!cur) throw new Error("Expense not found");
+    const next: Expense = {
+      ...cur,
+      ...patch,
+      amount: patch.amount !== undefined ? String(patch.amount) : cur.amount,
+      id,
+    };
+    this.expensesMap.set(id, next);
+    return next;
+  }
+
+  async deleteExpense(id: string): Promise<boolean> {
+    return this.expensesMap.delete(id);
   }
 
   async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {

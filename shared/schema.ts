@@ -947,3 +947,45 @@ export const insertServiceContractSchema = createInsertSchema(serviceContracts, 
 });
 export type InsertServiceContract = z.infer<typeof insertServiceContractSchema>;
 export type ServiceContract = typeof serviceContracts.$inferSelect;
+
+// ── Captured Expenses ─────────────────────────────────────────────────────────
+export const EXPENSE_CATEGORIES = [
+  "Wages",
+  "Rent",
+  "Fuel",
+  "Vehicle repairs",
+  "Chemicals",
+  "Hygiene consumables",
+  "Paper products",
+  "Insurance",
+  "Telephone / Internet",
+  "Electricity / Water",
+  "Bank charges",
+  "Repairs and maintenance",
+  "Other",
+] as const;
+
+export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
+export type ExpensePaymentStatus = "unpaid" | "paid" | "part_paid";
+
+export const expenses = pgTable("expenses", {
+  id:            varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date:          text("date").notNull(),                                          // "YYYY-MM-DD"
+  supplier:      text("supplier").notNull(),
+  category:      text("category").notNull(),
+  description:   text("description").notNull(),
+  amount:        decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  vatIncluded:   boolean("vat_included").notNull().default(false),
+  departmentId:  varchar("department_id"),
+  invoiceUrl:    text("invoice_url"),
+  paymentStatus: text("payment_status").notNull().default("unpaid"),             // unpaid | paid | part_paid
+  notes:         text("notes"),
+  createdAt:     timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;

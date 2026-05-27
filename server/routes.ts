@@ -3312,6 +3312,41 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     res.status(204).send();
   });
 
+  // ── Expenses ──────────────────────────────────────────────────────────────
+  app.get("/api/expenses", async (_req, res) => {
+    res.json(await storage.getExpenses());
+  });
+
+  app.get("/api/expenses/:id", async (req, res) => {
+    const e = await storage.getExpense(req.params.id);
+    if (!e) return res.status(404).json({ error: "Expense not found" });
+    res.json(e);
+  });
+
+  app.post("/api/expenses", async (req, res) => {
+    try {
+      const created = await storage.createExpense(req.body);
+      res.status(201).json(created);
+    } catch (err: any) {
+      res.status(400).json({ error: "Failed to create expense", details: err.message });
+    }
+  });
+
+  app.put("/api/expenses/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateExpense(req.params.id, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: "Failed to update expense", details: err.message });
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req, res) => {
+    const ok = await storage.deleteExpense(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Expense not found" });
+    res.status(204).send();
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

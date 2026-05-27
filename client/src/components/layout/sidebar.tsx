@@ -76,6 +76,7 @@ const ALL_SECTIONS: NavSection[] = [
     items: [
       { name: "Finance Overview",  href: "/finance-dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "accounts"] },
       { name: "Invoices",          href: "/invoices",    icon: Receipt,         roles: ["admin", "manager", "accounts", "coordinator"] },
+      { name: "Expense Capture",   href: "/expenses",    icon: Wallet,          roles: ["admin", "manager", "accounts"] },
       { name: "Debtors",           href: "/debtors",     icon: HandCoins,       roles: ["admin", "manager", "accounts"] },
       { name: "Creditors",         href: "/creditors",   icon: Wallet,          roles: ["admin", "manager", "accounts"] },
       { name: "Sage Export",       href: "/sage-export", icon: FileSpreadsheet, roles: ["admin", "manager", "accounts"] },

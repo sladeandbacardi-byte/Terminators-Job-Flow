@@ -18,7 +18,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
-import type { Invoice, Client, Job, PurchaseOrder } from "@shared/schema";
+import type { Invoice, Client, Job, Expense } from "@shared/schema";
 
 const fmtR = (n: number) =>
   `R${Math.round(n).toLocaleString("en-ZA")}`;
@@ -58,14 +58,14 @@ export default function FinanceDashboard() {
   const [jobSearch, setJobSearch] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Monthly Sales vs Expenses state
+  // Monthly Profit Position state
   const [svMonth, setSvMonth] = useState<Date>(startOfMonth(new Date()));
-  const [salesMode, setSalesMode] = useState<"invoiced" | "collected">("invoiced");
+  const [profitView, setProfitView] = useState<"profitability" | "cashflow">("profitability");
 
   const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
-  const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({ queryKey: ["/api/purchase-orders"] });
+  const { data: capturedExpenses = [] } = useQuery<Expense[]>({ queryKey: ["/api/expenses"] });
 
   const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
 
@@ -99,7 +99,7 @@ export default function FinanceDashboard() {
     }, 0);
   const collectionRate = totalInvoiced > 0 ? Math.round((totalPaid / totalInvoiced) * 100) : 0;
 
-  // ── Monthly Sales vs Expenses ──────────────────────────────────────────────
+  // ── Monthly Profit Position ────────────────────────────────────────────────
   const svMonthStart = startOfMonth(svMonth);
   const svMonthEnd   = endOfMonth(svMonth);
 
@@ -109,6 +109,7 @@ export default function FinanceDashboard() {
     return d >= svMonthStart && d <= svMonthEnd;
   };
 
+  // Profitability View: invoiced sales
   const monthlySalesInvoiced = useMemo(() =>
     invoices
       .filter(i => inRange(i.issueDate))
@@ -116,6 +117,7 @@ export default function FinanceDashboard() {
     [invoices, svMonth]
   );
 
+  // Cash Flow View: collected receipts (payments received this month)
   const monthlySalesCollected = useMemo(() =>
     invoices
       .filter(i => i.status === "paid" && inRange(i.paymentDate ?? i.issueDate))
@@ -123,18 +125,34 @@ export default function FinanceDashboard() {
     [invoices, svMonth]
   );
 
-  const monthlyExpenses = useMemo(() =>
-    purchaseOrders
-      .filter(po => po.status !== "rejected" && po.status !== "cancelled" && inRange(po.requestDate))
-      .reduce((s, po) => s + parseFloat(String(po.totalAmount || 0)), 0),
-    [purchaseOrders, svMonth]
+  // All captured expenses for the month
+  const monthlyExpensesAll = useMemo(() =>
+    capturedExpenses
+      .filter(e => e.date.startsWith(format(svMonth, "yyyy-MM")))
+      .reduce((s, e) => s + parseFloat(String(e.amount || 0)), 0),
+    [capturedExpenses, svMonth]
   );
 
-  const monthlySales = salesMode === "invoiced" ? monthlySalesInvoiced : monthlySalesCollected;
-  const monthlyNet   = monthlySales - monthlyExpenses;
-  const svRatio      = monthlyExpenses === 0
-    ? (monthlySales > 0 ? 100 : 0)
-    : Math.min(100, Math.round((monthlySales / (monthlySales + monthlyExpenses)) * 100));
+  // Only paid expenses (for cash flow view)
+  const monthlyExpensesPaid = useMemo(() =>
+    capturedExpenses
+      .filter(e => e.paymentStatus === "paid" && e.date.startsWith(format(svMonth, "yyyy-MM")))
+      .reduce((s, e) => s + parseFloat(String(e.amount || 0)), 0),
+    [capturedExpenses, svMonth]
+  );
+
+  const monthlyExpenseCount = capturedExpenses.filter(e =>
+    e.date.startsWith(format(svMonth, "yyyy-MM"))
+  ).length;
+
+  // Active view figures
+  const activeSales    = profitView === "profitability" ? monthlySalesInvoiced : monthlySalesCollected;
+  const activeExpenses = profitView === "profitability" ? monthlyExpensesAll   : monthlyExpensesPaid;
+  const monthlyNet     = activeSales - activeExpenses;
+
+  const svRatio = activeExpenses === 0
+    ? (activeSales > 0 ? 100 : 0)
+    : Math.min(100, Math.round((activeSales / (activeSales + activeExpenses)) * 100));
 
   const svStatus = monthlyNet > 0
     ? { label: "Profitable — Ahead", color: "green" }
@@ -296,12 +314,13 @@ export default function FinanceDashboard() {
             />
           </div>
 
-          {/* ── Monthly Sales vs Expenses Card ─────────────────────────────── */}
+          {/* ── Monthly Profit Position Card ────────────────────────────────── */}
           <div className={`rounded-2xl border-2 p-5 ${
             svStatus.color === "green" ? "bg-emerald-50 border-emerald-300"
             : svStatus.color === "red"  ? "bg-red-50 border-red-300"
             :                             "bg-amber-50 border-amber-300"
           }`}>
+
             {/* Card header row */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
               <div>
@@ -309,14 +328,14 @@ export default function FinanceDashboard() {
                   {svStatus.color === "green" ? <TrendingUp className="h-5 w-5 text-emerald-600" />
                    : svStatus.color === "red"  ? <TrendingDown className="h-5 w-5 text-red-600" />
                    :                             <Minus className="h-5 w-5 text-amber-600" />}
-                  Monthly Sales vs Expenses
+                  Monthly Profit Position
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Showing figures for <strong>{svMonthLabel}</strong>
                 </p>
               </div>
 
-              {/* Controls: month nav + sales-mode toggle */}
+              {/* Controls row */}
               <div className="flex flex-wrap gap-2 items-center">
                 {/* Month navigator */}
                 <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1 py-0.5">
@@ -343,22 +362,6 @@ export default function FinanceDashboard() {
                   </button>
                 </div>
 
-                {/* Sales mode toggle */}
-                <button
-                  onClick={() => setSalesMode(m => m === "invoiced" ? "collected" : "invoiced")}
-                  className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${
-                    salesMode === "invoiced"
-                      ? "bg-blue-50 border-blue-300 text-blue-700"
-                      : "bg-purple-50 border-purple-300 text-purple-700"
-                  }`}
-                >
-                  {salesMode === "invoiced"
-                    ? <><ToggleLeft className="h-3.5 w-3.5" /> Invoiced Sales</>
-                    : <><ToggleRight className="h-3.5 w-3.5" /> Collected Cash</>
-                  }
-                </button>
-
-                {/* Quick-jump: current month */}
                 {format(svMonth, "yyyy-MM") !== format(new Date(), "yyyy-MM") && (
                   <button
                     onClick={() => setSvMonth(startOfMonth(new Date()))}
@@ -370,9 +373,45 @@ export default function FinanceDashboard() {
               </div>
             </div>
 
+            {/* View toggle — Profitability / Cash Flow */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setProfitView("profitability")}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl border-2 transition ${
+                  profitView === "profitability"
+                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-blue-300"
+                }`}
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+                Profitability View
+              </button>
+              <button
+                onClick={() => setProfitView("cashflow")}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl border-2 transition ${
+                  profitView === "cashflow"
+                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
+                }`}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Cash Flow View
+              </button>
+              <div className={`hidden sm:flex items-center text-[11px] px-3 py-2 rounded-xl border ${
+                profitView === "profitability"
+                  ? "bg-blue-50 border-blue-200 text-blue-600"
+                  : "bg-indigo-50 border-indigo-200 text-indigo-600"
+              }`}>
+                {profitView === "profitability"
+                  ? "Invoiced Sales vs All Captured Expenses"
+                  : "Receipts Collected vs Paid Expenses Only"
+                }
+              </div>
+            </div>
+
             {/* Main figures */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              {/* Net Position — big number */}
+              {/* Net Position */}
               <div className={`sm:col-span-1 rounded-xl p-4 border text-center ${
                 svStatus.color === "green" ? "bg-emerald-100 border-emerald-300"
                 : svStatus.color === "red"  ? "bg-red-100 border-red-300"
@@ -400,29 +439,31 @@ export default function FinanceDashboard() {
 
               {/* Sales + Expenses breakdown */}
               <div className="sm:col-span-2 grid grid-cols-2 gap-3">
-                {/* Sales */}
+                {/* Sales/Receipts */}
                 <div className="bg-white rounded-xl border border-gray-200 p-4">
                   <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1">
-                    {salesMode === "invoiced" ? "Invoiced Sales" : "Collected Cash"}
+                    {profitView === "profitability" ? "Invoiced Sales" : "Receipts Collected"}
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">{fmtR(monthlySales)}</p>
-                  {salesMode === "invoiced" && monthlySalesCollected !== monthlySalesInvoiced && (
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      Collected: {fmtR(monthlySalesCollected)}
-                    </p>
+                  <p className="text-2xl font-bold text-gray-900">{fmtR(activeSales)}</p>
+                  {profitView === "profitability" && monthlySalesCollected !== monthlySalesInvoiced && (
+                    <p className="text-[11px] text-gray-400 mt-1">Cash collected: {fmtR(monthlySalesCollected)}</p>
+                  )}
+                  {profitView === "cashflow" && (
+                    <p className="text-[11px] text-gray-400 mt-1">Invoiced: {fmtR(monthlySalesInvoiced)}</p>
                   )}
                 </div>
 
-                {/* Expenses */}
+                {/* Captured Expenses */}
                 <div className="bg-white rounded-xl border border-gray-200 p-4">
                   <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1">
-                    Expenses (POs)
+                    {profitView === "profitability" ? "Captured Expenses" : "Paid Expenses"}
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">{fmtR(monthlyExpenses)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{fmtR(activeExpenses)}</p>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    {purchaseOrders.filter(po =>
-                      po.status !== "rejected" && po.status !== "cancelled" && inRange(po.requestDate)
-                    ).length} purchase order(s)
+                    {profitView === "profitability"
+                      ? `${monthlyExpenseCount} expense record(s)`
+                      : `Unpaid: ${fmtR(monthlyExpensesAll - monthlyExpensesPaid)}`
+                    }
                   </p>
                 </div>
               </div>
@@ -431,8 +472,8 @@ export default function FinanceDashboard() {
             {/* Progress bar */}
             <div className="space-y-1.5">
               <div className="flex justify-between text-[11px] font-medium text-gray-500">
-                <span>Sales</span>
-                <span>{svRatio}% of total spend</span>
+                <span>{profitView === "profitability" ? "Sales" : "Receipts"}</span>
+                <span>{svRatio}% of combined total</span>
                 <span>Expenses</span>
               </div>
               <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
@@ -445,9 +486,8 @@ export default function FinanceDashboard() {
                   style={{ width: `${svRatio}%` }}
                 />
               </div>
-              <p className="text-[11px] text-gray-400 mt-1">
-                Updated from {salesMode === "invoiced" ? "invoiced sales" : "collected receipts"} and supplier purchase orders captured in the system.
-                {" "}Toggle the button above to switch between <em>Invoiced Sales</em> (profitability view) and <em>Collected Cash</em> (cash-flow view).
+              <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                <strong>Profitability View</strong> uses invoiced sales. <strong>Cash Flow View</strong> uses receipts collected. Expenses are based on captured monthly expenses.
               </p>
             </div>
           </div>
