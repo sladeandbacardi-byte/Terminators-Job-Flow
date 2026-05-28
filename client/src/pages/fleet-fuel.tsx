@@ -10,13 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearch } from "wouter";
-import { Fuel, ArrowLeft, Truck, User } from "lucide-react";
+import { Fuel, ArrowLeft, Truck, User, ShieldOff } from "lucide-react";
 import { format } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import { getDashboardRole } from "@/lib/dashboardRole";
 
 export default function FleetFuel() {
   const { user } = useAuth();
+  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
   const { toast } = useToast();
   const qc = useQueryClient();
   const search = useSearch();
@@ -76,6 +78,36 @@ export default function FleetFuel() {
 
   const vehicleName = (id: string) => (vehicles as any[]).find(v => v.id === id)?.name ?? id;
   const canSubmit = vehicleId && fillDate && litres && cost;
+
+  if (role === "admin") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header title="Fuel Fill-up" onMobileMenuToggle={() => {}} />
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="flex-1 p-4 sm:p-6 overflow-auto">
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="flex items-center gap-3">
+                <Link href="/fleet">
+                  <Button variant="ghost" size="sm" className="gap-1"><ArrowLeft className="h-4 w-4" /> Fleet</Button>
+                </Link>
+                <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Fuel className="h-5 w-5 text-amber-500" /> Fuel Fill-up
+                </h1>
+              </div>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <ShieldOff className="h-12 w-12 text-gray-300 mb-4" />
+                <h2 className="text-lg font-semibold text-gray-700 mb-2">Not available for admin users</h2>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  Fuel fill-ups must be logged by the driver of the vehicle. Please ask the assigned driver to record this fill-up.
+                </p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
