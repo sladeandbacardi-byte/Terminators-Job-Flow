@@ -1,0 +1,645 @@
+Update the Job Flow contract scheduling system using the old ZAP screenshots and the hygiene service manager feedback.
+
+The old ZAP system allowed contract jobs to be added to a diary with:
+- client
+- contract number
+- service type
+- included date
+- price
+- start date
+- start time
+- duration
+- fixed time yes/no
+- repeat every X
+- frequency type
+- specific day
+- number of times or years
+- contract checkbox
+
+Job Flow must keep the useful scheduling logic but make it much simpler and easier to use.
+
+IMPORTANT CONCEPT
+
+A contract must contain its own schedule.
+
+Do not create a separate Service Scheduling main menu item where users manually add schedule entries.
+
+The Contract is the source of truth.
+
+The contract must control:
+- how often the service repeats
+- which week of the month it happens
+- which day it happens
+- what time it happens
+- what sequence/order it appears in
+- which team/technician does it
+- whether the time is fixed
+- whether the job must be invoiced
+- whether stock must be tracked
+
+SERVICE MENU
+
+Use this Service menu:
+
+Service
+- Jobs
+- Calendar
+- Contracts
+- Daily Diaries
+- Stock Management
+- Reports
+
+Remove "Service Scheduling" as a main menu item.
+
+Inside Contracts, add tabs:
+
+- Contract List
+- Schedule View
+- Contracts Ending
+- Increase Dates
+- Contract Documents
+
+CONTRACT FORM
+
+When adding or editing a contract, show these sections:
+
+1. Client & Contract Details
+
+Fields:
+- Client
+- Contract Number
+- Service Type
+- Department
+- Contract Price
+- PPU if applicable
+- Contract Start Date
+- Contract End Date
+- Increase Date
+- Increase Percentage
+- Active / Inactive
+- Notes
+
+2. Scheduling
+
+Fields:
+- Frequency
+- Start Date
+- Start Time
+- Estimated Duration
+- Fixed Time
+- Week of Month
+- Day of Week
+- Second Day of Week if needed
+- Route Sequence
+- Assigned Team
+- Assigned Technician
+- Repeat Until / End Date
+
+3. Invoicing
+
+Fields:
+- Invoice Rule
+- Must Be Invoiced: Yes / No
+- Invoice Status
+- Finance Notes
+
+4. Stock / Refill Tracking
+
+Fields:
+- Stock Tracking Required: Yes / No
+- Refill Rule
+- Stock Items Linked to Contract
+- Notes
+
+5. Documents
+
+Allow documents to be linked to the client, contract, or job:
+- Treatment Reports
+- Installation Checklist
+- Survey Sheets
+- Pictures
+- POD
+- Signed Worksheets
+- Other Documents
+
+FREQUENCY OPTIONS
+
+The frequency dropdown must include:
+
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+- On Demand
+
+These must replace confusing old ZAP style options like "repeat every X per 2M/S".
+
+WEEK OF MONTH OPTIONS
+
+- Every Week
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Last Week
+
+DAY OF WEEK OPTIONS
+
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+FIXED TIME
+
+Add a Fixed Time field:
+
+Fixed Time:
+- Yes
+- No
+
+If Fixed Time is Yes:
+The job must appear on the calendar at the selected Start Time.
+
+If Fixed Time is No:
+The job can still appear in the route order but the exact time is flexible.
+
+ROUTE SEQUENCE
+
+Add Route Sequence to the contract schedule.
+
+This is especially important for sanitary bins.
+
+Example:
+Client: Volkswagen SA
+Service Type: Sanitary Bins
+Frequency: Monthly
+Week of Month: Week 1
+Day of Week: Monday
+Start Time: 08:00
+Route Sequence: 1
+
+The system must use Route Sequence to show the jobs in the correct order.
+
+If Route Sequence is left blank, automatically assign the next available sequence number for that:
+- service type
+- week of month
+- day of week
+- assigned team
+
+SCHEDULING RULES BY FREQUENCY
+
+If Frequency is Once-off:
+Show:
+- Job Date
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+Hide:
+- Week of Month
+- Second Day of Week
+- Route Sequence optional
+
+If Frequency is Daily:
+Show:
+- Start Date
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+
+If Frequency is 2 x a week:
+Show:
+- First Day of Week
+- Second Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Monday and Thursday at 08:00
+
+If Frequency is Weekly:
+Show:
+- Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Every Tuesday at 10:00
+
+If Frequency is Twice a month:
+Show:
+- First Week of Month
+- First Day of Week
+- First Start Time
+- Second Week of Month
+- Second Day of Week
+- Second Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Week 1 Monday at 08:00 and Week 3 Monday at 08:00
+
+If Frequency is Monthly:
+Show:
+- Week of Month
+- Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Week 1 Monday at 08:00
+
+If Frequency is Every 2 months:
+Show the same fields as Monthly, but repeat every 2 months.
+
+If Frequency is Quarterly:
+Show the same fields as Monthly, but repeat every 3 months.
+
+If Frequency is Every 6 months:
+Show the same fields as Monthly, but repeat every 6 months.
+
+If Frequency is Annually:
+Show:
+- Month
+- Week of Month
+- Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+If Frequency is On Demand:
+Do not automatically place it on the calendar.
+Show it under the client profile and contract list as an available on-demand contract.
+Jobs must only be created when the client requests the service.
+
+SCHEDULE SUMMARY
+
+Every contract must automatically generate a readable schedule summary.
+
+Examples:
+
+Daily at 08:00
+Weekly - Every Tuesday at 10:00
+2 x a week - Monday and Thursday at 08:00
+Twice a month - Week 1 Monday and Week 3 Monday at 08:00
+Monthly - Week 1 Monday at 08:00 - Route 1
+Every 2 months - Week 2 Wednesday at 09:00
+Quarterly - Week 1 Friday at 11:00
+Every 6 months - Last Friday at 14:00
+Annually - March, Week 2 Tuesday at 09:00
+Once-off - 28 May 2026 at 08:00
+On Demand - Create job only when requested
+
+CONTRACT TYPES
+
+A client can have multiple contracts.
+
+Contract type options:
+
+- Sanitary Bins
+- Washroom Dispensers
+- Washroom Refills Included
+- Washroom Refills Excluded
+- Washroom On-Demand Refills
+- Dustmats
+- Pest Control
+- Deep Cleaning
+- Other
+
+For washroom clients, allow separate contracts for:
+- Dispensers
+- Refills Included
+- Refills Excluded
+- On-Demand Refills
+
+This is required so stock usage and refill rules can be tracked properly.
+
+REFILL RULE OPTIONS
+
+- Refills Included
+- Refills Excluded
+- On Demand Refills
+- Not Applicable
+
+INVOICE RULE OPTIONS
+
+- Invoice per completed job
+- Invoice monthly contract
+- Invoice on demand
+- Do not invoice automatically
+
+Add invoiceStatus to jobs:
+
+- Not Ready
+- Ready to Invoice
+- Invoiced
+- Do Not Invoice
+
+CLIENT PROFILE
+
+When opening a client profile, show immediately:
+
+- Client name
+- Address
+- Contact person
+- Phone
+- Email
+- Contract number or contract numbers
+- Service type
+- List of active contracts
+- Previous service date
+- Next service date
+- Completed service history
+- Documents/files
+- Notes
+
+The client profile must show all contracts linked to that client.
+
+Each contract card must show:
+
+- Contract Number
+- Service Type
+- Frequency
+- Schedule Summary
+- Price
+- Increase Date
+- Contract End Date
+- Status
+- View Contract button
+- Edit Contract button
+
+SCHEDULE VIEW INSIDE CONTRACTS
+
+Inside the Contracts section, create a tab called Schedule View.
+
+This is only a view of contract schedules.
+Users must not create separate schedule records here.
+
+The Schedule View must display active contracts grouped by:
+
+1. Week of Month
+2. Day of Week
+3. Start Time
+4. Route Sequence
+
+Example:
+
+Week 1
+  Monday
+    1. 08:00 - Volkswagen SA - Sanitary Bins
+    2. 08:30 - Client B - Sanitary Bins
+    3. 09:00 - Client C - Washroom Refills
+
+  Tuesday
+    1. 08:00 - Client D - Dustmats
+
+Allow managers/admins to move scheduled contracts up and down within the same week/day/team/service type.
+When moved, automatically update the Route Sequence numbers.
+
+CALENDAR
+
+The calendar must work like Microsoft Outlook.
+
+It must show:
+- Once-off jobs
+- Recurring contract jobs
+
+Calendar views:
+- Daily
+- Weekly
+- Monthly
+
+Calendar filters:
+- All services
+- Sanitary Bins
+- Washroom Dispensers
+- Washroom Refills
+- Washroom On-Demand Refills
+- Dustmats
+- Pest Control
+- Deep Cleaning
+- Assigned Team
+- Assigned Staff
+
+Contract jobs must appear on the correct calendar dates based on their frequency rule.
+
+Do not require users to manually generate monthly jobs at this stage.
+The calendar should read from active contracts and display the recurring jobs automatically.
+
+DAILY DIARIES
+
+Daily Diaries must be generated from:
+- once-off jobs
+- active contract schedules
+
+Daily diary filters:
+- date
+- service type
+- team
+- staff member
+
+Daily diary must show jobs in:
+1. time order
+2. route sequence order
+
+Each diary row must show:
+
+- route sequence
+- time
+- client
+- address
+- service type
+- frequency
+- assigned team
+- job status
+- notes
+- open job button
+- open Google Maps button if googleMapsLink exists
+
+TECHNICIAN PHONE VIEW
+
+Before starting a job, technicians must see:
+
+- Client name
+- Address
+- Service type
+- Scheduled time
+- Route sequence
+- Open in Google Maps button
+- Start Job button
+
+Before closing a job, technicians must complete:
+
+- Confirm all units checked/completed
+- Capture customer signature
+- Add notes if needed
+- Report extra fault / extra work if found
+- Complete job button
+
+For sanitary bins and washroom jobs, include this checklist:
+
+All units checked/completed:
+- Yes
+- No
+
+If No, require a note before the job can be completed.
+
+EXTRA FAULT / EXTRA WORK
+
+Technicians must have a button:
+
+Report Extra Fault / Extra Work
+
+When submitted, capture:
+
+- Client
+- Related contract
+- Related job
+- Description
+- Photos optional
+- Priority: Low / Medium / High / Urgent
+- Responsible person
+- Notes
+
+When submitted, email or notify the responsible person.
+
+REMINDERS / ALERTS
+
+Add automatic alerts for:
+
+- Contracts ending
+- Increase dates
+- Jobs not completed
+- Jobs to be invoiced
+
+Contracts Ending alert:
+Show contracts ending within:
+- 30 days
+- 60 days
+- 90 days
+
+Increase Date alert:
+Show contracts with increase dates due within:
+- 30 days
+- 60 days
+- 90 days
+
+Jobs Not Completed alert:
+Show scheduled jobs where scheduled date has passed and status is not Completed.
+
+Jobs To Be Invoiced alert:
+Show completed jobs where invoiceStatus is Not Invoiced or Ready to Invoice.
+
+STOCK TRACKING
+
+Stock must be linked to washroom and refill contract types.
+
+For washroom contracts, track whether refills are:
+- Included
+- Excluded
+- On Demand
+
+Create stock reports for:
+
+- Stock on hand
+- Stock used by job
+- Stock used by contract
+- Low stock
+- Stock by service type
+- Stock by team
+
+DOCUMENTS UNDER CLIENT
+
+Each client profile must allow storing:
+
+- Treatment Reports
+- Installation Checklist
+- Survey Sheets
+- Pictures
+- POD
+- Signed Worksheets
+- Other Documents
+
+Documents must be linked to:
+- client
+- contract optional
+- job optional
+
+PERMISSIONS
+
+Only managers/admins may edit:
+
+- contract details
+- client details
+- stock quantities
+- route sequence
+- prices
+- increase dates
+- contract end dates
+
+Technicians/staff may view but not edit:
+
+- client details
+- contract details
+- stock quantities
+
+Technicians may only update:
+
+- job status
+- job notes
+- photos
+- checklist
+- customer signature
+- extra fault report
+
+IMPORTANT
+
+Do not copy the old ZAP layout visually.
+Use a clean modern layout.
+
+The old screenshots are only to understand the fields and scheduling logic.
+
+The new Job Flow contract scheduling must be simple:
+
+Client
+Contract
+Service Type
+Frequency
+Week
+Day
+Time
+Route Sequence
+Assigned Team
+
+The main admin headache to solve is sanitary bin scheduling.
+
+The system must make sanitary bin contract scheduling simple:
+contract -> frequency -> week -> day -> time -> route sequence.
+
+The Contract is the source of truth.
+Calendar, Daily Diaries, Technician View, and Reports must all read from the contract schedule.

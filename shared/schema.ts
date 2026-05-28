@@ -881,6 +881,15 @@ export const serviceContracts = pgTable("service_contracts", {
   increaseDate: text("increase_date"),                // YYYY-MM-DD
   increasePercentage: text("increase_percentage"),    // e.g. "10" for 10%
   routeOrder: integer("route_order"),                 // position within the week/day slot
+  contractNumber: text("contract_number"),
+  ppu: text("ppu"),                                   // price per unit (if applicable)
+  fixedTime: boolean("fixed_time").default(false),    // if true, job must run at exact startTime
+  invoiceRule: text("invoice_rule"),                  // Invoice per completed job | monthly | on demand | do not invoice
+  mustBeInvoiced: boolean("must_be_invoiced").default(true),
+  financeNotes: text("finance_notes"),
+  stockTrackingRequired: boolean("stock_tracking_required").default(false),
+  refillRule: text("refill_rule"),                    // Refills Included | Excluded | On Demand | Not Applicable
+  stockNotes: text("stock_notes"),
   activeStatus: boolean("active_status").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
