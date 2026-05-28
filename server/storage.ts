@@ -3647,7 +3647,7 @@ export class MemStorage implements IStorage {
       { id: "vehicle-7",  name: "Isuzu D-Max (Mike)",         registration: "KRM914EC", make: "Isuzu",        model: "D-Max",   year: "2023", departmentId: "div-1", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2023-03-01") },
       { id: "vehicle-8",  name: "VW Caddy (Xolani)",          registration: "HRS116EC", make: "Volkswagen",   model: "Caddy",   year: "2016", departmentId: "div-1", isActive: true, vehicleStatus: "workshop",    notes: "Clutch repair in progress at Gqeberha Auto.", createdAt: new Date("2020-01-01") },
       { id: "vehicle-9",  name: "VW Caddy (Reece)",           registration: "KDM688EC", make: "Volkswagen",   model: "Caddy",   year: "2023", departmentId: "div-1", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2023-06-01") },
-      { id: "vehicle-10", name: "BYD Dolphin Surf (Julien)",  registration: "TBA",      make: "BYD",          model: "Dolphin Surf", year: "2026", departmentId: "div-6", isActive: true, vehicleStatus: "spare",       notes: "Electric vehicle — registration pending.", createdAt: new Date("2026-01-01") },
+      { id: "vehicle-10", name: "BYD Dolphin Surf (Julien)",  registration: "KTZ909EC", make: "BYD",          model: "Dolphin Surf", year: "2026", departmentId: "div-6", isActive: true, vehicleStatus: "spare",       notes: "Electric vehicle.", createdAt: new Date("2026-01-01") },
     ];
     vehiclesData.forEach(v => this.vehicles.set(v.id, v));
 
