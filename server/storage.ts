@@ -35,6 +35,8 @@ import {
   type SalesAppointment, type InsertSalesAppointment,
   type Expense, type InsertExpense,
   type ServiceScheduleEntry, type InsertServiceScheduleEntry,
+  type PricingLibraryItem, type InsertPricingLibraryItem,
+  type SalesFollowUp, type InsertSalesFollowUp,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -212,6 +214,20 @@ export interface IStorage {
   updateQuoteSubmission(id: string, submission: Partial<InsertQuoteSubmission>): Promise<QuoteSubmission>;
   deleteQuoteSubmission(id: string): Promise<boolean>;
 
+  // Pricing Library
+  getPricingLibrary(): Promise<PricingLibraryItem[]>;
+  getPricingLibraryItem(id: string): Promise<PricingLibraryItem | undefined>;
+  createPricingLibraryItem(item: InsertPricingLibraryItem): Promise<PricingLibraryItem>;
+  updatePricingLibraryItem(id: string, item: Partial<InsertPricingLibraryItem>): Promise<PricingLibraryItem | undefined>;
+  deletePricingLibraryItem(id: string): Promise<boolean>;
+
+  // Sales Follow-ups
+  getSalesFollowUps(): Promise<SalesFollowUp[]>;
+  getSalesFollowUpsByLead(leadId: string): Promise<SalesFollowUp[]>;
+  createSalesFollowUp(followUp: InsertSalesFollowUp): Promise<SalesFollowUp>;
+  updateSalesFollowUp(id: string, followUp: Partial<InsertSalesFollowUp>): Promise<SalesFollowUp | undefined>;
+  deleteSalesFollowUp(id: string): Promise<boolean>;
+
   // Fleet — Vehicles
   getVehicles(): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
@@ -370,6 +386,8 @@ export class MemStorage implements IStorage {
   private salesAppointments: Map<string, SalesAppointment> = new Map();
   private customReports: Map<string, CustomReport> = new Map();
   private quoteSubmissions: Map<string, QuoteSubmission> = new Map();
+  private pricingLibraryMap: Map<string, PricingLibraryItem> = new Map();
+  private salesFollowUpsMap: Map<string, SalesFollowUp> = new Map();
   private vehicles: Map<string, Vehicle> = new Map();
   private vehicleAssignments: Map<string, VehicleAssignment> = new Map();
   private kmLogs: Map<string, KmLog> = new Map();
@@ -398,6 +416,7 @@ export class MemStorage implements IStorage {
     this.createExampleData();
     this.initializeFleetData();
     this.initializeTeamData();
+    this.initializePricingLibrary();
   }
 
   private async createExampleData() {
@@ -3611,9 +3630,106 @@ export class MemStorage implements IStorage {
     return this.quoteSubmissions.delete(id);
   }
 
+  // ── Pricing Library ────────────────────────────────────────────────────────
+
+  async getPricingLibrary(): Promise<PricingLibraryItem[]> {
+    return Array.from(this.pricingLibraryMap.values()).sort((a, b) => a.category.localeCompare(b.category));
+  }
+
+  async getPricingLibraryItem(id: string): Promise<PricingLibraryItem | undefined> {
+    return this.pricingLibraryMap.get(id);
+  }
+
+  async createPricingLibraryItem(item: InsertPricingLibraryItem): Promise<PricingLibraryItem> {
+    const id = randomUUID();
+    const newItem: PricingLibraryItem = { ...item, id, createdAt: new Date() };
+    this.pricingLibraryMap.set(id, newItem);
+    return newItem;
+  }
+
+  async updatePricingLibraryItem(id: string, item: Partial<InsertPricingLibraryItem>): Promise<PricingLibraryItem | undefined> {
+    const existing = this.pricingLibraryMap.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...item };
+    this.pricingLibraryMap.set(id, updated);
+    return updated;
+  }
+
+  async deletePricingLibraryItem(id: string): Promise<boolean> {
+    return this.pricingLibraryMap.delete(id);
+  }
+
+  // ── Sales Follow-ups ───────────────────────────────────────────────────────
+
+  async getSalesFollowUps(): Promise<SalesFollowUp[]> {
+    return Array.from(this.salesFollowUpsMap.values())
+      .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
+  }
+
+  async getSalesFollowUpsByLead(leadId: string): Promise<SalesFollowUp[]> {
+    return Array.from(this.salesFollowUpsMap.values()).filter(f => f.leadId === leadId);
+  }
+
+  async createSalesFollowUp(followUp: InsertSalesFollowUp): Promise<SalesFollowUp> {
+    const id = randomUUID();
+    const newFU: SalesFollowUp = { ...followUp, id, createdAt: new Date() };
+    this.salesFollowUpsMap.set(id, newFU);
+    return newFU;
+  }
+
+  async updateSalesFollowUp(id: string, followUp: Partial<InsertSalesFollowUp>): Promise<SalesFollowUp | undefined> {
+    const existing = this.salesFollowUpsMap.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...followUp };
+    this.salesFollowUpsMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteSalesFollowUp(id: string): Promise<boolean> {
+    return this.salesFollowUpsMap.delete(id);
+  }
+
   // Activity Logs
   async getActivityLogs(): Promise<any[]> {
     return this.activityLogs;
+  }
+
+  private initializePricingLibrary() {
+    const seed: Array<Omit<PricingLibraryItem, "id" | "createdAt">> = [
+      // Sanitary Bins
+      { name: "Standard Sanitary Bin — Supply", category: "sanitary_bins", serviceType: "Supply", unit: "each", unitPrice: "195.00", description: "Standard 20L sanitary bin, supplied and installed", departmentId: "div-2", isActive: true },
+      { name: "Sanitary Bin — Monthly Service", category: "sanitary_bins", serviceType: "Monthly Service", unit: "per month", unitPrice: "85.00", description: "Monthly sanitary bin collection and swap", departmentId: "div-2", isActive: true },
+      { name: "Nappy Disposal Unit — Supply", category: "sanitary_bins", serviceType: "Supply", unit: "each", unitPrice: "295.00", description: "Nappy disposal unit, supplied and installed", departmentId: "div-2", isActive: true },
+      { name: "Nappy Disposal Unit — Monthly Service", category: "sanitary_bins", serviceType: "Monthly Service", unit: "per month", unitPrice: "95.00", description: "Monthly nappy disposal service and swap", departmentId: "div-2", isActive: true },
+      // Washroom
+      { name: "Soap Dispenser — Supply", category: "washroom", serviceType: "Dispenser Supply", unit: "each", unitPrice: "350.00", description: "Wall-mounted foam soap dispenser, supplied and installed", departmentId: "div-3", isActive: true },
+      { name: "Paper Towel Dispenser — Supply", category: "washroom", serviceType: "Dispenser Supply", unit: "each", unitPrice: "295.00", description: "Paper towel dispenser, supplied and installed", departmentId: "div-3", isActive: true },
+      { name: "Air Freshener Unit — Supply", category: "washroom", serviceType: "Dispenser Supply", unit: "each", unitPrice: "450.00", description: "Automatic air freshener unit, supplied and installed", departmentId: "div-3", isActive: true },
+      { name: "Soap Refill — Per Visit", category: "washroom", serviceType: "Refill Service", unit: "per visit", unitPrice: "75.00", description: "Soap refill service per washroom visit", departmentId: "div-3", isActive: true },
+      { name: "Paper Towel Refill — Per Visit", category: "washroom", serviceType: "Refill Service", unit: "per visit", unitPrice: "65.00", description: "Paper towel refill per washroom visit", departmentId: "div-3", isActive: true },
+      { name: "Washroom Monthly Service Package", category: "washroom", serviceType: "Contract", unit: "per month", unitPrice: "350.00", description: "Full monthly washroom service — all dispensers maintained and refilled", departmentId: "div-3", isActive: true },
+      // Pest Control
+      { name: "General Pest Control — Once-off", category: "pest_control", serviceType: "Once-off Treatment", unit: "per visit", unitPrice: "850.00", description: "General pest control treatment, residential or light commercial", departmentId: "div-1", isActive: true },
+      { name: "General Pest Control — Monthly Contract", category: "pest_control", serviceType: "Contract", unit: "per month", unitPrice: "450.00", description: "Monthly general pest control treatment", departmentId: "div-1", isActive: true },
+      { name: "Rodent Control — Once-off", category: "pest_control", serviceType: "Once-off Treatment", unit: "per visit", unitPrice: "1200.00", description: "Rodent baiting and control — once-off treatment", departmentId: "div-1", isActive: true },
+      { name: "Fumigation — Per sqm", category: "pest_control", serviceType: "Fumigation", unit: "per sqm", unitPrice: "12.00", description: "Commercial fumigation service, minimum 200sqm applies", departmentId: "div-1", isActive: true },
+      { name: "Termite Treatment — Once-off", category: "pest_control", serviceType: "Termite Control", unit: "per visit", unitPrice: "2500.00", description: "Termite baiting and chemical barrier treatment", departmentId: "div-1", isActive: true },
+      // Deep Cleaning
+      { name: "Office Deep Clean — Per sqm", category: "deep_cleaning", serviceType: "Deep Clean", unit: "per sqm", unitPrice: "45.00", description: "Professional deep clean, office/commercial space", departmentId: "div-4", isActive: true },
+      { name: "Kitchen/Canteen Deep Clean", category: "deep_cleaning", serviceType: "Deep Clean", unit: "per visit", unitPrice: "1800.00", description: "Industrial kitchen or canteen deep clean", departmentId: "div-4", isActive: true },
+      { name: "Bathroom Deep Clean", category: "deep_cleaning", serviceType: "Deep Clean", unit: "per visit", unitPrice: "650.00", description: "Deep clean and sanitisation of bathroom facilities", departmentId: "div-4", isActive: true },
+      // Dustmats
+      { name: "Entrance Mat — Supply (Standard)", category: "dustmats", serviceType: "Supply", unit: "each", unitPrice: "850.00", description: "Standard entrance dustmat, supplied", departmentId: null, isActive: true },
+      { name: "Entrance Mat — Monthly Rental Service", category: "dustmats", serviceType: "Rental Contract", unit: "per month", unitPrice: "185.00", description: "Monthly mat rental — laundering and swap included", departmentId: null, isActive: true },
+      // Installation
+      { name: "Installation Fee — Standard", category: "installation", serviceType: "Installation", unit: "each", unitPrice: "250.00", description: "Standard installation of any single unit/dispenser", departmentId: null, isActive: true },
+      { name: "Installation Fee — Complex (per hour)", category: "installation", serviceType: "Installation", unit: "per hour", unitPrice: "350.00", description: "Complex installation requiring drilling, pipework or electrical", departmentId: null, isActive: true },
+    ];
+
+    for (const item of seed) {
+      const id = randomUUID();
+      this.pricingLibraryMap.set(id, { ...item, id, createdAt: new Date() });
+    }
   }
 
   private initializeFleetData() {

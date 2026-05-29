@@ -1,0 +1,449 @@
+Update the JobFlow Sales module using the sales workflow feedback from the sales department.
+
+The Sales module must follow this workflow:
+
+Lead Origination → Contact → Appointment / Meeting → Site Assessment → Quote → Quote Follow-up → Accepted / Declined → Contract / Registration → Installation or Service Date → Invoiced → After-sales Follow-up
+
+MAIN SALES MENU:
+Create these Sales tabs:
+- Sales Dashboard
+- Leads
+- Sales Diary
+- Quotes
+- Follow-ups
+- Contracts Pending
+- Accepted Work
+- Clients
+- Sales Reports
+- Pricing Library
+
+LEAD ORIGINATION:
+Every lead must have an Origination field.
+
+Origination dropdown options:
+- Facebook
+- Google
+- Vehicles
+- Phone / Incoming Call
+- Cold Call
+- Word of Mouth / Referral
+- Website
+- Existing Client
+- Walk-in
+- Email
+- Other
+
+If Other is selected, show:
+- Other Origination Details
+
+The Origination field must appear on:
+- Add Lead form
+- Edit Lead form
+- Lead detail page
+- Leads table
+- Sales dashboard filters
+- Sales reports
+
+LEAD STAGES:
+Create a clear lead pipeline with these statuses:
+- New Lead
+- Contacted
+- Appointment Scheduled
+- Site Assessment Done
+- Quote Needed
+- Quote Sent
+- Follow-up Due
+- Accepted
+- Declined / Lost
+- Contract Pending
+- Converted to Contract
+- Converted to Once-off Job
+- Installation / Service Scheduled
+- Invoiced
+- After-sales Follow-up Due
+- Complete
+
+LEAD FORM:
+Each lead must include:
+- Company name
+- Trading name, if different
+- Contact person
+- Contact number
+- Email address
+- Site address
+- Origination
+- Department: Pest Control, Hygiene, Sanitary Bins, Deep Cleaning, Other
+- Service required
+- Lead type: Once-off, Contract, Rental, Outright Purchase, Unknown
+- Assigned sales rep
+- Priority: Low, Medium, High
+- Notes
+- Status
+- Created date
+- Last updated date
+
+SALES DIARY:
+Sales reps must be able to load meetings, appointments, site visits and follow-ups into a diary.
+
+Sales Diary views:
+- Day view
+- Week view
+- Month view
+- List view
+- Manager view grouped by sales rep
+
+Diary entry fields:
+- Appointment title
+- Client / lead name
+- Contact person
+- Phone number
+- Site address
+- Appointment type
+- Assigned sales rep
+- Date
+- Start time
+- End time
+- Estimated duration
+- Status
+- Notes
+
+Appointment type dropdown:
+- New lead meeting
+- Site visit / assessment
+- Quote follow-up
+- Contract renewal
+- Existing client visit
+- Complaint / issue visit
+- Internal sales meeting
+- After-sales follow-up
+- Other
+
+Appointment status dropdown:
+- Planned
+- Confirmed
+- Completed
+- Cancelled
+- Rescheduled
+- No show
+
+From a Lead, the user must be able to click:
+- Schedule Appointment
+
+From a Quote, the user must be able to click:
+- Schedule Follow-up
+
+When an appointment is completed, allow the sales rep to add:
+- What happened
+- Client feedback
+- Photos / site notes if needed
+- Next action required
+- Follow-up date
+
+QUOTE CREATION:
+Quotes must be quicker and easier.
+
+Create a Pricing Library that stores preloaded prices for:
+- Pest control services
+- Hygiene services
+- Sanitary bins
+- Dispensers
+- Refills
+- Washroom equipment
+- Deep cleaning services
+- Installation fees
+- Once-off services
+- Contract services
+- Rental items
+- Outright purchase items
+
+When creating a quote, users must be able to select items from the Pricing Library instead of typing prices manually.
+
+QUOTE FORM:
+Each quote must include:
+- Quote number, auto-generated
+- Linked lead/client
+- Company name
+- Contact person
+- Contact number
+- Email
+- Site address
+- Department
+- Quote type: Once-off, Contract, Rental, Outright Purchase
+- Selected pricing items
+- Quantity
+- Unit price
+- Discount, if allowed
+- Total quote value
+- Monthly recurring value, if contract/rental
+- Installation cost
+- Notes
+- Internal notes
+- Status
+- Valid until date
+- Follow-up date
+- Assigned sales rep
+
+INSTALLATION COST WARNING:
+If Quote Type = Outright Purchase, the system must show a warning:
+"Remember to add installation cost if installation is required."
+
+If an outright purchase quote has no installation cost, show a visible warning before the quote is sent:
+"This quote has no installation cost. Confirm before sending."
+
+QUOTE STATUSES:
+Use these quote statuses:
+- Draft
+- Sent
+- Follow-up Due
+- Followed Up
+- Accepted
+- Declined
+- Expired
+- Contract Pending
+- Converted to Contract
+- Converted to Job
+
+AUTOMATIC QUOTE FOLLOW-UPS:
+When a quote is marked as Sent, automatically create follow-up reminders:
+- First follow-up: 2 days after quote sent
+- Second follow-up: 7 days after quote sent
+
+Follow-up method options:
+- Phone call
+- Email
+- WhatsApp
+- Client visit
+- Other
+
+Each follow-up must allow:
+- Mark completed
+- Add note
+- Reschedule
+- Mark quote accepted
+- Mark quote declined
+- Create next follow-up
+
+CUSTOMER HISTORY:
+Before contacting or quoting a client, the sales rep must be able to view customer history.
+
+Client history must show:
+- Previous quotes
+- Accepted quotes
+- Declined quotes
+- Service history
+- Current contracts
+- Past contracts
+- Outstanding invoices
+- Payment behaviour
+- Notes from admin/finance
+- Complaint history
+- Site notes
+- Photos
+- Attachments
+
+Add internal client flags:
+- Bad payer
+- High-profile customer
+- Time waster
+- Difficult customer
+- Needs manager approval
+- Existing good customer
+- Contract risk
+- Special pricing
+
+These flags must be visible to sales reps before they contact or quote the client.
+
+PHOTOS AND SITE NOTES:
+Photos, site notes and inspection notes do not need to appear on the quote PDF by default.
+They must be stored in the customer file and linked to the lead/quote.
+
+Allow uploads for:
+- Site photos
+- Inspection notes
+- Assessment notes
+- Existing installation photos
+- Problem area photos
+- Customer documents
+
+ACCEPTED QUOTE WORKFLOW:
+When a quote is marked Accepted, the system must not just close the quote.
+
+It must show clear next-step buttons:
+- Create Contract
+- Create Once-off Job
+- Schedule Installation / Service Date
+- Send Contract to Client
+- Mark Contract Signed
+- Create Invoice
+
+CONTRACTS:
+Contracts must be generated from accepted quotes.
+
+When creating a contract from an accepted quote, automatically copy:
+- Client details
+- Contact person
+- Site address
+- Services quoted
+- Pricing
+- Monthly recurring value
+- Installation details
+- Notes
+- Sales rep
+- Quote reference number
+
+Contract status options:
+- Contract Draft
+- Sent to Client
+- Awaiting Signature
+- Signed
+- Installation / Service Ready
+- Active
+- Cancelled
+
+IMPORTANT CONTRACT RULE:
+For contract/rental work, the system must remind the user:
+"Contract must be sent and signed before installation or service is completed."
+
+If a quote is accepted but the contract is not signed yet, show it under:
+- Contracts Pending
+
+CONTRACTS PENDING:
+Create a Contracts Pending section showing:
+- Accepted quotes with no contract created
+- Contracts created but not sent
+- Contracts sent but not signed
+- Installation/service scheduled before contract signed
+
+Add warning if installation or service is scheduled before contract is signed:
+"Warning: service/installation is scheduled but contract is not signed."
+
+INSTALLATION / SERVICE DATE:
+After quote acceptance and contract setup, the system must allow scheduling of:
+- New installation
+- First service
+- Once-off job
+- Follow-up visit
+
+This must connect to the Service Calendar.
+
+Carry across:
+- Client
+- Site address
+- Department
+- Service type
+- Installation notes
+- Quote notes
+- Contract status
+- Required items/equipment
+
+INVOICING:
+After installation/service is completed, the job must be able to move to:
+- Ready to Invoice
+
+Sales must be able to see whether the accepted work has been invoiced.
+
+AFTER-SALES FOLLOW-UP:
+After installation/service is completed, automatically create an after-sales follow-up reminder for 2 weeks later.
+
+After-sales follow-up fields:
+- Client
+- Service/installation completed date
+- Follow-up due date
+- Assigned sales rep
+- Client feedback
+- Is client happy?
+- Any issues?
+- Further sales opportunity?
+- Notes
+
+SALES DASHBOARD:
+The Sales Dashboard must show:
+- New Leads
+- Appointments Today
+- Appointments This Week
+- Quotes Needed
+- Quotes Sent
+- Follow-ups Due Today
+- Follow-ups Overdue
+- Accepted Quotes
+- Declined Quotes
+- Contracts Pending
+- Unsigned Contracts
+- Installations / New Services This Week
+- After-sales Follow-ups Due
+- Sales This Month
+- Monthly Recurring Sales Added
+- Outstanding Payments per Sales Rep’s Customers
+
+SALES REPORTS:
+Create reports for:
+- Leads by origination
+- Leads by sales rep
+- Quotes sent
+- Quotes accepted
+- Quotes declined/lost
+- Quote conversion rate
+- Sales per rep
+- Sales per department
+- New monthly recurring revenue
+- Once-off sales
+- Outstanding contracts
+- Unsigned contracts
+- Appointments for the week
+- New installations/services for the week
+- Outstanding payments per sales rep’s customers
+- Lost quote reasons
+- High pricing losses
+
+LOST QUOTE REASONS:
+When a quote is declined/lost, require a reason.
+
+Lost reason dropdown:
+- Price too high
+- Client chose competitor
+- No response
+- Not ready yet
+- Wrong service
+- Bad timing
+- Duplicate lead
+- Other
+
+If Other is selected, show:
+- Other Lost Reason Details
+
+PERMISSIONS:
+Managers/admins must be able to edit:
+- Pricing Library
+- Discounts
+- Quote templates
+- Contract templates
+- Client flags
+- Sales rep assignments
+- Lost quote reasons
+- Contract status overrides
+
+Sales reps can:
+- Add leads
+- Edit their own leads
+- Schedule appointments
+- Create quotes
+- Add follow-up notes
+- Upload site photos
+- Mark appointments completed
+- Request quote approval if needed
+
+Sales reps should not be able to:
+- Change approved pricing library prices
+- Delete quotes
+- Delete clients
+- Remove bad payer flags
+- Mark contracts signed unless allowed by admin/manager
+
+DESIGN:
+Keep the Sales module clean and simple.
+Use a top menu layout:
+Sales Dashboard | Leads | Sales Diary | Quotes | Follow-ups | Contracts Pending | Clients | Reports | Pricing Library
+
+Make the Sales Diary look similar to an Outlook calendar.
+
+The goal is to make the sales process faster, prevent quotes and contracts from falling through the cracks, and make accepted work flow automatically into contracts, service scheduling and invoicing.

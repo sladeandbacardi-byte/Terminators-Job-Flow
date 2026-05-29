@@ -51,6 +51,9 @@ import FinanceDashboard from "@/pages/finance-dashboard";
 import HRDashboard from "@/pages/hr-dashboard";
 import Expenses from "@/pages/expenses";
 import ServiceScheduling from "@/pages/service-scheduling";
+import PricingLibraryPage from "@/pages/pricing-library";
+import FollowUpsPage from "@/pages/follow-ups";
+import ContractsPendingPage from "@/pages/contracts-pending";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -113,6 +116,9 @@ function AuthenticatedApp() {
       <Route path="/system-logs" component={SystemLogs} />
       <Route path="/testing-checklist" component={TestingChecklist} />
       <Route path="/service-contracts" component={ServiceContractsPage} />
+      <Route path="/pricing-library" component={PricingLibraryPage} />
+      <Route path="/follow-ups" component={FollowUpsPage} />
+      <Route path="/contracts-pending" component={ContractsPendingPage} />
       <Route path="/finance-dashboard" component={FinanceDashboard} />
       <Route path="/hr-dashboard" component={HRDashboard} />
       <Route path="/expenses" component={Expenses} />

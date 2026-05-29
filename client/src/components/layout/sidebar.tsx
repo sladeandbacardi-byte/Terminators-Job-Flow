@@ -8,6 +8,7 @@ import {
   Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck, FileSpreadsheet,
   ChevronDown, ChevronRight, UserCog, Lock, ScrollText, HandCoins, Wallet,
   CheckSquare, Cog, ListOrdered, BookOpen, LayoutDashboard, Heart,
+  Bell, Tag, Clock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
@@ -43,12 +44,15 @@ const ALL_SECTIONS: NavSection[] = [
     icon: DollarSign,
     roles: ["admin", "manager", "sales"],
     items: [
-      { name: "Leads",            href: "/leads",        icon: TrendingUp, roles: ["admin", "manager", "sales"] },
-      { name: "Quotes",           href: "/quotes",       icon: FileText,   roles: ["admin", "manager", "sales"] },
-      { name: "Sales Diary",      href: "/sales-diary",  icon: BookOpen,   roles: ["admin", "manager", "sales"] },
-      { name: "Clients",          href: "/clients",      icon: Shield,     roles: ["admin", "manager", "sales"] },
-      { name: "Rental Contracts", href: "/contracts",    icon: FileText,   roles: ["admin", "manager", "sales"] },
-      { name: "Email Center",     href: "/emails",       icon: Mail,       roles: ["admin", "manager", "sales"] },
+      { name: "Leads",              href: "/leads",              icon: TrendingUp, roles: ["admin", "manager", "sales"] },
+      { name: "Sales Diary",        href: "/sales-diary",        icon: BookOpen,   roles: ["admin", "manager", "sales"] },
+      { name: "Quotes",             href: "/quotes",             icon: FileText,   roles: ["admin", "manager", "sales"] },
+      { name: "Follow-ups",         href: "/follow-ups",         icon: Bell,       roles: ["admin", "manager", "sales"] },
+      { name: "Contracts Pending",  href: "/contracts-pending",  icon: Clock,      roles: ["admin", "manager", "sales"] },
+      { name: "Clients",            href: "/clients",            icon: Shield,     roles: ["admin", "manager", "sales"] },
+      { name: "Rental Contracts",   href: "/contracts",          icon: FileText,   roles: ["admin", "manager", "sales"] },
+      { name: "Pricing Library",    href: "/pricing-library",    icon: Tag,        roles: ["admin", "manager", "sales"] },
+      { name: "Email Center",       href: "/emails",             icon: Mail,       roles: ["admin", "manager", "sales"] },
     ],
   },
   {

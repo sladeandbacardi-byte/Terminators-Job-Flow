@@ -2072,6 +2072,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Pricing Library ──────────────────────────────────────────────────────
+
+  app.get("/api/pricing-library", async (req, res) => {
+    try {
+      const items = await storage.getPricingLibrary();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pricing library" });
+    }
+  });
+
+  app.post("/api/pricing-library", async (req, res) => {
+    try {
+      const item = await storage.createPricingLibraryItem(req.body);
+      res.status(201).json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create pricing library item" });
+    }
+  });
+
+  app.put("/api/pricing-library/:id", async (req, res) => {
+    try {
+      const item = await storage.updatePricingLibraryItem(req.params.id, req.body);
+      if (!item) return res.status(404).json({ error: "Item not found" });
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update pricing library item" });
+    }
+  });
+
+  app.delete("/api/pricing-library/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePricingLibraryItem(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Item not found" });
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete pricing library item" });
+    }
+  });
+
+  // ── Sales Follow-ups ─────────────────────────────────────────────────────
+
+  app.get("/api/sales-follow-ups", async (req, res) => {
+    try {
+      const followUps = await storage.getSalesFollowUps();
+      res.json(followUps);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch follow-ups" });
+    }
+  });
+
+  app.get("/api/sales-follow-ups/lead/:leadId", async (req, res) => {
+    try {
+      const followUps = await storage.getSalesFollowUpsByLead(req.params.leadId);
+      res.json(followUps);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch follow-ups for lead" });
+    }
+  });
+
+  app.post("/api/sales-follow-ups", async (req, res) => {
+    try {
+      const followUp = await storage.createSalesFollowUp(req.body);
+      res.status(201).json(followUp);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create follow-up" });
+    }
+  });
+
+  app.put("/api/sales-follow-ups/:id", async (req, res) => {
+    try {
+      const followUp = await storage.updateSalesFollowUp(req.params.id, req.body);
+      if (!followUp) return res.status(404).json({ error: "Follow-up not found" });
+      res.json(followUp);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update follow-up" });
+    }
+  });
+
+  app.delete("/api/sales-follow-ups/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSalesFollowUp(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Follow-up not found" });
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete follow-up" });
+    }
+  });
+
   // WhatsApp messaging endpoint
   app.post("/api/whatsapp/send", async (req, res) => {
     try {

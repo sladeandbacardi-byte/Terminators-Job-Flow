@@ -603,6 +603,18 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   specialInstructions: text("special_instructions"),
   origination: text("origination").notNull().default("other"), // marketing channel — see ORIGINATION_OPTIONS
   originationOther: text("origination_other"), // free text when origination === "other"
+  // Extended lead/sales pipeline fields
+  tradingName: text("trading_name"),
+  leadType: text("lead_type"),               // Once-off, Contract, Rental, Outright Purchase, Unknown
+  priority: text("priority").default("medium"), // low, medium, high
+  stage: text("stage"),                      // full 16-stage pipeline value
+  quoteType: text("quote_type"),             // Once-off, Contract, Rental, Outright Purchase
+  lostReason: text("lost_reason"),
+  lostReasonOther: text("lost_reason_other"),
+  validUntil: text("valid_until"),           // YYYY-MM-DD
+  monthlyRecurring: text("monthly_recurring"),
+  installationCost: text("installation_cost"),
+  internalNotes: text("internal_notes"),
 });
 
 // Marketing channel options for the Origination field on every lead
@@ -610,7 +622,8 @@ export const ORIGINATION_OPTIONS = [
   { value: "facebook",        label: "Facebook" },
   { value: "google",          label: "Google" },
   { value: "vehicles",        label: "Vehicles" },
-  { value: "phone",           label: "Phone" },
+  { value: "phone",           label: "Phone / Incoming Call" },
+  { value: "cold_call",       label: "Cold Call" },
   { value: "referral",        label: "Word of Mouth / Referral" },
   { value: "website",         label: "Website" },
   { value: "existing_client", label: "Existing Client" },
@@ -624,13 +637,52 @@ export type OriginationValue = typeof ORIGINATION_OPTIONS[number]["value"];
 export const ORIGINATION_LABELS: Record<string, string> =
   Object.fromEntries(ORIGINATION_OPTIONS.map(o => [o.value, o.label]));
 
+// ── Lead pipeline stages ────────────────────────────────────────────────────
+
+export const LEAD_STAGES = [
+  { value: "new",                    label: "New Lead",                          color: "bg-blue-100 text-blue-700" },
+  { value: "contacted",              label: "Contacted",                         color: "bg-indigo-100 text-indigo-700" },
+  { value: "appointment_scheduled",  label: "Appointment Scheduled",             color: "bg-purple-100 text-purple-700" },
+  { value: "site_assessment_done",   label: "Site Assessment Done",              color: "bg-violet-100 text-violet-700" },
+  { value: "quote_needed",           label: "Quote Needed",                      color: "bg-amber-100 text-amber-700" },
+  { value: "quote_sent",             label: "Quote Sent",                        color: "bg-yellow-100 text-yellow-700" },
+  { value: "follow_up_due",          label: "Follow-up Due",                     color: "bg-orange-100 text-orange-700" },
+  { value: "accepted",               label: "Accepted",                          color: "bg-green-100 text-green-700" },
+  { value: "declined",               label: "Declined / Lost",                   color: "bg-red-100 text-red-700" },
+  { value: "contract_pending",       label: "Contract Pending",                  color: "bg-teal-100 text-teal-700" },
+  { value: "converted_contract",     label: "Converted to Contract",             color: "bg-emerald-100 text-emerald-700" },
+  { value: "converted_job",          label: "Converted to Once-off Job",         color: "bg-cyan-100 text-cyan-700" },
+  { value: "installation_scheduled", label: "Installation / Service Scheduled",  color: "bg-sky-100 text-sky-700" },
+  { value: "invoiced",               label: "Invoiced",                          color: "bg-lime-100 text-lime-700" },
+  { value: "after_sales_followup",   label: "After-sales Follow-up Due",         color: "bg-pink-100 text-pink-700" },
+  { value: "complete",               label: "Complete",                          color: "bg-gray-100 text-gray-600" },
+] as const;
+export type LeadStage = typeof LEAD_STAGES[number]["value"];
+export const LEAD_STAGE_LABELS: Record<string, string> = Object.fromEntries(LEAD_STAGES.map(s => [s.value, s.label]));
+
+export const QUOTE_STATUSES = [
+  "Draft","Sent","Follow-up Due","Followed Up","Accepted","Declined",
+  "Expired","Contract Pending","Converted to Contract","Converted to Job",
+] as const;
+
+export const LOST_REASONS = [
+  { value: "price_too_high",  label: "Price too high" },
+  { value: "competitor",      label: "Client chose competitor" },
+  { value: "no_response",     label: "No response" },
+  { value: "not_ready",       label: "Not ready yet" },
+  { value: "wrong_service",   label: "Wrong service" },
+  { value: "bad_timing",      label: "Bad timing" },
+  { value: "duplicate",       label: "Duplicate lead" },
+  { value: "other",           label: "Other" },
+] as const;
+
 export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).omit({
   id: true,
   submittedAt: true,
   quoteNumber: true,
 }).extend({
   origination: z.enum([
-    "facebook","google","vehicles","phone","referral",
+    "facebook","google","vehicles","phone","cold_call","referral",
     "website","existing_client","walk_in","email","other",
   ], { required_error: "Origination is required" }),
   originationOther: z.string().optional().nullable(),
@@ -638,6 +690,45 @@ export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).
 
 export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;
 export type QuoteSubmission = typeof quoteSubmissions.$inferSelect;
+
+// ─── PRICING LIBRARY ────────────────────────────────────────────────────────
+
+export const pricingLibrary = pgTable("pricing_library", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),  // sanitary_bins, washroom, pest_control, deep_cleaning, installation, dustmats, other
+  serviceType: text("service_type"),
+  unit: text("unit"),                    // per month, per visit, each, per sqm, etc.
+  unitPrice: text("unit_price").notNull(),
+  departmentId: varchar("department_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertPricingLibrarySchema = createInsertSchema(pricingLibrary).omit({ id: true, createdAt: true });
+export type InsertPricingLibraryItem = z.infer<typeof insertPricingLibrarySchema>;
+export type PricingLibraryItem = typeof pricingLibrary.$inferSelect;
+
+// ─── SALES FOLLOW-UPS ───────────────────────────────────────────────────────
+
+export const salesFollowUps = pgTable("sales_follow_ups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id"),
+  type: text("type"),                   // first_followup, second_followup, manual, after_sales
+  method: text("method"),               // Phone call, Email, WhatsApp, Client visit, Other
+  dueDate: text("due_date"),            // YYYY-MM-DD
+  completedAt: text("completed_at"),
+  status: text("status").notNull().default("pending"),  // pending, completed, rescheduled
+  result: text("result"),               // accepted, declined, reschedule, no_answer
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertSalesFollowUpSchema = createInsertSchema(salesFollowUps).omit({ id: true, createdAt: true });
+export type InsertSalesFollowUp = z.infer<typeof insertSalesFollowUpSchema>;
+export type SalesFollowUp = typeof salesFollowUps.$inferSelect;
 
 // ─── FLEET MODULE ──────────────────────────────────────────────────────────
 

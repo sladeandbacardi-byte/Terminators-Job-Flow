@@ -20,12 +20,11 @@ import { useLocation } from "wouter";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { QuoteSubmission, Worker, Department } from "@shared/schema";
-import { ORIGINATION_OPTIONS, ORIGINATION_LABELS } from "@shared/schema";
+import { ORIGINATION_OPTIONS, ORIGINATION_LABELS, LEAD_STAGES, LEAD_STAGE_LABELS } from "@shared/schema";
+import type { LeadStage } from "@shared/schema";
 import { exportLeads } from "@/lib/data-export";
 
 // ─── types ───────────────────────────────────────────────────────────────────
-
-type LeadStatus = "new" | "contacted" | "quoted" | "converted" | "declined";
 
 const SERVICE_LABELS: Record<string, string> = {
   pest_control: "Pest Control",
@@ -34,9 +33,21 @@ const SERVICE_LABELS: Record<string, string> = {
   deep_cleaning: "Deep Cleaning",
 };
 
-const PIPELINE: { status: LeadStatus; label: string; color: string; dotColor: string }[] = [
-  { status: "new",       label: "New Leads",  color: "bg-blue-50 border-blue-200",   dotColor: "bg-blue-500"   },
-  { status: "contacted", label: "Contacted",  color: "bg-amber-50 border-amber-200", dotColor: "bg-amber-400"  },
+const LEAD_TYPE_OPTIONS = ["Once-off","Contract","Rental","Outright Purchase","Unknown"];
+const PRIORITY_OPTIONS = [
+  { value: "low",    label: "Low",    cls: "bg-gray-100 text-gray-600" },
+  { value: "medium", label: "Medium", cls: "bg-blue-100 text-blue-700" },
+  { value: "high",   label: "High",   cls: "bg-red-100 text-red-700" },
+];
+
+// Active pipeline stages shown in the kanban (pre-quoting)
+const ACTIVE_PIPELINE_STAGES: LeadStage[] = ["new","contacted","appointment_scheduled","quote_needed"];
+
+const PIPELINE: { status: LeadStage; label: string; color: string; dotColor: string }[] = [
+  { status: "new",                   label: "New Leads",       color: "bg-blue-50 border-blue-200",    dotColor: "bg-blue-500"   },
+  { status: "contacted",             label: "Contacted",       color: "bg-amber-50 border-amber-200",  dotColor: "bg-amber-500"  },
+  { status: "appointment_scheduled", label: "Appt. Scheduled", color: "bg-purple-50 border-purple-200", dotColor: "bg-purple-500" },
+  { status: "quote_needed",          label: "Quote Needed",    color: "bg-orange-50 border-orange-200", dotColor: "bg-orange-500" },
 ];
 
 // ─── schema ──────────────────────────────────────────────────────────────────
@@ -121,8 +132,10 @@ export default function Leads() {
   });
 
   const saveLeadEdits = useMutation({
-    mutationFn: ({ id, notes, origination, originationOther }: { id: string; notes: string; origination: string; originationOther: string | null }) =>
-      apiRequest("PATCH", `/api/quote-submissions/${id}`, { notes, origination, originationOther }),
+    mutationFn: ({ id, notes, origination, originationOther, stage, priority, leadType, tradingName, internalNotes }:
+      { id: string; notes: string; origination: string; originationOther: string | null;
+        stage?: string; priority?: string; leadType?: string; tradingName?: string; internalNotes?: string }) =>
+      apiRequest("PATCH", `/api/quote-submissions/${id}`, { notes, origination, originationOther, stage, priority, leadType, tradingName, internalNotes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       setNotesLead(null);
@@ -132,6 +145,11 @@ export default function Leads() {
 
   const [editOrigination, setEditOrigination] = useState<string>("other");
   const [editOriginationOther, setEditOriginationOther] = useState<string>("");
+  const [editStage, setEditStage] = useState<string>("");
+  const [editPriority, setEditPriority] = useState<string>("");
+  const [editLeadType, setEditLeadType] = useState<string>("");
+  const [editTradingName, setEditTradingName] = useState<string>("");
+  const [editInternalNotes, setEditInternalNotes] = useState<string>("");
 
   const sendQuote = useMutation({
     mutationFn: async (data: DocumentFormValues) => {
@@ -154,28 +172,41 @@ export default function Leads() {
 
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
-  // Only show active leads — quoted/converted/declined live on Quotes page
-  const LEAD_STATUSES = ["new", "contacted"];
+  // Active pipeline stages shown in kanban; quoted/accepted/converted/declined handled in Quotes / Contracts pages
+  const getLeadStage = (l: QuoteSubmission) => (l as any).stage || l.status;
+
+  const [stageFilter, setStageFilter] = useState<string>("active");
 
   const filteredLeads = useMemo(() => {
     const q = search.toLowerCase().trim();
     return leads.filter(l => {
-      if (!LEAD_STATUSES.includes(l.status)) return false;
-      if (q && !l.companyName.toLowerCase().includes(q) && !l.contactPerson.toLowerCase().includes(q)) return false;
+      const ls = getLeadStage(l);
+      if (stageFilter === "active") {
+        if (!ACTIVE_PIPELINE_STAGES.includes(ls as LeadStage)) return false;
+      } else if (stageFilter !== "all") {
+        if (ls !== stageFilter) return false;
+      }
+      if (q && !l.companyName.toLowerCase().includes(q) && !(l.contactPerson ?? "").toLowerCase().includes(q) && !((l as any).tradingName ?? "").toLowerCase().includes(q)) return false;
       if (serviceFilter !== "all" && l.serviceType !== serviceFilter) return false;
       if (salespersonFilter !== "all" && l.assignedTo !== salespersonFilter) return false;
       if (originationFilter !== "all" && (l.origination ?? "other") !== originationFilter) return false;
       return true;
     });
-  }, [leads, search, serviceFilter, salespersonFilter, originationFilter]);
+  }, [leads, search, serviceFilter, salespersonFilter, originationFilter, stageFilter]);
 
-  const totals = PIPELINE.reduce((acc, col) => {
-    acc[col.status] = filteredLeads.filter(l => l.status === col.status).length;
+  // For kanban: columns come from PIPELINE when filter is "active"; otherwise one "All" column
+  const pipelineColumns = stageFilter === "active"
+    ? PIPELINE
+    : LEAD_STAGES.filter(s => stageFilter === "all" || s.value === stageFilter)
+        .map(s => ({ status: s.value as LeadStage, label: s.label, color: "bg-gray-50 border-gray-200", dotColor: "bg-gray-400" }));
+
+  const totals = pipelineColumns.reduce((acc, col) => {
+    acc[col.status] = filteredLeads.filter(l => getLeadStage(l) === col.status).length;
     return acc;
   }, {} as Record<string, number>);
 
-  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all";
-  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); };
+  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all" || stageFilter !== "active";
+  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); setStageFilter("active"); };
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -212,8 +243,10 @@ export default function Leads() {
         {[
           { label: "New Lead", cls: "bg-blue-100 text-blue-700" },
           { label: "Contacted", cls: "bg-amber-100 text-amber-700" },
-          { label: "Send Quote →  Quotes Page", cls: "bg-purple-100 text-purple-700" },
-          { label: "Lost", cls: "bg-gray-100 text-gray-500" },
+          { label: "Appt. Scheduled", cls: "bg-purple-100 text-purple-700" },
+          { label: "Quote Needed", cls: "bg-orange-100 text-orange-700" },
+          { label: "Quote Sent → Quotes Page", cls: "bg-teal-100 text-teal-700" },
+          { label: "Accepted → Contracts", cls: "bg-green-100 text-green-700" },
         ].map((step, i, arr) => (
           <span key={step.label} className="flex items-center gap-1 whitespace-nowrap">
             <span className={`px-2 py-0.5 rounded-full font-medium ${step.cls}`}>{step.label}</span>
@@ -280,6 +313,20 @@ export default function Leads() {
           </SelectContent>
         </Select>
 
+        {/* Stage */}
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger className="h-8 text-sm w-48">
+            <SelectValue placeholder="Pipeline Stage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active Pipeline</SelectItem>
+            <SelectItem value="all">All Stages</SelectItem>
+            {LEAD_STAGES.map(s => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {/* Export */}
         <Button
           variant="outline"
@@ -316,9 +363,9 @@ export default function Leads() {
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">Loading pipeline...</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-          {PIPELINE.map(col => {
-            const colLeads = filteredLeads.filter(l => l.status === col.status)
+        <div className={`grid gap-4 items-start ${pipelineColumns.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : pipelineColumns.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
+          {pipelineColumns.map(col => {
+            const colLeads = filteredLeads.filter(l => getLeadStage(l) === col.status)
               .sort((a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime());
             return (
               <div key={col.status} className={`rounded-xl border ${col.color} p-3 min-h-[200px]`}>
@@ -341,7 +388,12 @@ export default function Leads() {
                         setNotesLead(lead);
                         setNotesText(lead.notes ?? "");
                         setEditOrigination(lead.origination ?? "other");
-                        setEditOriginationOther(lead.originationOther ?? "");
+                        setEditOriginationOther((lead as any).originationOther ?? "");
+                        setEditStage(getLeadStage(lead));
+                        setEditPriority((lead as any).priority ?? "medium");
+                        setEditLeadType((lead as any).leadType ?? "");
+                        setEditTradingName((lead as any).tradingName ?? "");
+                        setEditInternalNotes((lead as any).internalNotes ?? "");
                       }}
                       onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
                       onSchedule={() => {
@@ -412,15 +464,60 @@ export default function Leads() {
         </Dialog>
       )}
 
-      {/* ── Edit Lead dialog (origination + notes) ── */}
+      {/* ── Edit Lead dialog ── */}
       {notesLead && (
         <Dialog open={!!notesLead} onOpenChange={() => setNotesLead(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Lead — {notesLead.companyName}</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4">
+              {/* Trading name */}
+              <div>
+                <label className="text-sm font-medium block mb-1">Trading Name <span className="text-xs text-gray-400">(if different from company)</span></label>
+                <Input value={editTradingName} onChange={e => setEditTradingName(e.target.value)} placeholder="e.g. The Corner Café t/a ABC Holdings" className="h-9 text-sm" />
+              </div>
+
+              {/* Stage + Priority row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium block mb-1">Pipeline Stage</label>
+                  <Select value={editStage} onValueChange={setEditStage}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select stage" /></SelectTrigger>
+                    <SelectContent>
+                      {LEAD_STAGES.map(s => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Priority</label>
+                  <Select value={editPriority} onValueChange={setEditPriority}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Priority" /></SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map(p => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Lead type */}
+              <div>
+                <label className="text-sm font-medium block mb-1">Lead Type</label>
+                <Select value={editLeadType} onValueChange={setEditLeadType}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    {LEAD_TYPE_OPTIONS.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Origination */}
               <div>
                 <label className="text-sm font-medium block mb-1">
@@ -441,24 +538,20 @@ export default function Leads() {
               {editOrigination === "other" && (
                 <div>
                   <label className="text-sm font-medium block mb-1">Other Origination Details</label>
-                  <Input
-                    value={editOriginationOther}
-                    onChange={e => setEditOriginationOther(e.target.value)}
-                    placeholder="e.g. Trade show, magazine ad..."
-                    className="h-9 text-sm"
-                  />
+                  <Input value={editOriginationOther} onChange={e => setEditOriginationOther(e.target.value)} placeholder="e.g. Trade show, magazine ad..." className="h-9 text-sm" />
                 </div>
               )}
 
               {/* Notes */}
               <div>
-                <label className="text-sm font-medium block mb-1">Notes</label>
-                <Textarea
-                  rows={5}
-                  value={notesText}
-                  onChange={e => setNotesText(e.target.value)}
-                  placeholder="Internal notes, call summary, quote amount, etc."
-                />
+                <label className="text-sm font-medium block mb-1">Client-facing Notes</label>
+                <Textarea rows={3} value={notesText} onChange={e => setNotesText(e.target.value)} placeholder="Call summary, requirements, etc." />
+              </div>
+
+              {/* Internal notes */}
+              <div>
+                <label className="text-sm font-medium block mb-1">Internal Notes <span className="text-xs text-gray-400">(staff only)</span></label>
+                <Textarea rows={2} value={editInternalNotes} onChange={e => setEditInternalNotes(e.target.value)} placeholder="Margin notes, concerns, strategy..." />
               </div>
             </div>
 
@@ -480,6 +573,11 @@ export default function Leads() {
                     notes: notesText,
                     origination: editOrigination,
                     originationOther: editOrigination === "other" ? editOriginationOther.trim() : null,
+                    stage: editStage || undefined,
+                    priority: editPriority || undefined,
+                    leadType: editLeadType || undefined,
+                    tradingName: editTradingName || undefined,
+                    internalNotes: editInternalNotes || undefined,
                   });
                 }}
                 disabled={saveLeadEdits.isPending}
@@ -518,23 +616,49 @@ function LeadCard({
 }) {
   const fu = followUpLabel(lead.followUpDate);
   const assignedWorker = lead.assignedTo ? workers.find(w => w.id === lead.assignedTo) : null;
+  const stage = (lead as any).stage || lead.status;
+  const priority = (lead as any).priority as string | undefined;
+  const leadType = (lead as any).leadType as string | undefined;
+  const tradingName = (lead as any).tradingName as string | undefined;
+
+  const priorityCls = priority === "high" ? "bg-red-100 text-red-700" : priority === "low" ? "bg-gray-100 text-gray-500" : "bg-blue-50 text-blue-600";
+
+  // Next-stage quick-advance map
+  const STAGE_NEXT: Record<string, { label: string; nextStage: string; cls?: string }> = {
+    new:                   { label: "→ Contacted",       nextStage: "contacted" },
+    contacted:             { label: "→ Set Appt.",        nextStage: "appointment_scheduled" },
+    appointment_scheduled: { label: "→ Site Done",        nextStage: "site_assessment_done" },
+    site_assessment_done:  { label: "→ Quote Needed",     nextStage: "quote_needed" },
+    quote_needed:          { label: "→ Send Quote",       nextStage: "quote_sent", cls: "border-purple-300 text-purple-700 hover:bg-purple-50" },
+    quote_sent:            { label: "→ Follow-up Due",    nextStage: "follow_up_due" },
+    follow_up_due:         { label: "→ Accepted",         nextStage: "accepted", cls: "border-green-300 text-green-700 hover:bg-green-50" },
+  };
+  const nextAction = STAGE_NEXT[stage];
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 space-y-2">
-      {/* Company + service */}
+      {/* Company + service + priority */}
       <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-gray-900 truncate">{lead.companyName}</p>
+          {tradingName && <p className="text-xs text-gray-400 truncate italic">t/a {tradingName}</p>}
           <p className="text-xs text-gray-500 flex items-center gap-1"><User className="h-3 w-3" />{lead.contactPerson}</p>
         </div>
-        <Badge variant="outline" className="text-xs flex-shrink-0">{SERVICE_LABELS[lead.serviceType] ?? lead.serviceType}</Badge>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <Badge variant="outline" className="text-xs">{SERVICE_LABELS[lead.serviceType] ?? lead.serviceType}</Badge>
+          {priority && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${priorityCls}`}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>}
+        </div>
       </div>
 
-      {/* Origination */}
-      <div>
+      {/* Lead type + origination badges */}
+      <div className="flex flex-wrap gap-1">
+        {leadType && (
+          <Badge variant="secondary" className="text-xs bg-teal-50 text-teal-700 border border-teal-100">{leadType}</Badge>
+        )}
         <Badge variant="secondary" className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100">
           <Megaphone className="h-3 w-3 mr-1" />
           {ORIGINATION_LABELS[lead.origination ?? "other"] ?? "Other"}
-          {lead.origination === "other" && lead.originationOther ? `: ${lead.originationOther}` : ""}
+          {lead.origination === "other" && (lead as any).originationOther ? `: ${(lead as any).originationOther}` : ""}
         </Badge>
       </div>
 
@@ -571,12 +695,14 @@ function LeadCard({
 
       {/* Actions */}
       <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
-        {lead.status === "new" && (
-          <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={() => onAdvance("contacted")}>
-            <ChevronRight className="h-3 w-3 mr-0.5" /> Contacted
+        {/* Dynamic next-stage advance */}
+        {nextAction && stage !== "quote_needed" && (
+          <Button size="sm" variant="outline" className={`text-xs h-6 px-2 ${nextAction.cls ?? ""}`} onClick={() => onAdvance(nextAction.nextStage)}>
+            <ChevronRight className="h-3 w-3 mr-0.5" /> {nextAction.label}
           </Button>
         )}
-        {lead.status === "contacted" && (
+        {/* Send Quote (special — opens quote form) */}
+        {(stage === "quote_needed" || stage === "contacted") && (
           <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-purple-300 text-purple-700 hover:bg-purple-50" onClick={onQuote}>
             <Send className="h-3 w-3 mr-0.5" /> Send Quote
           </Button>
