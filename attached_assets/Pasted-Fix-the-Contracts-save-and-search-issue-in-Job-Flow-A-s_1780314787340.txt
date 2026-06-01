@@ -1,0 +1,170 @@
+Fix the Contracts save and search issue in Job Flow.
+
+A service admin loaded a job/contract under the Contracts section and clicked save. The app indicated that it saved successfully, but the record could not be found when searching for it afterwards.
+
+This must be treated as a critical data integrity bug.
+
+CORE REQUIREMENT
+
+Anything created from the Contracts section must save as a Contract record.
+
+It must appear immediately after saving in:
+- Contracts list
+- Contract search results
+- Client profile under that client's contracts
+- Schedule View if active and scheduled
+- Calendar if active and recurring
+- Daily Diaries when the date matches the contract schedule
+
+Do not save a contract into a separate jobs table, service schedule table, draft-only table, or local component state unless it is clearly marked as a draft.
+
+DATA MODEL RULES
+
+Use these clear record types:
+
+1. Job
+A once-off or actual work occurrence.
+
+2. Contract
+A recurring service agreement linked to a client.
+
+3. Contract Schedule
+The scheduling fields inside the contract record.
+
+The Contract must be the source of truth for recurring service work.
+
+When the user is in Service > Contracts and clicks Add Contract or Save Contract, the record must be saved to the contracts collection/table.
+
+SAVE FLOW
+
+When saving a contract:
+
+1. Validate required fields:
+- clientId
+- clientName
+- contractNumber if used
+- serviceType
+- frequency
+- activeStatus
+
+2. Save the contract to the contracts table/collection.
+
+3. Wait for the database/storage save to complete successfully.
+
+4. Refetch the saved contract from the database/storage by its new id.
+
+5. Only then show:
+"Contract saved successfully."
+
+6. After saving, redirect the user to the saved contract detail page or show it in the Contracts list immediately.
+
+Do not show "saved successfully" if:
+- the database insert failed
+- the contract was only saved in temporary state
+- the contract was saved without an id
+- the contract was saved to the wrong table
+- required fields are missing
+
+SEARCH REQUIREMENTS
+
+The Contracts search must search all contract records, not only currently visible filtered rows.
+
+Search must include:
+- clientName
+- contractNumber
+- serviceType
+- address
+- assignedTeam
+- assignedTechnician
+- notes
+
+Add a filter option:
+All Contracts
+
+This must include:
+- active contracts
+- inactive contracts
+- draft contracts if drafts exist
+
+If filters are active, show a clear message:
+"Some contracts may be hidden by filters."
+
+Add a button:
+Clear Filters
+
+BUG CHECK
+
+Inspect the current code for separate data arrays/tables named like:
+- contracts
+- jobs
+- serviceSchedule
+- scheduledServices
+- recurringJobs
+- contractJobs
+- draftContracts
+
+Make sure the Contracts page is saving and reading from the same source.
+
+The contract creation form, contract list, contract search, client profile, and schedule view must all use the same contract data source.
+
+CLIENT LINKING
+
+When saving a contract, it must be linked to a client using:
+
+- clientId
+- clientName
+
+After saving, opening the client profile must show the contract under:
+Client Profile > Contracts
+
+If clientId is missing, do not allow save.
+Show:
+"Please select a valid client before saving this contract."
+
+DRAFTS
+
+If the system has draft contracts, make this obvious.
+
+Draft contracts must appear in the Contract List with status:
+Draft
+
+Do not hide draft contracts from search.
+
+DUPLICATE PROTECTION
+
+Before saving, check for an existing contract with the same:
+- clientId
+- serviceType
+- frequency
+- dayOfWeek
+- weekOfMonth
+- startTime
+
+If a possible duplicate exists, warn the user:
+"A similar contract already exists for this client. Do you want to continue?"
+
+Do not silently create duplicate contracts.
+
+TEST CASE
+
+Test this exact flow:
+
+1. Go to Service > Contracts.
+2. Click Add Contract.
+3. Select an existing client.
+4. Add service type, frequency, day, time, route sequence, and assigned team.
+5. Save the contract.
+6. Confirm that the app shows "Contract saved successfully" only after the database save completes.
+7. Search for the client name in Contracts.
+8. Confirm the new contract appears.
+9. Open the client profile.
+10. Confirm the new contract appears under the client's contracts.
+11. Open Schedule View.
+12. Confirm the contract appears if it is active and has schedule fields.
+13. Clear all filters and confirm the contract is still visible.
+
+IMPORTANT
+
+This bug must be fixed before adding more contract features.
+
+Users must be able to trust that when a contract is saved, it can be found again.

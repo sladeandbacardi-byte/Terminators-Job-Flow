@@ -1,0 +1,849 @@
+Update the Job Flow Service section using the combined feedback from the Hygiene Service Manager, Service Admin, and the old ZAP screenshots/videos.
+
+The system must be simple, contract-driven, and easier than ZAP.
+
+CORE PRINCIPLE
+
+Contracts are the source of truth for recurring service work.
+
+A contract must contain:
+- the client
+- the service type
+- the frequency
+- the schedule
+- the price
+- the increase date
+- the contract end date
+- the route sequence
+- the assigned team/technician
+- the invoicing rule
+- the stock/refill rule
+
+The calendar, daily diaries, technician view, reports, reminders, and client profile must all read from the contract data.
+
+Do not create a separate Service Scheduling main menu item where users manually add duplicate schedule entries.
+
+SERVICE MENU
+
+Use this Service menu:
+
+Service
+- Jobs
+- Calendar
+- Contracts
+- Daily Diaries
+- Stock Management
+- Reports
+
+Inside Contracts, create these tabs:
+
+- Contract List
+- Schedule View
+- Contracts Ending
+- Increase Dates
+- Contract Documents
+
+CONTRACT FORM
+
+When adding or editing a contract, split the form into simple sections:
+
+1. Client & Contract Details
+2. Scheduling
+3. Invoicing
+4. Stock / Refill Tracking
+5. Documents
+
+CLIENT & CONTRACT DETAILS
+
+Fields:
+
+- Client
+- Contract Number
+- Service Type
+- Department
+- Contract Price
+- PPU if applicable
+- Contract Start Date
+- Contract End Date
+- Increase Date
+- Increase Percentage
+- Active / Inactive
+- Special Instructions
+- Internal Notes
+
+SERVICE TYPE OPTIONS
+
+- Sanitary Bins
+- Washroom Dispensers
+- Washroom Refills Included
+- Washroom Refills Excluded
+- Washroom On-Demand Refills
+- Dustmats
+- Pest Control
+- Deep Cleaning
+- Hygiene Deep Cleaning
+- Paper Towel Refills
+- Auto Towel Dispensers
+- Urinal Mats
+- Other
+
+A client can have multiple contracts.
+
+Examples:
+- Sanitary Bins contract
+- Washroom Dispensers contract
+- Washroom Refills Included contract
+- Washroom On-Demand Refills contract
+- Pest Control contract
+- Dustmats contract
+
+This is important because different services may have different stock usage, invoicing rules, and schedules.
+
+SCHEDULING SECTION
+
+Fields:
+
+- Frequency
+- Start Date
+- Start Time
+- Estimated Duration
+- Fixed Time: Yes / No
+- Week of Month
+- Day of Week
+- Second Day of Week if needed
+- Route Sequence
+- Assigned Team
+- Assigned Technician
+- Repeat Until / End Date
+- Confirm With Client Before Service: Yes / No
+
+FREQUENCY OPTIONS
+
+Use these options:
+
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+- On Demand
+
+WEEK OF MONTH OPTIONS
+
+- Every Week
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Last Week
+
+DAY OF WEEK OPTIONS
+
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+FIXED TIME
+
+Fixed Time must work like the old ZAP fixed time checkbox.
+
+If Fixed Time = Yes:
+The job must appear on the calendar at the selected start time.
+
+If Fixed Time = No:
+The job must still appear in the correct route sequence, but the exact time can be treated as flexible.
+
+ROUTE SEQUENCE
+
+Every recurring contract can have a Route Sequence number.
+
+This is especially important for sanitary bins.
+
+Example:
+Client: Volkswagen SA
+Service Type: Sanitary Bins
+Frequency: Monthly
+Week of Month: Week 1
+Day of Week: Monday
+Start Time: 08:00
+Route Sequence: 1
+
+The system must show the work in route order.
+
+If Route Sequence is left blank, automatically assign the next available sequence number for that:
+- service type
+- week of month
+- day of week
+- assigned team
+
+SCHEDULING RULES BY FREQUENCY
+
+If Frequency is Once-off:
+Show:
+- Job Date
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Must Be Invoiced
+Hide:
+- Week of Month
+- Second Day of Week
+
+If Frequency is Daily:
+Show:
+- Start Date
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+
+If Frequency is 2 x a week:
+Show:
+- First Day of Week
+- Second Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Monday and Thursday at 08:00
+
+If Frequency is Weekly:
+Show:
+- Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Every Tuesday at 10:00
+
+If Frequency is Twice a month:
+Show:
+- First Week of Month
+- First Day of Week
+- First Start Time
+- Second Week of Month
+- Second Day of Week
+- Second Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Week 1 Monday at 08:00 and Week 3 Monday at 08:00
+
+If Frequency is Monthly:
+Show:
+- Week of Month
+- Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+Example:
+Week 1 Monday at 08:00
+
+If Frequency is Every 2 months:
+Show the same fields as Monthly, but repeat every 2 months.
+
+If Frequency is Quarterly:
+Show the same fields as Monthly, but repeat every 3 months.
+
+If Frequency is Every 6 months:
+Show the same fields as Monthly, but repeat every 6 months.
+
+If Frequency is Annually:
+Show:
+- Month
+- Week of Month
+- Day of Week
+- Start Time
+- Duration
+- Assigned Team
+- Fixed Time
+- Route Sequence
+
+If Frequency is On Demand:
+Do not automatically place it on the calendar.
+Show it under the client profile and contract list as an available on-demand contract.
+Jobs must only be created when the client requests the service.
+
+SCHEDULE SUMMARY
+
+Every contract must automatically generate a readable schedule summary.
+
+Examples:
+
+Daily at 08:00
+Weekly - Every Tuesday at 10:00
+2 x a week - Monday and Thursday at 08:00
+Twice a month - Week 1 Monday and Week 3 Monday at 08:00
+Monthly - Week 1 Monday at 08:00 - Route 1
+Every 2 months - Week 2 Wednesday at 09:00
+Quarterly - Week 1 Friday at 11:00
+Every 6 months - Last Friday at 14:00
+Annually - March, Week 2 Tuesday at 09:00
+Once-off - 28 May 2026 at 08:00
+On Demand - Create job only when requested
+
+IMPORTANT DUPLICATE PROTECTION
+
+The old ZAP system sometimes loads the same monthly contract many times in the same month.
+
+Job Flow must prevent this.
+
+Before creating or displaying a contract job occurrence, check for an existing job occurrence with the same:
+- contractId
+- clientId
+- service date
+- service type
+- assigned team
+
+If one already exists, do not create a duplicate.
+
+If the user tries to create a duplicate, show:
+"This contract job already exists for this date."
+
+CALENDAR REQUIREMENTS
+
+The service calendar must be daily and technician-focused.
+
+It must look and behave like a simple daily calendar/diary, not only a monthly calendar.
+
+Calendar views:
+
+- Daily
+- Weekly
+- Monthly
+
+Default view for service users:
+Daily
+
+Calendar filters:
+
+- Date
+- Technician
+- Team
+- Service Type
+- Department
+- Completed / Not Completed
+- Fixed Time
+- Invoiced / Not Invoiced
+
+Daily calendar layout must show time slots down the left side.
+
+Example daily columns/rows:
+
+- Time
+- Client Name
+- Address
+- Service Type
+- Contract / Once-off
+- Invoice Number
+- Complete
+- Fixed
+- Job Number
+- Previous Job Number
+- Job Done On
+- Assigned Technician/Team
+
+Daily calendar rows must be sorted by:
+
+1. Start Time
+2. Route Sequence
+3. Client Name
+
+Use colour/status badges:
+
+- Green: Completed
+- Blue: Scheduled / Contract job
+- Red: Overdue / Not completed
+- Grey: Flexible time / no fixed time
+- Yellow/Orange: Must confirm with client
+
+Do not use harsh old ZAP colours.
+Use modern badges and row highlights.
+
+CLIENT PROFILE REQUIREMENTS
+
+When opening a client profile, show all services and client information immediately.
+
+The client profile must show:
+
+- Client name
+- Address
+- Contact person
+- Phone
+- Email
+- Google Maps link
+- All active contracts
+- All inactive contracts
+- Service types
+- Contract numbers
+- Previous service date
+- Next service date
+- Previous costs
+- Current prices
+- Availability / next available service slot
+- Completed service history
+- Treatment reports
+- ISO pest control file
+- Installation checklists
+- Survey sheets
+- Pictures
+- PODs
+- Signed worksheets
+- WhatsApp/client communication notes
+- Internal notes
+
+Under the client profile, show a simple contracts table:
+
+- Start Time
+- Service Type
+- Address
+- Contract Number
+- Frequency
+- Schedule Summary
+- Price
+- Increase Date
+- Contract End Date
+- Status
+- View / Edit
+
+This must replace the need to open multiple ZAP screens to see all services.
+
+CONTRACT LIST
+
+The Contract List must support filters:
+
+- All contracts
+- Active contracts
+- Inactive contracts
+- Contracts ending soon
+- Increase dates due
+- Service type
+- Client
+- Technician
+- Team
+- Rental contracts
+- Service contracts
+- Frequency
+
+Contracts ending soon filter:
+- next 30 days
+- next 60 days
+- next 90 days
+
+Increase dates due filter:
+- next 30 days
+- next 60 days
+- next 90 days
+
+CONTRACTS ENDING
+
+Create a Contracts Ending tab.
+
+Show:
+
+- Contract Number
+- Client
+- Service Type
+- Contract End Date
+- Days Remaining
+- Assigned Manager
+- Status
+- Extend Contract button
+- Contact Client button
+
+This fixes the problem where ZAP no longer shows contracts ending properly.
+
+INCREASE DATES
+
+Create an Increase Dates tab.
+
+Show:
+
+- Contract Number
+- Client
+- Service Type
+- Current Price
+- Increase Date
+- Increase Percentage
+- New Price if calculated
+- Status
+- Apply Increase button
+- Contact Client button
+
+REMINDERS / ALERTS
+
+Add dashboard alerts for:
+
+- Contracts ending
+- Increase dates
+- Jobs not completed
+- Jobs ready to invoice
+- Jobs requiring client confirmation
+- Duplicate contract job warning
+- Low stock
+
+The system must remind the user if:
+- a contract is ending soon
+- an increase date is due soon
+- the client must be confirmed before service
+- a scheduled job has not been completed
+- a job is completed but not invoiced
+- stock is low
+
+INVOICING
+
+Job Flow must help track Y/N for invoicing purposes.
+
+Add these fields to jobs:
+
+- Must Be Invoiced: Yes / No
+- Invoice Status
+- Invoice Number
+- How Invoiced
+- Finance Notes
+
+Invoice Status options:
+
+- Not Ready
+- Ready to Invoice
+- Invoiced
+- Do Not Invoice
+
+Invoice Rule options on contracts:
+
+- Invoice per completed job
+- Invoice monthly contract
+- Invoice on demand
+- Do not invoice automatically
+
+Create a Jobs To Be Invoiced report showing:
+
+- Date completed
+- Client
+- Contract Number
+- Service Type
+- Price
+- Must Be Invoiced
+- Invoice Status
+- Invoice Number
+- Assigned Team
+- Open Job button
+
+TECHNICIAN PHONE VIEW
+
+Before starting a job, technicians must see:
+
+- Client name
+- Address
+- Contact details if allowed
+- Job information
+- Service type
+- Special instructions
+- Amount / price if allowed for that user role
+- Scheduled time
+- Route sequence
+- Open in Google Maps button
+- Start Job button
+
+Before closing a job, technicians must complete:
+
+- Confirm all units checked/completed
+- Capture customer signature
+- Add notes if needed
+- Capture photos if needed
+- Capture chemicals/stock used if required
+- Report extra fault / extra work if found
+- Complete job button
+
+For sanitary bins and washroom jobs, include this checklist:
+
+All units checked/completed:
+- Yes
+- No
+
+If No, require a note before the job can be completed.
+
+EXTRA FAULT / EXTRA WORK
+
+Technicians must have a button:
+
+Report Extra Fault / Extra Work
+
+When submitted, capture:
+
+- Client
+- Related contract
+- Related job
+- Description
+- Photos optional
+- Preferred cost
+- Priority: Low / Medium / High / Urgent
+- Responsible person
+- Notes
+
+When submitted, notify or email the responsible person.
+
+STOCK TRACKING
+
+Stock is currently tracked outside the system in spreadsheets.
+
+Job Flow must include stock tracking.
+
+Stock must support:
+
+- Stock on hand
+- Stock used by job
+- Stock used by contract
+- Stock used by technician
+- Daily chemical take per pest control technician
+- Low stock alerts
+- Stock by service type
+- Stock by team
+
+Technicians must be able to load their daily chemical take electronically into their own stock/chemical folder or record.
+
+For PC technicians, daily chemical usage must be tracked.
+
+For washroom contracts, track whether refills are:
+
+- Included
+- Excluded
+- On Demand
+- Not Applicable
+
+Treatment reports must be able to use chemical/stock usage data where relevant.
+
+TREATMENT REPORTS
+
+Treatment reports are a major admin time problem.
+
+When a technician completes a pest control job, Job Flow must allow the treatment report to be completed electronically.
+
+After completion, the treatment report must be automatically saved under the client folder/profile.
+
+Treatment reports must be linked to:
+
+- Client
+- Contract
+- Job
+- Technician
+- Date completed
+
+Treatment reports must be visible under the client profile.
+
+DOCUMENT STORAGE
+
+Each client profile must allow storing:
+
+- ISO client pest control file
+- Treatment Reports
+- Installation Checklist
+- Survey Sheets
+- Pictures
+- POD
+- Signed Worksheets
+- WhatsApp confirmations
+- Client communication notes
+- Other Documents
+
+Documents must be linked to:
+- client
+- contract optional
+- job optional
+
+WHATSAPP / CLIENT CONFIRMATIONS
+
+The system must allow staff to record client confirmations that happened via WhatsApp or phone.
+
+Add a simple communication note feature under client and job:
+
+Fields:
+- Date
+- Contact person
+- Communication type: WhatsApp / Phone / Email / In person / Other
+- Notes
+- Confirmation received: Yes / No
+- File/photo upload optional
+
+If a contract has Confirm With Client Before Service = Yes, show an alert before the job date.
+
+SALES HANDOVER
+
+The service admin said loading info for Sales Department on ZAP is too complicated and should be done by Sales.
+
+Job Flow must allow Sales users to load their own new client/job/contract information.
+
+Sales should be able to create:
+- New client lead
+- New client profile
+- New job request
+- New proposed contract
+
+But only managers/admins should be able to approve or activate the final contract.
+
+Use workflow:
+
+Sales creates proposed contract
+Service/Admin reviews details
+Manager/Admin approves contract
+Contract becomes active
+Contract appears on calendar/diary
+
+This prevents service admin from re-entering sales information.
+
+DAILY DIARIES
+
+Daily Diaries must be generated from:
+
+- once-off jobs
+- active contract schedules
+
+Daily diary filters:
+
+- date
+- service type
+- team
+- staff member
+- technician
+- completed / not completed
+- invoice status
+
+Daily diary must show jobs in:
+
+1. time order
+2. route sequence order
+
+Each diary row must show:
+
+- time
+- route sequence
+- client
+- address
+- service type
+- contract number
+- frequency
+- assigned team
+- job status
+- invoice status
+- notes
+- open job button
+- open Google Maps button if googleMapsLink exists
+
+PERMISSIONS
+
+The feedback says managers/admins should edit everything, and staff should see everything but not change everything.
+
+Set permissions like this:
+
+Managers/Admins can edit:
+- client details
+- contract details
+- stock quantities
+- route sequence
+- prices
+- increase dates
+- contract end dates
+- invoice settings
+- documents
+- staff assignments
+
+Sales users can create:
+- proposed clients
+- proposed jobs
+- proposed contracts
+- notes
+
+Sales users cannot activate final contracts unless they have manager/admin permission.
+
+Technicians/staff may view:
+- client details
+- contract details
+- stock quantities
+- job information
+- special instructions
+
+Technicians may update only:
+- job status
+- job notes
+- photos
+- checklist
+- customer signature
+- chemical/stock used
+- treatment report
+- extra fault report
+
+Technicians cannot edit:
+- client master details
+- contract prices
+- increase dates
+- contract end dates
+- route sequence
+- stock quantities directly
+
+IMPORTANT OLD ZAP TRANSLATION
+
+Do not copy the old ZAP screens visually.
+
+The old screenshots are only used to understand the logic.
+
+Old ZAP concepts must translate to Job Flow like this:
+
+ZAP Diary -> Job Flow Daily Calendar / Daily Diary
+ZAP Contract checkbox -> Job Flow Contract Type / Recurring Contract
+ZAP From Date -> Job Flow Start Date
+ZAP Start Time -> Job Flow Start Time
+ZAP Duration -> Job Flow Estimated Duration
+ZAP Fixed -> Job Flow Fixed Time
+ZAP 1 per 2M/S -> Job Flow Frequency
+ZAP Specific Day -> Job Flow Day of Week
+ZAP Client Services popup -> Job Flow Client Profile Contracts Table
+ZAP Complete Y/N -> Job Flow Job Status + Completion Checklist
+ZAP Invoice No -> Job Flow Invoice Status + Invoice Number
+
+FINAL GOAL
+
+Job Flow must remove these admin headaches:
+
+- checking contracts ending manually
+- checking increase dates manually
+- duplicate contract jobs being created
+- sanitary bin scheduling in spreadsheets
+- stock tracking in spreadsheets
+- treatment reports being handled outside the system
+- service admin re-entering sales information
+- staff not having easy access to current client information
+
+Keep the interface simple.
+
+The basic service workflow must be:
+
+Sales or Admin loads client/job/contract details
+Manager/Admin approves contract
+Contract stores schedule and frequency
+Calendar shows daily technician work
+Technician completes job on phone
+Treatment report/signature/stock usage saves to client profile
+Job becomes ready for invoicing if required
+Reports and alerts update automatically
