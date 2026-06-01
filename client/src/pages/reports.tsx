@@ -30,6 +30,8 @@ import { exportAllData } from "@/lib/data-export";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Job, RentalContract, Worker, Department } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 
 // ─── Quick-preset helpers ─────────────────────────────────────────────────────
 type Preset = '7d' | '30d' | '90d' | '6m' | 'ytd' | '1y' | 'custom';
@@ -120,6 +122,10 @@ function buildChartData(jobs: Job[], groupBy: GroupBy, from: Date, to: Date): Ch
 }
 
 export default function Reports() {
+  const { user } = useAuth();
+  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const canSeeFinancials = role !== "manager";
+
   // ── Existing overview / staff / contract state ────────────────────────────
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -283,7 +289,7 @@ export default function Reports() {
                   <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
                 </PopoverContent>
               </Popover>
-              <ExportButton onExportCSV={() => exportAllData()} entityName="All Business Data" variant="default" />
+              {canSeeFinancials && <ExportButton onExportCSV={() => exportAllData()} entityName="All Business Data" variant="default" />}
             </div>
           </div>
 
@@ -632,16 +638,18 @@ export default function Reports() {
                     <p className="text-xs text-muted-foreground">{expiringContracts.length} expiring soon</p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(totalMonthlyRevenue)}</div>
-                    <p className="text-xs text-muted-foreground">From rental contracts</p>
-                  </CardContent>
-                </Card>
+                {canSeeFinancials && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{formatCurrency(totalMonthlyRevenue)}</div>
+                      <p className="text-xs text-muted-foreground">From rental contracts</p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               <Card>
@@ -755,8 +763,8 @@ export default function Reports() {
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Jobs</CardTitle><Target className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{staffPerformance.totalJobs}</div><p className="text-xs text-muted-foreground">{staffPerformance.completedJobs} completed</p></CardContent></Card>
-                        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Sales</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">R {parseFloat(staffPerformance.totalSales).toLocaleString()}</div><p className="text-xs text-muted-foreground">From products & services</p></CardContent></Card>
-                        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Average Sales</CardTitle><TrendingUp className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">R {parseFloat(staffPerformance.averageSalesPerJob).toLocaleString()}</div><p className="text-xs text-muted-foreground">Per job</p></CardContent></Card>
+                        {canSeeFinancials && <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Sales</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">R {parseFloat(staffPerformance.totalSales).toLocaleString()}</div><p className="text-xs text-muted-foreground">From products & services</p></CardContent></Card>}
+                        {canSeeFinancials && <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Average Sales</CardTitle><TrendingUp className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">R {parseFloat(staffPerformance.averageSalesPerJob).toLocaleString()}</div><p className="text-xs text-muted-foreground">Per job</p></CardContent></Card>}
                         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Completion Rate</CardTitle><BarChart3 className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{staffPerformance.completionRate}%</div><p className="text-xs text-muted-foreground">Job completion</p></CardContent></Card>
                       </div>
                       <Card>
@@ -804,7 +812,9 @@ export default function Reports() {
                     <div className="flex justify-between"><span>Total Contracts:</span><span className="font-semibold">{contracts.length}</span></div>
                     <div className="flex justify-between"><span>Active Contracts:</span><span className="font-semibold text-green-600">{activeContracts.length}</span></div>
                     <div className="flex justify-between"><span>Expiring Soon:</span><span className="font-semibold text-orange-600">{expiringContracts.length}</span></div>
-                    <div className="flex justify-between border-t pt-4"><span>Monthly Revenue:</span><span className="font-bold text-lg">{formatCurrency(totalMonthlyRevenue)}</span></div>
+                    {canSeeFinancials && (
+                      <div className="flex justify-between border-t pt-4"><span>Monthly Revenue:</span><span className="font-bold text-lg">{formatCurrency(totalMonthlyRevenue)}</span></div>
+                    )}
                   </CardContent>
                 </Card>
                 <Card>
@@ -814,7 +824,7 @@ export default function Reports() {
                       <div className="space-y-3">
                         {expiringContracts.slice(0, 5).map(contract => (
                           <div key={contract.id} className="flex justify-between items-center p-3 border rounded">
-                            <div><p className="font-medium">Contract #{contract.id.slice(-6)}</p><p className="text-sm text-gray-600">{formatCurrency(Number(contract.monthlyPrice))}/month</p></div>
+                            <div><p className="font-medium">Contract #{contract.id.slice(-6)}</p>{canSeeFinancials && <p className="text-sm text-gray-600">{formatCurrency(Number(contract.monthlyPrice))}/month</p>}</div>
                             <Badge variant="destructive">{contract.endDate && formatDate(contract.endDate)}</Badge>
                           </div>
                         ))}

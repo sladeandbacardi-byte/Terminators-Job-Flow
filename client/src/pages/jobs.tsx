@@ -27,8 +27,8 @@ export default function Jobs() {
   const { user } = useAuth();
   const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
   const isTechnician = role === "service";
-  // Only Admin/Manager/Coordinator/Accounts can move jobs into the invoicing pipeline
-  const canInvoice = role === "admin" || role === "manager" || role === "coordinator" || role === "accounts";
+  // Only Admin/Coordinator/Accounts can move jobs into the invoicing pipeline (not manager)
+  const canInvoice = role === "admin" || role === "coordinator" || role === "accounts";
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -547,7 +547,7 @@ export default function Jobs() {
                             <Badge variant="secondary" className={getStatusColor(job.status)} data-testid={`job-status-${job.id}`}>
                               {job.status.replace('_', ' ')}
                             </Badge>
-                            {job.invoiceStatus && job.invoiceStatus !== 'not_invoiced' && (
+                            {role !== "manager" && job.invoiceStatus && job.invoiceStatus !== 'not_invoiced' && (
                               <Badge
                                 variant="outline"
                                 className={

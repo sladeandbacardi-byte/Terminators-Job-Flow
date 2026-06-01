@@ -270,7 +270,7 @@ export default function Dashboard() {
                           { label: "active jobs",  value: metrics?.activeJobs ?? "—",    cls: "bg-blue-50 border-blue-100", val: "text-blue-600" },
                           { label: "workers",      value: metrics?.activeWorkers ?? "—",  cls: "bg-teal-50 border-teal-100", val: "text-teal-600" },
                           { label: "done / month", value: jobsCompletedThisMonth,         cls: "bg-purple-50 border-purple-100", val: "text-purple-600" },
-                          { label: "invoiced",     value: invoicesSentThisMonth,           cls: "bg-indigo-50 border-indigo-100", val: "text-indigo-600" },
+                          ...(dashboardRole === "admin" ? [{ label: "invoiced", value: invoicesSentThisMonth, cls: "bg-indigo-50 border-indigo-100", val: "text-indigo-600" }] : []),
                         ].map(({ label, value, cls, val }) => (
                           <div key={label} className={`border rounded-md px-2 py-1 text-center min-w-[52px] ${cls}`}>
                             <p className={`text-sm font-bold leading-tight ${val}`}>{value}</p>

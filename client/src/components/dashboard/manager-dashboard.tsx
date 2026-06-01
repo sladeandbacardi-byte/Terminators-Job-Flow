@@ -7,24 +7,19 @@ import { Button } from "@/components/ui/button";
 import { DepartmentOverview } from "./department-overview";
 import { WorkerJobsSummary } from "./worker-jobs-summary";
 import {
-  Users, Briefcase, ClipboardList, AlertTriangle, Package,
-  ShoppingCart, CheckCircle, CalendarDays, MapPin, Eye, Clock,
+  Users, AlertTriangle, Package,
+  ShoppingCart, CalendarDays, MapPin, Eye, Clock,
 } from "lucide-react";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, ComposedChart, Area,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import type { Job, Worker, Client, Department, PurchaseOrder, InventoryItem, Invoice } from "@shared/schema";
-import { format, subDays, parseISO, isValid } from "date-fns";
+import type { Job, Worker, Client, PurchaseOrder, InventoryItem } from "@shared/schema";
+import { format, subDays, isValid } from "date-fns";
 
 type Range = "7" | "14" | "30";
 
-function buildDailyData(
-  days: number,
-  jobs: Job[],
-  invoices: Invoice[],
-  purchaseOrders: PurchaseOrder[]
-) {
+function buildDailyData(days: number, jobs: Job[]) {
   const result = [];
   const now = new Date();
 
@@ -39,62 +34,13 @@ function buildDailyData(
       return isValid(d) && format(d, "yyyy-MM-dd") === dayStr;
     });
 
-    const completedJobs = dayJobs.filter(j => j.status === "completed").length;
-    const totalJobs = dayJobs.length;
-
-    // Revenue = paid invoices issued on this day
-    const dayRevenue = invoices
-      .filter(inv => {
-        const d = inv.paymentDate ?? inv.issueDate;
-        if (!d) return false;
-        const parsed = new Date(d);
-        return isValid(parsed) && format(parsed, "yyyy-MM-dd") === dayStr && inv.status === "paid";
-      })
-      .reduce((s, inv) => s + parseFloat(inv.total ?? "0"), 0);
-
-    // Expenses = POs on this day
-    const dayExpenses = purchaseOrders
-      .filter(po => {
-        if (!po.requestDate) return false;
-        const d = new Date(po.requestDate);
-        return isValid(d) && format(d, "yyyy-MM-dd") === dayStr && !["rejected","cancelled"].includes(po.status);
-      })
-      .reduce((s, po) => s + parseFloat(po.totalAmount ?? "0"), 0);
-
     result.push({
       label,
-      totalJobs,
-      completedJobs,
-      revenue: Math.round(dayRevenue),
-      expenses: Math.round(dayExpenses),
-      profit: Math.round(dayRevenue - dayExpenses),
+      totalJobs: dayJobs.length,
+      completedJobs: dayJobs.filter(j => j.status === "completed").length,
     });
   }
   return result;
-}
-
-// Revenue per job: match each job to an invoice via clientId on same day
-function buildRevenuePerJob(jobs: Job[], invoices: Invoice[], clients: Client[]) {
-  const completed = jobs.filter(j => j.status === "completed" && j.scheduledDate);
-  return completed
-    .map(job => {
-      const client = clients.find(c => c.id === job.clientId);
-      const jobDate = job.scheduledDate ? format(new Date(job.scheduledDate), "yyyy-MM-dd") : null;
-      const inv = invoices.find(inv => {
-        const d = inv.issueDate ?? inv.paymentDate;
-        if (!d || !jobDate) return false;
-        return inv.clientId === job.clientId && format(new Date(d), "yyyy-MM-dd") === jobDate;
-      });
-      const revenue = inv ? parseFloat(inv.total ?? "0") : 0;
-      return {
-        name: (client?.name ?? "Unknown").substring(0, 14),
-        revenue: Math.round(revenue),
-        jobId: job.id,
-      };
-    })
-    .filter(j => j.revenue > 0)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 12);
 }
 
 const RANGE_OPTIONS: { label: string; value: Range }[] = [
@@ -109,10 +55,8 @@ export function ManagerDashboard() {
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
-  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({ queryKey: ["/api/purchase-orders"] });
   const { data: inventory = [] } = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
-  const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
 
   const todayDate = new Date();
   const today = todayDate.toDateString();
@@ -124,18 +68,11 @@ export function ManagerDashboard() {
     return new Date(j.scheduledDate) < new Date(todayDate.toDateString());
   });
   const unassignedJobs = jobs.filter(j => !j.workerId && j.status === "pending");
-  const activeWorkers = workers.filter(w => w.isActive !== false);
   const pendingPOs = purchaseOrders.filter(po => po.status === "pending");
   const lowStock = inventory.filter(i => i.quantity <= (i.minStockLevel ?? 0));
 
   const days = parseInt(range);
-  const dailyData = buildDailyData(days, jobs, invoices, purchaseOrders);
-  const revenuePerJob = buildRevenuePerJob(jobs, invoices, clients);
-
-  const totalRevenue = dailyData.reduce((s, d) => s + d.revenue, 0);
-  const totalExpenses = dailyData.reduce((s, d) => s + d.expenses, 0);
-  const totalProfit = totalRevenue - totalExpenses;
-  const totalJobsDone = dailyData.reduce((s, d) => s + d.completedJobs, 0);
+  const dailyData = buildDailyData(days, jobs);
 
   const jobStatusColor: Record<string, string> = {
     pending: "bg-amber-100 text-amber-800",
@@ -143,8 +80,6 @@ export function ManagerDashboard() {
     completed: "bg-green-100 text-green-800",
     cancelled: "bg-gray-100 text-gray-600",
   };
-
-  const fmt = (n: number) => (n < 0 ? "-R" : "R") + Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
 
   return (
     <div className="space-y-6">
@@ -298,54 +233,6 @@ export function ManagerDashboard() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Revenue & Profit — Last {range} Days</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={dailyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} width={55} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: number, name: string) => [
-                `R${Number(v).toLocaleString()}`,
-                name === "revenue" ? "Revenue" : name === "expenses" ? "Expenses" : "Profit"
-              ]} />
-              <Legend formatter={(v) => v === "revenue" ? "Revenue" : v === "expenses" ? "Expenses" : "Profit"} />
-              <Area type="monotone" dataKey="revenue" name="revenue" fill="#bfdbfe" stroke="#3b82f6" strokeWidth={2} fillOpacity={0.4} />
-              <Bar dataKey="expenses" name="expenses" fill="#fca5a5" radius={[3, 3, 0, 0]} />
-              <Line type="monotone" dataKey="profit" name="profit" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
-          <div className="flex gap-6 mt-2 text-sm border-t pt-3">
-            <div><span className="text-gray-500">Revenue: </span><span className="font-semibold text-blue-600">{fmt(totalRevenue)}</span></div>
-            <div><span className="text-gray-500">Expenses: </span><span className="font-semibold text-red-500">{fmt(totalExpenses)}</span></div>
-            <div><span className="text-gray-500">Profit: </span><span className={`font-semibold ${totalProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmt(totalProfit)}</span></div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Revenue Per Completed Job</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {revenuePerJob.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No completed jobs with matched invoices yet</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={revenuePerJob} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `R${v.toLocaleString()}`} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
-                <Tooltip formatter={(v: number) => [`R${Number(v).toLocaleString()}`, "Revenue"]} />
-                <Bar dataKey="revenue" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
