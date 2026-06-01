@@ -280,25 +280,29 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="hidden sm:block w-px bg-gray-200 self-stretch flex-shrink-0" />
-                    <div className="sm:hidden h-px bg-gray-100 w-full" />
+                    {dashboardRole === "admin" && (
+                      <>
+                        <div className="hidden sm:block w-px bg-gray-200 self-stretch flex-shrink-0" />
+                        <div className="sm:hidden h-px bg-gray-100 w-full" />
 
-                    {/* Finance column */}
-                    <div className="sm:flex-shrink-0 sm:pl-4">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance Department</p>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {[
-                          { label: "revenue",   value: `R${Math.round(metrics?.monthlyRevenue ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`, cls: "bg-green-50 border-green-100", val: "text-green-600", minW: "min-w-[72px]" },
-                          { label: "debtors",   value: `R${Math.round(debtors).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`,                    cls: "bg-red-50 border-red-100",   val: "text-red-600",   minW: "min-w-[72px]" },
-                          { label: "expiring",  value: metrics?.expiringContracts ?? "—",                                                              cls: "bg-amber-50 border-amber-100", val: "text-amber-600", minW: "min-w-[52px]" },
-                        ].map(({ label, value, cls, val, minW }) => (
-                          <div key={label} className={`border rounded-md px-2 py-1 text-center ${minW} ${cls}`}>
-                            <p className={`text-sm font-bold leading-tight ${val}`}>{value}</p>
-                            <p className="text-[10px] text-gray-400">{label}</p>
+                        {/* Finance column */}
+                        <div className="sm:flex-shrink-0 sm:pl-4">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Finance Department</p>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[
+                              { label: "revenue",   value: `R${Math.round(metrics?.monthlyRevenue ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`, cls: "bg-green-50 border-green-100", val: "text-green-600", minW: "min-w-[72px]" },
+                              { label: "debtors",   value: `R${Math.round(debtors).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`,                    cls: "bg-red-50 border-red-100",   val: "text-red-600",   minW: "min-w-[72px]" },
+                              { label: "expiring",  value: metrics?.expiringContracts ?? "—",                                                              cls: "bg-amber-50 border-amber-100", val: "text-amber-600", minW: "min-w-[52px]" },
+                            ].map(({ label, value, cls, val, minW }) => (
+                              <div key={label} className={`border rounded-md px-2 py-1 text-center ${minW} ${cls}`}>
+                                <p className={`text-sm font-bold leading-tight ${val}`}>{value}</p>
+                                <p className="text-[10px] text-gray-400">{label}</p>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+                      </>
+                    )}
 
                   </div>
                 )}
