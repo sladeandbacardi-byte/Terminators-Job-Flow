@@ -18,6 +18,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import type { CustomReport, Department } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { getDashboardRole } from "@/lib/dashboardRole";
 
 interface ReportTemplate {
   id: string;
@@ -28,6 +30,7 @@ interface ReportTemplate {
   color: string;
   fields: string[];
   defaultFilters: any;
+  isFinancial: boolean;
 }
 
 const reportTemplates: ReportTemplate[] = [
@@ -43,7 +46,8 @@ const reportTemplates: ReportTemplate[] = [
       dateRange: "last_30_days",
       departments: [],
       includeInvoiceStatus: ["paid", "sent"]
-    }
+    },
+    isFinancial: true
   },
   {
     id: "expense_breakdown",
@@ -57,7 +61,8 @@ const reportTemplates: ReportTemplate[] = [
       dateRange: "last_30_days",
       departments: [],
       includeExpenseTypes: ["inventory", "equipment", "supplies"]
-    }
+    },
+    isFinancial: true
   },
   {
     id: "financial_overview",
@@ -71,11 +76,32 @@ const reportTemplates: ReportTemplate[] = [
       dateRange: "last_90_days",
       departments: [],
       compareWithPrevious: true
-    }
+    },
+    isFinancial: true
+  },
+  {
+    id: "jobs_summary",
+    name: "Jobs Summary Report",
+    description: "Jobs completed, in-progress, and scheduled by department and date range",
+    type: "operational",
+    icon: Calendar,
+    color: "bg-teal-500",
+    fields: ["jobs_completed", "jobs_in_progress", "jobs_scheduled", "jobs_by_department", "worker_utilisation"],
+    defaultFilters: {
+      dateRange: "last_30_days",
+      departments: [],
+    },
+    isFinancial: false
   }
 ];
 
+const FINANCIAL_REPORT_TYPES = ["sales", "expenses", "financial"];
+
 export default function CustomReports() {
+  const { user } = useAuth();
+  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const canSeeFinancials = role !== "manager";
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [reportName, setReportName] = useState("");
@@ -228,31 +254,33 @@ export default function CustomReports() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {reportTemplates.map((template) => {
-                    const IconComponent = template.icon;
-                    return (
-                      <Card key={template.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className={`${template.color} p-2 rounded-lg`}>
-                              <IconComponent className="h-5 w-5 text-white" />
+                  {reportTemplates
+                    .filter((t) => canSeeFinancials || !t.isFinancial)
+                    .map((template) => {
+                      const IconComponent = template.icon;
+                      return (
+                        <Card key={template.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className={`${template.color} p-2 rounded-lg`}>
+                                <IconComponent className="h-5 w-5 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-sm mb-1">{template.name}</h3>
+                                <p className="text-xs text-gray-600 mb-3">{template.description}</p>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleCreateFromTemplate(template)}
+                                  data-testid={`button-create-${template.id}`}
+                                >
+                                  Create Report
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-sm mb-1">{template.name}</h3>
-                              <p className="text-xs text-gray-600 mb-3">{template.description}</p>
-                              <Button 
-                                size="sm" 
-                                onClick={() => handleCreateFromTemplate(template)}
-                                data-testid={`button-create-${template.id}`}
-                              >
-                                Create Report
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                 </div>
               </CardContent>
             </Card>
@@ -343,14 +371,16 @@ export default function CustomReports() {
               <CardContent>
                 {isLoading ? (
                   <div className="text-center py-8 text-gray-500">Loading reports...</div>
-                ) : reports.length === 0 ? (
+                ) : reports.filter((r) => canSeeFinancials || !FINANCIAL_REPORT_TYPES.includes(r.reportType)).length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p>No custom reports yet. Create your first report using the templates above.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {reports.map((report) => {
+                    {reports
+                      .filter((r) => canSeeFinancials || !FINANCIAL_REPORT_TYPES.includes(r.reportType))
+                      .map((report) => {
                       const filters = report.filters ? JSON.parse(report.filters) : {};
                       const config = report.configuration ? JSON.parse(report.configuration) : {};
                       
