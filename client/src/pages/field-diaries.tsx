@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, User,
   Briefcase, CalendarDays, Phone, CheckCircle2, AlertCircle,
-  Circle, Loader2,
+  Circle, Loader2, X,
 } from "lucide-react";
 import type { Worker, Job, Client, Department } from "@shared/schema";
 
@@ -106,126 +106,243 @@ function JobPill({ job, clientMap }: { job: Job; clientMap: Record<string, Clien
 // ─── Day View ─────────────────────────────────────────────────────────────────
 
 function DayView({
-  selectedDate, fieldWorkers, jobs, clientMap, deptMap, isTechnician,
+  selectedDate, fieldWorkers, jobs, clientMap, deptMap, workers: allWorkers, isTechnician,
 }: {
   selectedDate: Date;
   fieldWorkers: Worker[];
   jobs: Job[];
   clientMap: Record<string, Client>;
   deptMap: Record<string, Department>;
+  workers: Worker[];
   isTechnician?: boolean;
 }) {
-  const jobsForDate = useMemo(
-    () => jobs.filter(j => jobOnDay(j, selectedDate)),
-    [jobs, selectedDate],
+  const workerMap = useMemo(
+    () => Object.fromEntries(allWorkers.map(w => [w.id, w])),
+    [allWorkers],
+  );
+  const fieldWorkerIds = useMemo(
+    () => new Set(fieldWorkers.map(w => w.id)),
+    [fieldWorkers],
   );
 
-  if (fieldWorkers.length === 0) {
+  const [workerFilt, setWorkerFilt] = useState("all");
+  const [svcFilt, setSvcFilt] = useState("all");
+  const [statusFilt, setStatusFilt] = useState("all");
+  const [invFilt, setInvFilt] = useState("all");
+
+  const now = new Date();
+
+  function isOverdue(j: Job) {
+    if (j.status === "completed" || j.status === "cancelled") return false;
+    try {
+      const d = parseISO(j.scheduledDate as unknown as string);
+      return d < now && d.toDateString() !== now.toDateString();
+    } catch { return false; }
+  }
+
+  const jobsForDate = useMemo(() => {
+    return jobs
+      .filter(j => jobOnDay(j, selectedDate))
+      .filter(j => !j.workerId || fieldWorkerIds.has(j.workerId))
+      .filter(j => workerFilt === "all" || j.workerId === workerFilt)
+      .filter(j => svcFilt === "all" || (j.serviceType ?? "") === svcFilt)
+      .filter(j => {
+        if (statusFilt === "all") return true;
+        if (statusFilt === "completed") return j.status === "completed";
+        if (statusFilt === "not_completed") return j.status !== "completed" && j.status !== "cancelled";
+        if (statusFilt === "overdue") return isOverdue(j);
+        return true;
+      })
+      .filter(j => {
+        if (invFilt === "all") return true;
+        if (invFilt === "not_invoiced") return !j.invoiceStatus || j.invoiceStatus === "not_invoiced";
+        if (invFilt === "ready") return j.invoiceStatus === "ready_to_invoice";
+        if (invFilt === "invoiced") return j.invoiceStatus === "invoiced" || j.invoiceStatus === "exported";
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.scheduledTime ?? formatTime(a.scheduledDate as unknown as string, null);
+        const tb = b.scheduledTime ?? formatTime(b.scheduledDate as unknown as string, null);
+        if (ta !== tb) return ta.localeCompare(tb);
+        const ra = parseInt(String(a.orderNo ?? "9999")), rb = parseInt(String(b.orderNo ?? "9999"));
+        if (ra !== rb) return ra - rb;
+        return (clientMap[a.clientId ?? ""]?.name ?? "").localeCompare(clientMap[b.clientId ?? ""]?.name ?? "");
+      });
+  }, [jobs, selectedDate, fieldWorkerIds, workerFilt, svcFilt, statusFilt, invFilt, clientMap]);
+
+  const svcTypes = useMemo(() => {
+    const s = new Set<string>();
+    jobs.filter(j => jobOnDay(j, selectedDate) && (!j.workerId || fieldWorkerIds.has(j.workerId)))
+      .forEach(j => { if (j.serviceType) s.add(j.serviceType); });
+    return Array.from(s).sort();
+  }, [jobs, selectedDate, fieldWorkerIds]);
+
+  const activeFilters = [workerFilt !== "all", svcFilt !== "all", statusFilt !== "all", invFilt !== "all"].filter(Boolean).length;
+
+  function rowBg(j: Job) {
+    if (j.status === "completed")   return "bg-green-50/70 hover:bg-green-100/60";
+    if (j.status === "cancelled")   return "bg-gray-50/80 opacity-60";
+    if (isOverdue(j))               return "bg-red-50/70 hover:bg-red-100/60";
+    if (j.status === "in_progress") return "bg-blue-50/60 hover:bg-blue-100/60";
+    return "hover:bg-gray-50";
+  }
+
+  function statusBadge(j: Job) {
+    if (j.status === "completed")   return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">✓ Done</span>;
+    if (j.status === "cancelled")   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">Cancelled</span>;
+    if (isOverdue(j))               return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Overdue</span>;
+    if (j.status === "in_progress") return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">In Progress</span>;
+    return <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Scheduled</span>;
+  }
+
+  function invBadge(s: string | null | undefined) {
+    if (!s || s === "not_invoiced") return <span className="text-[10px] text-gray-300">—</span>;
+    if (s === "ready_to_invoice")  return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Ready</span>;
+    if (s === "invoiced" || s === "exported") return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">Invoiced</span>;
+    if (s === "do_not_invoice")    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Skip</span>;
+    return <span className="text-[10px] text-gray-400">{s}</span>;
+  }
+
+  if (fieldWorkers.length === 0 && !isTechnician) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <User className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>
-          {isTechnician
-            ? "No jobs scheduled for you for the selected day."
-            : "No field staff found for the selected filter."}
-        </p>
+        <p>No field staff found for the selected filter.</p>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {fieldWorkers.map(worker => {
-        const dept = deptMap[worker.departmentId ?? ""];
-        const workerJobs = jobsForDate
-          .filter(j => j.workerId === worker.id)
-          .sort((a, b) => {
-            const ta = a.scheduledTime ?? formatTime(a.scheduledDate as unknown as string, null);
-            const tb = b.scheduledTime ?? formatTime(b.scheduledDate as unknown as string, null);
-            return ta.localeCompare(tb);
-          });
+    <div className="space-y-3">
+      {/* Secondary filters */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {!isTechnician && (
+          <Select value={workerFilt} onValueChange={setWorkerFilt}>
+            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All Staff" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Staff</SelectItem>
+              {fieldWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        <Select value={svcFilt} onValueChange={setSvcFilt}>
+          <SelectTrigger className="h-8 w-48 text-xs"><SelectValue placeholder="All Service Types" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Service Types</SelectItem>
+            {svcTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilt} onValueChange={setStatusFilt}>
+          <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="not_completed">Not Completed</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={invFilt} onValueChange={setInvFilt}>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Invoice" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Invoice</SelectItem>
+            <SelectItem value="not_invoiced">Not Invoiced</SelectItem>
+            <SelectItem value="ready">Ready to Invoice</SelectItem>
+            <SelectItem value="invoiced">Invoiced</SelectItem>
+          </SelectContent>
+        </Select>
+        {activeFilters > 0 && (
+          <button
+            onClick={() => { setWorkerFilt("all"); setSvcFilt("all"); setStatusFilt("all"); setInvFilt("all"); }}
+            className="h-8 px-2.5 text-xs flex items-center gap-1 border border-gray-200 rounded-md text-gray-500 hover:text-red-500 hover:border-red-300 transition"
+          >
+            <X className="h-3 w-3" /> Clear ({activeFilters})
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground font-medium">
+          {jobsForDate.length} job{jobsForDate.length !== 1 ? "s" : ""}
+        </span>
+      </div>
 
-        const deptColorBar = DEPT_COLORS[worker.departmentId ?? ""] ?? "bg-gray-400";
-        const deptCard = DEPT_LIGHT[worker.departmentId ?? ""] ?? "bg-gray-50 border-gray-200";
-
-        return (
-          <Card key={worker.id} className={`border ${deptCard} overflow-hidden`}>
-            <div className={`h-1.5 w-full ${deptColorBar}`} />
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-base leading-tight">{worker.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{worker.role}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {dept && (
-                    <Badge variant="outline" className="text-xs shrink-0" style={{ borderColor: dept.colorCode ?? undefined, color: dept.colorCode ?? undefined }}>
-                      {dept.name}
-                    </Badge>
-                  )}
-                  {worker.phone && (
-                    <a href={`tel:${worker.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
-                      <Phone className="h-3 w-3" />{worker.phone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              {workerJobs.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-sm border border-dashed rounded-lg">
-                  No jobs scheduled for this day
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {workerJobs.map(job => {
-                    const client = clientMap[job.clientId ?? ""];
-                    const statusCfg = STATUS_CONFIG[job.status ?? "scheduled"] ?? STATUS_CONFIG.scheduled;
-                    const timeStr = formatTime(job.scheduledDate as unknown as string, job.scheduledTime);
-                    return (
-                      <div key={job.id} className="bg-white rounded-lg border p-3 space-y-1.5 shadow-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                            {timeStr}
-                            {job.estimatedDuration && (
-                              <span className="text-xs font-normal text-muted-foreground">({job.estimatedDuration} min)</span>
-                            )}
-                          </div>
-                          <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusCfg.class}`}>
-                            {statusCfg.icon}{statusCfg.label}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium leading-tight">{job.title}</p>
-                        {client && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Briefcase className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{client.name}</span>
-                          </div>
-                        )}
-                        {job.location && (
-                          <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
-                            <span className="leading-snug">{job.location}</span>
-                          </div>
-                        )}
-                        {job.notes && (
-                          <p className="text-xs text-gray-400 italic border-t pt-1.5 mt-1">{job.notes}</p>
-                        )}
+      {jobsForDate.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
+          <CalendarDays className="h-10 w-10 mx-auto mb-2 opacity-30" />
+          <p>{activeFilters > 0 ? "No jobs match the current filters." : "No jobs scheduled for this day."}</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-left">
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Time</th>
+                <th className="px-2 py-2.5 text-xs font-semibold text-gray-500 uppercase">Fix</th>
+                <th className="px-2 py-2.5 text-xs font-semibold text-gray-500 uppercase">#</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Client</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Address</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Service</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">Contract #</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Team / Tech</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Invoice</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">Job #</th>
+                <th className="px-2 py-2.5 text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobsForDate.map(job => {
+                const client = clientMap[job.clientId ?? ""];
+                const worker = workerMap[job.workerId ?? ""];
+                const dept = deptMap[worker?.departmentId ?? ""] ?? deptMap[job.departmentId ?? ""];
+                const deptBar = DEPT_COLORS[worker?.departmentId ?? job.departmentId ?? ""] ?? "bg-gray-300";
+                return (
+                  <tr key={job.id} className={`border-b border-gray-100 last:border-0 ${rowBg(job)} transition-colors`}>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1 h-6 rounded-full shrink-0 ${deptBar}`} />
+                        <span className="font-mono text-sm font-semibold text-gray-800">
+                          {formatTime(job.scheduledDate as unknown as string, job.scheduledTime)}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-              {workerJobs.length > 0 && (
-                <p className="text-xs text-muted-foreground text-right mt-2">
-                  {workerJobs.length} job{workerJobs.length !== 1 ? "s" : ""} today
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+                    </td>
+                    <td className="px-2 py-2.5 text-center text-sm">
+                      {job.isFixed ? <span title="Fixed time">🔒</span> : <span className="text-gray-200">—</span>}
+                    </td>
+                    <td className="px-2 py-2.5 text-xs text-gray-400 font-medium tabular-nums">{job.orderNo ?? "—"}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold text-gray-900 leading-tight text-sm">{client?.name ?? "—"}</div>
+                      {dept && <div className="text-[10px] text-gray-400 mt-0.5">{dept.name}</div>}
+                    </td>
+                    <td className="px-3 py-2.5 hidden md:table-cell">
+                      <span className="text-xs text-gray-600 max-w-[150px] block truncate">{job.location ?? "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="text-xs font-medium text-gray-700">{job.serviceType ?? "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell">
+                      <span className="text-xs font-mono text-gray-500">{job.contractNo ?? "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5 hidden sm:table-cell">
+                      <span className="text-xs text-gray-700">{worker?.name ?? "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5">{statusBadge(job)}</td>
+                    <td className="px-3 py-2.5 hidden sm:table-cell">{invBadge(job.invoiceStatus)}</td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell">
+                      <span className="text-xs font-mono text-blue-600">{job.jobNumber ?? "—"}</span>
+                    </td>
+                    <td className="px-2 py-2.5 text-right">
+                      {job.googleMapsLink && (
+                        <a href={job.googleMapsLink} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex p-1 rounded text-blue-500 hover:bg-blue-50 transition" title="Open in Maps">
+                          <MapPin className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -648,6 +765,7 @@ export default function FieldDiariesPage() {
                 jobs={jobs}
                 clientMap={clientMap}
                 deptMap={deptMap}
+                workers={workers}
                 isTechnician={isTechnician}
               />
             )}

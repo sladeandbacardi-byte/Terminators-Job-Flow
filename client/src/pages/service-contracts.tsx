@@ -20,6 +20,7 @@ import {
   ArrowUp, ArrowDown, User, DollarSign, Package, Clock, Hash,
 } from "lucide-react";
 import { format, differenceInDays, parseISO, addDays } from "date-fns";
+import { SERVICE_SCHEDULE_SERVICE_TYPES } from "@shared/schema";
 import type { ServiceContract, Department, Client, Worker, Team } from "@shared/schema";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -189,7 +190,7 @@ export default function ServiceContractsPage() {
   const [tab, setTab] = useState<TabId>("list");
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("active");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SC | null>(null);
   const [form, setForm] = useState<CF>({});
@@ -233,9 +234,22 @@ export default function ServiceContractsPage() {
     if (deptFilter !== "all" && c.departmentId !== deptFilter) return false;
     if (statusFilter === "active" && !c.activeStatus) return false;
     if (statusFilter === "inactive" && c.activeStatus) return false;
-    if (search && !c.customerName.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const hit =
+        c.customerName.toLowerCase().includes(q) ||
+        (c.contractNumber ?? "").toLowerCase().includes(q) ||
+        c.serviceType.toLowerCase().includes(q) ||
+        (c.address ?? "").toLowerCase().includes(q) ||
+        (c.assignedTechnicianName ?? "").toLowerCase().includes(q) ||
+        (c.assignedTeamName ?? "").toLowerCase().includes(q) ||
+        (c.notes ?? "").toLowerCase().includes(q);
+      if (!hit) return false;
+    }
     return true;
   }), [contracts, deptFilter, statusFilter, search]);
+
+  const activeFilterCount = (deptFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0) + (search ? 1 : 0);
 
   const endingSoon = useMemo(() => {
     const today = new Date();
@@ -727,7 +741,14 @@ export default function ServiceContractsPage() {
             </div>
             <div>
               <Label>Service Type *</Label>
-              <Input value={form.serviceType ?? ""} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))} placeholder="e.g. Sanitary Bins" />
+              <Select value={form.serviceType ?? ""} onValueChange={v => setForm(f => ({ ...f, serviceType: v }))}>
+                <SelectTrigger><SelectValue placeholder="Choose service type" /></SelectTrigger>
+                <SelectContent>
+                  {SERVICE_SCHEDULE_SERVICE_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Department *</Label>
@@ -938,6 +959,13 @@ export default function ServiceContractsPage() {
                   <div>
                     <Label className="font-normal">Fixed Time</Label>
                     <p className="text-xs text-gray-400">Job must run at exact start time</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-3">
+                  <Switch checked={!!(form as any).confirmWithClient} onCheckedChange={v => setForm(f => ({ ...f, confirmWithClient: v }))} />
+                  <div>
+                    <Label className="font-normal">Confirm With Client</Label>
+                    <p className="text-xs text-gray-400">Contact client before scheduling this service</p>
                   </div>
                 </div>
               </>

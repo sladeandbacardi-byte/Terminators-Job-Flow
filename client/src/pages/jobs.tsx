@@ -69,6 +69,7 @@ export default function Jobs() {
   const [clientFilter, setClientFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -139,6 +140,11 @@ export default function Jobs() {
       job.title.toLowerCase().includes(term) ||
       job.location?.toLowerCase().includes(term) ||
       job.jobNumber?.toLowerCase().includes(term) ||
+      job.serviceType?.toLowerCase().includes(term) ||
+      job.insects?.toLowerCase().includes(term) ||
+      job.contractNo?.toLowerCase().includes(term) ||
+      (job as any).invoiceRef?.toLowerCase().includes(term) ||
+      (job as any).otherPestType?.toLowerCase().includes(term) ||
       clientMap.get(job.clientId)?.name?.toLowerCase().includes(term);
 
     const addr = addressFilter.toLowerCase().trim();
@@ -160,6 +166,8 @@ export default function Jobs() {
     const matchesClient = clientFilter === "all" || job.clientId === clientFilter;
     const matchesPriority = priorityFilter === "all" || job.priority === priorityFilter;
     const matchesServiceType = serviceTypeFilter === "all" || job.serviceType === serviceTypeFilter;
+    const matchesInvoiceStatus = invoiceStatusFilter === "all" ||
+      (invoiceStatusFilter === "not_invoiced" ? (!job.invoiceStatus || job.invoiceStatus === "not_invoiced") : job.invoiceStatus === invoiceStatusFilter);
 
     let matchesDateFrom = true;
     let matchesDateTo = true;
@@ -182,17 +190,18 @@ export default function Jobs() {
 
     return matchesSearch && matchesAddress && matchesStatus && matchesDepartment &&
       matchesTeam && matchesWorkerFilter && matchesClient && matchesPriority &&
-      matchesServiceType && matchesDateFrom && matchesDateTo && matchesWorker;
+      matchesServiceType && matchesInvoiceStatus && matchesDateFrom && matchesDateTo && matchesWorker;
   }), [
     jobs, searchTerm, addressFilter, statusFilter, departmentFilter, teamFilter,
-    workerFilter, clientFilter, priorityFilter, serviceTypeFilter, dateFrom, dateTo,
-    clientMap, workerTeamsMap, isTechnician, myWorker,
+    workerFilter, clientFilter, priorityFilter, serviceTypeFilter, invoiceStatusFilter,
+    dateFrom, dateTo, clientMap, workerTeamsMap, isTechnician, myWorker,
   ]);
 
   const activeFilterCount = [
     addressFilter, statusFilter !== "all", departmentFilter !== "all",
     teamFilter !== "all", workerFilter !== "all", clientFilter !== "all",
-    priorityFilter !== "all", serviceTypeFilter !== "all", dateFrom, dateTo,
+    priorityFilter !== "all", serviceTypeFilter !== "all", invoiceStatusFilter !== "all",
+    dateFrom, dateTo,
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
@@ -205,6 +214,7 @@ export default function Jobs() {
     setClientFilter("all");
     setPriorityFilter("all");
     setServiceTypeFilter("all");
+    setInvoiceStatusFilter("all");
     setDateFrom("");
     setDateTo("");
   };
@@ -429,6 +439,21 @@ export default function Jobs() {
                   </Select>
                 </div>
 
+                {/* Invoice status */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Invoice Status</label>
+                  <Select value={invoiceStatusFilter} onValueChange={setInvoiceStatusFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Invoice Status</SelectItem>
+                      <SelectItem value="not_invoiced">Not Ready</SelectItem>
+                      <SelectItem value="ready_to_invoice">Ready to Invoice</SelectItem>
+                      <SelectItem value="invoiced">Invoiced</SelectItem>
+                      <SelectItem value="do_not_invoice">Do Not Invoice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Date range */}
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Scheduled From</label>
@@ -612,10 +637,19 @@ export default function Jobs() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm text-gray-600">
-                          <div><span className="font-medium">Service:</span> {job.serviceType}</div>
+                          <div><span className="font-medium">Service:</span> {job.serviceType || '—'}</div>
                           <div><span className="font-medium">Location:</span> {job.location || 'Not specified'}</div>
                           <div><span className="font-medium">Scheduled:</span> {formatDateTime(job.scheduledDate)}</div>
                           <div><span className="font-medium">Worker:</span> {worker?.name || 'Unassigned'}</div>
+                          {job.insects && (
+                            <div><span className="font-medium">Pest:</span> {job.insects}</div>
+                          )}
+                          {(job.price || (job as any).pricePerUnit) && (
+                            <div>
+                              <span className="font-medium">Price:</span>{" "}
+                              {job.price ? `R ${parseFloat(String(job.price)).toFixed(2)}` : `R ${parseFloat(String((job as any).pricePerUnit)).toFixed(2)}/unit`}
+                            </div>
+                          )}
                         </div>
 
                         {job.description && (

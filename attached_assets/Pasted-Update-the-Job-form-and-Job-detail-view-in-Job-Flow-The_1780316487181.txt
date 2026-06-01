@@ -1,0 +1,253 @@
+Update the Job form and Job detail view in Job Flow.
+
+The current job form is too basic. It must include service-specific information, pricing, quantity, and invoicing details.
+
+The job form must be split into simple sections:
+
+1. Job Details
+2. Service Details
+3. Pricing / Invoicing
+4. Technician Completion
+
+JOB DETAILS SECTION
+
+Keep these fields:
+
+- Job Title
+- Description
+- Date
+- Time
+- Client
+- Worker / Technician
+- Department
+- Status
+- Duration
+- Priority
+- Location / Address
+- Google Maps Link if available
+
+SERVICE DETAILS SECTION
+
+Add these fields:
+
+- Service Type
+- Service Category
+- Pest / Insect Type
+- Treatment Type
+- Special Instructions
+- Internal Notes
+
+Service Type options:
+
+- Pest Control
+- Sanitary Bins
+- Washroom Service
+- Washroom Refills
+- Dustmats
+- Deep Cleaning
+- Wood Borer COC
+- Electrical COC
+- Other
+
+If Service Type or Department is Pest Control, show Pest / Insect Type.
+
+Pest / Insect Type options:
+
+- Rodents
+- Cockroaches
+- Ants
+- Fleas
+- Flies
+- Bed Bugs
+- Termites
+- Wood Borer
+- Birds
+- Stored Product Insects
+- Other
+
+Treatment Type options for Pest Control:
+
+- Inspection
+- Treatment
+- Follow-up
+- Monitoring
+- Baiting
+- Fumigation
+- Spray Treatment
+- Gel Treatment
+- Dust Treatment
+- Proofing
+- COC Inspection
+- Other
+
+If Pest / Insect Type is Other, show an extra field:
+Other Pest / Insect Type
+
+PRICING / INVOICING SECTION
+
+Add these fields to every job:
+
+- Quantity
+- Unit Price
+- Total Price
+- VAT Included: Yes / No
+- Must Be Invoiced: Yes / No
+- Invoice Status
+- Invoice Number
+- Invoice Notes
+
+Quantity must be numeric.
+
+Unit Price must be currency.
+
+Total Price must automatically calculate as:
+
+Quantity x Unit Price
+
+Allow the user to manually override Total Price if needed, but show a warning:
+"Total price has been manually adjusted."
+
+Invoice Status options:
+
+- Not Ready
+- Ready to Invoice
+- Invoiced
+- Do Not Invoice
+
+If Must Be Invoiced is No:
+Set Invoice Status to Do Not Invoice.
+
+If job status is Completed and Must Be Invoiced is Yes:
+Set Invoice Status to Ready to Invoice unless already Invoiced.
+
+CONTRACT LINKING
+
+A job may be linked to a contract.
+
+Add optional field:
+
+- Linked Contract
+
+If a job is created from a contract, pre-fill:
+- Client
+- Service Type
+- Department
+- Price
+- Quantity
+- Unit Price
+- Must Be Invoiced
+- Assigned Technician / Team
+- Special Instructions
+- Address
+- Google Maps Link
+
+TECHNICIAN COMPLETION SECTION
+
+Before a technician can complete a job, show completion fields:
+
+- All units checked/completed: Yes / No / Not Applicable
+- Customer signature
+- Technician notes
+- Photos
+- Chemicals / stock used if applicable
+- Extra fault / extra work found: Yes / No
+
+If All units checked/completed is No:
+Require a note.
+
+If Extra fault / extra work found is Yes:
+Show a button:
+Report Extra Fault / Extra Work
+
+JOB DETAIL VIEW
+
+When opening a job, show a clear summary at the top:
+
+- Client
+- Address
+- Service Type
+- Pest / Insect Type if applicable
+- Date and Time
+- Assigned Technician
+- Status
+- Price / Total
+- Invoice Status
+
+Then show tabs or sections:
+
+- Details
+- Pricing
+- Completion
+- Documents / Photos
+- History
+
+JOB LIST VIEW
+
+Update job list/table/cards to show:
+
+- Date
+- Time
+- Client
+- Service Type
+- Pest / Insect Type if Pest Control
+- Technician
+- Status
+- Total Price
+- Invoice Status
+- Priority
+
+SEARCH
+
+Job search must search:
+
+- Job Title
+- Client Name
+- Service Type
+- Pest / Insect Type
+- Technician
+- Address
+- Invoice Number
+- Contract Number
+
+FILTERS
+
+Add filters:
+
+- Department
+- Service Type
+- Pest / Insect Type
+- Technician
+- Status
+- Invoice Status
+- Date Range
+- Priority
+
+PEST CONTROL REQUIREMENT
+
+For Pest Control jobs, Pest / Insect Type must be visible and easy to select.
+
+Examples:
+
+Rodent Service
+Cockroach Service
+Ant Treatment
+Flea Treatment
+Fly Control
+Bed Bug Treatment
+Termite Inspection
+Wood Borer COC
+
+Do not make pest type a hidden note field.
+It must be a proper dropdown field so reports can be generated later.
+
+REPORTING
+
+The system must later be able to report:
+
+- Jobs by service type
+- Pest control jobs by insect/pest type
+- Revenue by service type
+- Revenue by pest type
+- Jobs ready to invoice
+- Completed jobs not invoiced
+- Technician jobs completed

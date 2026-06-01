@@ -151,7 +151,19 @@ export const jobs = pgTable("jobs", {
   recurrenceYears: integer("recurrence_years"),
   jobNumber: text("job_number"),
   linkedQuoteId: varchar("linked_quote_id"),
-  invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | ready_to_invoice | exported | invoiced
+  invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | ready_to_invoice | exported | invoiced | do_not_invoice
+  mustBeInvoiced: boolean("must_be_invoiced").default(true),
+  invoiceRef: text("invoice_ref"),
+  financeNotes: text("finance_notes"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }),
+  vatIncluded: boolean("vat_included").default(false),
+  linkedContractId: varchar("linked_contract_id"),
+  treatmentType: text("treatment_type"),
+  otherPestType: text("other_pest_type"),
+  serviceCategory: text("service_category"),
+  completionAllUnitsChecked: text("completion_all_units_checked"), // yes | no | na
+  completionExtraFaultFound: boolean("completion_extra_fault_found").default(false),
+  completionCustomerSignature: text("completion_customer_signature"),
   googleMapsLink: text("google_maps_link"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
@@ -981,6 +993,7 @@ export const serviceContracts = pgTable("service_contracts", {
   stockTrackingRequired: boolean("stock_tracking_required").default(false),
   refillRule: text("refill_rule"),                    // Refills Included | Excluded | On Demand | Not Applicable
   stockNotes: text("stock_notes"),
+  confirmWithClient: boolean("confirm_with_client").default(false),
   activeStatus: boolean("active_status").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
@@ -1100,13 +1113,21 @@ export type Expense = typeof expenses.$inferSelect;
 // ─── SERVICE SCHEDULING ─────────────────────────────────────────────────────
 
 export const SERVICE_SCHEDULE_SERVICE_TYPES = [
-  { value: "sanitary_bins",      label: "Sanitary Bins" },
-  { value: "washroom_contract",  label: "Washroom Contracts" },
-  { value: "washroom_adhoc",     label: "Washroom Ad-Hoc" },
-  { value: "dustmats",           label: "Dustmats" },
-  { value: "pest_control",       label: "Pest Control" },
-  { value: "deep_cleaning",      label: "Deep Cleaning" },
-  { value: "other",              label: "Other" },
+  { value: "sanitary_bins",              label: "Sanitary Bins" },
+  { value: "washroom_contract",          label: "Washroom Contracts" },
+  { value: "washroom_adhoc",             label: "Washroom Ad-Hoc" },
+  { value: "washroom_dispensers",        label: "Washroom Dispensers" },
+  { value: "washroom_refills_included",  label: "Washroom Refills (Included)" },
+  { value: "washroom_refills_excluded",  label: "Washroom Refills (Excluded)" },
+  { value: "washroom_on_demand",         label: "Washroom On Demand" },
+  { value: "dustmats",                   label: "Dustmats" },
+  { value: "urinal_mats",                label: "Urinal Mats" },
+  { value: "paper_towel_refills",        label: "Paper Towel Refills" },
+  { value: "auto_towel_dispensers",      label: "Auto Towel Dispensers" },
+  { value: "hygiene_deep_cleaning",      label: "Hygiene Deep Cleaning" },
+  { value: "pest_control",               label: "Pest Control" },
+  { value: "deep_cleaning",              label: "Deep Cleaning" },
+  { value: "other",                      label: "Other" },
 ] as const;
 
 export type ServiceScheduleServiceType = typeof SERVICE_SCHEDULE_SERVICE_TYPES[number]["value"];

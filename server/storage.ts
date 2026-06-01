@@ -4685,6 +4685,7 @@ export class MemStorage implements IStorage {
       stockTrackingRequired: (c as any).stockTrackingRequired ?? false,
       refillRule: (c as any).refillRule ?? null,
       stockNotes: (c as any).stockNotes ?? null,
+      confirmWithClient: (c as any).confirmWithClient ?? false,
       activeStatus: c.activeStatus ?? true,
       createdAt: now,
       updatedAt: now,
