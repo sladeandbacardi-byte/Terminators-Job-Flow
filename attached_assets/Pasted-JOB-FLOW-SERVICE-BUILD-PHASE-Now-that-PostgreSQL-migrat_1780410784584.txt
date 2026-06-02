@@ -1,0 +1,706 @@
+JOB FLOW SERVICE BUILD PHASE
+
+Now that PostgreSQL migration is complete and the central client database is working, build the next Service Department features in this exact order:
+
+1. Contract scheduling inside the contract form
+2. Daily calendar per technician/team
+3. Client profile showing all contracts/services
+4. Treatment reports saving to client profile
+5. Stock usage per technician/job
+
+IMPORTANT FOUNDATION
+
+PostgreSQL is the production source of truth.
+
+Do not use MemStorage for production data.
+
+All new fields and records must be saved to PostgreSQL.
+
+Every service-related record must link back to the central client database using clientId.
+
+Do not create duplicate client records.
+
+Do not create frontend-only fields that disappear after refresh or server restart.
+
+Before adding any new field:
+1. Update Drizzle schema
+2. Update PostgreSQL table/migration
+3. Update API insert/update/select logic
+4. Update backup export if relevant
+5. Update Data Integrity checks if relevant
+6. Test save/search after implementation
+
+PART 1: CONTRACT SCHEDULING INSIDE CONTRACT FORM
+
+Contracts must control recurring service work.
+
+The Contract is the source of truth for:
+- frequency
+- week of month
+- day of week
+- start time
+- duration
+- fixed time
+- route sequence
+- assigned technician/team
+- contract start date
+- contract end date
+- increase date
+- service type
+- price
+- invoice rule
+- stock/refill rule
+
+Do not create a separate Service Scheduling main menu item where users add separate schedule entries.
+
+Add a Scheduling section inside the Contract form.
+
+Contract form sections must be:
+
+1. Client & Contract Details
+2. Scheduling
+3. Pricing / Invoicing
+4. Stock / Refill Tracking
+5. Documents / Notes
+
+Contract scheduling fields:
+
+- frequency
+- contractStartDate
+- contractEndDate
+- weekOfMonth
+- dayOfWeek
+- secondDayOfWeek
+- startTime
+- secondStartTime
+- estimatedDuration
+- fixedTime
+- routeSequence
+- assignedTeam
+- assignedTechnician
+- confirmWithClientBeforeService
+
+Frequency options:
+
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+- On Demand
+
+Week of Month options:
+
+- Every Week
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Last Week
+
+Day of Week options:
+
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+Fixed Time options:
+
+- Yes
+- No
+
+If fixedTime = Yes:
+The job must appear at the selected start time.
+
+If fixedTime = No:
+The job can still appear in route order, but the time is flexible.
+
+Frequency field behaviour:
+
+If Frequency = Daily:
+Show:
+- Start Date
+- Start Time
+- Estimated Duration
+- Fixed Time
+- Assigned Team / Technician
+
+If Frequency = 2 x a week:
+Show:
+- First Day of Week
+- Second Day of Week
+- Start Time
+- Estimated Duration
+- Fixed Time
+- Route Sequence
+- Assigned Team / Technician
+
+If Frequency = Weekly:
+Show:
+- Day of Week
+- Start Time
+- Estimated Duration
+- Fixed Time
+- Route Sequence
+- Assigned Team / Technician
+
+If Frequency = Twice a month:
+Show:
+- First Week of Month
+- First Day of Week
+- First Start Time
+- Second Week of Month
+- Second Day of Week
+- Second Start Time
+- Estimated Duration
+- Fixed Time
+- Route Sequence
+- Assigned Team / Technician
+
+If Frequency = Monthly, Every 2 months, Quarterly, Every 6 months:
+Show:
+- Week of Month
+- Day of Week
+- Start Time
+- Estimated Duration
+- Fixed Time
+- Route Sequence
+- Assigned Team / Technician
+
+If Frequency = Annually:
+Show:
+- Month
+- Week of Month
+- Day of Week
+- Start Time
+- Estimated Duration
+- Fixed Time
+- Route Sequence
+- Assigned Team / Technician
+
+If Frequency = Once-off:
+Show:
+- Job Date
+- Start Time
+- Estimated Duration
+- Assigned Team / Technician
+
+If Frequency = On Demand:
+Do not place it automatically on the calendar.
+Show it as an available contract under the client profile.
+Jobs must only be created when the client requests the service.
+
+Every contract must generate a readable schedule summary.
+
+Examples:
+- Daily at 08:00
+- Weekly - Every Tuesday at 10:00
+- 2 x a week - Monday and Thursday at 08:00
+- Twice a month - Week 1 Monday at 08:00 and Week 3 Monday at 08:00
+- Monthly - Week 1 Monday at 08:00 - Route 1
+- Quarterly - Week 2 Wednesday at 09:00
+- Every 6 months - Last Friday at 14:00
+- Annually - March, Week 2 Tuesday at 09:00
+- On Demand - Create job only when requested
+
+PART 2: DAILY CALENDAR PER TECHNICIAN/TEAM
+
+Update the Service Calendar.
+
+The default view for service users must be:
+
+Daily Calendar
+
+The calendar must be technician/team focused.
+
+Calendar views:
+
+- Daily
+- Weekly
+- Monthly
+
+Default:
+- Daily
+
+Daily calendar filters:
+
+- Date
+- Technician
+- Team
+- Department
+- Service Type
+- Client
+- Area / Suburb
+- Status
+- Invoice Status
+- Fixed Time
+- Contract / Once-off
+
+The daily calendar must show:
+
+- once-off jobs from the Jobs table
+- recurring contract occurrences from active Contracts
+
+The calendar must not create duplicate jobs just to display contract work.
+
+Recurring contract jobs can be calculated/displayed from contract schedules.
+
+If actual job completion records are needed, create linked job occurrences with:
+- clientId
+- contractId
+- scheduledDate
+- scheduledTime
+- assignedTechnician
+- assignedTeam
+- status
+
+Duplicate protection:
+Before creating a job occurrence from a contract, check for an existing occurrence with the same:
+- contractId
+- clientId
+- scheduledDate
+- serviceType
+- assignedTeam
+
+If it exists, do not create a duplicate.
+
+Daily calendar rows must show:
+
+- Time
+- Route Sequence
+- Client
+- Address
+- Service Type
+- Pest Type if Pest Control
+- Contract Number if linked
+- Assigned Technician / Team
+- Status
+- Fixed Time
+- Invoice Status
+- Open Job button
+- Open Client button
+- Open Google Maps button
+
+Sort daily calendar by:
+
+1. Start Time
+2. Route Sequence
+3. Client Name
+
+For flexible time jobs, show them in route sequence order.
+
+Status badges:
+
+- Scheduled
+- In Progress
+- Completed
+- Not Completed
+- Overdue
+- Requires Confirmation
+- Ready to Invoice
+- Invoiced
+
+If a contract has confirmWithClientBeforeService = Yes, show a warning badge:
+Confirm client
+
+PART 3: CLIENT PROFILE SHOWING ALL CONTRACTS / SERVICES
+
+Update the Client Profile so it becomes the central client hub.
+
+When opening a client profile, show these tabs:
+
+- Overview
+- Leads
+- Quotes
+- Jobs
+- Contracts
+- Invoices
+- Treatment Reports
+- Documents
+- Communication Notes
+- Stock Usage
+
+Overview tab must show:
+
+- Business name
+- Trading name
+- Contact person
+- Phone
+- Email
+- Address
+- Google Maps link
+- Billing details
+- Notes
+- Active status
+
+Client profile must show all linked records using clientId.
+
+Contracts tab must show all contracts for the client:
+
+- Contract Number
+- Service Type
+- Department
+- Frequency
+- Schedule Summary
+- Assigned Team
+- Assigned Technician
+- Price
+- Increase Date
+- Contract End Date
+- Status
+- View Contract
+- Edit Contract
+
+Jobs tab must show:
+
+- Date
+- Time
+- Job Title
+- Service Type
+- Pest Type if Pest Control
+- Technician / Team
+- Status
+- Total Price
+- Invoice Status
+- Open Job
+
+Invoices tab must show:
+
+- Invoice Number
+- Invoice Date
+- Linked Job
+- Linked Contract
+- Total
+- Status
+
+Treatment Reports tab must show:
+
+- Report Date
+- Job
+- Contract
+- Technician
+- Pest Type
+- Chemicals Used
+- View / Download
+
+Documents tab must show:
+
+- Treatment Reports
+- Installation Checklists
+- Survey Sheets
+- Pictures
+- PODs
+- Signed Worksheets
+- ISO Pest Control File
+- Other Documents
+
+Communication Notes tab must show:
+
+- Date
+- Type: WhatsApp / Phone / Email / In Person / Other
+- Contact Person
+- Notes
+- Confirmation Received Yes/No
+- Linked Job optional
+- Linked Contract optional
+
+PART 4: TREATMENT REPORTS SAVING TO CLIENT PROFILE
+
+Create electronic Treatment Reports for Pest Control jobs.
+
+Treatment reports must save to PostgreSQL and link to:
+
+- clientId
+- jobId
+- contractId optional
+- technicianId
+- reportDate
+
+Treatment report fields:
+
+- treatmentReportId
+- clientId
+- jobId
+- contractId optional
+- technicianId
+- technicianName
+- reportDate
+- serviceType
+- pestType
+- treatmentType
+- siteArea
+- chemicalsUsed
+- quantityUsed
+- batchNumber optional
+- activeIngredient optional
+- treatmentNotes
+- recommendations
+- followUpRequired Yes/No
+- followUpDate optional
+- customerName
+- customerSignature
+- technicianSignature optional
+- photos optional
+- createdAt
+- updatedAt
+
+For Pest Control jobs, add a button:
+
+Complete Treatment Report
+
+When the technician completes the treatment report:
+1. Save it to PostgreSQL
+2. Link it to the job
+3. Link it to the client
+4. Show it under Client Profile > Treatment Reports
+5. Show it under Job > Documents / Reports
+6. Mark treatmentReportCompleted = true on the job
+
+If possible, generate a printable or downloadable PDF version later, but the first version can be a saved electronic report view.
+
+Treatment report search must allow:
+
+- Client
+- Date range
+- Technician
+- Pest Type
+- Job Number
+- Contract Number
+
+PART 5: STOCK USAGE PER TECHNICIAN / JOB
+
+Create stock usage tracking.
+
+Stock usage must link to:
+
+- clientId
+- jobId
+- contractId optional
+- technicianId
+- stockItemId
+- date
+
+Create or update stock tables:
+
+Stock Items:
+- stockItemId
+- itemName
+- category
+- department
+- unitOfMeasure
+- quantityOnHand
+- minimumStockLevel
+- activeStatus
+- notes
+
+Stock Usage:
+- stockUsageId
+- clientId
+- jobId
+- contractId optional
+- technicianId
+- technicianName
+- stockItemId
+- stockItemName
+- quantityUsed
+- unitOfMeasure
+- usageDate
+- notes
+- createdAt
+- updatedAt
+
+Technicians must be able to record stock/chemical usage on a job.
+
+On the technician job completion screen, add:
+
+Stock / Chemicals Used
+
+Fields:
+- Stock Item
+- Quantity Used
+- Unit
+- Notes
+
+Allow multiple stock items per job.
+
+When stock usage is saved:
+1. Save stock usage record to PostgreSQL
+2. Link it to clientId
+3. Link it to jobId
+4. Link it to contractId if the job came from a contract
+5. Link it to technicianId
+6. Reduce quantityOnHand if stock control is enabled
+7. Show the stock usage under Client Profile > Stock Usage
+8. Show it under Job > Completion
+9. Include it in reports
+
+For Pest Control technicians:
+Add daily chemical usage tracking.
+
+Technician Daily Chemical Take:
+- technicianId
+- date
+- stockItemId
+- quantityTaken
+- quantityUsed
+- quantityReturned
+- notes
+
+Reports needed:
+
+- Stock on hand
+- Low stock
+- Stock used by job
+- Stock used by client
+- Stock used by contract
+- Stock used by technician
+- Daily chemical usage by PC technician
+- Stock usage by date range
+
+Low stock alert:
+If quantityOnHand <= minimumStockLevel, show Low Stock warning.
+
+PERMISSIONS
+
+Managers/Admins can edit:
+
+- contract schedules
+- route sequence
+- client details
+- contract details
+- prices
+- stock quantities
+- treatment report templates
+- stock items
+
+Service admin can edit:
+
+- contract schedules if allowed
+- jobs
+- daily calendar
+- client communication notes
+- treatment reports
+- stock usage corrections if allowed
+
+Technicians can update only:
+
+- job status
+- job notes
+- completion checklist
+- customer signature
+- treatment report
+- stock/chemical usage
+- photos
+- extra fault report
+
+Technicians cannot edit:
+
+- client master details
+- contract price
+- increase date
+- contract end date
+- route sequence
+- stock quantity on hand directly
+
+DATA INTEGRITY REQUIREMENTS
+
+After implementing these 5 items, update Admin > Data Integrity.
+
+Add checks for:
+
+- contracts without schedule fields where required
+- jobs without clientId
+- jobs without linked contractId where they came from a contract
+- treatment reports without clientId
+- treatment reports without jobId
+- stock usage without clientId
+- stock usage without jobId
+- stock usage without technicianId
+- calendar occurrences without clientId
+- duplicate contract occurrences for same contract/date/team
+
+Backup export must include:
+
+- treatment reports
+- stock items
+- stock usage
+- technician daily chemical takes
+- communication notes
+
+TESTS REQUIRED
+
+Run these tests after implementation:
+
+TEST 1: Contract scheduling
+1. Open existing client.
+2. Create a monthly service contract.
+3. Set Week 1, Monday, 08:00, Route 1.
+4. Save.
+5. Confirm it appears under Client Profile > Contracts.
+6. Confirm Schedule Summary is correct.
+7. Confirm Daily Calendar shows it on the correct date.
+
+TEST 2: Daily calendar per technician
+1. Assign contract to a technician/team.
+2. Open Daily Calendar.
+3. Filter by that technician/team.
+4. Confirm the job appears.
+5. Filter by another technician/team.
+6. Confirm the job hides correctly.
+7. Clear filters.
+8. Confirm it appears again.
+
+TEST 3: Client profile
+1. Open a client.
+2. Confirm all linked contracts, jobs, invoices, treatment reports, documents, communication notes, and stock usage appear in the correct tabs.
+
+TEST 4: Treatment report
+1. Open a Pest Control job.
+2. Complete a treatment report.
+3. Save.
+4. Refresh.
+5. Open the job and confirm the report is still there.
+6. Open the client profile and confirm the report appears under Treatment Reports.
+
+TEST 5: Stock usage
+1. Open a job.
+2. Add stock/chemical usage.
+3. Save.
+4. Refresh.
+5. Open the job and confirm usage appears.
+6. Open the client profile and confirm stock usage appears.
+7. Confirm stock report includes the usage.
+8. If stock control is active, confirm quantity on hand reduced correctly.
+
+TEST 6: Restart persistence
+1. Save a contract schedule.
+2. Save a treatment report.
+3. Save stock usage.
+4. Restart the server.
+5. Confirm all records still exist and appear in the correct screens.
+
+IMPORTANT
+
+Do not implement these features as isolated screens.
+
+They must all connect through:
+- clientId
+- jobId
+- contractId where applicable
+- technicianId where applicable
+
+The central Clients database remains the master source of truth.
+
+Contracts drive recurring work.
+Daily Calendar displays work.
+Client Profile shows the full history.
+Treatment Reports and Stock Usage save back to the client profile.

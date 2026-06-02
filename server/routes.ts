@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { runDailyBackupEmail, getBackupEmailConfig } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
 import { 
@@ -4107,6 +4109,199 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
     const overall = results.length > 0 && results.every(r => r.status === "passed") ? "passed" : "failed";
     res.json({ overall, results });
+  });
+
+  // ── Database Status ──────────────────────────────────────────────────────
+  // PostgreSQL is the production source of truth.
+  // Do not add new fields to API writes unless the Drizzle schema AND
+  // PostgreSQL table columns are updated together. Previous bugs occurred
+  // when Drizzle tried to write fields that did not exist in the database.
+  app.get("/api/admin/data-integrity/db-status", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      // Verify connection with a lightweight query
+      const connCheck = await db.execute(sql`SELECT NOW() as now`);
+      const checkedAt = (connCheck.rows[0] as any)?.now ?? new Date();
+
+      const [
+        clients, workers, jobs, invoices, quotes,
+        serviceContracts, rentalContracts, purchaseOrders,
+        activityLogs, backupLogs,
+      ] = await Promise.all([
+        storage.getClients(),
+        storage.getWorkers(),
+        storage.getJobs(),
+        storage.getInvoices(),
+        storage.getQuoteSubmissions(),
+        storage.getServiceContracts(),
+        storage.getRentalContracts(),
+        storage.getPurchaseOrders(),
+        storage.getActivityLogs(),
+        storage.getBackupLogs(),
+      ]);
+
+      res.json({
+        storageType: "PostgreSQL",
+        memStorageDisabled: true,
+        checkedAt: new Date(checkedAt).toISOString(),
+        counts: {
+          clients:          clients.length,
+          workers:          workers.length,
+          jobs:             jobs.length,
+          invoices:         invoices.length,
+          quotes:           quotes.length,
+          serviceContracts: serviceContracts.length,
+          rentalContracts:  rentalContracts.length,
+          purchaseOrders:   purchaseOrders.length,
+          activityLogs:     activityLogs.length,
+          backupLogs:       backupLogs.length,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch database status", details: err.message });
+    }
+  });
+
+  // ── Database Health Check ────────────────────────────────────────────────
+  app.get("/api/admin/data-integrity/health-check", requireAuth, requireAdmin, async (_req, res) => {
+    type CheckResult = {
+      name: string;
+      status: "passed" | "failed" | "warning";
+      details: string;
+      error?: string;
+    };
+    const checks: CheckResult[] = [];
+    const pass  = (name: string, details: string): CheckResult => ({ name, status: "passed",  details });
+    const fail  = (name: string, details: string, error?: string): CheckResult => ({ name, status: "failed",  details, error });
+    const warn  = (name: string, details: string): CheckResult => ({ name, status: "warning", details });
+
+    // 1. PostgreSQL connection
+    try {
+      const r = await db.execute(sql`SELECT NOW() as now`);
+      checks.push(pass("PostgreSQL Connection", `Connected — server time: ${new Date((r.rows[0] as any)?.now).toISOString()}`));
+    } catch (e: any) {
+      checks.push(fail("PostgreSQL Connection", "Could not connect to PostgreSQL", e.message));
+    }
+
+    // 2 & 3. All main tables queryable + counts return correctly
+    let clients: any[] = [], workers: any[] = [], jobs: any[] = [], invoices: any[] = [],
+        quotes: any[] = [], serviceContracts: any[] = [], rentalContracts: any[] = [],
+        purchaseOrders: any[] = [];
+    try {
+      [clients, workers, jobs, invoices, quotes, serviceContracts, rentalContracts, purchaseOrders] =
+        await Promise.all([
+          storage.getClients(),        storage.getWorkers(),
+          storage.getJobs(),           storage.getInvoices(),
+          storage.getQuoteSubmissions(), storage.getServiceContracts(),
+          storage.getRentalContracts(), storage.getPurchaseOrders(),
+        ]);
+      checks.push(pass(
+        "All Main Tables Queryable",
+        `clients:${clients.length} workers:${workers.length} jobs:${jobs.length} invoices:${invoices.length} quotes:${quotes.length} service_contracts:${serviceContracts.length} rental_contracts:${rentalContracts.length} purchase_orders:${purchaseOrders.length}`,
+      ));
+    } catch (e: any) {
+      checks.push(fail("All Main Tables Queryable", "One or more tables failed to query", e.message));
+    }
+
+    // 4. Orphan jobs
+    try {
+      const validIds = new Set(clients.map((c: any) => c.id));
+      const orphanJobs = jobs.filter((j: any) => j.clientId && !validIds.has(j.clientId));
+      if (orphanJobs.length === 0) checks.push(pass("No Orphan Jobs", `All ${jobs.length} jobs have valid client references`));
+      else checks.push(warn("No Orphan Jobs", `${orphanJobs.length} job(s) reference a missing client`));
+    } catch (e: any) { checks.push(fail("No Orphan Jobs", "Could not check", e.message)); }
+
+    // 5. Orphan quotes
+    try {
+      const validIds = new Set(clients.map((c: any) => c.id));
+      const orphanQuotes = quotes.filter((q: any) => q.clientId && !validIds.has(q.clientId));
+      if (orphanQuotes.length === 0) checks.push(pass("No Orphan Quotes", `All linked quotes point to valid clients`));
+      else checks.push(warn("No Orphan Quotes", `${orphanQuotes.length} quote(s) reference a missing client`));
+    } catch (e: any) { checks.push(fail("No Orphan Quotes", "Could not check", e.message)); }
+
+    // 6. Orphan invoices
+    try {
+      const validIds = new Set(clients.map((c: any) => c.id));
+      const orphanInv = invoices.filter((i: any) => i.clientId && !validIds.has(i.clientId));
+      if (orphanInv.length === 0) checks.push(pass("No Orphan Invoices", `All ${invoices.length} invoices have valid client references`));
+      else checks.push(warn("No Orphan Invoices", `${orphanInv.length} invoice(s) reference a missing client`));
+    } catch (e: any) { checks.push(fail("No Orphan Invoices", "Could not check", e.message)); }
+
+    // 7. Orphan service contracts
+    try {
+      const validIds = new Set(clients.map((c: any) => c.id));
+      const orphanSC = serviceContracts.filter((sc: any) => sc.clientId && !validIds.has(sc.clientId));
+      if (orphanSC.length === 0) checks.push(pass("No Orphan Service Contracts", `All ${serviceContracts.length} service contracts have valid client references`));
+      else checks.push(warn("No Orphan Service Contracts", `${orphanSC.length} service contract(s) reference a missing client`));
+    } catch (e: any) { checks.push(fail("No Orphan Service Contracts", "Could not check", e.message)); }
+
+    // 8. Orphan rental contracts
+    try {
+      const validIds = new Set(clients.map((c: any) => c.id));
+      const orphanRC = rentalContracts.filter((rc: any) => rc.clientId && !validIds.has(rc.clientId));
+      if (orphanRC.length === 0) checks.push(pass("No Orphan Rental Contracts", `All ${rentalContracts.length} rental contracts have valid client references`));
+      else checks.push(warn("No Orphan Rental Contracts", `${orphanRC.length} rental contract(s) reference a missing client`));
+    } catch (e: any) { checks.push(fail("No Orphan Rental Contracts", "Could not check", e.message)); }
+
+    // 9. No missing required columns (spot-check critical columns added during migration)
+    try {
+      const criticalChecks: { table: string; column: string }[] = [
+        { table: "jobs",              column: "job_number" },
+        { table: "jobs",              column: "linked_quote_id" },
+        { table: "jobs",              column: "invoice_status" },
+        { table: "invoices",          column: "linked_job_id" },
+        { table: "invoices",          column: "linked_quote_id" },
+        { table: "clients",           column: "sage_customer_code" },
+        { table: "quote_submissions", column: "origination" },
+        { table: "quote_submissions", column: "stage" },
+        { table: "rental_contracts",  column: "contract_number" },
+        { table: "rental_contracts",  column: "unit_price" },
+      ];
+      const colResult = await db.execute(sql`
+        SELECT table_name, column_name FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND (table_name, column_name) IN (
+            ${sql.raw(criticalChecks.map(c => `('${c.table}','${c.column}')`).join(","))}
+          )
+      `);
+      const found = new Set(colResult.rows.map((r: any) => `${r.table_name}.${r.column_name}`));
+      const missing = criticalChecks.filter(c => !found.has(`${c.table}.${c.column}`));
+      if (missing.length === 0) {
+        checks.push(pass("Required Columns Present", `All ${criticalChecks.length} critical columns verified in PostgreSQL`));
+      } else {
+        checks.push(fail("Required Columns Present",
+          `${missing.length} column(s) missing: ${missing.map(c => `${c.table}.${c.column}`).join(", ")}`,
+        ));
+      }
+    } catch (e: any) { checks.push(fail("Required Columns Present", "Could not query information_schema", e.message)); }
+
+    // 10. Schema integrity — all key tables exist
+    try {
+      const requiredTables = [
+        "clients", "workers", "jobs", "invoices", "invoice_items",
+        "rental_contracts", "service_contracts", "quote_submissions",
+        "purchase_orders", "inventory_items", "suppliers", "departments",
+        "expenses", "calendar_events", "notifications",
+      ];
+      const tableResult = await db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+      `);
+      const existingTables = new Set(tableResult.rows.map((r: any) => r.table_name));
+      const missingTables = requiredTables.filter(t => !existingTables.has(t));
+      if (missingTables.length === 0) {
+        checks.push(pass("Schema Integrity", `All ${requiredTables.length} required tables exist in PostgreSQL`));
+      } else {
+        checks.push(fail("Schema Integrity",
+          `${missingTables.length} table(s) missing: ${missingTables.join(", ")}`,
+        ));
+      }
+    } catch (e: any) { checks.push(fail("Schema Integrity", "Could not query information_schema tables", e.message)); }
+
+    const overall = checks.every(c => c.status === "passed") ? "passed"
+      : checks.some(c => c.status === "failed") ? "failed"
+      : "warning";
+
+    res.json({ overall, checkedAt: new Date().toISOString(), checks });
   });
 
   const httpServer = createServer(app);

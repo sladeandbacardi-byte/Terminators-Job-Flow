@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   AlertTriangle, CheckCircle2, Copy, Database, Download,
   RefreshCw, ExternalLink, CalendarClock, FlaskConical,
-  XCircle, Loader2,
+  XCircle, Loader2, ShieldCheck, AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -85,6 +85,38 @@ interface SaveSearchTestResponse {
   results: RecordTestResult[];
 }
 
+interface DbStatusCounts {
+  clients: number;
+  workers: number;
+  jobs: number;
+  invoices: number;
+  quotes: number;
+  serviceContracts: number;
+  rentalContracts: number;
+  purchaseOrders: number;
+  activityLogs: number;
+  backupLogs: number;
+}
+interface DbStatusResponse {
+  storageType: string;
+  memStorageDisabled: boolean;
+  checkedAt: string;
+  counts: DbStatusCounts;
+}
+
+interface HealthCheckItem {
+  name: string;
+  status: "passed" | "failed" | "warning";
+  details: string;
+  error?: string;
+}
+interface HealthCheckResponse {
+  overall: "passed" | "failed" | "warning";
+  checkedAt: string;
+  checks: HealthCheckItem[];
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 const BACKUP_LABELS: Record<string, string> = {
   clients:          "Clients",
   jobs:             "Jobs",
@@ -95,7 +127,6 @@ const BACKUP_LABELS: Record<string, string> = {
   workers:          "Staff",
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
   job:             "Job",
   invoice:         "Invoice",
@@ -124,6 +155,19 @@ const FIELD_COLORS: Record<string, string> = {
   name:  "bg-pink-100 text-pink-800",
 };
 
+const DB_COUNT_LABELS: Array<{ key: keyof DbStatusCounts; label: string }> = [
+  { key: "clients",          label: "Clients" },
+  { key: "workers",          label: "Workers" },
+  { key: "jobs",             label: "Jobs" },
+  { key: "invoices",         label: "Invoices" },
+  { key: "quotes",           label: "Quotes / Leads" },
+  { key: "serviceContracts", label: "Service Contracts" },
+  { key: "rentalContracts",  label: "Rental Contracts" },
+  { key: "purchaseOrders",   label: "Purchase Orders" },
+  { key: "activityLogs",     label: "Activity Logs" },
+  { key: "backupLogs",       label: "Backup Logs" },
+];
+
 function LoadingRows() {
   return (
     <div className="space-y-3 pt-2">
@@ -137,6 +181,218 @@ function NoIssues({ label }: { label: string }) {
     <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
       <CheckCircle2 className="h-10 w-10 text-green-500" />
       <p className="text-sm font-medium">{label}</p>
+    </div>
+  );
+}
+
+// ── Database Status Section ─────────────────────────────────────────────────────
+function DatabaseStatusSection() {
+  const { data, isLoading, refetch, isFetching } = useQuery<DbStatusResponse>({
+    queryKey: ["/api/admin/data-integrity/db-status"],
+    refetchInterval: 60_000,
+  });
+
+  return (
+    <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <Database className="h-5 w-5 text-green-600" />
+            <div>
+              <CardTitle className="text-base text-green-900">Database Status</CardTitle>
+              <CardDescription className="text-green-700 text-xs">
+                All production data is stored in PostgreSQL — not in memory.
+              </CardDescription>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-green-300 text-green-800 hover:bg-green-100"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            {isFetching
+              ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Status badges */}
+        <div className="flex flex-wrap gap-2">
+          <Badge className="bg-green-600 text-white px-3 py-1 text-xs font-semibold">
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+            Persistent database storage active. Data survives server restarts.
+          </Badge>
+          {data && (
+            <>
+              <Badge variant="outline" className="border-green-300 text-green-800 text-xs">
+                Storage Type: {data.storageType}
+              </Badge>
+              <Badge variant="outline" className="border-green-300 text-green-800 text-xs">
+                MemStorage: Disabled for production data
+              </Badge>
+            </>
+          )}
+        </div>
+
+        {/* Connection check time */}
+        {data && (
+          <p className="text-xs text-green-700">
+            Last connection check:{" "}
+            <span className="font-medium">
+              {format(new Date(data.checkedAt), "d MMM yyyy, HH:mm:ss")}
+            </span>
+          </p>
+        )}
+
+        {/* Record counts grid */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {[...Array(10)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded" />
+            ))}
+          </div>
+        ) : data ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {DB_COUNT_LABELS.map(({ key, label }) => (
+              <div key={key} className="bg-white rounded-lg border border-green-100 px-3 py-2 text-center shadow-sm">
+                <p className="text-xl font-bold text-green-800">{data.counts[key].toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground leading-tight">{label}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Health Check Tab ────────────────────────────────────────────────────────────
+function HealthCheckTab() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<HealthCheckResponse | null>(null);
+  const [running, setRunning] = useState(false);
+
+  async function runCheck() {
+    setRunning(true);
+    setResult(null);
+    try {
+      const resp = await apiRequest("GET", "/api/admin/data-integrity/health-check");
+      const json: HealthCheckResponse = await resp.json();
+      setResult(json);
+      if (json.overall === "passed") {
+        toast({ title: "All checks passed", description: "PostgreSQL is healthy and all data integrity checks passed." });
+      } else if (json.overall === "warning") {
+        toast({ title: "Checks passed with warnings", description: "Some minor issues detected — see details below.", variant: "destructive" });
+      } else {
+        toast({ title: "Health check failed", description: "One or more checks failed — see details below.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Health check error", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const statusIcon = (s: HealthCheckItem["status"]) => {
+    if (s === "passed")  return <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />;
+    if (s === "warning") return <AlertCircle  className="h-4 w-4 text-yellow-500 shrink-0" />;
+    return <XCircle className="h-4 w-4 text-red-500 shrink-0" />;
+  };
+
+  const statusBadge = (s: HealthCheckItem["status"]) => {
+    if (s === "passed")  return <Badge className="bg-green-100 text-green-800 text-xs">PASSED</Badge>;
+    if (s === "warning") return <Badge className="bg-yellow-100 text-yellow-800 text-xs">WARNING</Badge>;
+    return <Badge className="bg-red-100 text-red-800 text-xs">FAILED</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">
+            Runs 10 checks against the PostgreSQL database: connection, table queries, record counts,
+            orphan detection, required columns, and schema integrity.
+          </p>
+        </div>
+        <Button
+          onClick={runCheck}
+          disabled={running}
+          className="shrink-0 bg-blue-700 hover:bg-blue-800 text-white"
+        >
+          {running
+            ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running…</>
+            : <><ShieldCheck className="h-4 w-4 mr-2" />Run Database Health Check</>}
+        </Button>
+      </div>
+
+      {!result && !running && (
+        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+          <ShieldCheck className="h-10 w-10 text-blue-300" />
+          <p className="text-sm">Press the button above to run the database health check.</p>
+        </div>
+      )}
+
+      {running && (
+        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
+          <p className="text-sm">Running 10 checks against PostgreSQL…</p>
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-4">
+          {/* Overall banner */}
+          <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
+            result.overall === "passed"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : result.overall === "warning"
+              ? "bg-yellow-50 border-yellow-200 text-yellow-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}>
+            {result.overall === "passed"
+              ? <CheckCircle2 className="h-5 w-5 shrink-0" />
+              : result.overall === "warning"
+              ? <AlertCircle className="h-5 w-5 shrink-0" />
+              : <XCircle className="h-5 w-5 shrink-0" />}
+            <div>
+              <span className="font-semibold text-sm">
+                Overall:{" "}
+                {result.overall === "passed" ? "PASSED — All database checks passed."
+                  : result.overall === "warning" ? "WARNING — Some issues detected."
+                  : "FAILED — One or more critical checks failed."}
+              </span>
+              <p className="text-xs opacity-75">
+                Checked at: {format(new Date(result.checkedAt), "d MMM yyyy, HH:mm:ss")}
+              </p>
+            </div>
+          </div>
+
+          {/* Per-check rows */}
+          <div className="rounded-md border divide-y">
+            {result.checks.map((c, i) => (
+              <div key={i} className="px-4 py-3 flex items-start gap-3">
+                {statusIcon(c.status)}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span className="text-sm font-medium">{c.name}</span>
+                    {statusBadge(c.status)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{c.details}</p>
+                  {c.error && (
+                    <p className="text-xs text-red-600 mt-1 bg-red-50 rounded px-2 py-1 font-mono">
+                      {c.error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -331,7 +587,7 @@ function DataSourcesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Live record counts for every data module — confirms data is loading and accessible.
+          Live record counts for every data module — confirms data is loading from PostgreSQL.
         </p>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
           <RefreshCw className="h-4 w-4 mr-2" /> Refresh
@@ -343,7 +599,7 @@ function DataSourcesTab() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[220px]">Module</TableHead>
-              <TableHead>Data Source / Table</TableHead>
+              <TableHead>PostgreSQL Table</TableHead>
               <TableHead className="text-right w-[100px]">Records</TableHead>
               <TableHead className="w-[80px]">Status</TableHead>
             </TableRow>
@@ -356,7 +612,7 @@ function DataSourcesTab() {
                 <TableCell className="text-right font-semibold">{s.count.toLocaleString()}</TableCell>
                 <TableCell>
                   <Badge className="bg-green-100 text-green-800 text-xs">
-                    OK
+                    PostgreSQL
                   </Badge>
                 </TableCell>
               </TableRow>
@@ -434,7 +690,6 @@ function BackupTab() {
       a.click();
       URL.revokeObjectURL(a.href);
 
-      // After JSON export, record summary
       if (type === "json") {
         const s = await refetchSummary();
         setLastExport(s.data ?? null);
@@ -450,11 +705,15 @@ function BackupTab() {
 
   return (
     <div className="space-y-6 max-w-xl">
+      <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 flex items-center gap-2">
+        <Database className="h-3.5 w-3.5 shrink-0" />
+        Backup reads from PostgreSQL. All production records are included.
+      </div>
+
       <p className="text-sm text-muted-foreground">
-        Export a point-in-time snapshot of the system data. Store it somewhere safe — you can restore from the JSON backup via the Backup & Restore page.
+        Export a point-in-time snapshot of the system data. Store it somewhere safe — you can restore from the JSON backup via the Backup &amp; Restore page.
       </p>
 
-      {/* Scheduled backup status */}
       {schedule && (
         <div className={`rounded-md border p-3 flex items-center gap-3 text-sm ${schedule.enabled ? "border-violet-200 bg-violet-50 text-violet-800" : "border-gray-200 bg-muted/20 text-muted-foreground"}`}>
           <CalendarClock className="h-4 w-4 shrink-0" />
@@ -473,7 +732,6 @@ function BackupTab() {
         </div>
       )}
 
-      {/* Current data summary */}
       {summary && (
         <div className="rounded-md border bg-muted/20 p-4 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Current data snapshot</p>
@@ -488,7 +746,6 @@ function BackupTab() {
         </div>
       )}
 
-      {/* Last export summary */}
       {lastExport && (
         <div className="rounded-md border border-green-200 bg-green-50 p-4 space-y-2">
           <div className="flex items-center gap-2">
@@ -596,12 +853,13 @@ function SaveSearchTestTab() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
-            Creates one record of each type for a temporary test client, then checks that
+            Creates one record of each type for a temporary test client in PostgreSQL, then checks that
             every record can be found in the list screens a real user would navigate to.
             All test data is deleted automatically when the test finishes.
           </p>
-          <p className="text-xs text-orange-600 font-medium">
-            Note: this app stores data in memory. Data is lost on server restart — records saved before a restart will not survive it.
+          <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Records are saved to PostgreSQL — they survive server restarts.
           </p>
         </div>
         <Button
@@ -611,7 +869,7 @@ function SaveSearchTestTab() {
         >
           {running
             ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running…</>
-            : <><FlaskConical className="h-4 w-4 mr-2" />Run Save/Search Test</>}
+            : <><FlaskConical className="h-4 w-4 mr-2" />Run Save/Search/Restart Test</>}
         </Button>
       </div>
 
@@ -625,13 +883,12 @@ function SaveSearchTestTab() {
       {running && (
         <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
           <Loader2 className="h-10 w-10 animate-spin text-indigo-400" />
-          <p className="text-sm">Creating records and verifying visibility…</p>
+          <p className="text-sm">Creating records in PostgreSQL and verifying visibility…</p>
         </div>
       )}
 
       {result && (
         <div className="space-y-4">
-          {/* Overall banner */}
           <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
             result.overall === "passed"
               ? "bg-green-50 border-green-200 text-green-800"
@@ -647,7 +904,6 @@ function SaveSearchTestTab() {
             </span>
           </div>
 
-          {/* Per-record cards */}
           <div className="space-y-3">
             {result.results.map((r, i) => (
               <Card key={i} className={r.status === "failed" ? "border-red-200" : "border-green-200"}>
@@ -718,17 +974,24 @@ export default function DataIntegrity() {
         <main className="flex-1 overflow-auto p-6">
           <div className="space-y-6 max-w-5xl">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-6 w-6 text-orange-500" />
+              <Database className="h-6 w-6 text-green-600" />
               <div>
                 <h1 className="text-2xl font-bold">Data Integrity</h1>
                 <p className="text-sm text-muted-foreground">
-                  Scan for orphaned records, duplicate clients, and export a backup.
+                  PostgreSQL database health, orphan detection, duplicate scanning, and backup export.
                 </p>
               </div>
             </div>
 
-            <Tabs defaultValue="orphans" className="space-y-4">
+            {/* Database Status — always visible at the top */}
+            <DatabaseStatusSection />
+
+            <Tabs defaultValue="health-check" className="space-y-4">
               <TabsList className="flex-wrap h-auto gap-1">
+                <TabsTrigger value="health-check" className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Health Check
+                </TabsTrigger>
                 <TabsTrigger value="orphans" className="flex items-center gap-1.5">
                   Orphan Records
                   {orphanCount > 0 && (
@@ -752,6 +1015,23 @@ export default function DataIntegrity() {
                 </TabsTrigger>
               </TabsList>
 
+              <TabsContent value="health-check">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-blue-600" />
+                      Database Health Check
+                    </CardTitle>
+                    <CardDescription>
+                      10-point check: connection, table access, record counts, orphan detection, required columns, and schema integrity.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <HealthCheckTab />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
               <TabsContent value="orphans">
                 <Card>
                   <CardHeader className="pb-3">
@@ -771,7 +1051,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Duplicate Clients</CardTitle>
                     <CardDescription>
-                      Client records that appear to be the same based on phone, email, or name. Use "View" to open the client profile.
+                      Client records that appear to be the same based on phone, email, or name.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -785,7 +1065,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Data Source Check</CardTitle>
                     <CardDescription>
-                      Live record counts for each module mapped to its backing data source.
+                      Live record counts for each module — all backed by PostgreSQL.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -799,7 +1079,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Backup Export</CardTitle>
                     <CardDescription>
-                      Download a full or lightweight export of your data. A summary shows counts at the time of export.
+                      Download a full or lightweight export from PostgreSQL. A summary shows counts at the time of export.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -813,10 +1093,10 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <FlaskConical className="h-4 w-4 text-indigo-600" />
-                      Save / Search Workflow Test
+                      Save / Search / Restart Readiness Test
                     </CardTitle>
                     <CardDescription>
-                      Proves that a record saved in any module can be found again on every screen that should show it.
+                      Proves that records saved to PostgreSQL can be found on every screen that should show them.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

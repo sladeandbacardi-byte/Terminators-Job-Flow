@@ -1,0 +1,175 @@
+Great. PostgreSQL migration is now complete.
+
+Before adding more features, please lock in the database integrity layer and add a clear production readiness check.
+
+Create or update Admin > Data Integrity with a section called:
+
+Database Status
+
+It must show:
+
+- Storage Type: PostgreSQL
+- Temporary MemStorage: Disabled for production data
+- Last database connection check
+- Clients count
+- Jobs count
+- Quotes count
+- Service contracts count
+- Rental contracts count
+- Invoices count
+- Purchase orders count
+- Workers count
+- Activity logs count
+- Backup logs count
+
+Show a green status badge:
+
+Persistent database storage active. Data survives server restarts.
+
+Remove or hide any old warnings that say data may be lost due to MemStorage, unless MemStorage is still being used for test-only/demo-only data.
+
+IMPORTANT DATA RULE
+
+Do not reintroduce MemStorage as the source of truth.
+
+All production records must use PostgreSQL:
+
+- clients
+- leads
+- quotes
+- jobs
+- service contracts
+- rental contracts
+- invoices
+- purchase orders
+- expenses
+- stock
+- workers
+- activity logs
+- backup logs
+- treatment reports
+- documents metadata
+- communication notes
+
+MemStorage may only be used for temporary UI state or test mocks, never production data.
+
+DATABASE HEALTH CHECK
+
+Add a button under Admin > Data Integrity:
+
+Run Database Health Check
+
+When clicked, check:
+
+1. PostgreSQL connection works
+2. All main tables can be queried
+3. Record counts return correctly
+4. No orphan jobs without valid clientId
+5. No orphan quotes without valid clientId
+6. No orphan invoices without valid clientId
+7. No orphan service contracts without valid clientId
+8. No orphan rental contracts without valid clientId
+9. No missing required columns
+10. No schema mismatch between Drizzle schema and PostgreSQL tables
+
+The result must show:
+
+Overall: PASSED or FAILED
+
+For each section, show:
+- Passed / Failed
+- Details
+- Error message if failed
+
+SCHEMA SAFETY
+
+Add a developer note or code comment near the storage layer:
+
+PostgreSQL is the production source of truth.
+Do not add new fields to API writes unless the Drizzle schema and PostgreSQL migration/table columns are updated together.
+
+This is important because previous bugs happened when Drizzle tried to write fields that did not exist in the database table.
+
+SEEDING SAFETY
+
+Keep seeding idempotent.
+
+The seed function must be safe to re-run and must not create duplicates.
+
+The seed guard must check more than only the clients table.
+
+It should check the required core tables, especially:
+
+- clients
+- jobs
+- invoices
+- workers
+
+If one table is missing records due to a previous partial seed failure, the seeding process must fill the missing table without duplicating existing data.
+
+SAVE/SEARCH/RESTART TEST
+
+Add this as a permanent test button under Admin > Data Integrity:
+
+Run Save/Search/Restart Readiness Test
+
+The test must check that these records can be created, saved, searched, and found through the client profile:
+
+- Quote
+- Job
+- Service Contract
+- Rental Contract
+- Invoice
+
+The test must confirm each record appears in:
+
+- its main list
+- search results
+- the client profile tab
+- calendar if applicable
+- related API endpoint
+
+The test must show:
+
+Overall: PASSED or FAILED
+
+BACKUP CHECK
+
+Add or confirm backup export reads from PostgreSQL, not old MemStorage.
+
+Backup export must include:
+
+- clients
+- leads
+- quotes
+- jobs
+- service contracts
+- rental contracts
+- invoices
+- purchase orders
+- expenses
+- stock
+- workers
+- treatment reports
+- documents metadata
+- communication notes
+- activity logs
+- backup logs
+
+Backup report must show record counts for each table.
+
+NEXT FEATURE SAFETY RULE
+
+Before adding any new feature, check whether it needs a new database field.
+
+If yes:
+1. Update Drizzle schema
+2. Update PostgreSQL table/migration
+3. Update insert/select logic
+4. Update backup export
+5. Update Admin > Data Integrity counts/checks if relevant
+6. Test save/search after adding the feature
+
+Do not add UI fields that only save to frontend state.
+
+Every important field must save to PostgreSQL.

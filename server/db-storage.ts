@@ -204,13 +204,23 @@ export class DbStorage implements IStorage {
   }
 
   private async initialize(): Promise<void> {
-    // Check both clients AND jobs — if either is empty, run the full seed
-    // (ON CONFLICT DO NOTHING makes it safe to re-run at any time)
-    const [existingClient, existingJob] = await Promise.all([
-      db.select({ id: clients.id }).from(clients).where(eq(clients.id, "client-1")).limit(1),
+    // PostgreSQL is the production source of truth.
+    // Do not add new fields to API writes unless the Drizzle schema AND
+    // PostgreSQL table columns are updated together. Previous bugs occurred
+    // when Drizzle tried to write fields that did not exist in the DB table.
+    //
+    // Seeding is idempotent — ON CONFLICT DO NOTHING prevents duplicates.
+    // We check four core tables: if ANY is empty, the seed fills missing data.
+    // This handles partial-seed failures (e.g. previous boot crashed mid-seed).
+    const [existingClients, existingJobs, existingInvoices, existingWorkers] = await Promise.all([
+      db.select({ id: clients.id }).from(clients).limit(1),
       db.select({ id: jobs.id }).from(jobs).limit(1),
+      db.select({ id: invoices.id }).from(invoices).limit(1),
+      db.select({ id: workers.id }).from(workers).limit(1),
     ]);
-    if (existingClient.length === 0 || existingJob.length === 0) {
+    const needsSeed = existingClients.length === 0 || existingJobs.length === 0
+      || existingInvoices.length === 0 || existingWorkers.length === 0;
+    if (needsSeed) {
       console.log("[DbStorage] Seeding database...");
       await this.seedDatabase();
       console.log("[DbStorage] Seed complete.");
