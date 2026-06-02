@@ -3569,12 +3569,19 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     res.status(204).send();
   });
 
-  // ── Data Integrity ────────────────────────────────────────────────────────
+  // ── Data Integrity (admin-only) ───────────────────────────────────────────
+
+  // Inline admin-role guard used by all data-integrity endpoints
+  const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
+    const role = (req.user as any)?.role ?? "";
+    if (!["admin", "superadmin"].includes(role)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
 
   // GET /api/admin/data-integrity/orphans
-  // Returns records from jobs, invoices, rentalContracts, quoteSubmissions, serviceContracts
-  // whose clientId is missing or does not match any known client.
-  app.get("/api/admin/data-integrity/orphans", async (_req, res) => {
+  app.get("/api/admin/data-integrity/orphans", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const [clients, jobs, invoices, contracts, quotes, serviceContracts] = await Promise.all([
         storage.getClients(),
@@ -3588,33 +3595,32 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
       const orphans: { type: string; id: string; label: string; clientId: string | null }[] = [];
 
+      const isOrphan = (cid: string | null | undefined) => !cid || !validClientIds.has(cid);
+
       for (const j of jobs) {
-        const cid = j.clientId ?? null;
-        if (!cid || !validClientIds.has(cid)) {
-          orphans.push({ type: "job", id: j.id, label: j.title ?? j.jobNumber ?? j.id, clientId: cid });
+        if (isOrphan(j.clientId)) {
+          orphans.push({ type: "job", id: j.id, label: j.title ?? j.jobNumber ?? j.id, clientId: j.clientId ?? null });
         }
       }
       for (const inv of invoices) {
-        const cid = inv.clientId ?? null;
-        if (!cid || !validClientIds.has(cid)) {
-          orphans.push({ type: "invoice", id: inv.id, label: inv.invoiceNumber ?? inv.id, clientId: cid });
+        if (isOrphan(inv.clientId)) {
+          orphans.push({ type: "invoice", id: inv.id, label: inv.invoiceNumber ?? inv.id, clientId: inv.clientId ?? null });
         }
       }
       for (const c of contracts) {
-        const cid = c.clientId ?? null;
-        if (!cid || !validClientIds.has(cid)) {
-          orphans.push({ type: "rentalContract", id: c.id, label: c.contractNumber ?? c.id, clientId: cid });
+        if (isOrphan(c.clientId)) {
+          orphans.push({ type: "rentalContract", id: c.id, label: c.contractNumber ?? c.id, clientId: c.clientId ?? null });
         }
       }
       for (const q of quotes) {
         const cid = (q as any).clientId ?? null;
-        if (cid && !validClientIds.has(cid)) {
-          orphans.push({ type: "quote", id: q.id, label: q.quoteNumber ?? q.id, clientId: cid });
+        if (isOrphan(cid)) {
+          orphans.push({ type: "quote", id: q.id, label: (q as any).quoteNumber ?? q.id, clientId: cid });
         }
       }
       for (const sc of serviceContracts) {
         const cid = (sc as any).clientId ?? null;
-        if (cid && !validClientIds.has(cid)) {
+        if (isOrphan(cid)) {
           orphans.push({ type: "serviceContract", id: sc.id, label: (sc as any).title ?? sc.id, clientId: cid });
         }
       }
@@ -3626,11 +3632,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // GET /api/admin/data-integrity/duplicates
-  // Groups clients by normalised name / phone / email and returns groups with 2+ members.
-  app.get("/api/admin/data-integrity/duplicates", async (_req, res) => {
+  app.get("/api/admin/data-integrity/duplicates", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const clients = await storage.getClients();
-
       const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[\s\-.()+]/g, "");
 
       const byPhone: Record<string, typeof clients> = {};
@@ -3641,30 +3645,15 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         const phone = norm(c.phone);
         const email = norm(c.email);
         const name  = norm(c.name);
-        if (phone.length > 4) {
-          if (!byPhone[phone]) byPhone[phone] = [];
-          byPhone[phone].push(c);
-        }
-        if (email.length > 3) {
-          if (!byEmail[email]) byEmail[email] = [];
-          byEmail[email].push(c);
-        }
-        if (name.length > 2) {
-          if (!byName[name]) byName[name] = [];
-          byName[name].push(c);
-        }
+        if (phone.length > 4) { (byPhone[phone] ??= []).push(c); }
+        if (email.length > 3) { (byEmail[email] ??= []).push(c); }
+        if (name.length  > 2) { (byName[name]   ??= []).push(c); }
       }
 
       const groups: { field: string; value: string; clients: typeof clients }[] = [];
-      for (const [k, v] of Object.entries(byPhone)) {
-        if (v.length > 1) groups.push({ field: "phone", value: k, clients: v });
-      }
-      for (const [k, v] of Object.entries(byEmail)) {
-        if (v.length > 1) groups.push({ field: "email", value: k, clients: v });
-      }
-      for (const [k, v] of Object.entries(byName)) {
-        if (v.length > 1) groups.push({ field: "name", value: k, clients: v });
-      }
+      for (const [k, v] of Object.entries(byPhone)) { if (v.length > 1) groups.push({ field: "phone", value: k, clients: v }); }
+      for (const [k, v] of Object.entries(byEmail)) { if (v.length > 1) groups.push({ field: "email", value: k, clients: v }); }
+      for (const [k, v] of Object.entries(byName))  { if (v.length > 1) groups.push({ field: "name",  value: k, clients: v }); }
 
       res.json({ groups, totalClients: clients.length });
     } catch (err: any) {
@@ -3673,8 +3662,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // GET /api/admin/data-integrity/sources
-  // Returns record counts for every data source in the system.
-  app.get("/api/admin/data-integrity/sources", async (_req, res) => {
+  app.get("/api/admin/data-integrity/sources", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const [
         clients, workers, jobs, invoices, contracts, quotes, serviceContracts,
@@ -3696,19 +3684,19 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       ]);
 
       res.json([
-        { label: "Clients",           count: clients.length,          icon: "users" },
-        { label: "Workers",           count: workers.length,          icon: "users" },
-        { label: "Jobs",              count: jobs.length,             icon: "briefcase" },
-        { label: "Invoices",          count: invoices.length,         icon: "receipt" },
-        { label: "Rental Contracts",  count: contracts.length,        icon: "file-text" },
-        { label: "Quotes",            count: quotes.length,           icon: "file-text" },
-        { label: "Service Contracts", count: serviceContracts.length, icon: "list-ordered" },
-        { label: "Inventory Items",   count: inventoryItems.length,   icon: "box" },
-        { label: "Suppliers",         count: suppliers.length,        icon: "shopping-cart" },
-        { label: "Purchase Orders",   count: purchaseOrders.length,   icon: "shopping-cart" },
-        { label: "Vehicles",          count: vehicles.length,         icon: "truck" },
-        { label: "Expenses",          count: expenses.length,         icon: "wallet" },
-        { label: "Calendar Events",   count: calendarEvents.length,   icon: "calendar" },
+        { module: "Clients",           source: "clients",           count: clients.length },
+        { module: "Workers / Staff",   source: "workers",           count: workers.length },
+        { module: "Jobs",              source: "jobs",              count: jobs.length },
+        { module: "Invoices",          source: "invoices",          count: invoices.length },
+        { module: "Rental Contracts",  source: "rental_contracts",  count: contracts.length },
+        { module: "Quotes / Leads",    source: "quote_submissions", count: quotes.length },
+        { module: "Service Contracts", source: "service_contracts", count: serviceContracts.length },
+        { module: "Inventory Items",   source: "inventory_items",   count: inventoryItems.length },
+        { module: "Suppliers",         source: "suppliers",         count: suppliers.length },
+        { module: "Purchase Orders",   source: "purchase_orders",   count: purchaseOrders.length },
+        { module: "Vehicles",          source: "vehicles",          count: vehicles.length },
+        { module: "Expenses",          source: "expenses",          count: expenses.length },
+        { module: "Calendar Events",   source: "calendar_events",   count: calendarEvents.length },
       ]);
     } catch (err: any) {
       res.status(500).json({ error: "Failed to fetch data sources", details: err.message });
@@ -3716,8 +3704,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // PATCH /api/admin/data-integrity/fix-orphan
-  // Reassigns the clientId on an orphan record. Body: { type, id, clientId }
-  app.patch("/api/admin/data-integrity/fix-orphan", async (req, res) => {
+  app.patch("/api/admin/data-integrity/fix-orphan", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { type, id, clientId } = req.body as { type: string; id: string; clientId: string };
       if (!type || !id || !clientId) {
@@ -3736,6 +3723,12 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         case "rentalContract":
           await storage.updateRentalContract(id, { clientId });
           break;
+        case "quote":
+          await storage.updateQuoteSubmission(id, { clientId } as any);
+          break;
+        case "serviceContract":
+          await storage.updateServiceContract(id, { clientId } as any);
+          break;
         default:
           return res.status(400).json({ error: `Unsupported type: ${type}` });
       }
@@ -3746,8 +3739,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // GET /api/admin/data-integrity/backup/csv
-  // Streams clients as CSV (lightweight export).
-  app.get("/api/admin/data-integrity/backup/csv", async (_req, res) => {
+  app.get("/api/admin/data-integrity/backup/csv", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const clients = await storage.getClients();
       const headers = ["id","name","email","phone","address","businessType","status","createdAt"];
@@ -3765,6 +3757,32 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       res.send(csv);
     } catch (err: any) {
       res.status(500).json({ error: "Failed to export CSV", details: err.message });
+    }
+  });
+
+  // GET /api/admin/data-integrity/backup/summary
+  // Returns record counts + export timestamp for the Backup tab UI.
+  app.get("/api/admin/data-integrity/backup/summary", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const [clients, jobs, contracts, invoices, quotes] = await Promise.all([
+        storage.getClients(),
+        storage.getJobs(),
+        storage.getRentalContracts(),
+        storage.getInvoices(),
+        storage.getQuoteSubmissions(),
+      ]);
+      res.json({
+        exportedAt: new Date().toISOString(),
+        counts: {
+          clients:   clients.length,
+          jobs:      jobs.length,
+          contracts: contracts.length,
+          invoices:  invoices.length,
+          quotes:    quotes.length,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch backup summary", details: err.message });
     }
   });
 

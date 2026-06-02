@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
@@ -11,11 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertTriangle, CheckCircle2, Copy, Database, Download,
-  RefreshCw, Users, Briefcase, Receipt, FileText, Box,
-  ShoppingCart, Truck, Wallet, Calendar, ListOrdered, BarChart3,
+  RefreshCw, ExternalLink,
 } from "lucide-react";
+import { format } from "date-fns";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface OrphanRecord {
@@ -24,34 +26,51 @@ interface OrphanRecord {
   label: string;
   clientId: string | null;
 }
-
 interface OrphansResponse {
   orphans: OrphanRecord[];
   totalClients: number;
 }
 
+interface DuplicateClient {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+}
 interface DuplicateGroup {
   field: "phone" | "email" | "name";
   value: string;
-  clients: { id: string; name: string; email: string | null; phone: string | null; status: string }[];
+  clients: DuplicateClient[];
 }
-
 interface DuplicatesResponse {
   groups: DuplicateGroup[];
   totalClients: number;
 }
 
 interface SourceEntry {
-  label: string;
+  module: string;
+  source: string;
   count: number;
-  icon: string;
 }
 
+interface BackupSummary {
+  exportedAt: string;
+  counts: {
+    clients: number;
+    jobs: number;
+    contracts: number;
+    invoices: number;
+    quotes: number;
+  };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
   job:             "Job",
   invoice:         "Invoice",
   rentalContract:  "Rental Contract",
-  quote:           "Quote",
+  quote:           "Quote / Lead",
   serviceContract: "Service Contract",
 };
 
@@ -75,18 +94,22 @@ const FIELD_COLORS: Record<string, string> = {
   name:  "bg-pink-100 text-pink-800",
 };
 
-const SOURCE_ICONS: Record<string, any> = {
-  users: Users,
-  briefcase: Briefcase,
-  receipt: Receipt,
-  "file-text": FileText,
-  box: Box,
-  "shopping-cart": ShoppingCart,
-  truck: Truck,
-  wallet: Wallet,
-  calendar: Calendar,
-  "list-ordered": ListOrdered,
-};
+function LoadingRows() {
+  return (
+    <div className="space-y-3 pt-2">
+      {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+    </div>
+  );
+}
+
+function NoIssues({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+      <CheckCircle2 className="h-10 w-10 text-green-500" />
+      <p className="text-sm font-medium">{label}</p>
+    </div>
+  );
+}
 
 // ── Orphans Tab ────────────────────────────────────────────────────────────────
 function OrphansTab() {
@@ -146,7 +169,7 @@ function OrphansTab() {
                     <span className="text-sm font-medium truncate">{o.label}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    clientId: <span className="font-mono">{o.clientId ?? "(null)"}</span>
+                    clientId: <span className="font-mono">{o.clientId ?? "(null — no client assigned)"}</span>
                   </p>
                 </div>
 
@@ -175,11 +198,9 @@ function OrphansTab() {
                     <Button size="sm" variant="ghost" onClick={() => setFixingId(null)}>Cancel</Button>
                   </div>
                 ) : (
-                  o.type !== "quote" && o.type !== "serviceContract" && (
-                    <Button size="sm" variant="outline" onClick={() => setFixingId(o.id)}>
-                      Fix
-                    </Button>
-                  )
+                  <Button size="sm" variant="outline" onClick={() => setFixingId(o.id)}>
+                    Fix
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -233,12 +254,21 @@ function DuplicatesTab() {
               <CardContent className="pt-0 pb-3 px-4">
                 <div className="space-y-1.5">
                   {g.clients.map(c => (
-                    <div key={c.id} className="flex items-center justify-between bg-muted/30 rounded px-3 py-1.5 text-sm">
-                      <span className="font-medium">{c.name}</span>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {c.email && <span>{c.email}</span>}
-                        {c.phone && <span>{c.phone}</span>}
+                    <div key={c.id} className="flex items-center justify-between bg-muted/30 rounded px-3 py-1.5 gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[c.email, c.phone].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
                         <Badge variant="outline" className="text-xs">{c.status}</Badge>
+                        <Link href={`/clients/${c.id}`}>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1">
+                            <ExternalLink className="h-3 w-3" />
+                            View
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   ))}
@@ -271,34 +301,44 @@ function DataSourcesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Record counts for every data module currently loaded in memory.
+          Live record counts for every data module — confirms data is loading and accessible.
         </p>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
           <RefreshCw className="h-4 w-4 mr-2" /> Refresh
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {sources.map(s => {
-          const Icon = SOURCE_ICONS[s.icon] ?? BarChart3;
-          return (
-            <Card key={s.label} className="hover:shadow-sm transition-shadow">
-              <CardContent className="pt-4 pb-3 flex flex-col items-center gap-2">
-                <Icon className="h-6 w-6 text-muted-foreground" />
-                <p className="text-2xl font-bold">{s.count.toLocaleString()}</p>
-                <p className="text-xs text-center text-muted-foreground">{s.label}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[220px]">Module</TableHead>
+              <TableHead>Data Source / Table</TableHead>
+              <TableHead className="text-right w-[100px]">Records</TableHead>
+              <TableHead className="w-[80px]">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sources.map(s => (
+              <TableRow key={s.source}>
+                <TableCell className="font-medium">{s.module}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{s.source}</TableCell>
+                <TableCell className="text-right font-semibold">{s.count.toLocaleString()}</TableCell>
+                <TableCell>
+                  <Badge className="bg-green-100 text-green-800 text-xs">
+                    OK
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
-      <Card className="bg-muted/30">
-        <CardContent className="py-3 px-4 flex items-center justify-between">
-          <span className="text-sm font-medium">Total records in memory</span>
-          <span className="text-xl font-bold">{total.toLocaleString()}</span>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between bg-muted/30 rounded px-4 py-2.5">
+        <span className="text-sm font-medium">Total records loaded</span>
+        <span className="text-xl font-bold">{total.toLocaleString()}</span>
+      </div>
     </div>
   );
 }
@@ -307,6 +347,11 @@ function DataSourcesTab() {
 function BackupTab() {
   const { toast } = useToast();
   const [downloading, setDownloading] = useState<"json" | "csv" | null>(null);
+  const [lastExport, setLastExport] = useState<BackupSummary | null>(null);
+
+  const { data: summary, refetch: refetchSummary } = useQuery<BackupSummary>({
+    queryKey: ["/api/admin/data-integrity/backup/summary"],
+  });
 
   const download = async (type: "json" | "csv") => {
     setDownloading(type);
@@ -314,7 +359,9 @@ function BackupTab() {
       const url = type === "json"
         ? "/api/backup/export"
         : "/api/admin/data-integrity/backup/csv";
-      const resp = await fetch(url);
+      const resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}` },
+      });
       if (!resp.ok) throw new Error(await resp.text());
       const blob = await resp.blob();
       const a = document.createElement("a");
@@ -324,6 +371,13 @@ function BackupTab() {
       a.download = match?.[1] ?? (type === "json" ? "backup.json" : "clients.csv");
       a.click();
       URL.revokeObjectURL(a.href);
+
+      // After JSON export, record summary
+      if (type === "json") {
+        const s = await refetchSummary();
+        setLastExport(s.data ?? null);
+      }
+
       toast({ title: "Download started", description: `${a.download} is downloading.` });
     } catch (e: any) {
       toast({ title: "Download failed", description: e.message, variant: "destructive" });
@@ -337,6 +391,41 @@ function BackupTab() {
       <p className="text-sm text-muted-foreground">
         Export a point-in-time snapshot of the system data. Store it somewhere safe — you can restore from the JSON backup via the Backup & Restore page.
       </p>
+
+      {/* Current data summary */}
+      {summary && (
+        <div className="rounded-md border bg-muted/20 p-4 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Current data snapshot</p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {Object.entries(summary.counts).map(([k, v]) => (
+              <div key={k} className="bg-white rounded p-2 border">
+                <p className="text-lg font-bold">{v}</p>
+                <p className="text-xs text-muted-foreground capitalize">{k}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Last export summary */}
+      {lastExport && (
+        <div className="rounded-md border border-green-200 bg-green-50 p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <p className="text-sm font-medium text-green-800">
+              Last export: {format(new Date(lastExport.exportedAt), "d MMM yyyy, HH:mm")}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            {Object.entries(lastExport.counts).map(([k, v]) => (
+              <div key={k} className="bg-white/70 rounded px-2 py-1 border border-green-100">
+                <p className="font-bold">{v}</p>
+                <p className="text-muted-foreground capitalize">{k}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Card>
@@ -355,11 +444,9 @@ function BackupTab() {
               disabled={downloading === "json"}
               className="w-full sm:w-auto"
             >
-              {downloading === "json" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
+              {downloading === "json"
+                ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                : <Download className="h-4 w-4 mr-2" />}
               Download JSON Backup
             </Button>
           </CardContent>
@@ -368,7 +455,7 @@ function BackupTab() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
+              <Download className="h-4 w-4" />
               Clients CSV Export
             </CardTitle>
             <CardDescription>
@@ -382,11 +469,9 @@ function BackupTab() {
               disabled={downloading === "csv"}
               className="w-full sm:w-auto"
             >
-              {downloading === "csv" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
+              {downloading === "csv"
+                ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                : <Download className="h-4 w-4 mr-2" />}
               Download Clients CSV
             </Button>
           </CardContent>
@@ -396,24 +481,6 @@ function BackupTab() {
       <p className="text-xs text-muted-foreground">
         Tip: Schedule regular downloads and store them in a cloud folder (Google Drive, OneDrive) as your backup cadence.
       </p>
-    </div>
-  );
-}
-
-// ── Shared helpers ─────────────────────────────────────────────────────────────
-function LoadingRows() {
-  return (
-    <div className="space-y-3 pt-2">
-      {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
-    </div>
-  );
-}
-
-function NoIssues({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-      <CheckCircle2 className="h-10 w-10 text-green-500" />
-      <p className="text-sm font-medium">{label}</p>
     </div>
   );
 }
@@ -473,7 +540,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Orphan Records</CardTitle>
                     <CardDescription>
-                      Jobs, invoices, and contracts that reference a client ID that does not exist.
+                      Jobs, invoices, contracts, quotes, and service contracts that reference a client ID that does not exist.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -487,7 +554,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Duplicate Clients</CardTitle>
                     <CardDescription>
-                      Client records that appear to be the same based on phone, email, or name.
+                      Client records that appear to be the same based on phone, email, or name. Use "View" to open the client profile.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -501,7 +568,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Data Source Check</CardTitle>
                     <CardDescription>
-                      Live record counts for each module — confirms data is loading correctly.
+                      Live record counts for each module mapped to its backing data source.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -515,7 +582,7 @@ export default function DataIntegrity() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Backup Export</CardTitle>
                     <CardDescription>
-                      Download a full or lightweight export of your data.
+                      Download a full or lightweight export of your data. A summary shows counts at the time of export.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
