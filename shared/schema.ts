@@ -635,6 +635,7 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   monthlyRecurring: text("monthly_recurring"),
   installationCost: text("installation_cost"),
   internalNotes: text("internal_notes"),
+  clientId: varchar("client_id"),
 });
 
 // Marketing channel options for the Origination field on every lead

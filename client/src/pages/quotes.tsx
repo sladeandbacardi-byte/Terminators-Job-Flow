@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Phone, Mail, MapPin, Calendar, User,
   MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase, UserPlus,
-  Package, AlertCircle, RefreshCw, ClipboardList,
+  Package, AlertCircle, RefreshCw, ClipboardList, FileCheck,
 } from "lucide-react";
 import type { QuoteSubmission, Worker, Client, Department } from "@shared/schema";
 
@@ -51,6 +51,17 @@ const FREQUENCY_OPTIONS = [
   { value: "biannual",    label: "Every 6 Months" },
   { value: "annual",      label: "Annually" },
 ];
+
+const convertToContractSchema = z.object({
+  clientId:     z.string().min(1, "Client required"),
+  departmentId: z.string().min(1, "Department required"),
+  serviceType:  z.string().min(1, "Service type required"),
+  frequency:    z.string().min(1, "Frequency required"),
+  contractPrice: z.string().optional(),
+  startDate:    z.string().optional(),
+  notes:        z.string().optional(),
+});
+type ConvertContractForm = z.infer<typeof convertToContractSchema>;
 
 function parseLineItems(json: string | null | undefined): Array<{ description: string; qty?: number; unit?: string }> {
   if (!json) return [];
@@ -126,6 +137,9 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
   const [acceptOpen, setAcceptOpen]   = useState(false);
   const [newClientMode, setNewClientMode] = useState(false);
 
+  // Convert-to-contract dialog
+  const [contractOpen, setContractOpen] = useState(false);
+
   const { toast } = useToast();
 
   const deptId = SERVICE_TO_DEPT[quote.serviceType] ?? departments[0]?.id ?? "";
@@ -137,6 +151,19 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
       clientId: "", workerId: "", salespersonId: "", departmentId: deptId,
       scheduledDate: "", scheduledTime: "08:00",
       address: quote.address || "", notes: quote.description || "", estimatedValue: "",
+    },
+  });
+
+  const convertContractForm = useForm<ConvertContractForm>({
+    resolver: zodResolver(convertToContractSchema),
+    defaultValues: {
+      clientId: (quote as any).clientId ?? "",
+      departmentId: deptId,
+      serviceType: quote.serviceType,
+      frequency: (quote as any).frequency ?? "monthly",
+      contractPrice: quote.quoteAmount ?? "",
+      startDate: "",
+      notes: quote.notes ?? "",
     },
   });
 
@@ -233,6 +260,36 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
       navigate("/jobs");
     },
     onError: (e: any) => toast({ title: "Failed to create job", description: e.message, variant: "destructive" }),
+  });
+
+  const convertContractMutation = useMutation({
+    mutationFn: async (data: ConvertContractForm) => {
+      const selectedClient = clients.find(c => c.id === data.clientId);
+      if (!selectedClient) throw new Error("Client not found");
+
+      const contractRes = await apiRequest("POST", "/api/service-contracts", {
+        customerId:    selectedClient.id,
+        customerName:  selectedClient.name,
+        departmentId:  data.departmentId,
+        serviceType:   data.serviceType,
+        frequency:     data.frequency,
+        contractPrice: data.contractPrice || null,
+        startDate:     data.startDate ? new Date(data.startDate).toISOString() : null,
+        notes:         data.notes || null,
+        isServiceContract: true,
+        activeStatus:  true,
+      });
+      if (!contractRes.ok) throw new Error("Failed to create service contract");
+
+      await apiRequest("PATCH", `/api/quote-submissions/${quote.id}`, { status: "converted" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-contracts"] });
+      toast({ title: "Contract created!", description: "Quote converted to a service contract." });
+      setContractOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Failed to create contract", description: e.message, variant: "destructive" }),
   });
 
   // ── Handlers ──
@@ -453,6 +510,32 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Convert to Contract button — shown when quote is in "quoted" status */}
+        {quote.status === "quoted" && (
+          <div className="pt-2 border-t flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50"
+              onClick={() => {
+                const linkedClient = clients.find(c => c.id === (quote as any).clientId);
+                convertContractForm.reset({
+                  clientId:     (quote as any).clientId ?? "",
+                  departmentId: deptId,
+                  serviceType:  quote.serviceType,
+                  frequency:    (quote as any).frequency ?? "monthly",
+                  contractPrice: quote.quoteAmount ?? "",
+                  startDate:    "",
+                  notes:        quote.notes ?? "",
+                });
+                setContractOpen(true);
+              }}
+            >
+              <FileCheck className="h-3.5 w-3.5" /> Convert to Contract
+            </Button>
           </div>
         )}
       </CardContent>
@@ -818,6 +901,133 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
               >
                 <Briefcase className="h-4 w-4 mr-1" />
                 {convertMutation.isPending ? "Creating Job..." : "Create Job & Mark Won"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+
+    {/* ── Convert to Contract dialog ── */}
+    <Dialog open={contractOpen} onOpenChange={setContractOpen}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileCheck className="h-4 w-4 text-teal-600" /> Convert to Service Contract — {quote.companyName}
+          </DialogTitle>
+        </DialogHeader>
+
+        <Form {...convertContractForm}>
+          <form onSubmit={convertContractForm.handleSubmit(d => convertContractMutation.mutate(d))} className="space-y-4">
+
+            {/* Client selector */}
+            <FormField control={convertContractForm.control} name="clientId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Client Account <span className="text-red-500">*</span></FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}{c.contactPerson ? ` — ${c.contactPerson}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+                <p className="text-xs text-muted-foreground">
+                  The contract will be linked to this client account.
+                </p>
+              </FormItem>
+            )} />
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Department */}
+              <FormField control={convertContractForm.control} name="departmentId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Department <span className="text-red-500">*</span></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {departments.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Service type */}
+              <FormField control={convertContractForm.control} name="serviceType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Service Type <span className="text-red-500">*</span></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="pest_control">Pest Control</SelectItem>
+                      <SelectItem value="sanitary_bins">Sanitary Bins</SelectItem>
+                      <SelectItem value="washroom">Washroom</SelectItem>
+                      <SelectItem value="deep_cleaning">Deep Cleaning</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Frequency */}
+              <FormField control={convertContractForm.control} name="frequency" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Frequency <span className="text-red-500">*</span></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {FREQUENCY_OPTIONS.map(f => (
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Contract price */}
+              <FormField control={convertContractForm.control} name="contractPrice" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contract Price (R)</FormLabel>
+                  <FormControl><Input type="text" placeholder="e.g. 1200.00" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Start date */}
+              <FormField control={convertContractForm.control} name="startDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Start Date</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Notes */}
+              <FormField control={convertContractForm.control} name="notes" render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Contract Notes</FormLabel>
+                  <FormControl><Textarea rows={2} placeholder="Access requirements, special instructions..." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setContractOpen(false)}>Cancel</Button>
+              <Button
+                type="submit"
+                disabled={convertContractMutation.isPending}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                <FileCheck className="h-4 w-4 mr-1" />
+                {convertContractMutation.isPending ? "Creating Contract..." : "Create Contract & Mark Won"}
               </Button>
             </DialogFooter>
           </form>

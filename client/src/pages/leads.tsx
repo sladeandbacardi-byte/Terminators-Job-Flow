@@ -93,6 +93,7 @@ export default function Leads() {
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
 
   // ── mutations ──
   const createLead = useMutation({
@@ -112,6 +113,7 @@ export default function Leads() {
       quoteAmount: data.totalAmount,
       origination: data.origination,
       originationOther: data.origination === "other" ? (data.originationOther || null) : null,
+      clientId: data.clientId || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
@@ -426,6 +428,7 @@ export default function Leads() {
           <DocumentForm
             docType="lead"
             salesWorkers={salesWorkers}
+            clients={clients}
             isPending={createLead.isPending}
             onSubmit={d => createLead.mutate(d)}
             onCancel={() => setShowNewLead(false)}
