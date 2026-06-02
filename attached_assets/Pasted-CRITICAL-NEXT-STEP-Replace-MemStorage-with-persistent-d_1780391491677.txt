@@ -1,0 +1,150 @@
+CRITICAL NEXT STEP: Replace MemStorage with persistent database storage.
+
+The live save/search test has passed, which confirms the app screens and clientId relationships work during a normal running session.
+
+However, the app currently notes that MemStorage loses data on server restart.
+
+This is not acceptable for production.
+
+Job Flow must use persistent database storage so that clients, jobs, contracts, invoices, quotes, stock records, treatment reports, and documents do not disappear when the server restarts.
+
+REQUIREMENT
+
+Replace or upgrade MemStorage so all important records are saved permanently.
+
+Persistent storage must include:
+
+- Clients
+- Leads
+- Quotes
+- Jobs
+- Service Contracts
+- Rental Contracts
+- Invoices
+- Treatment Reports
+- Documents metadata
+- Stock records
+- Stock usage
+- Communication notes
+- Users / staff / teams
+- Settings
+- Backup logs
+- Audit logs
+
+The central Clients table must remain the master source of truth.
+
+All related records must continue to link to Clients using clientId.
+
+DO NOT break the save/search test that already passed.
+
+DATABASE REQUIREMENTS
+
+Use a proper persistent database suitable for deployment.
+
+If the app already has PostgreSQL or another persistent database available, connect all storage functions to that.
+
+If no persistent database is configured, set one up.
+
+Do not rely on MemStorage for production data.
+
+STORAGE LAYER
+
+Update the storage layer so the app uses the same methods, but writes to the persistent database instead of memory.
+
+Keep the same interface/function names if possible, for example:
+
+- createClient
+- getClient
+- getClients
+- updateClient
+- createJob
+- getJobs
+- getJobsByClient
+- createServiceContract
+- getServiceContracts
+- getServiceContractsByClient
+- createRentalContract
+- getRentalContractsByClient
+- createInvoice
+- getInvoicesByClient
+- createQuote
+- getQuotesByClient
+
+The screens should not need to know whether the data comes from memory or database.
+
+DATA MIGRATION
+
+If there is current MemStorage test data, add an export option before switching.
+
+Add:
+Admin > Data Integrity > Export Current Data
+
+This should export all current in-memory records to JSON or Excel before switching storage.
+
+Then add:
+Admin > Data Integrity > Import Data
+
+This can be used to restore/import data into the persistent database if needed.
+
+SERVER RESTART TEST
+
+After moving to persistent storage, run this test:
+
+1. Create or use a test client.
+2. Create a quote linked to that client.
+3. Create a job linked to that client.
+4. Create a service contract linked to that client.
+5. Create a rental contract linked to that client.
+6. Create an invoice linked to that client.
+7. Confirm all appear in the correct lists and client profile.
+8. Restart the server.
+9. After restart, search for the same client.
+10. Confirm the quote, job, service contract, rental contract and invoice are still there.
+
+The test must show:
+
+Overall: PASSED
+
+And each item must show:
+
+- Quote persisted after restart
+- Job persisted after restart
+- Service Contract persisted after restart
+- Rental Contract persisted after restart
+- Invoice persisted after restart
+- Client profile still shows linked records after restart
+
+ADMIN WARNING
+
+Until persistent storage is active, show a clear warning on Admin > Data Integrity:
+
+"Warning: The app is currently using temporary MemStorage. Data may be lost if the server restarts. Do not use for live production data until persistent database storage is enabled."
+
+Once persistent storage is active and the restart test passes, remove this warning or change it to:
+
+"Persistent database storage active. Data survives server restarts."
+
+BACKUP
+
+After persistent storage is active, backups must export from the persistent database, not from MemStorage.
+
+Backup report must show:
+
+- clients backed up
+- leads backed up
+- quotes backed up
+- jobs backed up
+- service contracts backed up
+- rental contracts backed up
+- invoices backed up
+- treatment reports backed up
+- documents metadata backed up
+- stock records backed up
+- backup date/time
+- backup success/failure
+
+IMPORTANT
+
+Do not continue live rollout until persistent storage is confirmed.
+
+The app must not lose client, job, contract or invoice data after a server restart.
