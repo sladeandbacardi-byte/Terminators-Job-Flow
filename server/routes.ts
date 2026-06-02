@@ -3640,7 +3640,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       }
       for (const q of quotes) {
         const cid = (q as any).clientId ?? null;
-        if (isOrphan(cid)) {
+        // Quotes with no clientId are new leads — not broken records.
+        // Only flag if a clientId is present but points to a missing client.
+        if (cid !== null && !validClientIds.has(cid)) {
           orphans.push({ type: "quote", id: q.id, label: (q as any).quoteNumber ?? q.id, clientId: cid });
         }
       }
