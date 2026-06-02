@@ -298,11 +298,15 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
       setDeclineReason("");
       setDeclineOpen(true);
     } else if (status === "converted") {
-      // Try to auto-match existing client
-      const match = clients.find(c =>
+      // Priority: use the quote's stored clientId if present, then fall back to name-match
+      const linkedClientId = (quote as any).clientId as string | undefined;
+      const exactMatch = linkedClientId ? clients.find(c => c.id === linkedClientId) : null;
+      const nameMatch = !exactMatch ? clients.find(c =>
         c.name.toLowerCase().includes(quote.companyName.toLowerCase()) ||
         quote.companyName.toLowerCase().includes(c.name.toLowerCase())
-      );
+      ) : null;
+      const match = exactMatch ?? nameMatch;
+
       // Pre-fill forms from quote data
       convertJobForm.reset({
         clientId:            match?.id ?? "",
@@ -326,7 +330,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
         industry:      "",
         departmentId:  deptId,
       });
-      // If no match found, default to create-new mode
+      // Only enter "create new" mode if there is truly no client link and no name-match
       setNewClientMode(!match);
       setAcceptOpen(true);
     } else {
@@ -682,32 +686,48 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
               <div className="col-span-2 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Client</span>
-                  <button
-                    type="button"
-                    onClick={() => setNewClientMode(v => !v)}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    {newClientMode ? (
-                      <><ChevronDown className="h-3.5 w-3.5" /> Use existing client</>
-                    ) : (
-                      <><UserPlus className="h-3.5 w-3.5" /> Create new client</>
-                    )}
-                  </button>
+                  {/* Only show the "create new" toggle when the quote has no linked clientId */}
+                  {!(quote as any).clientId && (
+                    <button
+                      type="button"
+                      onClick={() => setNewClientMode(v => !v)}
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {newClientMode ? (
+                        <><ChevronDown className="h-3.5 w-3.5" /> Use existing client</>
+                      ) : (
+                        <><UserPlus className="h-3.5 w-3.5" /> Create new client</>
+                      )}
+                    </button>
+                  )}
                 </div>
 
                 {!newClientMode ? (
                   <FormField control={convertJobForm.control} name="clientId" render={({ field }) => (
                     <FormItem>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select existing client" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {clients.filter(c => c.status === "active").map(c => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* If the quote already has a stored clientId, show it as a locked badge */}
+                      {(quote as any).clientId && clients.find(c => c.id === (quote as any).clientId) ? (
+                        <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
+                          <Building2 className="h-4 w-4 text-green-600 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-green-800 truncate">
+                              {clients.find(c => c.id === (quote as any).clientId)?.name}
+                            </p>
+                            <p className="text-xs text-green-600">Linked client — carried through from lead</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select existing client" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {clients.filter(c => c.status === "active").map(c => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )} />
