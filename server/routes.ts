@@ -3569,6 +3569,205 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     res.status(204).send();
   });
 
+  // ── Data Integrity ────────────────────────────────────────────────────────
+
+  // GET /api/admin/data-integrity/orphans
+  // Returns records from jobs, invoices, rentalContracts, quoteSubmissions, serviceContracts
+  // whose clientId is missing or does not match any known client.
+  app.get("/api/admin/data-integrity/orphans", async (_req, res) => {
+    try {
+      const [clients, jobs, invoices, contracts, quotes, serviceContracts] = await Promise.all([
+        storage.getClients(),
+        storage.getJobs(),
+        storage.getInvoices(),
+        storage.getRentalContracts(),
+        storage.getQuoteSubmissions(),
+        storage.getServiceContracts(),
+      ]);
+      const validClientIds = new Set(clients.map(c => c.id));
+
+      const orphans: { type: string; id: string; label: string; clientId: string | null }[] = [];
+
+      for (const j of jobs) {
+        const cid = j.clientId ?? null;
+        if (!cid || !validClientIds.has(cid)) {
+          orphans.push({ type: "job", id: j.id, label: j.title ?? j.jobNumber ?? j.id, clientId: cid });
+        }
+      }
+      for (const inv of invoices) {
+        const cid = inv.clientId ?? null;
+        if (!cid || !validClientIds.has(cid)) {
+          orphans.push({ type: "invoice", id: inv.id, label: inv.invoiceNumber ?? inv.id, clientId: cid });
+        }
+      }
+      for (const c of contracts) {
+        const cid = c.clientId ?? null;
+        if (!cid || !validClientIds.has(cid)) {
+          orphans.push({ type: "rentalContract", id: c.id, label: c.contractNumber ?? c.id, clientId: cid });
+        }
+      }
+      for (const q of quotes) {
+        const cid = (q as any).clientId ?? null;
+        if (cid && !validClientIds.has(cid)) {
+          orphans.push({ type: "quote", id: q.id, label: q.quoteNumber ?? q.id, clientId: cid });
+        }
+      }
+      for (const sc of serviceContracts) {
+        const cid = (sc as any).clientId ?? null;
+        if (cid && !validClientIds.has(cid)) {
+          orphans.push({ type: "serviceContract", id: sc.id, label: (sc as any).title ?? sc.id, clientId: cid });
+        }
+      }
+
+      res.json({ orphans, totalClients: clients.length });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to scan orphans", details: err.message });
+    }
+  });
+
+  // GET /api/admin/data-integrity/duplicates
+  // Groups clients by normalised name / phone / email and returns groups with 2+ members.
+  app.get("/api/admin/data-integrity/duplicates", async (_req, res) => {
+    try {
+      const clients = await storage.getClients();
+
+      const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[\s\-.()+]/g, "");
+
+      const byPhone: Record<string, typeof clients> = {};
+      const byEmail: Record<string, typeof clients> = {};
+      const byName:  Record<string, typeof clients> = {};
+
+      for (const c of clients) {
+        const phone = norm(c.phone);
+        const email = norm(c.email);
+        const name  = norm(c.name);
+        if (phone.length > 4) {
+          if (!byPhone[phone]) byPhone[phone] = [];
+          byPhone[phone].push(c);
+        }
+        if (email.length > 3) {
+          if (!byEmail[email]) byEmail[email] = [];
+          byEmail[email].push(c);
+        }
+        if (name.length > 2) {
+          if (!byName[name]) byName[name] = [];
+          byName[name].push(c);
+        }
+      }
+
+      const groups: { field: string; value: string; clients: typeof clients }[] = [];
+      for (const [k, v] of Object.entries(byPhone)) {
+        if (v.length > 1) groups.push({ field: "phone", value: k, clients: v });
+      }
+      for (const [k, v] of Object.entries(byEmail)) {
+        if (v.length > 1) groups.push({ field: "email", value: k, clients: v });
+      }
+      for (const [k, v] of Object.entries(byName)) {
+        if (v.length > 1) groups.push({ field: "name", value: k, clients: v });
+      }
+
+      res.json({ groups, totalClients: clients.length });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to scan duplicates", details: err.message });
+    }
+  });
+
+  // GET /api/admin/data-integrity/sources
+  // Returns record counts for every data source in the system.
+  app.get("/api/admin/data-integrity/sources", async (_req, res) => {
+    try {
+      const [
+        clients, workers, jobs, invoices, contracts, quotes, serviceContracts,
+        inventoryItems, suppliers, purchaseOrders, vehicles, expenses, calendarEvents,
+      ] = await Promise.all([
+        storage.getClients(),
+        storage.getWorkers(),
+        storage.getJobs(),
+        storage.getInvoices(),
+        storage.getRentalContracts(),
+        storage.getQuoteSubmissions(),
+        storage.getServiceContracts(),
+        storage.getInventoryItems(),
+        storage.getSuppliers(),
+        storage.getPurchaseOrders(),
+        storage.getVehicles(),
+        storage.getExpenses(),
+        storage.getCalendarEvents(),
+      ]);
+
+      res.json([
+        { label: "Clients",           count: clients.length,          icon: "users" },
+        { label: "Workers",           count: workers.length,          icon: "users" },
+        { label: "Jobs",              count: jobs.length,             icon: "briefcase" },
+        { label: "Invoices",          count: invoices.length,         icon: "receipt" },
+        { label: "Rental Contracts",  count: contracts.length,        icon: "file-text" },
+        { label: "Quotes",            count: quotes.length,           icon: "file-text" },
+        { label: "Service Contracts", count: serviceContracts.length, icon: "list-ordered" },
+        { label: "Inventory Items",   count: inventoryItems.length,   icon: "box" },
+        { label: "Suppliers",         count: suppliers.length,        icon: "shopping-cart" },
+        { label: "Purchase Orders",   count: purchaseOrders.length,   icon: "shopping-cart" },
+        { label: "Vehicles",          count: vehicles.length,         icon: "truck" },
+        { label: "Expenses",          count: expenses.length,         icon: "wallet" },
+        { label: "Calendar Events",   count: calendarEvents.length,   icon: "calendar" },
+      ]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch data sources", details: err.message });
+    }
+  });
+
+  // PATCH /api/admin/data-integrity/fix-orphan
+  // Reassigns the clientId on an orphan record. Body: { type, id, clientId }
+  app.patch("/api/admin/data-integrity/fix-orphan", async (req, res) => {
+    try {
+      const { type, id, clientId } = req.body as { type: string; id: string; clientId: string };
+      if (!type || !id || !clientId) {
+        return res.status(400).json({ error: "type, id, and clientId are required" });
+      }
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ error: "Target client not found" });
+
+      switch (type) {
+        case "job":
+          await storage.updateJob(id, { clientId });
+          break;
+        case "invoice":
+          await storage.updateInvoice(id, { clientId });
+          break;
+        case "rentalContract":
+          await storage.updateRentalContract(id, { clientId });
+          break;
+        default:
+          return res.status(400).json({ error: `Unsupported type: ${type}` });
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fix orphan", details: err.message });
+    }
+  });
+
+  // GET /api/admin/data-integrity/backup/csv
+  // Streams clients as CSV (lightweight export).
+  app.get("/api/admin/data-integrity/backup/csv", async (_req, res) => {
+    try {
+      const clients = await storage.getClients();
+      const headers = ["id","name","email","phone","address","businessType","status","createdAt"];
+      const escape  = (v: any) => {
+        const s = String(v ?? "").replace(/"/g, '""');
+        return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s}"` : s;
+      };
+      const rows = clients.map(c =>
+        [c.id, c.name, c.email, c.phone, c.address, (c as any).businessType, c.status, c.createdAt].map(escape).join(",")
+      );
+      const csv = [headers.join(","), ...rows].join("\n");
+      const filename = `clients-backup-${new Date().toISOString().split("T")[0]}.csv`;
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to export CSV", details: err.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

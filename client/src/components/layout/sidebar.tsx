@@ -114,6 +114,7 @@ const ALL_SECTIONS: NavSection[] = [
       { name: "Permissions",      href: "/permissions",    icon: Lock,       roles: ["admin", "manager"] },
       { name: "Custom Reports",   href: "/custom-reports", icon: BarChart3,  roles: ["admin", "manager"] },
       { name: "Settings",         href: "/settings",       icon: Settings,   roles: ["admin", "manager"] },
+      { name: "Data Integrity",   href: "/data-integrity", icon: AlertCircle, roles: ["admin"] },
       { name: "System Logs",      href: "/system-logs",    icon: ScrollText, roles: ["admin"] },
       { name: "Backup & Restore", href: "/backup",         icon: Database,   roles: ["admin"] },
     ],

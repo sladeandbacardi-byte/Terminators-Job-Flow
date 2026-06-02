@@ -55,6 +55,7 @@ import PricingLibraryPage from "@/pages/pricing-library";
 import FollowUpsPage from "@/pages/follow-ups";
 import ContractsPendingPage from "@/pages/contracts-pending";
 import ClientProfile from "@/pages/client-profile";
+import DataIntegrity from "@/pages/data-integrity";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -125,6 +126,7 @@ function AuthenticatedApp() {
       <Route path="/hr-dashboard" component={HRDashboard} />
       <Route path="/expenses" component={Expenses} />
       <Route path="/service-scheduling" component={ServiceScheduling} />
+      <Route path="/data-integrity" component={DataIntegrity} />
       <Route component={NotFound} />
     </Switch>
   );
