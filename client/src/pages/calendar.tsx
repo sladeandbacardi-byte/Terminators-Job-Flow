@@ -1716,8 +1716,10 @@ export default function Calendar() {
                   {selectedEvent.clientId && (
                     <div>
                       <Label className="font-medium">Client</Label>
-                      <p className="text-sm text-gray-600">
-                        {clients.find(c => c.id === selectedEvent.clientId)?.name || 'Unknown Client'}
+                      <p className="text-sm">
+                        <a href={`/clients/${selectedEvent.clientId}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+                          {clients.find(c => c.id === selectedEvent.clientId)?.name || 'Unknown Client'}
+                        </a>
                       </p>
                     </div>
                   )}

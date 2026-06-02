@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -263,7 +264,9 @@ export default function Contracts() {
                               </span>
                             )}
                             <h4 className="font-semibold text-gray-900 text-lg" data-testid={`contract-client-${contract.id}`}>
-                              {getClientName(contract.clientId)}
+                              <Link href={`/clients/${contract.clientId}`} className="text-blue-700 hover:text-blue-900 hover:underline">
+                                {getClientName(contract.clientId)}
+                              </Link>
                             </h4>
                             <p className="text-gray-600" data-testid={`contract-item-${contract.id}`}>
                               {getItemName(contract.inventoryItemId)}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -276,7 +277,11 @@ export default function Invoices() {
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-600" data-testid={`client-name-${invoice.id}`}>
-                              {client?.name || 'Unknown Client'}
+                              {client ? (
+                                <Link href={`/clients/${invoice.clientId}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+                                  {client.name}
+                                </Link>
+                              ) : 'Unknown Client'}
                             </p>
                             <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                               <span>Issued: {formatDate(new Date(invoice.issueDate))}</span>

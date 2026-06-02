@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   format, isToday, parseISO, addDays, subDays,
@@ -97,7 +98,12 @@ function JobPill({ job, clientMap }: { job: Job; clientMap: Record<string, Clien
       <div className="flex items-center gap-1 text-gray-500">
         <Clock className="h-2.5 w-2.5 shrink-0" />
         <span>{time}</span>
-        {client && <><span>·</span><span className="truncate">{client.name}</span></>}
+        {client && (
+          <><span>·</span>
+          <Link href={`/clients/${job.clientId}`} className="truncate text-blue-600 hover:underline">
+            {client.name}
+          </Link></>
+        )}
       </div>
     </div>
   );
@@ -308,7 +314,13 @@ function DayView({
                     </td>
                     <td className="px-2 py-2.5 text-xs text-gray-400 font-medium tabular-nums">{job.orderNo ?? "—"}</td>
                     <td className="px-3 py-2.5">
-                      <div className="font-semibold text-gray-900 leading-tight text-sm">{client?.name ?? "—"}</div>
+                      <div className="font-semibold text-gray-900 leading-tight text-sm">
+                        {client ? (
+                          <Link href={`/clients/${job.clientId}`} className="text-blue-700 hover:text-blue-900 hover:underline">
+                            {client.name}
+                          </Link>
+                        ) : "—"}
+                      </div>
                       {dept && <div className="text-[10px] text-gray-400 mt-0.5">{dept.name}</div>}
                     </td>
                     <td className="px-3 py-2.5 hidden md:table-cell">

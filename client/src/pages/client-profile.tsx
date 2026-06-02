@@ -31,21 +31,36 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatClientAddress, hasStructuredAddress, type Client, type Job, type Invoice, type Department } from "@shared/schema";
 
+type ExtendedClient = Client & {
+  tradingName?: string;
+  alternateEmailAddress?: string;
+  alternatePhoneNumber?: string;
+  billingName?: string;
+  billingEmail?: string;
+  billingPhone?: string;
+  companyRegistrationNumber?: string;
+};
+
 type ServiceContract = {
   id: string;
-  clientId: string;
+  customerId: string;
+  customerName: string;
   contractNumber?: string;
   serviceType: string;
   departmentId: string;
-  frequency?: string;
+  frequency: string;
   assignedTeamId?: string;
+  assignedTeamName?: string;
+  assignedTechnicianName?: string;
   startTime?: string;
   estimatedDuration?: number;
-  contractStartDate?: string;
-  contractEndDate?: string;
-  isActive: boolean;
-  price?: string;
+  startDate?: string | Date;
+  endDate?: string | Date;
+  activeStatus: boolean;
+  contractPrice?: string;
   notes?: string;
+  dayOfWeek?: string;
+  weekOfMonth?: number;
 };
 
 type QuoteSubmission = {
@@ -96,7 +111,7 @@ export default function ClientProfilePage() {
   const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const { data: client, isLoading } = useQuery<Client>({
+  const { data: client, isLoading } = useQuery<ExtendedClient>({
     queryKey: ["/api/clients", id],
     queryFn: async () => {
       const res = await fetch(`/api/clients/${id}`);
@@ -115,7 +130,7 @@ export default function ClientProfilePage() {
 
   const clientJobs = allJobs.filter((j) => j.clientId === id);
   const clientInvoices = allInvoices.filter((i) => i.clientId === id);
-  const clientContracts = allContracts.filter((c) => c.clientId === id);
+  const clientContracts = allContracts.filter((c) => c.customerId === id);
   const clientQuotes = allQuotes.filter((q) => q.clientId === id || (q.companyName && client && q.companyName.toLowerCase() === client.name.toLowerCase()));
 
   // Job groupings
@@ -167,7 +182,7 @@ export default function ClientProfilePage() {
     );
   }
 
-  const c = client as any;
+  const c = client; // typed as ExtendedClient — all fields are accessible
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -219,7 +234,7 @@ export default function ClientProfilePage() {
                     <div className="text-xs text-muted-foreground">Total Jobs</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{clientContracts.filter(c => c.isActive).length}</div>
+                    <div className="text-2xl font-bold text-green-600">{clientContracts.filter(c => c.activeStatus).length}</div>
                     <div className="text-xs text-muted-foreground">Active Contracts</div>
                   </div>
                   <div className="text-center">
@@ -380,37 +395,66 @@ export default function ClientProfilePage() {
                   <Card><CardContent className="py-8 text-center text-muted-foreground">No service contracts for this client.</CardContent></Card>
                 ) : (
                   <div className="space-y-3">
-                    {clientContracts.map((contract) => (
-                      <Card key={contract.id}>
-                        <CardContent className="pt-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {contract.contractNumber && (
-                                  <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{contract.contractNumber}</span>
-                                )}
-                                <span className="font-medium text-sm">{contract.serviceType}</span>
-                                <Badge className={contract.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
-                                  {contract.isActive ? "Active" : "Inactive"}
-                                </Badge>
+                    {clientContracts.map((contract) => {
+                      // Build a human-readable schedule summary
+                      const scheduleParts: string[] = [];
+                      if (contract.frequency) scheduleParts.push(contract.frequency);
+                      if (contract.dayOfWeek) scheduleParts.push(contract.dayOfWeek);
+                      if (contract.weekOfMonth) scheduleParts.push(`Week ${contract.weekOfMonth}`);
+                      if (contract.startTime) scheduleParts.push(`@ ${contract.startTime}`);
+                      const scheduleText = scheduleParts.join(" · ");
+                      return (
+                        <Card key={contract.id}>
+                          <CardContent className="pt-4">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                              <div className="space-y-1.5 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {contract.contractNumber && (
+                                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{contract.contractNumber}</span>
+                                  )}
+                                  <span className="font-medium text-sm">{contract.serviceType}</span>
+                                  <Badge className={contract.activeStatus ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
+                                    {contract.activeStatus ? "Active" : "Inactive"}
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                                  <span><span className="font-medium text-gray-600">Dept:</span> {getDeptName(contract.departmentId)}</span>
+                                  {scheduleText && <span className="col-span-2 sm:col-span-2"><span className="font-medium text-gray-600">Schedule:</span> {scheduleText}</span>}
+                                  {(contract.assignedTeamName || contract.assignedTechnicianName) && (
+                                    <span className="col-span-2 sm:col-span-3">
+                                      <span className="font-medium text-gray-600">Assigned:</span>{" "}
+                                      {contract.assignedTeamName || contract.assignedTechnicianName}
+                                    </span>
+                                  )}
+                                  {contract.contractPrice && (
+                                    <span><span className="font-medium text-gray-600">Price:</span> R{Number(contract.contractPrice).toFixed(2)}</span>
+                                  )}
+                                  {contract.startDate && (
+                                    <span>
+                                      <span className="font-medium text-gray-600">Start:</span>{" "}
+                                      {format(new Date(contract.startDate), "dd MMM yyyy")}
+                                    </span>
+                                  )}
+                                  {contract.endDate && (
+                                    <span>
+                                      <span className="font-medium text-gray-600">End:</span>{" "}
+                                      {format(new Date(contract.endDate), "dd MMM yyyy")}
+                                    </span>
+                                  )}
+                                  {contract.estimatedDuration && (
+                                    <span><span className="font-medium text-gray-600">Duration:</span> {contract.estimatedDuration} min</span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                                <span>{getDeptName(contract.departmentId)}</span>
-                                {contract.frequency && <span>Frequency: {contract.frequency}</span>}
-                                {contract.startTime && <span>Time: {contract.startTime}</span>}
-                                {contract.price && <span>Price: R{Number(contract.price).toFixed(2)}</span>}
-                                {contract.contractStartDate && <span>Start: {contract.contractStartDate}</span>}
-                                {contract.contractEndDate && <span>End: {contract.contractEndDate}</span>}
-                              </div>
+                              <Link href="/service-contracts">
+                                <Button variant="outline" size="sm" className="text-xs shrink-0"><ExternalLink className="mr-1 h-3 w-3" />View</Button>
+                              </Link>
                             </div>
-                            <Link href="/service-contracts">
-                              <Button variant="outline" size="sm" className="text-xs"><ExternalLink className="mr-1 h-3 w-3" />View</Button>
-                            </Link>
-                          </div>
-                          {contract.notes && <p className="text-xs text-muted-foreground mt-2 border-t pt-2">{contract.notes}</p>}
-                        </CardContent>
-                      </Card>
-                    ))}
+                            {contract.notes && <p className="text-xs text-muted-foreground mt-2 border-t pt-2">{contract.notes}</p>}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </TabsContent>

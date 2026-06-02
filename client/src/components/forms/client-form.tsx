@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -83,6 +84,7 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false, a
 
   const clients = allClients ?? fetchedClients;
 
+  const [, navigate] = useLocation();
   const [duplicates, setDuplicates] = useState<Client[]>([]);
   const [duplicatesDismissed, setDuplicatesDismissed] = useState(false);
 
@@ -219,9 +221,14 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false, a
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
+              {duplicates.length === 1 && (
+                <Button type="button" size="sm" className="text-xs h-7 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => navigate(`/clients/${duplicates[0].id}`)}>
+                  Go to existing client
+                </Button>
+              )}
               <Button type="button" size="sm" variant="outline" className="text-xs h-7 border-amber-300 text-amber-800 hover:bg-amber-100" onClick={() => setDuplicatesDismissed(true)}>
-                Continue creating new client
+                Continue creating new client anyway
               </Button>
             </div>
           </div>

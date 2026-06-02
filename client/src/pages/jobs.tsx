@@ -541,7 +541,11 @@ export default function Jobs() {
                               </div>
                             )}
                             <h4 className="font-semibold text-gray-900" data-testid={`job-title-${job.id}`}>{job.title}</h4>
-                            {client && <p className="text-xs text-gray-500 mt-0.5">{client.name}</p>}
+                            {client && (
+                              <Link href={`/clients/${job.clientId}`}>
+                                <p className="text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer mt-0.5">{client.name}</p>
+                              </Link>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap justify-end">
                             <Badge variant="secondary" className={getStatusColor(job.status)} data-testid={`job-status-${job.id}`}>
