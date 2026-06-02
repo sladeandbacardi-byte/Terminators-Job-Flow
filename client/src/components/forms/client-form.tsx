@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,13 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Client, Department } from "@shared/schema";
 
 const clientFormSchema = z.object({
   name: z.string().min(1, "Company name is required"),
-  email: z.string().email().optional().or(z.literal("")),
+  tradingName: z.string().optional(),
+  email: z.string().email("Must be a valid email").optional().or(z.literal("")),
+  alternateEmailAddress: z.string().email("Must be a valid email").optional().or(z.literal("")),
   phone: z.string().optional(),
+  alternatePhoneNumber: z.string().optional(),
   contactPerson: z.string().optional(),
   businessType: z.string().optional(),
   status: z.enum(["active", "inactive", "suspended"]),
@@ -38,9 +44,15 @@ const clientFormSchema = z.object({
   province: z.string().optional(),
   postalCode: z.string().optional(),
   googleMapsLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  // Financial / legal
   taxNumber: z.string().optional(),
+  companyRegistrationNumber: z.string().optional(),
   paymentTerms: z.string().optional(),
   creditLimit: z.number().min(0).optional(),
+  // Billing contact
+  billingName: z.string().optional(),
+  billingEmail: z.string().email("Must be a valid email").optional().or(z.literal("")),
+  billingPhone: z.string().optional(),
   notes: z.string().optional(),
   sageCustomerCode: z.string().optional(),
   hasRentalContract: z.boolean().optional().default(false),
@@ -56,19 +68,33 @@ interface ClientFormProps {
   onSubmit: (data: ClientFormData) => void | Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
+  allClients?: Client[];
 }
 
-export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }: ClientFormProps) {
+export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false, allClients }: ClientFormProps) {
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
   });
+
+  const { data: fetchedClients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+    enabled: !allClients,
+  });
+
+  const clients = allClients ?? fetchedClients;
+
+  const [duplicates, setDuplicates] = useState<Client[]>([]);
+  const [duplicatesDismissed, setDuplicatesDismissed] = useState(false);
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: {
       name: client?.name || "",
+      tradingName: (client as any)?.tradingName || "",
       email: client?.email || "",
+      alternateEmailAddress: (client as any)?.alternateEmailAddress || "",
       phone: client?.phone || "",
+      alternatePhoneNumber: (client as any)?.alternatePhoneNumber || "",
       contactPerson: client?.contactPerson || "",
       businessType: client?.businessType || "",
       status: (client?.status as "active" | "inactive" | "suspended") || "active",
@@ -81,8 +107,12 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
       postalCode: client?.postalCode || "",
       googleMapsLink: client?.googleMapsLink || "",
       taxNumber: client?.taxNumber || "",
+      companyRegistrationNumber: (client as any)?.companyRegistrationNumber || "",
       paymentTerms: client?.paymentTerms || "",
       creditLimit: client?.creditLimit ? parseFloat(String(client.creditLimit)) : undefined,
+      billingName: (client as any)?.billingName || "",
+      billingEmail: (client as any)?.billingEmail || "",
+      billingPhone: (client as any)?.billingPhone || "",
       notes: client?.notes || "",
       sageCustomerCode: (client as any)?.sageCustomerCode || "",
       hasRentalContract: (client as any)?.hasRentalContract ?? false,
@@ -92,12 +122,42 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
     },
   });
 
+  // Watch fields for duplicate detection (only for new clients)
+  const watchedName = form.watch("name");
+  const watchedPhone = form.watch("phone");
+  const watchedEmail = form.watch("email");
+  const watchedStreetNumber = form.watch("streetNumber");
+  const watchedStreetName = form.watch("streetName");
+  const watchedSuburb = form.watch("suburb");
+
+  useEffect(() => {
+    if (client) return; // skip duplicate check when editing
+    setDuplicatesDismissed(false);
+
+    const norm = (s?: string | null) => (s || "").toLowerCase().trim();
+    const found = clients.filter((c) => {
+      if (watchedName && norm(c.name) === norm(watchedName)) return true;
+      if (watchedPhone && watchedPhone.length >= 7 && norm(c.phone) === norm(watchedPhone)) return true;
+      if (watchedEmail && watchedEmail.includes("@") && norm(c.email) === norm(watchedEmail)) return true;
+      if (
+        watchedStreetNumber && watchedStreetName && watchedSuburb &&
+        norm(c.streetNumber) === norm(watchedStreetNumber) &&
+        norm(c.streetName) === norm(watchedStreetName) &&
+        norm(c.suburb) === norm(watchedSuburb)
+      ) return true;
+      return false;
+    });
+    setDuplicates(found);
+  }, [watchedName, watchedPhone, watchedEmail, watchedStreetNumber, watchedStreetName, watchedSuburb, clients, client]);
+
   const handleSubmit = (data: ClientFormData) => {
-    // Strip blanks so empty strings don't overwrite existing values unnecessarily
     const submitData: any = {
       ...data,
+      tradingName: data.tradingName || undefined,
       email: data.email || undefined,
+      alternateEmailAddress: data.alternateEmailAddress || undefined,
       phone: data.phone || undefined,
+      alternatePhoneNumber: data.alternatePhoneNumber || undefined,
       contactPerson: data.contactPerson || undefined,
       businessType: data.businessType || undefined,
       streetNumber: data.streetNumber || undefined,
@@ -108,8 +168,12 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
       postalCode: data.postalCode || undefined,
       googleMapsLink: data.googleMapsLink || undefined,
       taxNumber: data.taxNumber || undefined,
+      companyRegistrationNumber: data.companyRegistrationNumber || undefined,
       paymentTerms: data.paymentTerms || undefined,
       creditLimit: data.creditLimit !== undefined ? String(data.creditLimit) : undefined,
+      billingName: data.billingName || undefined,
+      billingEmail: data.billingEmail || undefined,
+      billingPhone: data.billingPhone || undefined,
       notes: data.notes || undefined,
       sageCustomerCode: data.sageCustomerCode || undefined,
       hasRentalContract: !!data.hasRentalContract,
@@ -121,140 +185,216 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
   };
 
   const hasRental = form.watch("hasRentalContract");
-
   const legacyAddress = client?.address?.trim();
   const hasStructured =
     form.watch("streetNumber") || form.watch("streetName") || form.watch("suburb") ||
     form.watch("city") || form.watch("province") || form.watch("postalCode");
 
+  const showDuplicateWarning = !client && !duplicatesDismissed && duplicates.length > 0;
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Company Name *</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter company name" {...field} data-testid="input-company-name" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="businessType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Business Type</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., Restaurant, Office, Retail" {...field} data-testid="input-business-type" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-        </div>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField
-            control={form.control}
-            name="contactPerson"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Contact Person</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter contact person name" {...field} data-testid="input-contact-person" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Email</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="Enter email address" {...field} data-testid="input-email" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-        </div>
+        {/* ── Duplicate Warning ─────────────────────────────────────── */}
+        {showDuplicateWarning && (
+          <div className="border border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Possible existing client{duplicates.length > 1 ? "s" : ""} found
+            </div>
+            <p className="text-xs text-amber-700">A client with a matching name, phone, email, or address already exists. Do you want to use the existing client instead?</p>
+            <div className="space-y-1">
+              {duplicates.map((d) => (
+                <div key={d.id} className="flex items-center gap-2 text-xs bg-white border border-amber-200 rounded p-2">
+                  <User className="h-3 w-3 text-amber-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{d.name}</span>
+                    {d.contactPerson && <span className="text-muted-foreground ml-1">· {d.contactPerson}</span>}
+                    {d.phone && <span className="text-muted-foreground ml-1">· {d.phone}</span>}
+                    {d.email && <span className="text-muted-foreground ml-1">· {d.email}</span>}
+                    {(d.suburb || d.city) && <span className="text-muted-foreground ml-1">· {[d.suburb, d.city].filter(Boolean).join(", ")}</span>}
+                  </div>
+                  <Badge variant="outline" className="text-xs shrink-0">{d.status}</Badge>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" size="sm" variant="outline" className="text-xs h-7 border-amber-300 text-amber-800 hover:bg-amber-100" onClick={() => setDuplicatesDismissed(true)}>
+                Continue creating new client
+              </Button>
+            </div>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Phone</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter phone number" {...field} data-testid="input-phone" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Status *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+        {/* ── Business Details ──────────────────────────────────────── */}
+        <div className="border rounded-lg p-3 space-y-3 bg-gray-50/50">
+          <h4 className="text-sm font-semibold text-gray-700">Business Details</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Business / Company Name *</FormLabel>
                   <FormControl>
-                    <SelectTrigger data-testid="select-status" className="h-8 text-sm">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
+                    <Input placeholder="Enter company name" {...field} data-testid="input-company-name" className="h-8 text-sm" />
                   </FormControl>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="tradingName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Trading Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Trading name (if different)" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="businessType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Business Type</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Restaurant, Office, Retail" {...field} data-testid="input-business-type" className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Status *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-status" className="h-8 text-sm">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="departmentId"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel className="text-sm">Department *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-department" className="h-8 text-sm">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {departments.map((department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          {department.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
-        <FormField
-          control={form.control}
-          name="departmentId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-sm">Department *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger data-testid="select-department" className="h-8 text-sm">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {departments.map((department) => (
-                    <SelectItem key={department.id} value={department.id}>
-                      {department.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage className="text-xs" />
-            </FormItem>
-          )}
-        />
+        {/* ── Contact Details ───────────────────────────────────────── */}
+        <div className="border rounded-lg p-3 space-y-3 bg-gray-50/50">
+          <h4 className="text-sm font-semibold text-gray-700">Contact Details</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="contactPerson"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Contact Person</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Primary contact name" {...field} data-testid="input-contact-person" className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Primary phone number" {...field} data-testid="input-phone" className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Email Address</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="Primary email address" {...field} data-testid="input-email" className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="alternatePhoneNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Alternate Phone</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Alternate phone number" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="alternateEmailAddress"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel className="text-sm">Alternate Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="Alternate email address" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
-        {/* ── Address Section ─────────────────────────────────────────── */}
+        {/* ── Address Section ───────────────────────────────────────── */}
         <div className="border rounded-lg p-3 space-y-3 bg-gray-50/50">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-700">Address</h4>
+            <h4 className="text-sm font-semibold text-gray-700">Physical Address</h4>
             {legacyAddress && !hasStructured && (
               <span className="text-xs text-amber-600">
                 Legacy address present — fill the fields below to replace it
@@ -376,77 +516,138 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField
-            control={form.control}
-            name="taxNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Tax Number</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter tax/VAT number" {...field} data-testid="input-tax-number" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="sageCustomerCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Sage Customer Code</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., CUST001" {...field} className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
+        {/* ── Billing Contact ───────────────────────────────────────── */}
+        <div className="border rounded-lg p-3 space-y-3 bg-gray-50/50">
+          <h4 className="text-sm font-semibold text-gray-700">Billing Contact</h4>
+          <p className="text-xs text-muted-foreground -mt-1">Leave blank if same as main contact above.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <FormField
+              control={form.control}
+              name="billingName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Billing Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Billing contact name" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="billingEmail"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Billing Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="Billing email address" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="billingPhone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Billing Phone</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Billing phone number" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField
-            control={form.control}
-            name="creditLimit"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Credit Limit</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    placeholder="Enter credit limit"
-                    {...field}
-                    onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                    value={field.value || ""}
-                    data-testid="input-credit-limit"
-                    className="h-8 text-sm"
-                  />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="paymentTerms"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm">Payment Terms</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., Net 30, Cash on Delivery" {...field} data-testid="input-payment-terms" className="h-8 text-sm" />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
+        {/* ── Financial & Legal ─────────────────────────────────────── */}
+        <div className="border rounded-lg p-3 space-y-3 bg-gray-50/50">
+          <h4 className="text-sm font-semibold text-gray-700">Financial & Legal</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="taxNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">VAT Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="VAT / Tax number" {...field} data-testid="input-tax-number" className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="companyRegistrationNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Company Reg. Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., 2023/123456/07" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="creditLimit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Credit Limit (R)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      value={field.value || ""}
+                      data-testid="input-credit-limit"
+                      className="h-8 text-sm"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="paymentTerms"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Payment Terms</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Net 30, Cash on Delivery" {...field} data-testid="input-payment-terms" className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sageCustomerCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Sage Customer Code</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., CUST001" {...field} className="h-8 text-sm" />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
-        {/* ── Rental Contract Section ────────────────────────────────── */}
+        {/* ── Rental Contract ───────────────────────────────────────── */}
         <div className="border rounded-lg p-3 space-y-3 bg-blue-50/40">
           <h4 className="text-sm font-semibold text-gray-700">Rental Contract</h4>
           <p className="text-xs text-gray-500 -mt-2">
-            Does this customer rent equipment (e.g. sanitary bins, dispensers) from us? This is separate from regular service contracts.
+            Does this customer rent equipment (e.g. sanitary bins, dispensers) from us?
           </p>
 
           <FormField
@@ -542,15 +743,16 @@ export function ClientForm({ client, onSubmit, onCancel, isSubmitting = false }:
           )}
         </div>
 
+        {/* ── Notes ────────────────────────────────────────────────── */}
         <FormField
           control={form.control}
           name="notes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm">Notes</FormLabel>
+              <FormLabel className="text-sm">Internal Notes</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Additional notes"
+                  placeholder="Additional notes about this client"
                   {...field}
                   data-testid="textarea-notes"
                   className="min-h-[60px] text-sm py-1"

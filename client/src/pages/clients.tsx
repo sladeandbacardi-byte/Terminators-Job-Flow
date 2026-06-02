@@ -74,6 +74,7 @@ import { ClientForm } from "@/components/forms/client-form";
 import { ExportButton } from "@/components/export-button";
 import { apiRequest } from "@/lib/queryClient";
 import { exportClients } from "@/lib/data-export";
+import { Link } from "wouter";
 import { formatClientAddress, hasStructuredAddress, type Client, type Department } from "@shared/schema";
 
 export default function ClientsPage() {
@@ -417,7 +418,9 @@ export default function ClientsPage() {
                 <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{client.name}</div>
+                      <Link href={`/clients/${client.id}`} className="font-medium text-blue-700 hover:text-blue-900 hover:underline">
+                        {client.name}
+                      </Link>
                       <div className="text-sm text-muted-foreground">{client.businessType}</div>
                     </div>
                   </TableCell>

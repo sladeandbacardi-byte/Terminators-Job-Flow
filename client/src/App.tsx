@@ -54,6 +54,7 @@ import ServiceScheduling from "@/pages/service-scheduling";
 import PricingLibraryPage from "@/pages/pricing-library";
 import FollowUpsPage from "@/pages/follow-ups";
 import ContractsPendingPage from "@/pages/contracts-pending";
+import ClientProfile from "@/pages/client-profile";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -81,6 +82,7 @@ function AuthenticatedApp() {
       <Route path="/jobs" component={Jobs} />
       <Route path="/workers" component={Workers} />
       <Route path="/clients" component={Clients} />
+      <Route path="/clients/:id" component={ClientProfile} />
       <Route path="/inventory" component={Inventory} />
       <Route path="/contracts" component={Contracts} />
       <Route path="/invoices" component={Invoices} />

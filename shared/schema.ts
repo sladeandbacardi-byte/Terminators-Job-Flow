@@ -38,8 +38,11 @@ export const workers = pgTable("workers", {
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  tradingName: text("trading_name"),
   email: text("email"),
+  alternateEmailAddress: text("alternate_email_address"),
   phone: text("phone"),
+  alternatePhoneNumber: text("alternate_phone_number"),
   // Legacy single-line address — kept for backwards compatibility.
   // New structured address fields below should be used going forward.
   address: text("address"),
@@ -54,9 +57,14 @@ export const clients = pgTable("clients", {
   businessType: text("business_type"),
   status: text("status").notNull().default('active'), // active, inactive, suspended
   departmentId: varchar("department_id").notNull(),
-  taxNumber: text("tax_number"),
+  taxNumber: text("tax_number"), // VAT Number
+  companyRegistrationNumber: text("company_registration_number"),
   paymentTerms: text("payment_terms"),
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
+  // Billing contact (may differ from main contact)
+  billingName: text("billing_name"),
+  billingEmail: text("billing_email"),
+  billingPhone: text("billing_phone"),
   notes: text("notes"),
   sageCustomerCode: text("sage_customer_code"),
   // ── Rental Contract flags (separate from service contracts) ──
