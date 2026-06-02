@@ -4677,7 +4677,7 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const row: ServiceContract = {
       id: `sc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      customerId: c.customerId,
+      clientId: c.clientId,
       customerName: c.customerName,
       departmentId: c.departmentId,
       serviceType: c.serviceType,
@@ -4865,7 +4865,7 @@ export class MemStorage implements IStorage {
 export interface ContractOccurrence {
   id: string;                    // virtual id: `occ-<contractId>-<isoDate>`
   contractId: string;
-  customerId: string;
+  clientId: string;
   customerName: string;
   departmentId: string;
   serviceType: string;
@@ -4920,7 +4920,7 @@ function expandContract(c: ServiceContract, start: Date, end: Date): ContractOcc
     return {
       id: `occ-${c.id}-${sd.toISOString()}`,
       contractId: c.id,
-      customerId: c.customerId,
+      clientId: c.clientId,
       customerName: c.customerName,
       departmentId: c.departmentId,
       serviceType: c.serviceType,

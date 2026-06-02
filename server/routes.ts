@@ -2024,7 +2024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contractNumber = await storage.generateContractNumber();
       const contract = await storage.createRentalContract({
         contractNumber,
-        customerId: clientId,
+        clientId: clientId,
         customerName: client.name,
         departmentId,
         serviceType,
@@ -3790,21 +3790,25 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // Returns record counts + export timestamp for the Backup tab UI.
   app.get("/api/admin/data-integrity/backup/summary", requireAuth, requireAdmin, async (_req, res) => {
     try {
-      const [clients, jobs, contracts, invoices, quotes] = await Promise.all([
+      const [clients, jobs, rentalContracts, serviceContracts, invoices, quotes, workers] = await Promise.all([
         storage.getClients(),
         storage.getJobs(),
         storage.getRentalContracts(),
+        storage.getServiceContracts(),
         storage.getInvoices(),
         storage.getQuoteSubmissions(),
+        storage.getWorkers(),
       ]);
       res.json({
         exportedAt: new Date().toISOString(),
         counts: {
-          clients:   clients.length,
-          jobs:      jobs.length,
-          contracts: contracts.length,
-          invoices:  invoices.length,
-          quotes:    quotes.length,
+          clients:          clients.length,
+          jobs:             jobs.length,
+          rentalContracts:  rentalContracts.length,
+          serviceContracts: serviceContracts.length,
+          invoices:         invoices.length,
+          quotes:           quotes.length,
+          workers:          workers.length,
         },
       });
     } catch (err: any) {
@@ -3816,13 +3820,15 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // Admin-protected full system backup with summary metadata block.
   app.get("/api/admin/data-integrity/backup/json", requireAuth, requireAdmin, async (_req, res) => {
     try {
-      const [data, clients, jobs, contracts, invoices, quotes] = await Promise.all([
+      const [data, clients, jobs, rentalContracts, serviceContracts, invoices, quotes, workers] = await Promise.all([
         storage.exportBackup(),
         storage.getClients(),
         storage.getJobs(),
         storage.getRentalContracts(),
+        storage.getServiceContracts(),
         storage.getInvoices(),
         storage.getQuoteSubmissions(),
+        storage.getWorkers(),
       ]);
 
       const payload = {
@@ -3830,11 +3836,13 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
           exportedAt: new Date().toISOString(),
           appVersion: "1.0.0",
           counts: {
-            clients:   clients.length,
-            jobs:      jobs.length,
-            contracts: contracts.length,
-            invoices:  invoices.length,
-            quotes:    quotes.length,
+            clients:          clients.length,
+            jobs:             jobs.length,
+            rentalContracts:  rentalContracts.length,
+            serviceContracts: serviceContracts.length,
+            invoices:         invoices.length,
+            quotes:           quotes.length,
+            workers:          workers.length,
           },
         },
         ...data,

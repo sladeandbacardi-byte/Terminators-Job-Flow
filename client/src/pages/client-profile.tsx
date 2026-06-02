@@ -43,7 +43,7 @@ type ExtendedClient = Client & {
 
 type ServiceContract = {
   id: string;
-  customerId: string;
+  clientId: string;
   customerName: string;
   contractNumber?: string;
   serviceType: string;
@@ -130,7 +130,7 @@ export default function ClientProfilePage() {
 
   const clientJobs = allJobs.filter((j) => j.clientId === id);
   const clientInvoices = allInvoices.filter((i) => i.clientId === id);
-  const clientContracts = allContracts.filter((c) => c.customerId === id);
+  const clientContracts = allContracts.filter((c) => c.clientId === id);
   const clientQuotes = allQuotes.filter((q) => q.clientId === id || (q.companyName && client && q.companyName.toLowerCase() === client.name.toLowerCase()));
 
   // Job groupings

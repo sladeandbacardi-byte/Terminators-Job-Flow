@@ -1,0 +1,427 @@
+CRITICAL: Perform a full Job Flow data structure audit before adding more features.
+
+The app currently has Sales, Service, Operations, Jobs, Contracts, Calendar, Clients, Quotes and Invoices.
+
+The system must use ONE central client database as the master source of truth.
+
+No module may create or store its own separate version of a client.
+
+MAIN RULE
+
+There must be one central Clients table/collection.
+
+Every lead, quote, job, contract, invoice, treatment report, document, stock usage record and communication note must link back to the central client record using clientId.
+
+Do not duplicate clients in separate Sales, Service, Contract, Job or Invoice data stores.
+
+The clientId must be mandatory for:
+- leads
+- quotes
+- jobs
+- contracts
+- invoices
+- treatment reports
+- documents
+- communication notes
+- stock usage records
+
+CENTRAL CLIENT DATABASE
+
+Create or confirm one central Clients table/collection with these fields:
+
+- clientId
+- businessName
+- tradingName
+- contactPerson
+- phoneNumber
+- alternatePhoneNumber
+- emailAddress
+- alternateEmailAddress
+- streetNumber
+- streetName
+- suburb
+- city
+- province
+- postalCode
+- googleMapsLink
+- billingName
+- billingEmail
+- billingPhone
+- VATNumber
+- companyRegistrationNumber
+- notes
+- activeStatus
+- createdAt
+- updatedAt
+- createdBy
+- updatedBy
+
+Address fields must be stored separately:
+- streetNumber
+- streetName
+- suburb
+- city
+- province
+- postalCode
+
+The app can display a formatted address, but the actual stored data must stay separated.
+
+RELATIONSHIPS
+
+Use this model:
+
+Client has many Leads.
+Client has many Quotes.
+Client has many Jobs.
+Client has many Contracts.
+Client has many Invoices.
+Client has many Treatment Reports.
+Client has many Documents.
+Client has many Communication Notes.
+Client has many Stock Usage Records.
+
+Every related record must include:
+- clientId
+- createdAt
+- updatedAt
+
+clientName may be stored only as a display snapshot, but it must not replace clientId.
+
+SAVE RULE
+
+Do not show "saved successfully" unless the app has completed these checks:
+
+1. The record was saved to the correct database table/collection.
+2. The record has a valid id.
+3. The record has a valid clientId.
+4. The clientId exists in the central Clients database.
+5. The saved record can be immediately refetched from the database.
+6. The saved record appears in the relevant list/search/profile.
+
+For jobs:
+After saving, confirm the job appears in:
+- Jobs list
+- Calendar
+- Daily Diary for the correct date
+- Client profile under Jobs
+- Search results
+
+For contracts:
+After saving, confirm the contract appears in:
+- Contracts list
+- Client profile under Contracts
+- Contract search results
+- Schedule View if active and scheduled
+- Calendar if recurring
+
+For quotes:
+After saving, confirm the quote appears in:
+- Quotes list
+- Client profile under Quotes
+- Search results
+
+For leads:
+After saving, confirm the lead appears in:
+- Leads list
+- Client profile under Leads
+- Search results
+
+DO NOT ALLOW ORPHAN RECORDS
+
+An orphan record is any lead, quote, job, contract, invoice, report, document or stock usage record without a valid clientId.
+
+Do not allow orphan records.
+
+If clientId is missing, block the save and show:
+"Please select a valid client before saving."
+
+CONVERSION FLOW
+
+The app must preserve the same clientId through the full workflow:
+
+Lead
+↓
+Quote
+↓
+Job
+↓
+Contract if recurring
+↓
+Invoice
+↓
+Reports / Documents
+
+When converting:
+- lead to quote
+- quote to job
+- job to contract
+- job to invoice
+- contract to invoice
+
+the same clientId must be carried forward.
+
+At no stage may the app create a new duplicate client if a clientId already exists.
+
+JOB FORM CHECK
+
+The current job form has tabs:
+- Job Details
+- Service
+- Pricing
+- Completion
+
+Make sure all tabs save to the same Job record.
+
+The Job record must include:
+
+- jobId
+- clientId
+- linkedQuoteId optional
+- linkedContractId optional
+- jobTitle
+- description
+- department
+- serviceType
+- pestType if pest control
+- treatmentType if pest control
+- quantity
+- unitPrice
+- totalPrice
+- vatIncluded
+- mustBeInvoiced
+- invoiceStatus
+- invoiceNumber
+- invoiceNotes
+- date
+- time
+- duration
+- assignedTechnician
+- assignedTeam
+- status
+- priority
+- addressSnapshot
+- googleMapsLink
+- completionChecklist
+- customerSignature
+- photos
+- notes
+- createdAt
+- updatedAt
+
+The Pricing tab must save into the same Job record, not a separate temporary pricing object.
+
+The Completion tab must save into the same Job record, not a separate temporary completion object.
+
+CONTRACT FORM CHECK
+
+Contracts must be the source of truth for recurring service work.
+
+A Contract record must include:
+
+- contractId
+- clientId
+- contractNumber
+- department
+- serviceType
+- quantity
+- unitPrice
+- totalPrice
+- contractPrice
+- frequency
+- weekOfMonth
+- dayOfWeek
+- secondDayOfWeek if needed
+- startTime
+- duration
+- fixedTime
+- routeSequence
+- assignedTeam
+- assignedTechnician
+- contractStartDate
+- contractEndDate
+- increaseDate
+- increasePercentage
+- activeStatus
+- invoiceRule
+- stockTrackingRequired
+- refillRule
+- notes
+- createdAt
+- updatedAt
+
+The calendar must read active recurring jobs from Contract records.
+Do not create duplicate hidden schedule records unless they are clearly linked to contractId and clientId.
+
+CALENDAR CHECK
+
+The Calendar must display:
+- once-off jobs from the Jobs table
+- recurring contract jobs from the Contracts table
+
+Calendar filters must not hide records incorrectly.
+
+Filters:
+- Department
+- Person / Team
+- Job Type
+- Customer
+- Area
+- Status
+
+If filters are active, show:
+"Some jobs may be hidden by filters."
+
+Add a Clear Filters button.
+
+Daily view must be the default for Service users.
+
+The service calendar should be daily and technician-focused, with filters for technician/team.
+
+BACKUP CHECK
+
+The backup must clearly back up the master data.
+
+Backup must include:
+
+- Clients
+- Leads
+- Quotes
+- Jobs
+- Contracts
+- Invoices
+- Treatment Reports
+- Documents metadata
+- Communication Notes
+- Stock Usage
+- Users / Teams if applicable
+
+The backup report must show counts:
+
+- clients backed up
+- leads backed up
+- quotes backed up
+- jobs backed up
+- contracts backed up
+- invoices backed up
+- treatment reports backed up
+- documents backed up
+- stock usage records backed up
+- backup date/time
+- backup success/failure
+
+If backup fails, show an admin alert.
+
+ADMIN DATA INTEGRITY SCREEN
+
+Create an Admin > Data Integrity screen.
+
+This screen must show:
+
+1. Orphan Records
+Show counts and lists of:
+- leads without valid clientId
+- quotes without valid clientId
+- jobs without valid clientId
+- contracts without valid clientId
+- invoices without valid clientId
+- treatment reports without valid clientId
+- documents without valid clientId
+- stock usage without valid clientId
+
+2. Possible Duplicate Clients
+Check duplicates by:
+- businessName
+- tradingName
+- phoneNumber
+- emailAddress
+- address
+
+3. Save/Search Diagnostics
+Allow admin to test whether a saved record appears in the correct places.
+
+Example:
+Select a jobId or contractId and show whether it appears in:
+- relevant list
+- search
+- calendar
+- daily diary
+- client profile
+
+4. Module Data Source Check
+Show which table/collection each module reads from:
+- Clients
+- Leads
+- Quotes
+- Jobs
+- Contracts
+- Invoices
+- Documents
+- Reports
+
+5. Backup Status
+Show the most recent backup date/time and whether it succeeded.
+
+BUG TO INVESTIGATE
+
+A service admin created a contract, saved it, and then it could not be found.
+
+Investigate whether:
+- the contract saved to the wrong table
+- the search reads from a different table
+- the record was saved without clientId
+- the record was hidden by filters
+- the record was saved only in local state
+- the record was saved as a draft but drafts are hidden
+- the client was duplicated
+- the calendar is reading jobs but not contracts
+
+Fix this before adding more features.
+
+TESTS REQUIRED
+
+After the audit and fixes, run these tests:
+
+TEST 1: Central client
+Create a client.
+Search by business name, contact person, phone, email and address.
+Confirm the same client appears everywhere.
+
+TEST 2: Lead to quote to job
+Create a lead.
+Convert it to a quote.
+Convert it to a job.
+Confirm the same clientId is used throughout.
+Open the client profile and confirm the lead, quote and job all appear.
+
+TEST 3: Job with pricing
+Create a job.
+Add service details.
+Add quantity, unit price and invoice status.
+Save.
+Search for the job.
+Open the client profile and confirm the job appears with price and invoice status.
+Open the calendar and confirm the job appears on the correct date.
+
+TEST 4: Job to contract
+Create a job.
+Convert it to a contract.
+Save.
+Search by client name and contract number.
+Open the client profile and confirm the contract appears.
+Open Contracts > Schedule View and confirm it appears if active and scheduled.
+Open Calendar and confirm recurring contract jobs appear correctly.
+
+TEST 5: No disappearing records
+Create a contract under Service > Contracts.
+Save.
+Immediately refetch the contract.
+Confirm it appears in Contracts, Search, Client Profile, Schedule View and Calendar if scheduled.
+
+TEST 6: Backup
+Run backup.
+Confirm backup includes clients, leads, quotes, jobs, contracts, invoices, reports, documents metadata and stock usage.
+Confirm the backup report shows record counts and success/failure.
+
+DO NOT ADD MORE FEATURE WORK UNTIL THESE data integrity checks pass.
+
+The app must be trustworthy before it becomes bigger.

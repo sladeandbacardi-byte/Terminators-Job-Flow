@@ -76,7 +76,7 @@ const WEEK_ORDER = ["Week 1", "Week 2", "Week 3", "Week 4", "Last Week", "Every 
 // ── Minimal service contract type ─────────────────────────────────────────────
 interface ServiceContract {
   id: string;
-  customerId: string;
+  clientId: string;
   serviceType: string;
   frequency: string;
   activeStatus: boolean;
@@ -196,7 +196,7 @@ export default function ServiceScheduling() {
   });
 
   const clientContracts = useMemo(
-    () => allContracts.filter(c => c.customerId === form.clientId && c.activeStatus !== false),
+    () => allContracts.filter(c => c.clientId === form.clientId && c.activeStatus !== false),
     [allContracts, form.clientId]
   );
 

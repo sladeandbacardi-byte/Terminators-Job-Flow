@@ -214,7 +214,7 @@ export default function ServiceContractsPage() {
       startTime: "08:00", estimatedDuration: 60, isServiceContract: true, isRentalContract: false,
       mustBeInvoiced: true, fixedTime: false, stockTrackingRequired: false,
     };
-    if (p.get("clientId"))     prefill.customerId = p.get("clientId")!;
+    if (p.get("clientId"))     prefill.clientId = p.get("clientId")!;
     if (p.get("clientName"))   prefill.customerName = p.get("clientName")!;
     if (p.get("serviceType"))  prefill.serviceType = p.get("serviceType")!;
     if (p.get("departmentId")) prefill.departmentId = p.get("departmentId")!;
@@ -237,7 +237,7 @@ export default function ServiceContractsPage() {
     if (search) {
       const q = search.toLowerCase();
       const hit =
-        c.customerName.toLowerCase().includes(q) ||
+        (c.customerName ?? "").toLowerCase().includes(q) ||
         (c.contractNumber ?? "").toLowerCase().includes(q) ||
         c.serviceType.toLowerCase().includes(q) ||
         (c.address ?? "").toLowerCase().includes(q) ||
@@ -370,7 +370,7 @@ export default function ServiceContractsPage() {
 
   const setCustomer = (id: string) => {
     const cl = clients.find(c => c.id === id);
-    setForm(f => ({ ...f, customerId: id, customerName: cl?.name ?? f.customerName ?? "" }));
+    setForm(f => ({ ...f, clientId: id, customerName: cl?.name ?? f.customerName ?? "" }));
   };
 
   const setTech = (id: string) => {
@@ -730,7 +730,7 @@ export default function ServiceContractsPage() {
 
             <div>
               <Label>Client *</Label>
-              <Select value={form.customerId || ""} onValueChange={setCustomer}>
+              <Select value={form.clientId || "__none__"} onValueChange={v => setCustomer(v === "__none__" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Choose client" /></SelectTrigger>
                 <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
@@ -1015,7 +1015,7 @@ export default function ServiceContractsPage() {
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button
               onClick={() => save.mutate()}
-              disabled={save.isPending || !form.customerId || !form.serviceType || !form.departmentId || !form.frequency || (startRequired && !form.startDate)}
+              disabled={save.isPending || !form.clientId || !form.serviceType || !form.departmentId || !form.frequency || (startRequired && !form.startDate)}
             >
               {save.isPending ? "Saving…" : editing ? "Save Changes" : "Create Contract"}
             </Button>

@@ -418,7 +418,7 @@ export default function Calendar() {
       // 'appointment' routes the click to the read-only details dialog instead of the job-edit dialog.
       type: 'appointment' as const,
       priority: 'medium' as const,
-      clientId: o.customerId,
+      clientId: o.clientId,
       workerId: o.assignedTechnicianId || undefined,
       departmentId: o.departmentId,
       location: o.address || undefined,

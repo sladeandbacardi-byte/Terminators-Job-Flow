@@ -171,7 +171,7 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   const clientContracts = useMemo(() => {
     const cId = form.watch("clientId");
     if (!cId) return [];
-    return contracts.filter(c => (c as any).customerId === cId && c.activeStatus);
+    return contracts.filter(c => (c as any).clientId === cId && c.activeStatus);
   }, [contracts, form.watch("clientId")]);
 
   // Auto-calculate total price

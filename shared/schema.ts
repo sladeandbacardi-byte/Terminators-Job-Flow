@@ -963,7 +963,7 @@ export type AttendanceMemberRecord = typeof attendanceMemberRecords.$inferSelect
 // Frequency: Daily | 2 x a week | Weekly | Twice a month | Monthly | Every 2 months | Quarterly | Every 6 months | Annually | Once-off
 export const serviceContracts = pgTable("service_contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").notNull(),
+  clientId: varchar("client_id").notNull(),
   customerName: text("customer_name").notNull(),
   departmentId: varchar("department_id").notNull(),
   serviceType: text("service_type").notNull(),

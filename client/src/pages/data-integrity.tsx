@@ -59,11 +59,23 @@ interface BackupSummary {
   counts: {
     clients: number;
     jobs: number;
-    contracts: number;
+    rentalContracts: number;
+    serviceContracts: number;
     invoices: number;
     quotes: number;
+    workers: number;
   };
 }
+
+const BACKUP_LABELS: Record<string, string> = {
+  clients:          "Clients",
+  jobs:             "Jobs",
+  rentalContracts:  "Rental Contracts",
+  serviceContracts: "Service Contracts",
+  invoices:         "Invoices",
+  quotes:           "Quotes / Leads",
+  workers:          "Staff",
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
@@ -451,7 +463,7 @@ function BackupTab() {
             {Object.entries(summary.counts).map(([k, v]) => (
               <div key={k} className="bg-white rounded p-2 border">
                 <p className="text-lg font-bold">{v}</p>
-                <p className="text-xs text-muted-foreground capitalize">{k}</p>
+                <p className="text-xs text-muted-foreground">{BACKUP_LABELS[k] ?? k}</p>
               </div>
             ))}
           </div>
@@ -471,7 +483,7 @@ function BackupTab() {
             {Object.entries(lastExport.counts).map(([k, v]) => (
               <div key={k} className="bg-white/70 rounded px-2 py-1 border border-green-100">
                 <p className="font-bold">{v}</p>
-                <p className="text-muted-foreground capitalize">{k}</p>
+                <p className="text-muted-foreground">{BACKUP_LABELS[k] ?? k}</p>
               </div>
             ))}
           </div>
