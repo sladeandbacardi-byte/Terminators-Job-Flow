@@ -167,14 +167,17 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Department</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                <Select
+                  onValueChange={v => field.onChange(v === "__none__" ? "" : v)}
+                  defaultValue={field.value || "__none__"}
+                >
                   <FormControl>
                     <SelectTrigger data-testid="select-department">
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">No Department</SelectItem>
+                    <SelectItem value="__none__">No Department</SelectItem>
                     {departments.map((department) => (
                       <SelectItem key={department.id} value={department.id}>
                         {department.name}

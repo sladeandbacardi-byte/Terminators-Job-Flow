@@ -295,12 +295,15 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
               <FormField control={form.control} name="workerId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Technician / Worker</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                  <Select
+                    onValueChange={v => field.onChange(v === "__none__" ? undefined : v)}
+                    value={field.value || "__none__"}
+                  >
                     <FormControl>
                       <SelectTrigger data-testid="select-worker"><SelectValue placeholder="Choose worker" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">— Unassigned —</SelectItem>
+                      <SelectItem value="__none__">— Unassigned —</SelectItem>
                       {availableWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -531,12 +534,15 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
                 <FormField control={form.control} name={"linkedContractId" as any} render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Linked Service Contract <span className="text-xs text-gray-400 font-normal">(optional)</span></FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                    <Select
+                      onValueChange={v => field.onChange(v === "__none__" ? undefined : v)}
+                      value={field.value || "__none__"}
+                    >
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Link to a contract (optional)" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">— None —</SelectItem>
+                        <SelectItem value="__none__">— None —</SelectItem>
                         {clientContracts.map(c => (
                           <SelectItem key={c.id} value={c.id}>
                             {(c as any).contractNumber ?? c.id} — {c.serviceType}

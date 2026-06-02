@@ -171,7 +171,7 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">General (No specific department)</SelectItem>
+                      <SelectItem value="__none__">General (No specific department)</SelectItem>
                       {departments.map((department) => (
                         <SelectItem key={department.id} value={department.id}>
                           {department.name}
