@@ -23,6 +23,8 @@ import {
   insertServiceRecordSchema,
   insertWorkshopJobSchema,
   insertServiceScheduleEntrySchema,
+  insertTreatmentReportSchema,
+  insertCommunicationNoteSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -4302,6 +4304,89 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       : "warning";
 
     res.json({ overall, checkedAt: new Date().toISOString(), checks });
+  });
+
+  // ── Treatment Reports ─────────────────────────────────────────────────────
+
+  app.get("/api/treatment-reports", async (req, res) => {
+    try {
+      const { clientId, jobId } = req.query;
+      if (clientId) return res.json(await storage.getTreatmentReportsByClient(clientId as string));
+      if (jobId)    return res.json(await storage.getTreatmentReportsByJob(jobId as string));
+      return res.json(await storage.getTreatmentReports());
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/treatment-reports/:id", async (req, res) => {
+    try {
+      const r = await storage.getTreatmentReport(req.params.id);
+      if (!r) return res.status(404).json({ message: "Not found" });
+      res.json(r);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/treatment-reports", async (req, res) => {
+    try {
+      const parsed = insertTreatmentReportSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+      const r = await storage.createTreatmentReport(parsed.data);
+      res.status(201).json(r);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.put("/api/treatment-reports/:id", async (req, res) => {
+    try {
+      const r = await storage.updateTreatmentReport(req.params.id, req.body);
+      res.json(r);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/treatment-reports/:id", async (req, res) => {
+    try {
+      const ok = await storage.deleteTreatmentReport(req.params.id);
+      ok ? res.json({ success: true }) : res.status(404).json({ message: "Not found" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // ── Communication Notes ───────────────────────────────────────────────────
+
+  app.get("/api/communication-notes", async (req, res) => {
+    try {
+      const { clientId } = req.query;
+      if (clientId) return res.json(await storage.getCommunicationNotesByClient(clientId as string));
+      return res.json(await storage.getCommunicationNotes());
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/communication-notes/:id", async (req, res) => {
+    try {
+      const r = await storage.getCommunicationNote(req.params.id);
+      if (!r) return res.status(404).json({ message: "Not found" });
+      res.json(r);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/communication-notes", async (req, res) => {
+    try {
+      const parsed = insertCommunicationNoteSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+      const r = await storage.createCommunicationNote(parsed.data);
+      res.status(201).json(r);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.put("/api/communication-notes/:id", async (req, res) => {
+    try {
+      const r = await storage.updateCommunicationNote(req.params.id, req.body);
+      res.json(r);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/communication-notes/:id", async (req, res) => {
+    try {
+      const ok = await storage.deleteCommunicationNote(req.params.id);
+      ok ? res.json({ success: true }) : res.status(404).json({ message: "Not found" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
   const httpServer = createServer(app);

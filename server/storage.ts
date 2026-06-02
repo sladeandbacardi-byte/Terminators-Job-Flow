@@ -37,6 +37,8 @@ import {
   type ServiceScheduleEntry, type InsertServiceScheduleEntry,
   type PricingLibraryItem, type InsertPricingLibraryItem,
   type SalesFollowUp, type InsertSalesFollowUp,
+  type TreatmentReport, type InsertTreatmentReport,
+  type CommunicationNote, type InsertCommunicationNote,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -355,6 +357,23 @@ export interface IStorage {
   createServiceScheduleEntry(e: InsertServiceScheduleEntry): Promise<ServiceScheduleEntry>;
   updateServiceScheduleEntry(id: string, e: Partial<InsertServiceScheduleEntry>): Promise<ServiceScheduleEntry | undefined>;
   deleteServiceScheduleEntry(id: string): Promise<boolean>;
+
+  // Treatment Reports
+  getTreatmentReports(): Promise<TreatmentReport[]>;
+  getTreatmentReportsByClient(clientId: string): Promise<TreatmentReport[]>;
+  getTreatmentReportsByJob(jobId: string): Promise<TreatmentReport[]>;
+  getTreatmentReport(id: string): Promise<TreatmentReport | undefined>;
+  createTreatmentReport(r: InsertTreatmentReport): Promise<TreatmentReport>;
+  updateTreatmentReport(id: string, r: Partial<InsertTreatmentReport>): Promise<TreatmentReport>;
+  deleteTreatmentReport(id: string): Promise<boolean>;
+
+  // Communication Notes
+  getCommunicationNotes(): Promise<CommunicationNote[]>;
+  getCommunicationNotesByClient(clientId: string): Promise<CommunicationNote[]>;
+  getCommunicationNote(id: string): Promise<CommunicationNote | undefined>;
+  createCommunicationNote(n: InsertCommunicationNote): Promise<CommunicationNote>;
+  updateCommunicationNote(id: string, n: Partial<InsertCommunicationNote>): Promise<CommunicationNote>;
+  deleteCommunicationNote(id: string): Promise<boolean>;
 }
 
 export interface BackupLog {
@@ -4860,6 +4879,23 @@ export class MemStorage implements IStorage {
   async deleteServiceScheduleEntry(id: string): Promise<boolean> {
     return this.serviceScheduleMap.delete(id);
   }
+
+  // Treatment Reports (MemStorage stubs — production uses DbStorage)
+  async getTreatmentReports(): Promise<TreatmentReport[]> { return []; }
+  async getTreatmentReportsByClient(_clientId: string): Promise<TreatmentReport[]> { return []; }
+  async getTreatmentReportsByJob(_jobId: string): Promise<TreatmentReport[]> { return []; }
+  async getTreatmentReport(_id: string): Promise<TreatmentReport | undefined> { return undefined; }
+  async createTreatmentReport(r: InsertTreatmentReport): Promise<TreatmentReport> { throw new Error("Use DbStorage for treatment reports"); }
+  async updateTreatmentReport(_id: string, _r: Partial<InsertTreatmentReport>): Promise<TreatmentReport> { throw new Error("Use DbStorage for treatment reports"); }
+  async deleteTreatmentReport(_id: string): Promise<boolean> { return false; }
+
+  // Communication Notes (MemStorage stubs — production uses DbStorage)
+  async getCommunicationNotes(): Promise<CommunicationNote[]> { return []; }
+  async getCommunicationNotesByClient(_clientId: string): Promise<CommunicationNote[]> { return []; }
+  async getCommunicationNote(_id: string): Promise<CommunicationNote | undefined> { return undefined; }
+  async createCommunicationNote(_n: InsertCommunicationNote): Promise<CommunicationNote> { throw new Error("Use DbStorage for communication notes"); }
+  async updateCommunicationNote(_id: string, _n: Partial<InsertCommunicationNote>): Promise<CommunicationNote> { throw new Error("Use DbStorage for communication notes"); }
+  async deleteCommunicationNote(_id: string): Promise<boolean> { return false; }
 
   async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {
     const contracts = Array.from(this.serviceContractsMap.values())

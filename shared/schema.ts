@@ -1192,3 +1192,68 @@ export const insertServiceScheduleEntrySchema = createInsertSchema(serviceSchedu
 });
 export type InsertServiceScheduleEntry = z.infer<typeof insertServiceScheduleEntrySchema>;
 export type ServiceScheduleEntry = typeof serviceScheduleEntries.$inferSelect;
+
+// ─── TREATMENT REPORTS ──────────────────────────────────────────────────────
+
+export const treatmentReports = pgTable("treatment_reports", {
+  id:                   varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId:             varchar("client_id").notNull(),
+  jobId:                varchar("job_id"),
+  contractId:           varchar("contract_id"),
+  technicianId:         varchar("technician_id"),
+  technicianName:       text("technician_name"),
+  reportDate:           text("report_date").notNull(),        // YYYY-MM-DD
+  reportNumber:         text("report_number"),
+  serviceType:          text("service_type"),
+  pestType:             text("pest_type"),
+  treatmentType:        text("treatment_type"),
+  siteArea:             text("site_area"),
+  chemicalsUsed:        text("chemicals_used"),
+  quantityUsed:         text("quantity_used"),
+  batchNumber:          text("batch_number"),
+  activeIngredient:     text("active_ingredient"),
+  treatmentNotes:       text("treatment_notes"),
+  recommendations:      text("recommendations"),
+  followUpRequired:     boolean("follow_up_required").default(false),
+  followUpDate:         text("follow_up_date"),
+  customerName:         text("customer_name"),
+  customerSignature:    text("customer_signature"),
+  technicianSignature:  text("technician_signature"),
+  status:               text("status").default("completed"),
+  createdAt:            timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt:            timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertTreatmentReportSchema = createInsertSchema(treatmentReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertTreatmentReport = z.infer<typeof insertTreatmentReportSchema>;
+export type TreatmentReport = typeof treatmentReports.$inferSelect;
+
+// ─── COMMUNICATION NOTES ────────────────────────────────────────────────────
+
+export const communicationNotes = pgTable("communication_notes", {
+  id:                   varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId:             varchar("client_id").notNull(),
+  jobId:                varchar("job_id"),
+  contractId:           varchar("contract_id"),
+  noteDate:             text("note_date").notNull(),           // YYYY-MM-DD
+  noteTime:             text("note_time"),                     // HH:MM
+  type:                 text("type").notNull(),                // WhatsApp | Phone | Email | In Person | Other
+  contactPerson:        text("contact_person"),
+  notes:                text("notes").notNull(),
+  confirmationReceived: boolean("confirmation_received").default(false),
+  createdBy:            text("created_by"),
+  createdAt:            timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt:            timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertCommunicationNoteSchema = createInsertSchema(communicationNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCommunicationNote = z.infer<typeof insertCommunicationNoteSchema>;
+export type CommunicationNote = typeof communicationNotes.$inferSelect;

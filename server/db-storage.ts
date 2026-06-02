@@ -14,6 +14,7 @@ import {
   vehicles, vehicleAssignments, kmLogs, fuelFillups, vehicleInspections, vehicleIssues,
   serviceRecords, workshopJobs, teams, teamMembers, attendanceRecords, attendanceMemberRecords,
   serviceContracts, salesAppointments, expenses, serviceScheduleEntries, activityLogs,
+  treatmentReports, communicationNotes,
 } from "@shared/schema";
 
 import type {
@@ -54,6 +55,8 @@ import type {
   ServiceScheduleEntry, InsertServiceScheduleEntry,
   PricingLibraryItem, InsertPricingLibraryItem,
   SalesFollowUp, InsertSalesFollowUp,
+  TreatmentReport, InsertTreatmentReport,
+  CommunicationNote, InsertCommunicationNote,
 } from "@shared/schema";
 
 import type {
@@ -1853,5 +1856,81 @@ export class DbStorage implements IStorage {
       buckets[key] = (buckets[key] ?? 0) + parseFloat(inv.paidAmount ?? "0");
     }
     return Object.entries(buckets).map(([period, revenue]) => ({ period, revenue }));
+  }
+
+  // ── Treatment Reports ─────────────────────────────────────────────────────
+
+  async getTreatmentReports(): Promise<TreatmentReport[]> {
+    return db.select().from(treatmentReports).orderBy(desc(treatmentReports.reportDate));
+  }
+
+  async getTreatmentReportsByClient(clientId: string): Promise<TreatmentReport[]> {
+    return db.select().from(treatmentReports)
+      .where(eq(treatmentReports.clientId, clientId))
+      .orderBy(desc(treatmentReports.reportDate));
+  }
+
+  async getTreatmentReportsByJob(jobId: string): Promise<TreatmentReport[]> {
+    return db.select().from(treatmentReports)
+      .where(eq(treatmentReports.jobId, jobId))
+      .orderBy(desc(treatmentReports.reportDate));
+  }
+
+  async getTreatmentReport(id: string): Promise<TreatmentReport | undefined> {
+    const [r] = await db.select().from(treatmentReports).where(eq(treatmentReports.id, id));
+    return r;
+  }
+
+  async createTreatmentReport(r: InsertTreatmentReport): Promise<TreatmentReport> {
+    const [row] = await db.insert(treatmentReports).values(r as any).returning();
+    return row;
+  }
+
+  async updateTreatmentReport(id: string, r: Partial<InsertTreatmentReport>): Promise<TreatmentReport> {
+    const [row] = await db.update(treatmentReports)
+      .set({ ...r, updatedAt: new Date() } as any)
+      .where(eq(treatmentReports.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteTreatmentReport(id: string): Promise<boolean> {
+    const res = await db.delete(treatmentReports).where(eq(treatmentReports.id, id));
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  // ── Communication Notes ───────────────────────────────────────────────────
+
+  async getCommunicationNotes(): Promise<CommunicationNote[]> {
+    return db.select().from(communicationNotes).orderBy(desc(communicationNotes.noteDate));
+  }
+
+  async getCommunicationNotesByClient(clientId: string): Promise<CommunicationNote[]> {
+    return db.select().from(communicationNotes)
+      .where(eq(communicationNotes.clientId, clientId))
+      .orderBy(desc(communicationNotes.noteDate));
+  }
+
+  async getCommunicationNote(id: string): Promise<CommunicationNote | undefined> {
+    const [r] = await db.select().from(communicationNotes).where(eq(communicationNotes.id, id));
+    return r;
+  }
+
+  async createCommunicationNote(n: InsertCommunicationNote): Promise<CommunicationNote> {
+    const [row] = await db.insert(communicationNotes).values(n as any).returning();
+    return row;
+  }
+
+  async updateCommunicationNote(id: string, n: Partial<InsertCommunicationNote>): Promise<CommunicationNote> {
+    const [row] = await db.update(communicationNotes)
+      .set({ ...n, updatedAt: new Date() } as any)
+      .where(eq(communicationNotes.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteCommunicationNote(id: string): Promise<boolean> {
+    const res = await db.delete(communicationNotes).where(eq(communicationNotes.id, id));
+    return (res.rowCount ?? 0) > 0;
   }
 }

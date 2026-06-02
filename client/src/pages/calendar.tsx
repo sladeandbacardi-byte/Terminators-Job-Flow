@@ -94,7 +94,7 @@ type JobEditForm = z.infer<typeof jobEditSchema>;
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewType, setViewType] = useState<ViewType>('month');
+  const [viewType, setViewType] = useState<ViewType>('day');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
