@@ -188,7 +188,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
 
   const convertMutation = useMutation({
     mutationFn: async ({ jobData, newClientData }: { jobData: ConvertJobForm; newClientData?: z.infer<typeof newClientSchema> }) => {
-      // Resolve client
+      // Resolve client — create new if needed
       let clientId = jobData.clientId;
       if (newClientMode && newClientData) {
         const res = await apiRequest("POST", "/api/clients", { ...newClientData, status: "active" });
@@ -199,58 +199,27 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
       }
       if (!clientId) throw new Error("No client selected");
 
-      const salespersonWorker = jobData.salespersonId
-        ? allWorkers.find(w => w.id === jobData.salespersonId)
-        : allWorkers.find(w => w.id === quote.assignedTo);
-
-      // Build rich description from quote details
-      const lineItems = parseLineItems(quote.lineItemsJson);
-      const descParts: string[] = [];
-      if (quote.description) descParts.push(quote.description);
-      if (lineItems.length) {
-        descParts.push(
-          `\nProducts / Items Required:\n${lineItems.map(li =>
-            `• ${li.description}${li.qty ? ` — qty: ${li.qty}${li.unit ? ' ' + li.unit : ''}` : ''}`
-          ).join('\n')}`
-        );
-      }
-      const fullDescription = descParts.join('\n').trim();
-
-      // Build notes with contact person
-      const notesParts: string[] = [];
-      notesParts.push(`Contact: ${quote.contactPerson}${quote.phone ? ' · ' + quote.phone : ''}${quote.email ? ' · ' + quote.email : ''}`);
-      if (jobData.notes?.trim()) notesParts.push(jobData.notes.trim());
-      const fullNotes = notesParts.filter(Boolean).join('\n');
-
-      const freqLabel = FREQUENCY_OPTIONS.find(f => f.value === jobData.frequency)?.label;
-
-      // Create job
-      const jobRes = await apiRequest("POST", "/api/jobs", {
-        title:               `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
-        description:         fullDescription,
+      // Use the dedicated conversion endpoint — atomic job creation + quote status update
+      const res = await apiRequest("POST", `/api/quote-submissions/${quote.id}/convert-to-job`, {
         clientId,
         workerId:            jobData.workerId || null,
         departmentId:        jobData.departmentId,
-        serviceType:         quote.serviceType,
-        status:              "scheduled",
-        scheduledDate:       new Date(`${jobData.scheduledDate}T${jobData.scheduledTime || "08:00"}:00`).toISOString(),
+        scheduledDate:       jobData.scheduledDate,
         scheduledTime:       jobData.scheduledTime || "08:00",
-        location:            jobData.address || quote.address || "",
-        notes:               fullNotes,
-        price:               jobData.estimatedValue || quote.quoteAmount || null,
-        email:               quote.email || undefined,
-        salesperson:         salespersonWorker?.name ?? "",
-        priority:            "medium",
-        linkedQuoteId:       quote.id,
-        specialInstructions: jobData.specialInstructions || undefined,
-        isRecurring:         !!(jobData.frequency && jobData.frequency !== "once_off"),
-        recurringPattern:    freqLabel && jobData.frequency !== "once_off" ? freqLabel : undefined,
-        service:             SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
+        address:             jobData.address || quote.address || "",
+        notes:               [
+          `Contact: ${quote.contactPerson}${quote.phone ? ' · ' + quote.phone : ''}${quote.email ? ' · ' + quote.email : ''}`,
+          jobData.notes?.trim() || "",
+        ].filter(Boolean).join('\n'),
+        estimatedValue:      jobData.estimatedValue || quote.quoteAmount || null,
+        frequency:           jobData.frequency || null,
+        specialInstructions: jobData.specialInstructions || null,
+        salespersonId:       jobData.salespersonId || quote.assignedTo || null,
       });
-      if (!jobRes.ok) throw new Error("Failed to create job");
-
-      // Mark quote converted
-      await apiRequest("PATCH", `/api/quote-submissions/${quote.id}`, { status: "converted" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to convert quote to job");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
@@ -264,24 +233,20 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
 
   const convertContractMutation = useMutation({
     mutationFn: async (data: ConvertContractForm) => {
-      const selectedClient = clients.find(c => c.id === data.clientId);
-      if (!selectedClient) throw new Error("Client not found");
-
-      const contractRes = await apiRequest("POST", "/api/service-contracts", {
-        customerId:    selectedClient.id,
-        customerName:  selectedClient.name,
+      // Use the dedicated conversion endpoint — atomic contract creation + quote status update
+      const res = await apiRequest("POST", `/api/quote-submissions/${quote.id}/convert-to-contract`, {
+        clientId:      data.clientId,
         departmentId:  data.departmentId,
         serviceType:   data.serviceType,
         frequency:     data.frequency,
         contractPrice: data.contractPrice || null,
-        startDate:     data.startDate ? new Date(data.startDate).toISOString() : null,
+        startDate:     data.startDate || null,
         notes:         data.notes || null,
-        isServiceContract: true,
-        activeStatus:  true,
       });
-      if (!contractRes.ok) throw new Error("Failed to create service contract");
-
-      await apiRequest("PATCH", `/api/quote-submissions/${quote.id}`, { status: "converted" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to create service contract");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });

@@ -1948,6 +1948,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Convert quote to a job (atomic: create job + mark quote "converted") ──
+  app.post("/api/quote-submissions/:id/convert-to-job", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteSubmission(req.params.id);
+      if (!quote) return res.status(404).json({ error: "Quote not found" });
+      if (quote.status === "converted") return res.status(409).json({ error: "Quote is already converted" });
+
+      const { clientId, workerId, departmentId, scheduledDate, scheduledTime, address,
+              notes, estimatedValue, frequency, specialInstructions, salespersonId } = req.body;
+
+      if (!clientId) return res.status(400).json({ error: "clientId is required to convert to a job" });
+      if (!departmentId) return res.status(400).json({ error: "departmentId is required" });
+      if (!scheduledDate) return res.status(400).json({ error: "scheduledDate is required" });
+
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(400).json({ error: "Client not found" });
+
+      const workers = await storage.getWorkers();
+      const salesperson = salespersonId ? workers.find(w => w.id === salespersonId) : null;
+
+      const SERVICE_LABELS: Record<string, string> = {
+        pest_control: "Pest Control", sanitary_bins: "Sanitary Bins",
+        washroom: "Washroom Services", deep_cleaning: "Deep Cleaning",
+      };
+
+      const jobNumber = await storage.generateJobNumber();
+      const job = await storage.createJob({
+        title: `${SERVICE_LABELS[quote.serviceType] ?? quote.serviceType} — ${quote.companyName}`,
+        description: quote.description || "",
+        clientId,
+        workerId: workerId || null,
+        departmentId,
+        serviceType: quote.serviceType,
+        status: "scheduled",
+        scheduledDate: new Date(`${scheduledDate}T${scheduledTime || "08:00"}:00`),
+        scheduledTime: scheduledTime || "08:00",
+        location: address || quote.address || "",
+        notes: notes || "",
+        price: estimatedValue || quote.quoteAmount || null,
+        salesperson: salesperson?.name ?? "",
+        priority: "medium",
+        linkedQuoteId: quote.id,
+        specialInstructions: specialInstructions || null,
+        isRecurring: !!(frequency && frequency !== "once_off"),
+        recurringPattern: frequency && frequency !== "once_off" ? frequency : null,
+        service: SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
+        jobNumber,
+      });
+
+      await storage.updateQuoteSubmission(quote.id, { status: "converted", clientId });
+      res.status(201).json({ job });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to convert quote to job", details: error.message });
+    }
+  });
+
+  // ── Convert quote to a service contract (atomic: create contract + mark quote "converted") ──
+  app.post("/api/quote-submissions/:id/convert-to-contract", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteSubmission(req.params.id);
+      if (!quote) return res.status(404).json({ error: "Quote not found" });
+      if (quote.status === "converted") return res.status(409).json({ error: "Quote is already converted" });
+
+      const { clientId, departmentId, serviceType, frequency, contractPrice, startDate, notes } = req.body;
+
+      if (!clientId) return res.status(400).json({ error: "clientId is required to convert to a contract" });
+      if (!departmentId) return res.status(400).json({ error: "departmentId is required" });
+      if (!serviceType) return res.status(400).json({ error: "serviceType is required" });
+      if (!frequency) return res.status(400).json({ error: "frequency is required" });
+
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(400).json({ error: "Client not found" });
+
+      const contractNumber = await storage.generateContractNumber();
+      const contract = await storage.createRentalContract({
+        contractNumber,
+        customerId: clientId,
+        customerName: client.name,
+        departmentId,
+        serviceType,
+        frequency,
+        contractPrice: contractPrice || null,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        notes: notes || null,
+        isServiceContract: true,
+        activeStatus: true,
+        linkedQuoteId: quote.id,
+      } as any);
+
+      await storage.updateQuoteSubmission(quote.id, { status: "converted", clientId });
+      res.status(201).json({ contract });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to convert quote to contract", details: error.message });
+    }
+  });
+
   // Send a quote to a lead via email
   app.post("/api/quote-submissions/:id/send-quote", async (req, res) => {
     try {
