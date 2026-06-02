@@ -3786,6 +3786,43 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
+  // GET /api/admin/data-integrity/backup/json
+  // Admin-protected full system backup with summary metadata block.
+  app.get("/api/admin/data-integrity/backup/json", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const [data, clients, jobs, contracts, invoices, quotes] = await Promise.all([
+        storage.exportBackup(),
+        storage.getClients(),
+        storage.getJobs(),
+        storage.getRentalContracts(),
+        storage.getInvoices(),
+        storage.getQuoteSubmissions(),
+      ]);
+
+      const payload = {
+        _meta: {
+          exportedAt: new Date().toISOString(),
+          appVersion: "1.0.0",
+          counts: {
+            clients:   clients.length,
+            jobs:      jobs.length,
+            contracts: contracts.length,
+            invoices:  invoices.length,
+            quotes:    quotes.length,
+          },
+        },
+        ...data,
+      };
+
+      const filename = `terminators-backup-${new Date().toISOString().split("T")[0]}.json`;
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.json(payload);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to export backup", details: err.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

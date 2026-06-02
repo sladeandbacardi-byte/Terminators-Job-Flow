@@ -357,10 +357,12 @@ function BackupTab() {
     setDownloading(type);
     try {
       const url = type === "json"
-        ? "/api/backup/export"
+        ? "/api/admin/data-integrity/backup/json"
         : "/api/admin/data-integrity/backup/csv";
+      const token = localStorage.getItem("auth_token") ?? "";
       const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
       });
       if (!resp.ok) throw new Error(await resp.text());
       const blob = await resp.blob();
