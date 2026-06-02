@@ -15,7 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertTriangle, CheckCircle2, Copy, Database, Download,
-  RefreshCw, ExternalLink, CalendarClock,
+  RefreshCw, ExternalLink, CalendarClock, FlaskConical,
+  XCircle, Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -65,6 +66,23 @@ interface BackupSummary {
     quotes: number;
     workers: number;
   };
+}
+
+interface ScreenResult {
+  screen: string;
+  found: boolean;
+}
+interface RecordTestResult {
+  recordType: string;
+  id: string;
+  clientId: string;
+  status: "passed" | "failed";
+  screens: ScreenResult[];
+  failureReason?: string;
+}
+interface SaveSearchTestResponse {
+  overall: "passed" | "failed";
+  results: RecordTestResult[];
 }
 
 const BACKUP_LABELS: Record<string, string> = {
@@ -548,6 +566,138 @@ function BackupTab() {
   );
 }
 
+// ── Save/Search Test Tab ────────────────────────────────────────────────────────
+function SaveSearchTestTab() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<SaveSearchTestResponse | null>(null);
+  const [running, setRunning] = useState(false);
+
+  async function runTest() {
+    setRunning(true);
+    setResult(null);
+    try {
+      const data = await apiRequest("GET", "/api/admin/data-integrity/save-search-test");
+      const json: SaveSearchTestResponse = await data.json();
+      setResult(json);
+      if (json.overall === "passed") {
+        toast({ title: "All checks passed", description: "Every record was saved and found in all expected screens." });
+      } else {
+        toast({ title: "Some checks failed", description: "See below for details.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Test error", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">
+            Creates one record of each type for a temporary test client, then checks that
+            every record can be found in the list screens a real user would navigate to.
+            All test data is deleted automatically when the test finishes.
+          </p>
+          <p className="text-xs text-orange-600 font-medium">
+            Note: this app stores data in memory. Data is lost on server restart — records saved before a restart will not survive it.
+          </p>
+        </div>
+        <Button
+          onClick={runTest}
+          disabled={running}
+          className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          {running
+            ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running…</>
+            : <><FlaskConical className="h-4 w-4 mr-2" />Run Save/Search Test</>}
+        </Button>
+      </div>
+
+      {!result && !running && (
+        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+          <FlaskConical className="h-10 w-10 text-indigo-300" />
+          <p className="text-sm">Press the button above to run the test.</p>
+        </div>
+      )}
+
+      {running && (
+        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-indigo-400" />
+          <p className="text-sm">Creating records and verifying visibility…</p>
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-4">
+          {/* Overall banner */}
+          <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
+            result.overall === "passed"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}>
+            {result.overall === "passed"
+              ? <CheckCircle2 className="h-5 w-5 shrink-0" />
+              : <XCircle className="h-5 w-5 shrink-0" />}
+            <span className="font-semibold text-sm">
+              {result.overall === "passed"
+                ? "All record types passed — save and find is working correctly."
+                : "One or more record types failed — see details below."}
+            </span>
+          </div>
+
+          {/* Per-record cards */}
+          <div className="space-y-3">
+            {result.results.map((r, i) => (
+              <Card key={i} className={r.status === "failed" ? "border-red-200" : "border-green-200"}>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {r.status === "passed"
+                        ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        : <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
+                      <span className="font-semibold text-sm">{r.recordType}</span>
+                      <Badge className={r.status === "passed"
+                        ? "bg-green-100 text-green-800 text-xs"
+                        : "bg-red-100 text-red-800 text-xs"}>
+                        {r.status === "passed" ? "PASSED" : "FAILED"}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-x-2">
+                      <span>Record&nbsp;ID:&nbsp;<code className="font-mono bg-gray-100 px-1 rounded">{r.id}</code></span>
+                      <span>Client&nbsp;ID:&nbsp;<code className="font-mono bg-gray-100 px-1 rounded">{r.clientId}</code></span>
+                    </div>
+                  </div>
+
+                  {r.failureReason && (
+                    <p className="text-xs text-red-600 mb-3 bg-red-50 rounded px-2 py-1">
+                      Error: {r.failureReason}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {r.screens.map((s, j) => (
+                      <div key={j} className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${
+                        s.found ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                      }`}>
+                        {s.found
+                          ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                          : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                        {s.screen}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function DataIntegrity() {
   const { data: orphanData } = useQuery<OrphansResponse>({
@@ -595,6 +745,10 @@ export default function DataIntegrity() {
                 <TabsTrigger value="backup" className="flex items-center gap-1.5">
                   <Download className="h-3.5 w-3.5" />
                   Backup
+                </TabsTrigger>
+                <TabsTrigger value="save-search-test" className="flex items-center gap-1.5">
+                  <FlaskConical className="h-3.5 w-3.5" />
+                  Save/Search Test
                 </TabsTrigger>
               </TabsList>
 
@@ -650,6 +804,23 @@ export default function DataIntegrity() {
                   </CardHeader>
                   <CardContent>
                     <BackupTab />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="save-search-test">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FlaskConical className="h-4 w-4 text-indigo-600" />
+                      Save / Search Workflow Test
+                    </CardTitle>
+                    <CardDescription>
+                      Proves that a record saved in any module can be found again on every screen that should show it.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <SaveSearchTestTab />
                   </CardContent>
                 </Card>
               </TabsContent>

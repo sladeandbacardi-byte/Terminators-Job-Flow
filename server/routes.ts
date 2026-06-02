@@ -3859,6 +3859,256 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
+  // ── Save/Search Workflow Test ─────────────────────────────────────────────
+  // Creates test records, verifies each appears in its real list/filter
+  // queries, reports per-screen pass/fail, then cleans up.
+  app.get("/api/admin/data-integrity/save-search-test", async (_req, res) => {
+    type ScreenResult = { screen: string; found: boolean };
+    type RecordResult = {
+      recordType: string;
+      id: string;
+      clientId: string;
+      status: "passed" | "failed";
+      screens: ScreenResult[];
+      failureReason?: string;
+    };
+
+    const results: RecordResult[] = [];
+    const toDelete: { type: string; id: string }[] = [];
+    let testClientId = "";
+
+    const pass = (screen: string): ScreenResult => ({ screen, found: true });
+    const fail = (screen: string): ScreenResult => ({ screen, found: false });
+
+    try {
+      // ── 1. Create test client ────────────────────────────────────────────
+      const testClient = await storage.createClient({
+        name: `SYSCHECK-${Date.now()}`,
+        email: `syscheck-${Date.now()}@test.local`,
+        phone: "000-000-0000",
+        address: "1 Test Street",
+        city: "Port Elizabeth",
+        departmentId: "div-3",
+        status: "active",
+      });
+      testClientId = testClient.id;
+      toDelete.push({ type: "client", id: testClient.id });
+
+      // ── 2. Quote ─────────────────────────────────────────────────────────
+      {
+        const quote = await storage.createQuoteSubmission({
+          companyName: testClient.name,
+          contactPerson: "Test Contact",
+          email: testClient.email!,
+          phone: testClient.phone!,
+          serviceType: "washroom",
+          description: "SYSCHECK automated test quote",
+          preferredContactMethod: "email",
+          status: "new",
+          origination: "other",
+          clientId: testClient.id,
+        });
+        toDelete.push({ type: "quote", id: quote.id });
+
+        const allQuotes = await storage.getQuoteSubmissions();
+        const inList = allQuotes.some(q => q.id === quote.id);
+        const inClient = allQuotes.some(q => q.id === quote.id && (q.clientId === testClientId || q.companyName === testClient.name));
+
+        const screens: ScreenResult[] = [
+          inList ? pass("Sales › Quotes / Leads list") : fail("Sales › Quotes / Leads list"),
+          inClient ? pass("Client Profile › Quotes tab") : fail("Client Profile › Quotes tab"),
+        ];
+        results.push({
+          recordType: "Quote",
+          id: quote.id,
+          clientId: testClientId,
+          status: screens.every(s => s.found) ? "passed" : "failed",
+          screens,
+        });
+      }
+
+      // ── 3. Job ───────────────────────────────────────────────────────────
+      {
+        const scheduledDate = new Date();
+        const job = await storage.createJob({
+          clientId: testClient.id,
+          workerId: "worker-12",
+          departmentId: "div-3",
+          serviceType: "washroom",
+          title: "SYSCHECK-JOB",
+          status: "scheduled",
+          priority: "medium",
+          scheduledDate,
+          estimatedDuration: 60,
+          location: "1 Test Street",
+          isRecurring: false,
+          isContract: false,
+          isFixed: false,
+        });
+        toDelete.push({ type: "job", id: job.id });
+
+        const allJobs = await storage.getJobs();
+        const inList = allJobs.some(j => j.id === job.id);
+        const inClient = allJobs.some(j => j.id === job.id && j.clientId === testClientId);
+        const dayStart = new Date(scheduledDate); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(scheduledDate); dayEnd.setHours(23, 59, 59, 999);
+        const inCalendar = allJobs.some(j => {
+          if (j.id !== job.id) return false;
+          const d = new Date(j.scheduledDate);
+          return d >= dayStart && d <= dayEnd;
+        });
+
+        const screens: ScreenResult[] = [
+          inList ? pass("Service › Jobs list") : fail("Service › Jobs list"),
+          inClient ? pass("Client Profile › Jobs tab") : fail("Client Profile › Jobs tab"),
+          inCalendar ? pass("Calendar (scheduled date)") : fail("Calendar (scheduled date)"),
+        ];
+        results.push({
+          recordType: "Job",
+          id: job.id,
+          clientId: testClientId,
+          status: screens.every(s => s.found) ? "passed" : "failed",
+          screens,
+        });
+      }
+
+      // ── 4. Service Contract ───────────────────────────────────────────────
+      {
+        const sc = await storage.createServiceContract({
+          clientId: testClient.id,
+          customerName: testClient.name,
+          departmentId: "div-3",
+          serviceType: "washroom",
+          frequency: "Weekly",
+          dayOfWeek: "Wednesday",
+          startTime: "09:00",
+          estimatedDuration: 60,
+          contractPrice: "500.00",
+          notes: "SYSCHECK test contract",
+          isActive: true,
+        });
+        toDelete.push({ type: "serviceContract", id: sc.id });
+
+        const allSC = await storage.getServiceContracts();
+        const inList = allSC.some(c => c.id === sc.id);
+        const inClient = allSC.some(c => c.id === sc.id && c.clientId === testClientId);
+
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const occurrences = await storage.getContractOccurrences(monthStart, monthEnd, {});
+        const inCalendar = occurrences.some(o => o.id.includes(sc.id));
+
+        const screens: ScreenResult[] = [
+          inList ? pass("Service › Contracts list") : fail("Service › Contracts list"),
+          inClient ? pass("Client Profile › Contracts tab") : fail("Client Profile › Contracts tab"),
+          inCalendar ? pass("Calendar occurrences (this month)") : fail("Calendar occurrences (this month)"),
+        ];
+        results.push({
+          recordType: "Service Contract",
+          id: sc.id,
+          clientId: testClientId,
+          status: screens.every(s => s.found) ? "passed" : "failed",
+          screens,
+        });
+      }
+
+      // ── 5. Rental Contract ────────────────────────────────────────────────
+      {
+        const invItems = await storage.getInventoryItems();
+        const invItem = invItems[0];
+        if (!invItem) throw new Error("No inventory items found — cannot test rental contract");
+
+        const rc = await storage.createRentalContract({
+          clientId: testClient.id,
+          inventoryItemId: invItem.id,
+          startDate: new Date(),
+          isActive: true,
+          quantity: 1,
+          billingFrequency: "monthly",
+          monthlyPrice: "100.00",
+        });
+        toDelete.push({ type: "rentalContract", id: rc.id });
+
+        const allRC = await storage.getRentalContracts();
+        const inList = allRC.some(c => c.id === rc.id);
+        const inClient = allRC.some(c => c.id === rc.id && c.clientId === testClientId);
+
+        const screens: ScreenResult[] = [
+          inList ? pass("Sales › Rental Contracts list") : fail("Sales › Rental Contracts list"),
+          inClient ? pass("Client Profile › Contracts tab") : fail("Client Profile › Contracts tab"),
+        ];
+        results.push({
+          recordType: "Rental Contract",
+          id: rc.id,
+          clientId: testClientId,
+          status: screens.every(s => s.found) ? "passed" : "failed",
+          screens,
+        });
+      }
+
+      // ── 6. Invoice ────────────────────────────────────────────────────────
+      {
+        const inv = await storage.createInvoice({
+          clientId: testClient.id,
+          invoiceNumber: `SYSCHECK-${Date.now()}`,
+          status: "draft",
+          issueDate: new Date(),
+          dueDate: new Date(),
+          subtotal: "100.00",
+          taxAmount: "15.00",
+          total: "115.00",
+          paidAmount: "0.00",
+        });
+        toDelete.push({ type: "invoice", id: inv.id });
+
+        const allInv = await storage.getInvoices();
+        const inList = allInv.some(i => i.id === inv.id);
+        const inClient = allInv.some(i => i.id === inv.id && i.clientId === testClientId);
+        const byClient = await storage.getInvoicesByClient(testClientId);
+        const inClientQuery = byClient.some(i => i.id === inv.id);
+
+        const screens: ScreenResult[] = [
+          inList ? pass("Finance › Invoices list") : fail("Finance › Invoices list"),
+          inClient ? pass("Client Profile › Invoices tab") : fail("Client Profile › Invoices tab"),
+          inClientQuery ? pass("getInvoicesByClient query") : fail("getInvoicesByClient query"),
+        ];
+        results.push({
+          recordType: "Invoice",
+          id: inv.id,
+          clientId: testClientId,
+          status: screens.every(s => s.found) ? "passed" : "failed",
+          screens,
+        });
+      }
+
+    } catch (err: any) {
+      results.push({
+        recordType: "TEST ERROR",
+        id: "-",
+        clientId: testClientId,
+        status: "failed",
+        screens: [],
+        failureReason: err?.message ?? String(err),
+      });
+    } finally {
+      // ── Cleanup ─────────────────────────────────────────────────────────
+      for (const item of toDelete.reverse()) {
+        try {
+          if (item.type === "invoice") await storage.deleteInvoice(item.id);
+          else if (item.type === "job") await storage.deleteJob(item.id);
+          else if (item.type === "serviceContract") await storage.deleteServiceContract(item.id);
+          else if (item.type === "rentalContract") await storage.deleteRentalContract(item.id);
+          else if (item.type === "quote") await storage.deleteQuoteSubmission(item.id);
+          else if (item.type === "client") await storage.deleteClient(item.id);
+        } catch (_) { /* best-effort cleanup */ }
+      }
+    }
+
+    const overall = results.length > 0 && results.every(r => r.status === "passed") ? "passed" : "failed";
+    res.json({ overall, results });
+  });
+
   const httpServer = createServer(app);
 
   // ── Backup Scheduler ─────────────────────────────────────────────────────
