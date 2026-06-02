@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertTriangle, CheckCircle2, Copy, Database, Download,
-  RefreshCw, ExternalLink,
+  RefreshCw, ExternalLink, CalendarClock,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -344,6 +344,32 @@ function DataSourcesTab() {
 }
 
 // ── Backup Tab ─────────────────────────────────────────────────────────────────
+interface BackupSchedule {
+  enabled: boolean;
+  frequency: "daily" | "weekly";
+  dayOfWeek: number;
+  hourUTC: number;
+  minuteUTC: number;
+  recipientEmail: string;
+}
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function computeNextRun(s: BackupSchedule): string {
+  if (!s.enabled) return "Disabled";
+  const now = new Date();
+  const candidate = new Date(now);
+  candidate.setUTCHours(s.hourUTC, s.minuteUTC, 0, 0);
+  if (candidate <= now) candidate.setUTCDate(candidate.getUTCDate() + 1);
+  if (s.frequency === "weekly") {
+    while (candidate.getUTCDay() !== s.dayOfWeek) candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
+  return candidate.toLocaleString("en-ZA", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZoneName: "short",
+  });
+}
+
 function BackupTab() {
   const { toast } = useToast();
   const [downloading, setDownloading] = useState<"json" | "csv" | null>(null);
@@ -351,6 +377,10 @@ function BackupTab() {
 
   const { data: summary, refetch: refetchSummary } = useQuery<BackupSummary>({
     queryKey: ["/api/admin/data-integrity/backup/summary"],
+  });
+
+  const { data: schedule } = useQuery<BackupSchedule>({
+    queryKey: ["/api/backup/schedule"],
   });
 
   const download = async (type: "json" | "csv") => {
@@ -393,6 +423,25 @@ function BackupTab() {
       <p className="text-sm text-muted-foreground">
         Export a point-in-time snapshot of the system data. Store it somewhere safe — you can restore from the JSON backup via the Backup & Restore page.
       </p>
+
+      {/* Scheduled backup status */}
+      {schedule && (
+        <div className={`rounded-md border p-3 flex items-center gap-3 text-sm ${schedule.enabled ? "border-violet-200 bg-violet-50 text-violet-800" : "border-gray-200 bg-muted/20 text-muted-foreground"}`}>
+          <CalendarClock className="h-4 w-4 shrink-0" />
+          <div>
+            {schedule.enabled ? (
+              <>
+                <span className="font-medium">Automated backup active — </span>
+                {schedule.frequency === "daily" ? "Daily" : `Every ${DAYS[schedule.dayOfWeek]}`} at{" "}
+                {String(schedule.hourUTC).padStart(2, "0")}:{String(schedule.minuteUTC).padStart(2, "0")} UTC
+                {" "}→ next run: <strong>{computeNextRun(schedule)}</strong>
+              </>
+            ) : (
+              "Scheduled backup is disabled. Enable it on the Backup & Restore page."
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Current data summary */}
       {summary && (

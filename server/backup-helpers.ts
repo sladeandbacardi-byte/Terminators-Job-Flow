@@ -1,5 +1,85 @@
 import { storage } from "./storage";
 
+function escapeCsv(v: any): string {
+  const s = String(v ?? "").replace(/"/g, '""');
+  return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s}"` : s;
+}
+
+function rowToCsv(cells: any[]): string {
+  return cells.map(escapeCsv).join(",");
+}
+
+export async function generateCsvBackupBuffer(): Promise<{
+  buffer: Buffer;
+  filename: string;
+  sizeBytes: number;
+}> {
+  const backup = await storage.exportBackup();
+  const dateStr = (d: any) =>
+    d ? new Date(d).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "";
+  const zar = (v: any) =>
+    v !== null && v !== undefined && v !== "" ? `ZAR ${parseFloat(String(v)).toFixed(2)}` : "";
+
+  const clientMap = new Map((backup.clients as any[]).map((c: any) => [c.id, c.name]));
+  const workerMap = new Map((backup.workers as any[]).map((w: any) => [w.id, w.name]));
+  const deptMap   = new Map((backup.departments as any[]).map((d: any) => [d.id, d.name]));
+
+  const sections: string[] = [];
+
+  // ── Clients ──────────────────────────────────────────────────────────────
+  sections.push("# CLIENTS");
+  sections.push(rowToCsv(["Name", "Phone", "Email", "Business Type", "Address", "Status"]));
+  for (const c of backup.clients as any[]) {
+    sections.push(rowToCsv([c.name, c.phone, c.email, c.businessType, c.address, c.status]));
+  }
+
+  // ── Jobs ─────────────────────────────────────────────────────────────────
+  sections.push("");
+  sections.push("# JOBS");
+  sections.push(rowToCsv(["Job #", "Date", "Client", "Worker", "Department", "Status", "Priority", "Notes"]));
+  for (const j of backup.jobs as any[]) {
+    sections.push(rowToCsv([
+      j.jobNumber ?? j.id,
+      dateStr(j.scheduledDate ?? j.date),
+      clientMap.get(j.clientId) ?? j.clientId,
+      workerMap.get(j.workerId) ?? (j.workerId ?? "Unassigned"),
+      deptMap.get(j.departmentId ?? j.divisionId) ?? "",
+      j.status, j.priority ?? "", j.notes ?? "",
+    ]));
+  }
+
+  // ── Invoices ─────────────────────────────────────────────────────────────
+  sections.push("");
+  sections.push("# INVOICES");
+  sections.push(rowToCsv(["Invoice #", "Issue Date", "Due Date", "Client", "Total (ZAR)", "Status"]));
+  for (const inv of backup.invoices as any[]) {
+    sections.push(rowToCsv([
+      inv.invoiceNumber ?? inv.id,
+      dateStr(inv.issueDate ?? inv.date),
+      dateStr(inv.dueDate),
+      clientMap.get(inv.clientId) ?? inv.clientId,
+      zar(inv.totalAmount ?? inv.total ?? inv.amount),
+      inv.status ?? "",
+    ]));
+  }
+
+  // ── Workers ───────────────────────────────────────────────────────────────
+  sections.push("");
+  sections.push("# STAFF");
+  sections.push(rowToCsv(["Name", "Role", "Email", "Phone", "Department", "Active"]));
+  for (const w of backup.workers as any[]) {
+    sections.push(rowToCsv([
+      w.name, w.role ?? "", w.email ?? "", w.phone ?? "",
+      deptMap.get(w.departmentId) ?? "", w.isActive ? "Yes" : "No",
+    ]));
+  }
+
+  const csvContent = sections.join("\n");
+  const buffer = Buffer.from(csvContent, "utf-8");
+  const filename = `job-flow-backup-${new Date().toISOString().split("T")[0]}.csv`;
+  return { buffer, filename, sizeBytes: buffer.length };
+}
+
 export async function generateJsonBackupBuffer(): Promise<{
   buffer: Buffer;
   filename: string;

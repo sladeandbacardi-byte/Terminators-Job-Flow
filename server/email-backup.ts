@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import { sendEmail } from "./email-service";
 import { storage } from "./storage";
-import { generateJsonBackupBuffer, generateExcelBackupBuffer } from "./backup-helpers";
+import { generateJsonBackupBuffer, generateCsvBackupBuffer } from "./backup-helpers";
 
 const BACKUP_RECIPIENT =
   process.env.BACKUP_EMAIL_TO ??
@@ -122,7 +122,7 @@ export async function runDailyBackupEmail(
   status: "success" | "failed";
   recipient: string;
   jsonFile: { name: string; sizeBytes: number };
-  excelFile: { name: string; sizeBytes: number };
+  csvFile: { name: string; sizeBytes: number };
   errorMessage?: string;
 }> {
   const recipient = recipientOverride?.trim() || BACKUP_RECIPIENT;
@@ -130,15 +130,15 @@ export async function runDailyBackupEmail(
   const isTest = kind === "test";
 
   let jsonInfo = { name: `job-flow-restore-backup-${dateStr}.json`, sizeBytes: 0 };
-  let excelInfo = { name: `job-flow-excel-backup-${dateStr}.xlsx`, sizeBytes: 0 };
+  let csvInfo  = { name: `job-flow-backup-${dateStr}.csv`, sizeBytes: 0 };
 
   try {
     const jsonResult = await generateJsonBackupBuffer();
-    const excelResult = await generateExcelBackupBuffer();
+    const csvResult  = await generateCsvBackupBuffer();
     jsonInfo = { name: jsonResult.filename, sizeBytes: jsonResult.sizeBytes };
-    excelInfo = { name: excelResult.filename, sizeBytes: excelResult.sizeBytes };
+    csvInfo  = { name: csvResult.filename,  sizeBytes: csvResult.sizeBytes };
 
-    const totalBytes = jsonInfo.sizeBytes + excelInfo.sizeBytes;
+    const totalBytes = jsonInfo.sizeBytes + csvInfo.sizeBytes;
     if (totalBytes > BREVO_MAX_TOTAL_BYTES) {
       throw new Error(TOO_LARGE_MESSAGE);
     }
@@ -148,8 +148,8 @@ export async function runDailyBackupEmail(
       : `Job Flow Daily Backup - ${dateStr}`;
 
     const bodyText = isTest
-      ? `This is a TEST of the daily Job Flow backup email.\n\nAttached are the backup files generated right now for verification.\n\nThe JSON file is for system restore.\nThe Excel file is for human review and record keeping.`
-      : `Attached are the daily Job Flow backup files.\n\nThe JSON file is for system restore.\nThe Excel file is for human review and record keeping.`;
+      ? `This is a TEST of the daily Job Flow backup email.\n\nAttached are the backup files generated right now for verification.\n\nThe JSON file is for system restore.\nThe CSV file contains clients, jobs, invoices and staff for human review.`
+      : `Attached are the daily Job Flow backup files.\n\nThe JSON file is for system restore.\nThe CSV file contains clients, jobs, invoices and staff for human review.`;
 
     const bodyHtml = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;">
       <h2 style="color:#1d4ed8;margin-bottom:8px;">${isTest ? "Job Flow Daily Backup — TEST" : "Job Flow Daily Backup"}</h2>
@@ -158,7 +158,7 @@ export async function runDailyBackupEmail(
       <p>Attached are the daily Job Flow backup files.</p>
       <ul>
         <li><strong>${jsonInfo.name}</strong> — JSON restore backup (${(jsonInfo.sizeBytes / 1024).toFixed(1)} KB) — use to restore the system.</li>
-        <li><strong>${excelInfo.name}</strong> — Excel backup (${(excelInfo.sizeBytes / 1024).toFixed(1)} KB) — open in Excel for review.</li>
+        <li><strong>${csvInfo.name}</strong> — CSV summary (${(csvInfo.sizeBytes / 1024).toFixed(1)} KB) — open in Excel or Google Sheets for review.</li>
       </ul>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
       <p style="font-size:12px;color:#6b7280;">Sent automatically by Job Flow — The Terminators Field Service Management System.</p>
@@ -166,29 +166,44 @@ export async function runDailyBackupEmail(
 
     const attachments: BackupAttachment[] = [
       { filename: jsonInfo.name, contentBase64: jsonResult.buffer.toString("base64"), type: "application/json" },
-      { filename: excelInfo.name, contentBase64: excelResult.buffer.toString("base64"), type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+      { filename: csvInfo.name,  contentBase64: csvResult.buffer.toString("base64"),  type: "text/csv" },
     ];
 
     if (DEMO_MODE) {
       // Demo Mode disables real email sending. Skip provider call but still log.
     } else if (EMAIL_PROVIDER === "brevo") {
-      // Brevo's HTTP API rejects .json attachments, so SMTP relay is required
-      // for backup emails (which always include a .json file). Fail fast with
-      // a clear, actionable error if SMTP secrets are missing.
-      if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+      const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY);
+
+      if (!smtpConfigured && !apiKeyConfigured) {
         throw new Error(
-          "Brevo SMTP secrets are required for backup emails because the JSON attachment is not accepted by the Brevo HTTP API. " +
-          "Set SMTP_HOST=smtp-relay.brevo.com, SMTP_PORT=587, SMTP_USER=<brevo login>, SMTP_PASS=<brevo SMTP key>.",
+          "Brevo is not configured. Set BREVO_API_KEY for HTTP delivery, or set SMTP_HOST / SMTP_USER / SMTP_PASS for SMTP relay.",
         );
       }
-      await sendViaBrevoSmtp({
-        to: recipient,
-        from: BACKUP_SENDER,
-        subject,
-        text: bodyText,
-        html: bodyHtml,
-        attachments,
-      });
+
+      if (smtpConfigured) {
+        // Prefer SMTP relay — handles all attachment types reliably.
+        await sendViaBrevoSmtp({
+          to: recipient,
+          from: BACKUP_SENDER,
+          subject,
+          text: bodyText,
+          html: bodyHtml,
+          attachments,
+        });
+      } else {
+        // Fall back to Brevo HTTP API when SMTP credentials are absent.
+        // CSV + JSON attachments are generally accepted; if Brevo rejects a file type
+        // the API error will be propagated and logged for the admin to see.
+        await sendViaBrevoApi({
+          to: recipient,
+          from: BACKUP_SENDER,
+          subject,
+          text: bodyText,
+          html: bodyHtml,
+          attachments,
+        });
+      }
     } else {
       await sendEmail({
         to: recipient,
@@ -207,44 +222,49 @@ export async function runDailyBackupEmail(
     await storage.addBackupLog({
       datetime: new Date().toISOString(),
       backupType: logTypeFor(kind),
-      fileNames: [jsonInfo.name, excelInfo.name],
-      fileSizesBytes: [jsonInfo.sizeBytes, excelInfo.sizeBytes],
+      fileNames: [jsonInfo.name, csvInfo.name],
+      fileSizesBytes: [jsonInfo.sizeBytes, csvInfo.sizeBytes],
       destination: DEMO_MODE ? `Email (${EMAIL_PROVIDER}, demo)` : `Email (${EMAIL_PROVIDER})`,
       status: "success",
       recipientEmail: recipient,
     });
 
-    return { status: "success", recipient, jsonFile: jsonInfo, excelFile: excelInfo };
+    return { status: "success", recipient, jsonFile: jsonInfo, csvFile: csvInfo };
   } catch (e: any) {
     const errMsg = e?.message ?? "Unknown email backup error";
     await storage.addBackupLog({
       datetime: new Date().toISOString(),
       backupType: logTypeFor(kind),
-      fileNames: [jsonInfo.name, excelInfo.name],
-      fileSizesBytes: [jsonInfo.sizeBytes, excelInfo.sizeBytes],
+      fileNames: [jsonInfo.name, csvInfo.name],
+      fileSizesBytes: [jsonInfo.sizeBytes, csvInfo.sizeBytes],
       destination: `Email (${EMAIL_PROVIDER})`,
       status: "failed",
       errorMessage: errMsg,
       recipientEmail: recipient,
     });
-    return { status: "failed", recipient, jsonFile: jsonInfo, excelFile: excelInfo, errorMessage: errMsg };
+    return { status: "failed", recipient, jsonFile: jsonInfo, csvFile: csvInfo, errorMessage: errMsg };
   }
 }
 
 export function getBackupEmailConfig() {
+  const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY);
+  const brevoConfigured = smtpConfigured || apiKeyConfigured;
+  const brevoDeliveryMethod: "smtp" | "api" | "none" =
+    smtpConfigured ? "smtp" : apiKeyConfigured ? "api" : "none";
+
   return {
     recipient: BACKUP_RECIPIENT,
     sender: BACKUP_SENDER,
     provider: EMAIL_PROVIDER,
-    brevoConfigured:
-      Boolean(process.env.BREVO_API_KEY) ||
-      Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+    brevoConfigured,
+    brevoDeliveryMethod,
+    smtpConfigured,
     sendgridConfigured: Boolean(process.env.SENDGRID_API_KEY),
     demoMode: DEMO_MODE,
     emailConfigured:
       EMAIL_PROVIDER === "brevo"
-        ? Boolean(process.env.BREVO_API_KEY) ||
-          Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+        ? brevoConfigured
         : Boolean(process.env.SENDGRID_API_KEY),
     maxAttachmentBytes: BREVO_MAX_TOTAL_BYTES,
   };

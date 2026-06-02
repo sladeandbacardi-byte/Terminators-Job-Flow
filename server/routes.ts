@@ -2549,6 +2549,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inline admin-role guard (used by backup schedule and data-integrity endpoints)
+  const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
+    const role = (req.user as any)?.role ?? "";
+    if (!["admin", "superadmin"].includes(role)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
+
   // Backup & Restore
   app.get("/api/backup/export", async (req, res) => {
     try {
@@ -2905,6 +2914,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) {
       const logs = await storage.getBackupLogs().catch(() => []);
       res.status(500).json({ error: e.message, log: logs[0] ?? null });
+    }
+  });
+
+  app.get("/api/backup/schedule", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const schedule = await storage.getBackupSchedule();
+      res.json(schedule);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/backup/schedule", requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { enabled, frequency, dayOfWeek, hourUTC, minuteUTC, recipientEmail } = req.body;
+      if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be boolean" });
+      if (!["daily", "weekly"].includes(frequency)) return res.status(400).json({ error: "frequency must be daily or weekly" });
+      if (typeof hourUTC !== "number" || hourUTC < 0 || hourUTC > 23) return res.status(400).json({ error: "hourUTC must be 0-23" });
+      if (typeof minuteUTC !== "number" || minuteUTC < 0 || minuteUTC > 59) return res.status(400).json({ error: "minuteUTC must be 0-59" });
+      if (typeof dayOfWeek !== "number" || dayOfWeek < 0 || dayOfWeek > 6) return res.status(400).json({ error: "dayOfWeek must be 0-6" });
+      if (typeof recipientEmail !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) return res.status(400).json({ error: "recipientEmail must be a valid email address" });
+      const saved = await storage.setBackupSchedule({ enabled, frequency, dayOfWeek, hourUTC, minuteUTC, recipientEmail });
+      res.json(saved);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 
@@ -3570,15 +3604,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // ── Data Integrity (admin-only) ───────────────────────────────────────────
-
-  // Inline admin-role guard used by all data-integrity endpoints
-  const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
-    const role = (req.user as any)?.role ?? "";
-    if (!["admin", "superadmin"].includes(role)) {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-    next();
-  };
+  // requireAdmin is defined earlier in this function (before the Backup section)
 
   // GET /api/admin/data-integrity/orphans
   app.get("/api/admin/data-integrity/orphans", requireAuth, requireAdmin, async (_req, res) => {
@@ -3824,5 +3850,35 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   const httpServer = createServer(app);
+
+  // ── Backup Scheduler ─────────────────────────────────────────────────────
+  // Tracks the last minute the auto-backup fired to avoid double-triggering.
+  let lastScheduledRunMinute = "";
+
+  setInterval(async () => {
+    try {
+      const schedule = await storage.getBackupSchedule();
+      if (!schedule.enabled) return;
+
+      const now = new Date();
+      const currentHourUTC = now.getUTCHours();
+      const currentMinuteUTC = now.getUTCMinutes();
+      const currentDayUTC = now.getUTCDay();
+
+      if (currentHourUTC !== schedule.hourUTC || currentMinuteUTC !== schedule.minuteUTC) return;
+
+      const runKey = `${now.toISOString().slice(0, 16)}`; // YYYY-MM-DDTHH:MM
+      if (lastScheduledRunMinute === runKey) return;
+
+      if (schedule.frequency === "weekly" && currentDayUTC !== schedule.dayOfWeek) return;
+
+      lastScheduledRunMinute = runKey;
+      console.log(`[Backup Scheduler] Running scheduled backup at ${runKey} UTC`);
+      await runDailyBackupEmail("auto", schedule.recipientEmail);
+    } catch (err: any) {
+      console.error("[Backup Scheduler] Error:", err?.message ?? err);
+    }
+  }, 60_000);
+
   return httpServer;
 }

@@ -330,6 +330,10 @@ export interface IStorage {
   getBackupLogs(): Promise<BackupLog[]>;
   addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog>;
 
+  // Backup Schedule
+  getBackupSchedule(): Promise<BackupScheduleSettings>;
+  setBackupSchedule(settings: BackupScheduleSettings): Promise<BackupScheduleSettings>;
+
   // Service Contracts (recurring jobs)
   getServiceContracts(): Promise<ServiceContract[]>;
   getServiceContract(id: string): Promise<ServiceContract | undefined>;
@@ -363,6 +367,15 @@ export interface BackupLog {
   status: "success" | "failed";
   errorMessage?: string;
   recipientEmail?: string;
+}
+
+export interface BackupScheduleSettings {
+  enabled: boolean;
+  frequency: "daily" | "weekly";
+  dayOfWeek: number;
+  hourUTC: number;
+  minuteUTC: number;
+  recipientEmail: string;
 }
 
 export class MemStorage implements IStorage {
@@ -405,6 +418,14 @@ export class MemStorage implements IStorage {
   private serviceScheduleMap: Map<string, ServiceScheduleEntry> = new Map();
   private activityLogs: any[] = [];
   private backupLogs: BackupLog[] = [];
+  private backupSchedule: BackupScheduleSettings = {
+    enabled: true,
+    frequency: "daily",
+    dayOfWeek: 1,
+    hourUTC: 21,
+    minuteUTC: 30,
+    recipientEmail: process.env.BACKUP_EMAIL_TO ?? "info@terminators.co.za",
+  };
   private invoiceCounter: number = 1;
   private poCounter: number = 9;
   private jobCounter: number = 16;
@@ -4631,6 +4652,15 @@ export class MemStorage implements IStorage {
       this.backupLogs = this.backupLogs.slice(-200);
     }
     return newLog;
+  }
+
+  async getBackupSchedule(): Promise<BackupScheduleSettings> {
+    return { ...this.backupSchedule };
+  }
+
+  async setBackupSchedule(settings: BackupScheduleSettings): Promise<BackupScheduleSettings> {
+    this.backupSchedule = { ...settings };
+    return { ...this.backupSchedule };
   }
 
   // ─── Service Contracts (recurring jobs, Outlook-style) ──────────────────

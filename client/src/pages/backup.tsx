@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { useQueryClient as useQC } from "@tanstack/react-query";
 import {
   Download,
   Upload,
@@ -27,7 +26,13 @@ import {
   Mail,
   Send,
   TestTube2,
+  Save,
+  CalendarClock,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,9 +100,42 @@ interface EmailConfigResponse {
   sender: string;
   provider: string;
   brevoConfigured: boolean;
+  brevoDeliveryMethod?: "smtp" | "api" | "none";
+  smtpConfigured?: boolean;
   sendgridConfigured: boolean;
   emailConfigured: boolean;
   maxAttachmentBytes: number;
+}
+
+interface BackupScheduleSettings {
+  enabled: boolean;
+  frequency: "daily" | "weekly";
+  dayOfWeek: number;
+  hourUTC: number;
+  minuteUTC: number;
+  recipientEmail: string;
+}
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function computeNextRun(schedule: BackupScheduleSettings): string {
+  if (!schedule.enabled) return "Disabled";
+  const now = new Date();
+  const candidate = new Date(now);
+  candidate.setUTCHours(schedule.hourUTC, schedule.minuteUTC, 0, 0);
+  if (candidate <= now) candidate.setUTCDate(candidate.getUTCDate() + 1);
+
+  if (schedule.frequency === "weekly") {
+    while (candidate.getUTCDay() !== schedule.dayOfWeek) {
+      candidate.setUTCDate(candidate.getUTCDate() + 1);
+    }
+  }
+
+  return candidate.toLocaleString("en-ZA", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+    timeZoneName: "short",
+  });
 }
 
 const TYPE_LABEL: Record<BackupType, string> = {
@@ -115,6 +153,8 @@ export default function BackupPage() {
   const [confirmRestore, setConfirmRestore] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showLogs, setShowLogs] = useState(true);
+  const [scheduleForm, setScheduleForm] = useState<BackupScheduleSettings | null>(null);
+  const [scheduleSaved, setScheduleSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { isDemoMode } = useAuth();
@@ -124,10 +164,33 @@ export default function BackupPage() {
     queryKey: ["/api/backup/email-config"],
   });
 
+  const { data: scheduleData } = useQuery<BackupScheduleSettings>({
+    queryKey: ["/api/backup/schedule"],
+  });
+
+  useEffect(() => {
+    if (scheduleData && !scheduleForm) setScheduleForm(scheduleData);
+  }, [scheduleData]);
+
+  const scheduleMutation = useMutation({
+    mutationFn: (settings: BackupScheduleSettings) => apiRequest("POST", "/api/backup/schedule", settings),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/backup/schedule"] });
+      setScheduleSaved(true);
+      setTimeout(() => setScheduleSaved(false), 3000);
+      toast({ title: "Schedule saved", description: "Backup schedule has been updated." });
+    },
+    onError: (e: any) => {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    },
+  });
+
   const { data: backupLogs = [], refetch: refetchLogs } = useQuery<BackupLog[]>({
     queryKey: ["/api/backup/logs"],
     refetchInterval: 30_000,
   });
+
+  const activeSchedule = scheduleForm ?? scheduleData;
 
   const emailLogs = backupLogs.filter((l) => l.backupType.startsWith("email"));
   const lastEmailSuccess = emailLogs.find((l) => l.status === "success");
@@ -301,8 +364,8 @@ export default function BackupPage() {
                   <p className="font-semibold">Two backup types</p>
                   <p>
                     The <strong>Restore Backup</strong> (.json) captures all data for a full system restore.
-                    The <strong>Excel Backup</strong> (.xlsx) creates a workbook you can open in Excel or Google Sheets.
-                    Both are emailed automatically each night.
+                    The <strong>CSV Summary</strong> (.csv) covers clients, jobs, invoices and staff — open it in Excel or Google Sheets.
+                    Both are emailed automatically on the configured schedule.
                   </p>
                 </div>
               </CardContent>
@@ -319,7 +382,9 @@ export default function BackupPage() {
                     <CardTitle>Daily Backup Email</CardTitle>
                     <CardDescription>
                       {emailConfig?.emailConfigured
-                        ? <>Sends JSON + Excel attachments via <strong>{emailConfig.provider === "brevo" ? "Brevo" : emailConfig?.provider}</strong> to <strong>{emailConfig.recipient}</strong> every night at 23:30 SAST</>
+                        ? <>Sends JSON + CSV attachments via <strong>{emailConfig.provider === "brevo" ? "Brevo" : emailConfig?.provider}</strong>
+                            {emailConfig?.brevoDeliveryMethod === "smtp" ? " (SMTP relay)" : emailConfig?.brevoDeliveryMethod === "api" ? " (HTTP API)" : ""}
+                            {" "}to <strong>{emailConfig.recipient}</strong></>
                         : `${emailConfig?.provider === "brevo" ? "Brevo" : "Email provider"} not configured — set ${emailConfig?.provider === "brevo" ? "BREVO_API_KEY" : "SENDGRID_API_KEY"} to enable email backups`}
                     </CardDescription>
                   </div>
@@ -353,7 +418,9 @@ export default function BackupPage() {
                     <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5 text-blue-500" /> Next scheduled email
                     </p>
-                    <p className="text-sm font-medium">{nextScheduledBackup()}</p>
+                    <p className="text-sm font-medium">
+                      {activeSchedule ? computeNextRun(activeSchedule) : nextScheduledBackup()}
+                    </p>
                   </div>
                 </div>
 
@@ -446,6 +513,20 @@ export default function BackupPage() {
                   The test email is identical to the daily email but clearly labelled as a TEST.
                 </p>
 
+                {emailConfig?.emailConfigured && emailConfig?.brevoDeliveryMethod === "api" && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-1">
+                    <p className="font-semibold flex items-center gap-2">
+                      <Info className="h-4 w-4" /> Using Brevo HTTP API (BREVO_API_KEY)
+                    </p>
+                    <p>
+                      JSON attachments may occasionally be restricted by Brevo. If backup emails fail, configure Brevo SMTP
+                      relay by setting <code className="bg-amber-100 px-1 rounded">SMTP_HOST</code>,{" "}
+                      <code className="bg-amber-100 px-1 rounded">SMTP_USER</code>, and{" "}
+                      <code className="bg-amber-100 px-1 rounded">SMTP_PASS</code> for more reliable delivery.
+                    </p>
+                  </div>
+                )}
+
                 <div className="pt-3 mt-3 border-t border-dashed">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Brevo SMTP connection test</p>
                   <Button
@@ -474,6 +555,152 @@ export default function BackupPage() {
                   )}
                 </div>
 
+              </CardContent>
+            </Card>
+
+            {/* ── Schedule Settings ─────────────────────────────────────────── */}
+            <Card className="border-violet-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-violet-100">
+                    <CalendarClock className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <div>
+                    <CardTitle>Backup Schedule</CardTitle>
+                    <CardDescription>
+                      Configure when automated backup emails are sent. The server will email
+                      the backup at your chosen time each day or week.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {activeSchedule && (
+                  <>
+                    <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                      <div>
+                        <p className="text-sm font-medium">Enable scheduled backups</p>
+                        <p className="text-xs text-muted-foreground">
+                          {activeSchedule.enabled ? "Automated backups are active" : "Automated backups are paused"}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={activeSchedule.enabled}
+                        onCheckedChange={(val) =>
+                          setScheduleForm((f) => f ? { ...f, enabled: val } : { ...scheduleData!, enabled: val })
+                        }
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium">Frequency</Label>
+                        <Select
+                          value={activeSchedule.frequency}
+                          onValueChange={(val) =>
+                            setScheduleForm((f) => f ? { ...f, frequency: val as "daily" | "weekly" } : { ...scheduleData!, frequency: val as "daily" | "weekly" })
+                          }
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {activeSchedule.frequency === "weekly" && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium">Day of week</Label>
+                          <Select
+                            value={String(activeSchedule.dayOfWeek)}
+                            onValueChange={(val) =>
+                              setScheduleForm((f) => f ? { ...f, dayOfWeek: Number(val) } : { ...scheduleData!, dayOfWeek: Number(val) })
+                            }
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAY_NAMES.map((d, i) => (
+                                <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium">
+                          Time (UTC) — currently{" "}
+                          <span className="font-semibold">
+                            {String(activeSchedule.hourUTC).padStart(2, "0")}:{String(activeSchedule.minuteUTC).padStart(2, "0")} UTC
+                          </span>
+                          {" "}= {String((activeSchedule.hourUTC + 2) % 24).padStart(2, "0")}:{String(activeSchedule.minuteUTC).padStart(2, "0")} SAST
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={activeSchedule.hourUTC}
+                            onChange={(e) => {
+                              const h = Math.max(0, Math.min(23, Number(e.target.value)));
+                              setScheduleForm((f) => f ? { ...f, hourUTC: h } : { ...scheduleData!, hourUTC: h });
+                            }}
+                            className="h-9 w-20"
+                            placeholder="HH"
+                          />
+                          <span className="self-center text-muted-foreground font-bold">:</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={activeSchedule.minuteUTC}
+                            onChange={(e) => {
+                              const m = Math.max(0, Math.min(59, Number(e.target.value)));
+                              setScheduleForm((f) => f ? { ...f, minuteUTC: m } : { ...scheduleData!, minuteUTC: m });
+                            }}
+                            className="h-9 w-20"
+                            placeholder="MM"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium">Recipient email</Label>
+                        <Input
+                          type="email"
+                          value={activeSchedule.recipientEmail}
+                          onChange={(e) =>
+                            setScheduleForm((f) => f ? { ...f, recipientEmail: e.target.value } : { ...scheduleData!, recipientEmail: e.target.value })
+                          }
+                          className="h-9"
+                          placeholder="admin@example.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border bg-violet-50 border-violet-200 px-3 py-2 text-sm text-violet-800 flex items-center gap-2">
+                      <CalendarClock className="h-4 w-4 shrink-0" />
+                      <span>Next run: <strong>{computeNextRun(activeSchedule)}</strong></span>
+                    </div>
+
+                    <Button
+                      onClick={() => activeSchedule && scheduleMutation.mutate(activeSchedule)}
+                      disabled={scheduleMutation.isPending}
+                      className="w-full bg-violet-600 hover:bg-violet-700"
+                    >
+                      {scheduleMutation.isPending
+                        ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+                        : scheduleSaved
+                        ? <><CheckCircle className="mr-2 h-4 w-4" />Schedule saved!</>
+                        : <><Save className="mr-2 h-4 w-4" />Save Schedule</>}
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -734,7 +961,7 @@ export default function BackupPage() {
               <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>• Download a <strong>Restore Backup</strong> before making large changes — it can be used to undo everything.</p>
                 <p>• Use the <strong>Excel Backup</strong> to share records with staff, do admin checks, or print reports.</p>
-                <p>• Backup emails are sent automatically at <strong>23:30 South Africa time</strong> every night.</p>
+                <p>• Backup emails are sent automatically on the configured schedule — adjust it in the Backup Schedule card above.</p>
                 <p>• Retention policy: daily backups kept for <strong>30 days</strong>; month-end backups kept for <strong>12 months</strong>.</p>
                 <p>• Keep backups in a secure location — they contain all client and financial data.</p>
                 <p>• Because data is stored in memory, a server restart clears all changes — back up regularly.</p>
