@@ -1,0 +1,280 @@
+Client Profile tabs look good. Please now polish and verify the Client Profile behaviour.
+
+Keep the 9 tabs:
+
+1. Details
+2. Jobs
+3. Contracts
+4. Invoices
+5. Treatment Reports
+6. Comm. Notes
+7. Stock Usage
+8. Documents
+9. Quotes
+
+The Client Profile must be the central hub for each client and must pull all records by clientId from PostgreSQL.
+
+Do not use separate duplicated client data.
+
+QUICK-STATS BAR
+
+At the top of every client profile, show a quick-stats bar:
+
+- Jobs
+- Active Contracts
+- Open Invoices
+- Treatment Reports
+- Comm. Notes
+
+Each stat must be clickable and should open the relevant tab.
+
+Example:
+Click Active Contracts -> opens Contracts tab.
+Click Open Invoices -> opens Invoices tab.
+
+DETAILS TAB
+
+Show:
+
+- Business name
+- Trading name
+- Contact person
+- Phone
+- Email
+- Physical address
+- Billing details
+- VAT number
+- Company registration number
+- Google Maps link
+- Notes
+- Active status
+
+Address must display using the structured address fields:
+- streetNumber
+- streetName
+- suburb
+- city
+- province
+- postalCode
+
+JOBS TAB
+
+Group jobs by status in this order:
+
+1. In Progress
+2. Upcoming
+3. Completed
+4. Cancelled / Not Completed
+
+Each job card/row must show:
+
+- Date
+- Time
+- Job title
+- Department
+- Service type
+- Pest type if Pest Control
+- Technician / Team
+- Status
+- Total price
+- Invoice status
+- Open Job button
+
+CONTRACTS TAB
+
+Show all active and inactive contracts linked to this client.
+
+Each contract card/row must show:
+
+- Contract number
+- Service type
+- Department
+- Frequency
+- Schedule summary
+- Assigned team / technician
+- Price
+- Increase date
+- Contract end date
+- Status
+- View/Edit Contract button
+
+Add a button:
+New Contract
+
+When clicked from the client profile, the new contract form must prefill:
+- clientId
+- client name
+- address
+- contact details
+- googleMapsLink if available
+
+INVOICES TAB
+
+Show invoice table with status colours.
+
+Each row must show:
+
+- Invoice number
+- Invoice date
+- Due date
+- Linked job if applicable
+- Linked contract if applicable
+- Total
+- Status
+- Open Invoice button
+
+Use clear status badges:
+- Draft
+- Sent
+- Paid
+- Overdue
+- Cancelled
+
+TREATMENT REPORTS TAB
+
+Show treatment reports as expandable cards.
+
+Each card must show:
+
+- Report date
+- Job number
+- Contract number if linked
+- Technician
+- Pest type
+- Treatment type
+- Chemicals used summary
+- Follow-up required Yes/No
+- View button
+- Print/Download button if available
+
+Add a button:
+New Treatment Report
+
+When created from the client profile, prefill:
+- clientId
+- client name
+- address
+
+If created from a job, also prefill:
+- jobId
+- technician
+- service type
+- pest type
+
+COMM. NOTES TAB
+
+Show communication notes as expandable cards.
+
+Each card must show:
+
+- Date
+- Communication type
+- Contact person
+- Notes
+- Confirmation received Yes/No
+- Linked job optional
+- Linked contract optional
+
+Add button:
+Add Communication Note
+
+Communication type options:
+- WhatsApp
+- Phone
+- Email
+- In Person
+- Other
+
+STOCK USAGE TAB
+
+Show stock usage table filtered to this client.
+
+Each row must show:
+
+- Date
+- Job
+- Contract if linked
+- Technician
+- Stock item
+- Quantity used
+- Unit
+- Notes
+
+This tab must read from job inventory / stock usage records where clientId matches this client.
+
+DOCUMENTS TAB
+
+Show the 8 document categories:
+
+- ISO Pest Control File
+- Treatment Reports
+- Installation Checklists
+- Survey Sheets
+- Pictures
+- PODs
+- Signed Worksheets
+- Other Documents
+
+For now, if file upload is not complete, show a placeholder:
+File uploads coming soon.
+
+But the layout must be ready for uploads later.
+
+QUOTES TAB
+
+Show all quotes linked to this client.
+
+Each row must show:
+
+- Quote number
+- Date
+- Sales rep
+- Department
+- Service type
+- Total
+- Status
+- Open Quote button
+
+If quotes link through Leads, still make sure they are visible on the client profile using clientId.
+
+CALENDAR
+
+The Service Calendar now opens in Day view by default. Keep this.
+
+For service users, default calendar view must be:
+Day
+
+DATA CHECKS
+
+Add or update Data Integrity checks:
+
+- Client profile tabs all load by clientId
+- No tab uses client name only as the link
+- Jobs tab count matches jobs with this clientId
+- Contracts tab count matches contracts with this clientId
+- Invoices tab count matches invoices with this clientId
+- Treatment Reports tab count matches treatment reports with this clientId
+- Communication Notes tab count matches comm notes with this clientId
+- Stock Usage tab count matches stock usage with this clientId
+- Quotes tab count matches quotes with this clientId
+
+TEST REQUIRED
+
+Test with one existing client.
+
+Open the client profile and confirm:
+
+1. Quick-stats counts are correct.
+2. Jobs tab shows the client’s jobs.
+3. Contracts tab shows the client’s service/rental contracts.
+4. Invoices tab shows the client’s invoices.
+5. Treatment Reports tab shows linked treatment reports.
+6. Comm. Notes tab shows linked communication notes.
+7. Stock Usage tab shows only this client’s stock usage.
+8. Documents tab shows the placeholder categories.
+9. Quotes tab shows linked quotes.
+10. New Contract button pre-fills the client correctly.
+11. Calendar still opens in Day view by default.
+
+Important:
+The client profile must be reliable enough that when a client phones in, office staff can open the client and immediately see all services, contracts, previous work, next work, invoices, reports, notes and documents.
