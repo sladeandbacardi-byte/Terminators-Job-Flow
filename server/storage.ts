@@ -39,6 +39,7 @@ import {
   type SalesFollowUp, type InsertSalesFollowUp,
   type TreatmentReport, type InsertTreatmentReport,
   type CommunicationNote, type InsertCommunicationNote,
+  type AcceptedWorkflow, type InsertAcceptedWorkflow,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -374,6 +375,14 @@ export interface IStorage {
   createCommunicationNote(n: InsertCommunicationNote): Promise<CommunicationNote>;
   updateCommunicationNote(id: string, n: Partial<InsertCommunicationNote>): Promise<CommunicationNote>;
   deleteCommunicationNote(id: string): Promise<boolean>;
+
+  // Accepted Quote Workflows
+  getAcceptedWorkflows(): Promise<AcceptedWorkflow[]>;
+  getAcceptedWorkflow(id: string): Promise<AcceptedWorkflow | undefined>;
+  getAcceptedWorkflowByQuote(quoteId: string): Promise<AcceptedWorkflow | undefined>;
+  createAcceptedWorkflow(w: InsertAcceptedWorkflow): Promise<AcceptedWorkflow>;
+  updateAcceptedWorkflow(id: string, w: Partial<InsertAcceptedWorkflow>): Promise<AcceptedWorkflow>;
+  deleteAcceptedWorkflow(id: string): Promise<boolean>;
 }
 
 export interface BackupLog {
@@ -4896,6 +4905,14 @@ export class MemStorage implements IStorage {
   async createCommunicationNote(_n: InsertCommunicationNote): Promise<CommunicationNote> { throw new Error("Use DbStorage for communication notes"); }
   async updateCommunicationNote(_id: string, _n: Partial<InsertCommunicationNote>): Promise<CommunicationNote> { throw new Error("Use DbStorage for communication notes"); }
   async deleteCommunicationNote(_id: string): Promise<boolean> { return false; }
+
+  // Accepted Quote Workflows (MemStorage stubs — production uses DbStorage)
+  async getAcceptedWorkflows(): Promise<AcceptedWorkflow[]> { return []; }
+  async getAcceptedWorkflow(_id: string): Promise<AcceptedWorkflow | undefined> { return undefined; }
+  async getAcceptedWorkflowByQuote(_quoteId: string): Promise<AcceptedWorkflow | undefined> { return undefined; }
+  async createAcceptedWorkflow(_w: InsertAcceptedWorkflow): Promise<AcceptedWorkflow> { throw new Error("Use DbStorage for accepted workflows"); }
+  async updateAcceptedWorkflow(_id: string, _w: Partial<InsertAcceptedWorkflow>): Promise<AcceptedWorkflow> { throw new Error("Use DbStorage for accepted workflows"); }
+  async deleteAcceptedWorkflow(_id: string): Promise<boolean> { return false; }
 
   async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {
     const contracts = Array.from(this.serviceContractsMap.values())

@@ -1271,3 +1271,88 @@ export const insertCommunicationNoteSchema = createInsertSchema(communicationNot
 });
 export type InsertCommunicationNote = z.infer<typeof insertCommunicationNoteSchema>;
 export type CommunicationNote = typeof communicationNotes.$inferSelect;
+
+// ─── ACCEPTED QUOTE WORKFLOWS ────────────────────────────────────────────────
+
+export const WORKFLOW_STATUSES = [
+  { value: "pending_registration",  label: "Pending Registration",  color: "bg-slate-100 text-slate-700",   borderColor: "border-l-slate-400"   },
+  { value: "registration_sent",     label: "Registration Sent",     color: "bg-amber-100 text-amber-700",   borderColor: "border-l-amber-400"   },
+  { value: "registration_received", label: "Registration Received", color: "bg-yellow-100 text-yellow-700", borderColor: "border-l-yellow-400"  },
+  { value: "contract_drafted",      label: "Contract Drafted",      color: "bg-blue-100 text-blue-700",     borderColor: "border-l-blue-400"    },
+  { value: "contract_sent",         label: "Contract Sent",         color: "bg-indigo-100 text-indigo-700", borderColor: "border-l-indigo-400"  },
+  { value: "contract_signed",       label: "Contract Signed",       color: "bg-violet-100 text-violet-700", borderColor: "border-l-violet-400"  },
+  { value: "scheduled",             label: "Scheduled",             color: "bg-cyan-100 text-cyan-700",     borderColor: "border-l-cyan-400"    },
+  { value: "ready_to_invoice",      label: "Ready to Invoice",      color: "bg-orange-100 text-orange-700", borderColor: "border-l-orange-400"  },
+  { value: "invoiced",              label: "Invoiced",              color: "bg-lime-100 text-lime-700",     borderColor: "border-l-lime-400"    },
+  { value: "after_sales_due",       label: "After-sales Due",       color: "bg-pink-100 text-pink-700",     borderColor: "border-l-pink-400"    },
+  { value: "complete",              label: "Complete",              color: "bg-green-100 text-green-700",   borderColor: "border-l-green-400"   },
+] as const;
+export type WorkflowStatusValue = typeof WORKFLOW_STATUSES[number]["value"];
+
+export const acceptedWorkflows = pgTable("accepted_workflows", {
+  id:                          varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId:                     varchar("quote_id").notNull(),
+  quoteNumber:                 text("quote_number"),
+  companyName:                 text("company_name").notNull(),
+  contactPerson:               text("contact_person"),
+  serviceType:                 text("service_type"),
+  quoteAmount:                 text("quote_amount"),
+  monthlyRecurring:            text("monthly_recurring"),
+  installationCost:            text("installation_cost"),
+  frequency:                   text("frequency"),
+  address:                     text("address"),
+  specialInstructions:         text("special_instructions"),
+  salesRepId:                  varchar("sales_rep_id"),
+  afterHoursRequired:          text("after_hours_required"),
+  existingCompetitorContract:  text("existing_competitor_contract"),
+  competitorName:              text("competitor_name"),
+  cancellationNoticeRequired:  text("cancellation_notice_required"),
+  noticePeriod:                text("notice_period"),
+  departmentId:                varchar("department_id"),
+  // ── Client Registration ──────────────────────────────────────────────────
+  regFormSent:                 boolean("reg_form_sent").notNull().default(false),
+  regFormSentAt:               timestamp("reg_form_sent_at"),
+  regFormReceived:             boolean("reg_form_received").notNull().default(false),
+  regFormReceivedAt:           timestamp("reg_form_received_at"),
+  vatNumber:                   text("vat_number"),
+  companyRegNumber:            text("company_reg_number"),
+  accountsContact:             text("accounts_contact"),
+  accountsEmail:               text("accounts_email"),
+  paymentTerms:                text("payment_terms"),
+  regComplete:                 boolean("reg_complete").notNull().default(false),
+  // ── Service Contract ─────────────────────────────────────────────────────
+  contractDrafted:             boolean("contract_drafted").notNull().default(false),
+  contractSent:                boolean("contract_sent").notNull().default(false),
+  contractSentAt:              timestamp("contract_sent_at"),
+  contractSigned:              boolean("contract_signed").notNull().default(false),
+  contractSignedAt:            timestamp("contract_signed_at"),
+  linkedContractId:            varchar("linked_contract_id"),
+  // ── Service Handover & Scheduling ───────────────────────────────────────
+  handoverSent:                boolean("handover_sent").notNull().default(false),
+  serviceScheduled:            boolean("service_scheduled").notNull().default(false),
+  scheduledDate:               text("scheduled_date"),
+  linkedJobId:                 varchar("linked_job_id"),
+  // ── Invoice ──────────────────────────────────────────────────────────────
+  readyToInvoice:              boolean("ready_to_invoice").notNull().default(false),
+  readyToInvoiceAt:            timestamp("ready_to_invoice_at"),
+  linkedInvoiceId:             varchar("linked_invoice_id"),
+  invoiceStatus:               text("invoice_status"),
+  // ── After-sales Follow-up ────────────────────────────────────────────────
+  afterSalesFollowupDate:      text("after_sales_followup_date"),
+  afterSalesAssignedTo:        varchar("after_sales_assigned_to"),
+  afterSalesNotes:             text("after_sales_notes"),
+  afterSalesComplete:          boolean("after_sales_complete").notNull().default(false),
+  // ── Overall ──────────────────────────────────────────────────────────────
+  workflowStatus:              text("workflow_status").notNull().default("pending_registration"),
+  notes:                       text("notes"),
+  createdAt:                   timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt:                   timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertAcceptedWorkflowSchema = createInsertSchema(acceptedWorkflows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAcceptedWorkflow = z.infer<typeof insertAcceptedWorkflowSchema>;
+export type AcceptedWorkflow = typeof acceptedWorkflows.$inferSelect;

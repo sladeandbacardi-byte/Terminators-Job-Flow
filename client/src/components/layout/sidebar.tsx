@@ -46,6 +46,7 @@ const ALL_SECTIONS: NavSection[] = [
     items: [
       { name: "Sales Dashboard",    href: "/sales-dashboard",    icon: LayoutDashboard, roles: ["admin", "manager", "sales"] },
       { name: "Leads",              href: "/leads",              icon: TrendingUp, roles: ["admin", "manager", "sales"] },
+      { name: "Accepted Work",      href: "/accepted-work",      icon: CheckSquare, roles: ["admin", "manager", "sales"] },
       { name: "Sales Diary",        href: "/sales-diary",        icon: BookOpen,   roles: ["admin", "manager", "sales"] },
       { name: "Quotes",             href: "/quotes",             icon: FileText,   roles: ["admin", "manager", "sales"] },
       { name: "Follow-ups",         href: "/follow-ups",         icon: Bell,       roles: ["admin", "manager", "sales"] },

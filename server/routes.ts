@@ -4389,6 +4389,54 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ─── Accepted Quote Workflows ────────────────────────────────────────────
+
+  app.get("/api/accepted-workflows", async (_req, res) => {
+    try { res.json(await storage.getAcceptedWorkflows()); }
+    catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/accepted-workflows/by-quote/:quoteId", async (req, res) => {
+    try {
+      const w = await storage.getAcceptedWorkflowByQuote(req.params.quoteId);
+      w ? res.json(w) : res.status(404).json({ message: "Not found" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/accepted-workflows/:id", async (req, res) => {
+    try {
+      const w = await storage.getAcceptedWorkflow(req.params.id);
+      w ? res.json(w) : res.status(404).json({ message: "Not found" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/accepted-workflows", async (req, res) => {
+    try {
+      const data = req.body as any;
+      // Idempotent: don't create duplicate workflow for same quoteId
+      if (data.quoteId) {
+        const existing = await storage.getAcceptedWorkflowByQuote(data.quoteId);
+        if (existing) { return res.json(existing); }
+      }
+      const w = await storage.createAcceptedWorkflow(data);
+      res.status(201).json(w);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.patch("/api/accepted-workflows/:id", async (req, res) => {
+    try {
+      const w = await storage.updateAcceptedWorkflow(req.params.id, req.body);
+      res.json(w);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/accepted-workflows/:id", async (req, res) => {
+    try {
+      const ok = await storage.deleteAcceptedWorkflow(req.params.id);
+      ok ? res.json({ success: true }) : res.status(404).json({ message: "Not found" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   const httpServer = createServer(app);
 
   // ── Backup Scheduler ─────────────────────────────────────────────────────

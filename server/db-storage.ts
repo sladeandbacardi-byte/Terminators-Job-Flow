@@ -14,7 +14,7 @@ import {
   vehicles, vehicleAssignments, kmLogs, fuelFillups, vehicleInspections, vehicleIssues,
   serviceRecords, workshopJobs, teams, teamMembers, attendanceRecords, attendanceMemberRecords,
   serviceContracts, salesAppointments, expenses, serviceScheduleEntries, activityLogs,
-  treatmentReports, communicationNotes,
+  treatmentReports, communicationNotes, acceptedWorkflows,
 } from "@shared/schema";
 
 import type {
@@ -57,6 +57,7 @@ import type {
   SalesFollowUp, InsertSalesFollowUp,
   TreatmentReport, InsertTreatmentReport,
   CommunicationNote, InsertCommunicationNote,
+  AcceptedWorkflow, InsertAcceptedWorkflow,
 } from "@shared/schema";
 
 import type {
@@ -1931,6 +1932,43 @@ export class DbStorage implements IStorage {
 
   async deleteCommunicationNote(id: string): Promise<boolean> {
     const res = await db.delete(communicationNotes).where(eq(communicationNotes.id, id));
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  // ─── Accepted Quote Workflows ────────────────────────────────────────────
+
+  async getAcceptedWorkflows(): Promise<AcceptedWorkflow[]> {
+    return db.select().from(acceptedWorkflows).orderBy(desc(acceptedWorkflows.createdAt));
+  }
+
+  async getAcceptedWorkflow(id: string): Promise<AcceptedWorkflow | undefined> {
+    const [r] = await db.select().from(acceptedWorkflows).where(eq(acceptedWorkflows.id, id));
+    return r;
+  }
+
+  async getAcceptedWorkflowByQuote(quoteId: string): Promise<AcceptedWorkflow | undefined> {
+    const [r] = await db.select().from(acceptedWorkflows).where(eq(acceptedWorkflows.quoteId, quoteId));
+    return r;
+  }
+
+  async createAcceptedWorkflow(w: InsertAcceptedWorkflow): Promise<AcceptedWorkflow> {
+    const [row] = await db.insert(acceptedWorkflows)
+      .values({ ...w, id: randomUUID(), createdAt: new Date(), updatedAt: new Date() } as any)
+      .returning();
+    return row;
+  }
+
+  async updateAcceptedWorkflow(id: string, w: Partial<InsertAcceptedWorkflow>): Promise<AcceptedWorkflow> {
+    const [row] = await db.update(acceptedWorkflows)
+      .set({ ...w, updatedAt: new Date() } as any)
+      .where(eq(acceptedWorkflows.id, id))
+      .returning();
+    if (!row) throw new Error("Workflow not found");
+    return row;
+  }
+
+  async deleteAcceptedWorkflow(id: string): Promise<boolean> {
+    const res = await db.delete(acceptedWorkflows).where(eq(acceptedWorkflows.id, id));
     return (res.rowCount ?? 0) > 0;
   }
 }

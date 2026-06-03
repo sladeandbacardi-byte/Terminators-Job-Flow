@@ -157,11 +157,47 @@ export default function Leads() {
   });
 
   const advanceLead = useMutation({
-    mutationFn: ({ id, status, notes }: { id: string; status: string; notes?: string }) =>
-      apiRequest("PATCH", `/api/quote-submissions/${id}`, { status, ...(notes ? { notes } : {}) }),
-    onSuccess: () => {
+    mutationFn: async ({ id, status, notes, lead }: { id: string; status: string; notes?: string; lead?: any }) => {
+      const res = await apiRequest("PATCH", `/api/quote-submissions/${id}`, { status, ...(notes ? { notes } : {}) });
+      // Auto-create accepted workflow when advancing to "accepted" stage
+      if (status === "accepted" && lead) {
+        try {
+          await apiRequest("POST", "/api/accepted-workflows", {
+            quoteId: id,
+            quoteNumber: lead.quoteNumber,
+            companyName: lead.companyName,
+            contactPerson: lead.contactPerson,
+            serviceType: lead.serviceType,
+            quoteAmount: lead.quoteAmount,
+            monthlyRecurring: lead.monthlyRecurring,
+            installationCost: lead.installationCost,
+            frequency: lead.frequency,
+            address: lead.address,
+            specialInstructions: lead.specialInstructions,
+            salesRepId: lead.assignedTo,
+            afterHoursRequired: lead.afterHoursRequired,
+            existingCompetitorContract: lead.existingCompetitorContract,
+            competitorName: lead.competitorName,
+            cancellationNoticeRequired: lead.cancellationNoticeRequired,
+            noticePeriod: lead.noticePeriod,
+            departmentId: lead.departmentId,
+            workflowStatus: "pending_registration",
+          });
+        } catch (_) {}
+      }
+      return res;
+    },
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
-      toast({ title: "Lead updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accepted-workflows"] });
+      if (variables.status === "accepted") {
+        toast({
+          title: "Lead accepted! 🎉",
+          description: "Workflow created — go to Accepted Work to manage the next steps.",
+        });
+      } else {
+        toast({ title: "Lead updated" });
+      }
     },
     onError: () => toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" }),
   });
@@ -424,7 +460,7 @@ export default function Leads() {
                       key={lead.id}
                       lead={lead}
                       workers={workers}
-                      onAdvance={(status) => advanceLead.mutate({ id: lead.id, status })}
+                      onAdvance={(status) => advanceLead.mutate({ id: lead.id, status, lead })}
                       onQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
                       onNotes={() => {
                         setNotesLead(lead);

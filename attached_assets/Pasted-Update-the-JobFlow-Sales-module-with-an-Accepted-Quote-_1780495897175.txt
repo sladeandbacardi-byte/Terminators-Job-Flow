@@ -1,0 +1,95 @@
+Update the JobFlow Sales module with an Accepted Quote Workflow.
+
+When a quote or lead is marked as Accepted / Won / Converted, the system must open a clear next-step workflow panel.
+
+The workflow must create and track these tasks:
+
+1. Client Registration
+- Send client registration form
+- Mark registration form sent
+- Mark registration form received
+- Capture VAT number
+- Capture company registration number
+- Capture accounts contact
+- Capture accounts email
+- Capture payment terms
+- Mark client registration complete
+
+2. Service Contract
+- Create service contract from accepted quote
+- Copy client details from quote
+- Copy service details from quote
+- Copy pricing from quote
+- Copy monthly recurring amount from quote
+- Copy frequency from quote
+- Copy special instructions from quote
+- Mark contract drafted
+- Mark contract sent
+- Mark contract signed
+
+3. Service / Installation Handover
+- Create handover task for Service department
+- Show quote number
+- Show client name
+- Show site address
+- Show contact person
+- Show contact number
+- Show service required
+- Show installation requirements
+- Show photos / site notes / inspection notes
+- Show special instructions
+- Show after-hours or overtime warning if applicable
+- Show competitor cancellation notice warning if applicable
+
+4. Schedule Service / Installation
+- Allow user to create once-off job or recurring contract job
+- Link accepted quote to Service Calendar
+- Carry across client, address, contact person, service type, quote notes and special instructions
+
+5. Invoicing
+- Mark accepted work as Ready to Invoice
+- Show linked quote number
+- Show linked invoice number once invoiced
+- Show invoice status
+
+6. After-sales Follow-up
+- Automatically create a follow-up task 2 weeks after first service or installation
+- Assign it to the sales rep
+- Allow notes: client happy, issues, further opportunity, next action
+
+Create a new Sales page called Accepted Work or Accepted Quote Workflow.
+
+This page must show all accepted quotes grouped by workflow status:
+- Accepted, no registration sent
+- Registration sent, not received
+- Contract not drafted
+- Contract sent, not signed
+- Ready for scheduling
+- Scheduled
+- Ready to invoice
+- Invoiced
+- After-sales follow-up due
+- Complete
+
+Add warning badges:
+- Contract not signed
+- Registration outstanding
+- Service scheduled before contract signed
+- Overtime required
+- Competitor notice period
+- Missing installation cost
+- Missing service frequency
+- Missing client accounts details
+
+Add quick action buttons:
+- Send Registration Form
+- Create Contract
+- Mark Contract Sent
+- Mark Contract Signed
+- Send to Service
+- Schedule Job
+- Mark Ready to Invoice
+- Create After-sales Follow-up
+- Mark Complete
+
+The goal is that once Sales wins the work, JobFlow forces the process forward into registration, contract, service scheduling, invoicing and after-sales follow-up without relying on WhatsApp messages or memory.

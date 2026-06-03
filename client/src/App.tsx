@@ -58,6 +58,7 @@ import ClientProfile from "@/pages/client-profile";
 import DataIntegrity from "@/pages/data-integrity";
 import SalesDashboard from "@/pages/sales-dashboard";
 import CommissionReports from "@/pages/commission-reports";
+import AcceptedWork from "@/pages/accepted-work";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -131,6 +132,7 @@ function AuthenticatedApp() {
       <Route path="/data-integrity" component={DataIntegrity} />
       <Route path="/sales-dashboard" component={SalesDashboard} />
       <Route path="/commission-reports" component={CommissionReports} />
+      <Route path="/accepted-work" component={AcceptedWork} />
       <Route component={NotFound} />
     </Switch>
   );
