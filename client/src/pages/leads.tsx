@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase,
   XCircle, ArrowRight, Calendar, User, Building2, AlertCircle,
-  Send, Search, X, Megaphone, Download, BookOpen,
+  Send, Search, X, Megaphone, Download, BookOpen, Flag,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import DocumentForm from "@/components/forms/document-form";
@@ -42,6 +42,39 @@ const PRIORITY_OPTIONS = [
 
 // Active pipeline stages shown in the kanban (pre-quoting)
 const ACTIVE_PIPELINE_STAGES: LeadStage[] = ["new","contacted","appointment_scheduled","quote_needed"];
+
+// All stages considered active (including post-site-assessment)
+const ALL_ACTIVE_STAGES = [
+  "new","contacted","appointment_scheduled","site_assessment_done",
+  "quote_needed","quote_sent","follow_up_due",
+];
+
+// Stale-lead thresholds: days without advancement triggers a warning
+const STALE_DAYS: Record<string, number> = { high: 2, medium: 5, low: 7 };
+
+function isStale(lead: QuoteSubmission): boolean {
+  const stage = (lead as any).stage || lead.status;
+  if (!ALL_ACTIVE_STAGES.includes(stage)) return false;
+  const days = Math.floor((Date.now() - new Date(lead.submittedAt ?? 0).getTime()) / 86400000);
+  const threshold = STALE_DAYS[(lead as any).priority ?? "medium"] ?? 5;
+  return days > threshold;
+}
+
+const YES_NO_OPTIONS = [
+  { value: "yes",     label: "Yes" },
+  { value: "no",      label: "No" },
+  { value: "unknown", label: "Unknown / Not asked" },
+];
+
+const CLIENT_FLAG_OPTIONS = [
+  { value: "bad_payer",         label: "Bad Payer" },
+  { value: "high_profile",      label: "High Profile" },
+  { value: "price_sensitive",   label: "Price Sensitive" },
+  { value: "vip",               label: "VIP" },
+  { value: "requires_approval", label: "Requires Management Approval" },
+  { value: "competitor_risk",   label: "Competitor Risk" },
+  { value: "do_not_contact",    label: "Do Not Contact" },
+];
 
 const PIPELINE: { status: LeadStage; label: string; color: string; dotColor: string }[] = [
   { status: "new",                   label: "New Leads",       color: "bg-blue-50 border-blue-200",    dotColor: "bg-blue-500"   },
@@ -134,10 +167,8 @@ export default function Leads() {
   });
 
   const saveLeadEdits = useMutation({
-    mutationFn: ({ id, notes, origination, originationOther, stage, priority, leadType, tradingName, internalNotes }:
-      { id: string; notes: string; origination: string; originationOther: string | null;
-        stage?: string; priority?: string; leadType?: string; tradingName?: string; internalNotes?: string }) =>
-      apiRequest("PATCH", `/api/quote-submissions/${id}`, { notes, origination, originationOther, stage, priority, leadType, tradingName, internalNotes }),
+    mutationFn: (payload: Record<string, any>) =>
+      apiRequest("PATCH", `/api/quote-submissions/${payload.id}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       setNotesLead(null);
@@ -152,6 +183,15 @@ export default function Leads() {
   const [editLeadType, setEditLeadType] = useState<string>("");
   const [editTradingName, setEditTradingName] = useState<string>("");
   const [editInternalNotes, setEditInternalNotes] = useState<string>("");
+  // New site detail fields
+  const [editAfterHours, setEditAfterHours] = useState<string>("");
+  const [editExistingContract, setEditExistingContract] = useState<string>("");
+  const [editCompetitorName, setEditCompetitorName] = useState<string>("");
+  const [editCancellationNotice, setEditCancellationNotice] = useState<string>("");
+  const [editNoticePeriod, setEditNoticePeriod] = useState<string>("");
+  const [editEarliestStartDate, setEditEarliestStartDate] = useState<string>("");
+  const [editExpectedServiceTime, setEditExpectedServiceTime] = useState<string>("");
+  const [editClientFlags, setEditClientFlags] = useState<string[]>([]);
 
   const sendQuote = useMutation({
     mutationFn: async (data: DocumentFormValues) => {
@@ -396,6 +436,14 @@ export default function Leads() {
                         setEditLeadType((lead as any).leadType ?? "");
                         setEditTradingName((lead as any).tradingName ?? "");
                         setEditInternalNotes((lead as any).internalNotes ?? "");
+                        setEditAfterHours((lead as any).afterHoursRequired ?? "");
+                        setEditExistingContract((lead as any).existingCompetitorContract ?? "");
+                        setEditCompetitorName((lead as any).competitorName ?? "");
+                        setEditCancellationNotice((lead as any).cancellationNoticeRequired ?? "");
+                        setEditNoticePeriod((lead as any).noticePeriod ?? "");
+                        setEditEarliestStartDate((lead as any).earliestStartDate ?? "");
+                        setEditExpectedServiceTime((lead as any).expectedServiceTime ?? "");
+                        try { setEditClientFlags(JSON.parse((lead as any).clientFlags ?? "[]") ?? []); } catch { setEditClientFlags([]); }
                       }}
                       onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
                       onSchedule={() => {
@@ -556,6 +604,89 @@ export default function Leads() {
                 <label className="text-sm font-medium block mb-1">Internal Notes <span className="text-xs text-gray-400">(staff only)</span></label>
                 <Textarea rows={2} value={editInternalNotes} onChange={e => setEditInternalNotes(e.target.value)} placeholder="Margin notes, concerns, strategy..." />
               </div>
+
+              {/* ── Site & Competitor Details ── */}
+              <div className="border-t pt-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Site & Competitor Details</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium block mb-1">After-hours Required?</label>
+                    <Select value={editAfterHours || "_none"} onValueChange={v => setEditAfterHours(v === "_none" ? "" : v)}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">Not specified</SelectItem>
+                        {YES_NO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Existing Competitor Contract?</label>
+                    <Select value={editExistingContract || "_none"} onValueChange={v => setEditExistingContract(v === "_none" ? "" : v)}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">Not specified</SelectItem>
+                        {YES_NO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(editExistingContract === "yes") && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Competitor Name</label>
+                        <Input value={editCompetitorName} onChange={e => setEditCompetitorName(e.target.value)} className="h-9 text-sm" placeholder="e.g. ABC Services" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Cancellation Notice Required?</label>
+                        <Select value={editCancellationNotice || "_none"} onValueChange={v => setEditCancellationNotice(v === "_none" ? "" : v)}>
+                          <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="_none">Not specified</SelectItem>
+                            {YES_NO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {editCancellationNotice === "yes" && (
+                        <div className="col-span-2">
+                          <label className="text-sm font-medium block mb-1">Notice Period</label>
+                          <Input value={editNoticePeriod} onChange={e => setEditNoticePeriod(e.target.value)} className="h-9 text-sm" placeholder="e.g. 30 days, 1 month, 3 months" />
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Earliest Start Date</label>
+                    <Input type="date" value={editEarliestStartDate} onChange={e => setEditEarliestStartDate(e.target.value)} className="h-9 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Expected Service Frequency</label>
+                    <Input value={editExpectedServiceTime} onChange={e => setEditExpectedServiceTime(e.target.value)} className="h-9 text-sm" placeholder="e.g. Monthly, Bi-weekly" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Client Flags ── */}
+              <div className="border-t pt-3">
+                <label className="text-sm font-medium block mb-2">
+                  <Flag className="inline h-3.5 w-3.5 mr-1 text-amber-500" />Client Flags
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {CLIENT_FLAG_OPTIONS.map(f => {
+                    const active = editClientFlags.includes(f.value);
+                    return (
+                      <button
+                        key={f.value}
+                        type="button"
+                        onClick={() => setEditClientFlags(prev =>
+                          active ? prev.filter(x => x !== f.value) : [...prev, f.value]
+                        )}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-amber-100 border-amber-400 text-amber-800 font-semibold" : "bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-400"}`}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <DialogFooter>
@@ -581,6 +712,14 @@ export default function Leads() {
                     leadType: editLeadType || undefined,
                     tradingName: editTradingName || undefined,
                     internalNotes: editInternalNotes || undefined,
+                    afterHoursRequired: editAfterHours || null,
+                    existingCompetitorContract: editExistingContract || null,
+                    competitorName: editCompetitorName || null,
+                    cancellationNoticeRequired: editCancellationNotice || null,
+                    noticePeriod: editNoticePeriod || null,
+                    earliestStartDate: editEarliestStartDate || null,
+                    expectedServiceTime: editExpectedServiceTime || null,
+                    clientFlags: editClientFlags.length > 0 ? JSON.stringify(editClientFlags) : null,
                   });
                 }}
                 disabled={saveLeadEdits.isPending}
@@ -638,8 +777,42 @@ function LeadCard({
   };
   const nextAction = STAGE_NEXT[stage];
 
+  const stale = isStale(lead);
+  const clientFlagsList: string[] = (() => {
+    try { return JSON.parse((lead as any).clientFlags ?? "[]") ?? []; } catch { return []; }
+  })();
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 space-y-2">
+    <div className={`bg-white rounded-lg border shadow-sm p-3 space-y-2 ${stale ? "border-red-300 ring-1 ring-red-200" : "border-gray-200"}`}>
+      {/* Stale warning strip */}
+      {stale && (
+        <div className="flex items-center gap-1 text-[10px] font-semibold text-red-600 bg-red-50 rounded px-2 py-1 -mx-1 -mt-1">
+          <AlertCircle className="h-3 w-3 flex-shrink-0" />
+          Stale — no activity in {Math.floor((Date.now() - new Date(lead.submittedAt ?? 0).getTime()) / 86400000)}d
+        </div>
+      )}
+      {/* Competitor warning */}
+      {(lead as any).existingCompetitorContract === "yes" && (
+        <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded px-2 py-1 -mx-1">
+          <AlertCircle className="h-3 w-3 flex-shrink-0" />
+          Has competitor contract{(lead as any).competitorName ? `: ${(lead as any).competitorName}` : ""}
+          {(lead as any).cancellationNoticeRequired === "yes" && (lead as any).noticePeriod ? ` · ${(lead as any).noticePeriod} notice` : ""}
+        </div>
+      )}
+      {/* Client flags */}
+      {clientFlagsList.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {clientFlagsList.map((f: string) => {
+            const flagLabel = CLIENT_FLAG_OPTIONS.find(o => o.value === f)?.label ?? f;
+            const dangerous = ["bad_payer","do_not_contact"].includes(f);
+            return (
+              <span key={f} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${dangerous ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                <Flag className="inline h-2.5 w-2.5 mr-0.5" />{flagLabel}
+              </span>
+            );
+          })}
+        </div>
+      )}
       {/* Company + service + priority */}
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0 flex-1">

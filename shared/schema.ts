@@ -636,6 +636,16 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   installationCost: text("installation_cost"),
   internalNotes: text("internal_notes"),
   clientId: varchar("client_id").references(() => clients.id),
+  // Site & service detail fields
+  afterHoursRequired: text("after_hours_required"),           // yes / no / unknown
+  existingCompetitorContract: text("existing_competitor_contract"), // yes / no / unknown
+  competitorName: text("competitor_name"),
+  cancellationNoticeRequired: text("cancellation_notice_required"), // yes / no / unknown
+  noticePeriod: text("notice_period"),
+  earliestStartDate: text("earliest_start_date"),             // YYYY-MM-DD
+  clientFlags: text("client_flags"),                          // JSON array: ["bad_payer","high_profile",...]
+  expectedServiceTime: text("expected_service_time"),         // e.g. "Monthly", "Bi-weekly"
+  departmentId: varchar("department_id"),
 });
 
 // Marketing channel options for the Origination field on every lead
@@ -724,6 +734,10 @@ export const pricingLibrary = pgTable("pricing_library", {
   unitPrice: text("unit_price").notNull(),
   departmentId: varchar("department_id"),
   isActive: boolean("is_active").notNull().default(true),
+  cost: text("cost"),
+  itemCode: text("item_code"),
+  vatStatus: text("vat_status").default("inclusive"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 

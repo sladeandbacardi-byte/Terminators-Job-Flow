@@ -1,0 +1,659 @@
+Update the JobFlow Sales module using the combined sales rep feedback.
+
+The Sales module must help sales reps manage:
+- Leads
+- Appointments
+- Site assessments
+- Quotes
+- Follow-ups
+- Service contracts
+- Client registration
+- Scheduling handover
+- Client service history
+- Commission reporting
+
+MAIN SALES WORKFLOW:
+Lead Origination → Contact → Sales Diary Appointment → Site Assessment → Quote → Follow-up → Accepted / Declined → Client Registration → Service Contract → Installation / Service Scheduling → Invoiced → Commission Reporting → After-sales Follow-up
+
+SALES MENU:
+Create these Sales tabs:
+- Sales Dashboard
+- Leads
+- Sales Diary
+- Quotes
+- Follow-ups
+- Contracts Pending
+- Client Registration
+- Accepted Work
+- Clients
+- Pricing Library
+- Commission Reports
+- Sales Reports
+
+LEAD ORIGINATION:
+Every lead must have an Origination field.
+
+Origination dropdown:
+- Facebook
+- Google
+- Vehicles
+- Phone / Incoming Call
+- Cold Call
+- Word of Mouth / Referral
+- Website
+- Existing Client
+- Walk-in
+- Email
+- Other
+
+If Other is selected, show:
+- Other Origination Details
+
+LEAD FORM:
+Each lead must include:
+- Company name
+- Trading name, if different
+- Contact person
+- Contact number
+- Email address
+- Site address
+- Origination
+- Department: Pest Control, Hygiene, Sanitary Bins, Deep Cleaning, Other
+- Service required
+- Lead type: Once-off, Contract, Rental, Outright Purchase, Unknown
+- Assigned sales rep
+- Priority: Low, Medium, High
+- Expected service time
+- After-hours / overtime required: Yes / No / Unknown
+- Existing competitor contract: Yes / No / Unknown
+- Competitor cancellation notice period
+- Notes
+- Status
+- Created date
+- Last updated date
+
+LEAD STAGES:
+Create these lead stages:
+- New Lead
+- Contacted
+- Appointment Scheduled
+- Site Assessment Done
+- Quote Needed
+- Quote Sent
+- Follow-up Due
+- Accepted
+- Declined / Lost
+- Client Registration Pending
+- Contract Pending
+- Converted to Contract
+- Converted to Once-off Job
+- Installation / Service Scheduled
+- Invoiced
+- After-sales Follow-up Due
+- Complete
+
+STALE LEAD WARNING:
+If a lead has no activity for a set number of days, show a warning:
+"This lead has had no recent activity."
+
+Allow managers to set stale lead rules, for example:
+- High priority lead: warning after 2 days
+- Medium priority lead: warning after 5 days
+- Low priority lead: warning after 7 days
+
+SALES DIARY:
+Sales reps must be able to load meetings, appointments, site visits and follow-ups into a diary.
+
+Sales Diary views:
+- Day view
+- Week view
+- Month view
+- List view
+- Manager view grouped by sales rep
+
+Diary entry fields:
+- Appointment title
+- Client / lead name
+- Contact person
+- Phone number
+- Site address
+- Appointment type
+- Assigned sales rep
+- Date
+- Start time
+- End time
+- Estimated duration
+- Status
+- Notes
+
+Appointment type dropdown:
+- New lead meeting
+- Site visit / assessment
+- Quote follow-up
+- Contract renewal
+- Existing client visit
+- Complaint / issue visit
+- Internal sales meeting
+- After-sales follow-up
+- Other
+
+Appointment status dropdown:
+- Planned
+- Confirmed
+- Completed
+- Cancelled
+- Rescheduled
+- No show
+
+When an appointment is completed, allow the sales rep to add:
+- What happened
+- Client feedback
+- Photos
+- Site notes
+- Inspection notes
+- Next action required
+- Follow-up date
+
+If a follow-up date is added, automatically create a follow-up task.
+
+QUOTE CREATION:
+Quotes must be quick to create using preloaded pricing.
+
+Create a Pricing Library that stores preloaded prices for:
+- Pest control services
+- Hygiene services
+- Sanitary bins
+- Dispensers
+- Refills
+- Washroom equipment
+- Deep cleaning services
+- Installation fees
+- Once-off services
+- Contract services
+- Rental items
+- Outright purchase items
+- Overtime / after-hours rates
+
+Pricing Library fields:
+- Item code
+- Item description
+- Department
+- Category
+- Standard price
+- Cost, manager/admin only
+- Unit type
+- VAT status
+- Active / inactive
+- Notes
+- Last updated date
+
+QUOTE FORM:
+Each quote must include:
+- Quote number, auto-generated
+- Linked lead/client
+- Company name
+- Contact person
+- Contact number
+- Email
+- Site address
+- Department
+- Quote type: Once-off, Contract, Rental, Outright Purchase
+- Selected pricing items
+- Quantity
+- Unit price
+- Discount, if allowed
+- Total quote value
+- Monthly recurring value, if contract/rental
+- Installation cost
+- Overtime / after-hours cost
+- Notes
+- Internal notes
+- Photos
+- Site notes
+- Inspection report attachments
+- Status
+- Valid until date
+- Follow-up date
+- Assigned sales rep
+
+OVERTIME WARNING:
+When creating a quote, ask:
+"Will this service need to be done after hours or during overtime?"
+
+If Yes, show:
+"Remember to add overtime / after-hours rate to the quote."
+
+OUTRIGHT PURCHASE WARNING:
+If Quote Type = Outright Purchase, show:
+"Remember to add installation cost if installation is required."
+
+If no installation cost is added, show before sending:
+"This quote has no installation cost. Confirm before sending."
+
+COMPETITOR CONTRACT PROMPT:
+If the prospective client has an existing competitor contract, show:
+"Check cancellation notice period before confirming start date."
+
+Fields:
+- Competitor name
+- Existing contract: Yes / No / Unknown
+- Cancellation notice required: Yes / No / Unknown
+- Notice period
+- Earliest possible start date
+- Notes
+
+QUOTE STATUSES:
+Use these quote statuses:
+- Draft
+- Sent
+- Follow-up Due
+- Followed Up
+- Accepted
+- Declined
+- Expired
+- Client Registration Pending
+- Contract Pending
+- Converted to Contract
+- Converted to Job
+
+AUTOMATIC QUOTE FOLLOW-UPS:
+When a quote is marked Sent, automatically create follow-up reminders:
+- First follow-up: 2 days after quote sent
+- Second follow-up: 7 days after quote sent
+
+Follow-up method options:
+- Phone call
+- Email
+- WhatsApp
+- Client visit
+- Other
+
+Each follow-up must allow:
+- Mark completed
+- Add note
+- Reschedule
+- Mark quote accepted
+- Mark quote declined
+- Create next follow-up
+
+CLIENT SERVICE SUMMARY:
+Sales reps must be able to see what services an existing client already has.
+
+On every client profile, show a Client Service Summary with:
+- Active service contracts
+- Contract status
+- Contract start date
+- Contract end date
+- Service frequency
+- Service department
+- Service price
+- Monthly recurring value
+- Price increase month
+- Special instructions
+- Assigned service team / technician
+- Who does the service
+- Last service date
+- Next service date
+- Open jobs
+- Service history
+- Quote history
+- Invoice history
+- Payment behaviour
+
+PRICE INCREASE MONTH:
+Each contract must have:
+- Price increase month
+- Last increase date
+- Increase percentage
+- Next increase due date
+
+When working on a client, if the price increase month is within the next month, show a warning:
+"Price increase due soon. Check pricing before quoting or renewing."
+
+Also create dashboard reminders:
+- Price increases due this month
+- Price increases due next month
+- Overdue price increases
+
+CONTRACT STATUS VISIBILITY:
+Every client, lead and quote screen must clearly show:
+- Does this client have a service contract?
+- Contract status
+- Contract signed: Yes / No
+- Contract pending: Yes / No
+- Contract expiry date
+- Contract frequency
+- Special instructions
+
+CLIENT HISTORY:
+Before contacting or quoting a client, sales reps must be able to view:
+- Previous quotes
+- Accepted quotes
+- Declined quotes
+- Previous jobs
+- Current contracts
+- Past contracts
+- Why they cancelled, if applicable
+- What services we provided before
+- Service history
+- Outstanding invoices
+- Payment behaviour
+- Notes from admin/finance
+- Complaint history
+- Site notes
+- Photos
+- Attachments
+
+CLIENT FLAGS:
+Add internal client flags:
+- Bad payer
+- High-profile customer
+- Time waster
+- Difficult customer
+- Needs manager approval
+- Existing good customer
+- Contract risk
+- Special pricing
+- Previously cancelled
+- Price sensitive
+
+These flags must be visible to sales reps before contacting or quoting the client.
+
+PHOTOS, SITE NOTES AND INSPECTION REPORTS:
+Allow attachments to be linked to:
+- Lead
+- Quote
+- Client
+- Site assessment
+- Job
+- Contract
+
+Attachment types:
+- Site photos
+- Inspection notes
+- Assessment notes
+- Inspection reports
+- Existing installation photos
+- Problem area photos
+- Customer documents
+
+Allow quotes to include or exclude attachments depending on user selection.
+
+ACCEPTED QUOTE WORKFLOW:
+When a quote is marked Accepted, show clear next-step buttons:
+- Send Client Registration Form
+- Create Service Contract
+- Schedule Installation / Service
+- Create Once-off Job
+- Mark Contract Sent
+- Mark Contract Signed
+- Create Invoice
+
+CLIENT REGISTRATION:
+Create a Client Registration Pending section.
+
+When a quote is accepted, automatically create a client registration task.
+
+Client registration task must include:
+- Client name
+- Contact person
+- Email
+- Phone
+- Address
+- VAT number
+- Company registration number
+- Billing contact
+- Accounts email
+- Payment terms
+- Required documents
+- Registration form sent: Yes / No
+- Registration form received: Yes / No
+- Status
+
+SERVICE CONTRACTS:
+Contracts must be generated from accepted quotes.
+
+When creating a contract from an accepted quote, automatically copy:
+- Client details
+- Contact person
+- Site address
+- Services quoted
+- Pricing
+- Monthly recurring value
+- Installation details
+- Frequency
+- Special instructions
+- Notes
+- Sales rep
+- Quote reference number
+
+Contract status options:
+- Contract Draft
+- Sent to Client
+- Awaiting Signature
+- Signed
+- Installation / Service Ready
+- Active
+- Cancelled
+
+IMPORTANT CONTRACT RULE:
+For contract/rental work, show:
+"Contract must be sent and signed before installation or service is completed."
+
+If a quote is accepted but the contract is not signed yet, show it under:
+- Contracts Pending
+
+CONTRACTS PENDING:
+Create a Contracts Pending section showing:
+- Accepted quotes with no contract created
+- Contracts created but not sent
+- Contracts sent but not signed
+- Installation/service scheduled before contract signed
+- Client registration forms not returned
+
+Add warning if installation or service is scheduled before contract is signed:
+"Warning: service/installation is scheduled but contract is not signed."
+
+SCHEDULING HANDOVER:
+When a quote is accepted, create a clear handover flow to the Service department.
+
+Handover must include:
+- Client
+- Site address
+- Contact person
+- Contact number
+- Department
+- Service required
+- Quote number
+- Contract status
+- Client registration status
+- Special instructions
+- Required products/equipment
+- Photos/site notes/inspection reports
+- Preferred service time
+- Overtime requirement
+- Earliest start date
+- Competitor cancellation notice details, if applicable
+
+The service department must be able to see when a sales job is ready to schedule.
+
+COMMISSION REPORTS:
+Create a Commission Reports section to help reps complete monthly commission sheets.
+
+Commission report fields:
+- Sales rep
+- Client name
+- Quote number
+- Invoice number
+- Quote date
+- Accepted date
+- Invoice date
+- Department
+- Service type
+- Once-off value
+- Monthly recurring value
+- Contract value
+- Invoice status
+- Paid status
+- Payment date
+- Commission eligible: Yes / No
+- Commission notes
+
+Filters:
+- Sales rep
+- Month
+- Date range
+- Department
+- Quote status
+- Invoice status
+- Paid / unpaid
+- New business only
+- Existing client upsell
+
+Add export options:
+- Export to Excel
+- Export to CSV
+- Print report
+
+This must reduce the need to go in and out of Sage reports to complete commission sheets.
+
+SALES DASHBOARD:
+The Sales Dashboard must show:
+- New Leads
+- Appointments Today
+- Appointments This Week
+- Quotes Needed
+- Quotes Sent
+- Follow-ups Due Today
+- Follow-ups Overdue
+- Stale Leads
+- Accepted Quotes
+- Declined Quotes
+- Client Registration Pending
+- Contracts Pending
+- Unsigned Contracts
+- Price Increases Due This Month
+- Price Increases Due Next Month
+- Installations / New Services This Week
+- After-sales Follow-ups Due
+- Sales This Month
+- Monthly Recurring Sales Added
+- Outstanding Payments per Sales Rep’s Customers
+
+SALES REPORTS:
+Create reports for:
+- Leads by origination
+- Leads by sales rep
+- Quotes sent
+- Quotes accepted
+- Quotes declined/lost
+- Quote conversion rate
+- Sales per rep
+- Sales per department
+- New monthly recurring revenue
+- Once-off sales
+- Outstanding contracts
+- Unsigned contracts
+- Client registration pending
+- Appointments for the week
+- New installations/services for the week
+- Outstanding payments per sales rep’s customers
+- Lost quote reasons
+- High pricing losses
+- Price increases due
+- Commission report
+
+LOST QUOTE REASONS:
+When a quote is declined/lost, require a reason.
+
+Lost reason dropdown:
+- Price too high
+- Client chose competitor
+- No response
+- Not ready yet
+- Existing contract with competitor
+- Cancellation notice too long
+- Wrong service
+- Bad timing
+- Duplicate lead
+- Other
+
+If Other is selected, show:
+- Other Lost Reason Details
+
+PERMISSIONS:
+Managers/admins can edit:
+- Pricing Library
+- Discounts
+- Quote templates
+- Contract templates
+- Client details
+- Client flags
+- Contract details
+- Service frequency
+- Special instructions
+- Sales rep assignments
+- Lost quote reasons
+- Contract status overrides
+
+Sales reps can:
+- View all information needed for quoting and sales
+- Add leads
+- Edit their own leads
+- Schedule appointments
+- Create quotes
+- Add follow-up notes
+- Upload site photos
+- Upload inspection notes
+- Mark appointments completed
+- Request quote approval if needed
+- View client service summary
+- View quote/invoice numbers for commission reporting
+
+Sales reps should not be able to:
+- Change approved pricing library prices
+- Delete quotes
+- Delete clients
+- Remove bad payer flags
+- Edit financial cost/margin information
+- Edit contract frequency/special instructions after approval
+- Mark contracts signed unless allowed by admin/manager
+
+FINANCIAL VISIBILITY:
+Staff can see sales-related information needed for their work, including:
+- Quote number
+- Invoice number
+- Quote amount
+- Contract amount
+- Payment status for commission purposes
+
+But normal sales staff should not see sensitive financial information such as:
+- Cost prices
+- Margins
+- Profit reports
+- Full debtor ledger
+- Business financial reports
+
+DESIGN:
+Keep the Sales module clean and simple.
+
+Use top menu:
+Sales Dashboard | Leads | Sales Diary | Quotes | Follow-ups | Contracts Pending | Client Registration | Clients | Pricing Library | Commission Reports | Sales Reports
+
+Make the Sales Diary look similar to an Outlook calendar.
+
+Make the client profile a central “client file” where sales can quickly see:
+- Services
+- Contracts
+- Prices
+- Frequencies
+- Increase month
+- Service team
+- Quotes
+- Jobs
+- Invoices
+- Notes
+- Photos
+- Attachments
+
+The goal is to make quoting quicker, prevent leads and quotes from being forgotten, make client history visible, make accepted quotes flow into registration/contracts/scheduling, and make monthly commission reporting much easier.

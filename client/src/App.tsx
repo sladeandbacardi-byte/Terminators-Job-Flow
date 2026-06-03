@@ -56,6 +56,8 @@ import FollowUpsPage from "@/pages/follow-ups";
 import ContractsPendingPage from "@/pages/contracts-pending";
 import ClientProfile from "@/pages/client-profile";
 import DataIntegrity from "@/pages/data-integrity";
+import SalesDashboard from "@/pages/sales-dashboard";
+import CommissionReports from "@/pages/commission-reports";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -127,6 +129,8 @@ function AuthenticatedApp() {
       <Route path="/expenses" component={Expenses} />
       <Route path="/service-scheduling" component={ServiceScheduling} />
       <Route path="/data-integrity" component={DataIntegrity} />
+      <Route path="/sales-dashboard" component={SalesDashboard} />
+      <Route path="/commission-reports" component={CommissionReports} />
       <Route component={NotFound} />
     </Switch>
   );

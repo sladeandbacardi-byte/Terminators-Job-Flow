@@ -29,14 +29,22 @@ const CATEGORIES = [
 
 const UNITS = ["per month", "per visit", "each", "per sqm", "per hour", "once-off", "per kg", "per litre"];
 
+const VAT_STATUS_OPTIONS = [
+  { value: "inclusive", label: "VAT Inclusive" },
+  { value: "exclusive", label: "VAT Exclusive" },
+  { value: "exempt",    label: "VAT Exempt" },
+];
+
 type ItemForm = {
   name: string; description: string; category: string; serviceType: string;
   unit: string; unitPrice: string; departmentId: string; isActive: boolean;
+  cost: string; itemCode: string; vatStatus: string; notes: string;
 };
 
 const BLANK: ItemForm = {
   name: "", description: "", category: "sanitary_bins", serviceType: "",
   unit: "per month", unitPrice: "", departmentId: "", isActive: true,
+  cost: "", itemCode: "", vatStatus: "inclusive", notes: "",
 };
 
 export default function PricingLibraryPage() {
@@ -94,6 +102,10 @@ export default function PricingLibraryPage() {
       name: item.name, description: item.description ?? "", category: item.category,
       serviceType: item.serviceType ?? "", unit: item.unit ?? "per month",
       unitPrice: item.unitPrice, departmentId: item.departmentId ?? "", isActive: item.isActive,
+      cost: (item as any).cost ?? "",
+      itemCode: (item as any).itemCode ?? "",
+      vatStatus: (item as any).vatStatus ?? "inclusive",
+      notes: (item as any).notes ?? "",
     });
     setOpen(true);
   }
@@ -158,8 +170,10 @@ export default function PricingLibraryPage() {
                     <tr>
                       <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                       <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Description</th>
+                      <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Code</th>
                       <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Unit</th>
                       <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Price</th>
+                      {canEdit && <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right hidden sm:table-cell">Cost</th>}
                       <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide text-center">Active</th>
                       {canEdit && <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Actions</th>}
                     </tr>
@@ -172,8 +186,14 @@ export default function PricingLibraryPage() {
                           {item.serviceType && <div className="text-xs text-gray-400">{item.serviceType}</div>}
                         </td>
                         <td className="px-4 py-2.5 hidden md:table-cell text-xs text-gray-500 max-w-[200px] truncate">{item.description || "—"}</td>
+                        <td className="px-4 py-2.5 hidden lg:table-cell text-xs text-gray-400">{(item as any).itemCode || "—"}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-500">{item.unit || "—"}</td>
                         <td className="px-4 py-2.5 text-right font-semibold text-gray-900">R {item.unitPrice}</td>
+                        {canEdit && (
+                          <td className="px-4 py-2.5 text-right text-xs text-gray-500 hidden sm:table-cell">
+                            {(item as any).cost ? `R ${(item as any).cost}` : "—"}
+                          </td>
+                        )}
                         <td className="px-4 py-2.5 text-center">
                           <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${item.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                             {item.isActive ? "Active" : "Hidden"}
@@ -203,7 +223,7 @@ export default function PricingLibraryPage() {
       <MobileNavigation />
 
       <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setEditing(null); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Pricing Item" : "Add Pricing Item"}</DialogTitle>
           </DialogHeader>
@@ -226,9 +246,27 @@ export default function PricingLibraryPage() {
                 placeholder="e.g. Monthly Service, Once-off" />
             </div>
             <div>
-              <Label>Unit Price (R) *</Label>
+              <Label>Item Code</Label>
+              <Input value={form.itemCode} onChange={e => setForm(p => ({ ...p, itemCode: e.target.value }))}
+                placeholder="e.g. SB-STANDARD-01" />
+            </div>
+            <div>
+              <Label>VAT Status</Label>
+              <Select value={form.vatStatus} onValueChange={v => setForm(p => ({ ...p, vatStatus: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{VAT_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Sell Price (R) *</Label>
               <Input value={form.unitPrice} onChange={e => setForm(p => ({ ...p, unitPrice: e.target.value }))} placeholder="e.g. 85.00" />
             </div>
+            {canEdit && (
+              <div>
+                <Label>Cost Price (R) <span className="text-xs text-gray-400 font-normal">Admin only</span></Label>
+                <Input value={form.cost} onChange={e => setForm(p => ({ ...p, cost: e.target.value }))} placeholder="e.g. 45.00" />
+              </div>
+            )}
             <div>
               <Label>Unit</Label>
               <Select value={form.unit} onValueChange={v => setForm(p => ({ ...p, unit: v }))}>
@@ -255,6 +293,12 @@ export default function PricingLibraryPage() {
               <Textarea rows={2} value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 placeholder="Brief description — what does this item include?" />
+            </div>
+            <div className="col-span-2">
+              <Label>Internal Notes</Label>
+              <Textarea rows={2} value={form.notes}
+                onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="Supplier info, margin notes, conditions..." />
             </div>
           </div>
           <DialogFooter>
