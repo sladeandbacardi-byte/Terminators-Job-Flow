@@ -343,6 +343,10 @@ export interface IStorage {
   getBackupLogs(): Promise<BackupLog[]>;
   addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog>;
 
+  // Integrity Scan History
+  getIntegrityScans(): Promise<IntegrityScan[]>;
+  addIntegrityScan(scan: Omit<IntegrityScan, "id">): Promise<IntegrityScan>;
+
   // Backup Schedule
   getBackupSchedule(): Promise<BackupScheduleSettings>;
   setBackupSchedule(settings: BackupScheduleSettings): Promise<BackupScheduleSettings>;
@@ -407,6 +411,14 @@ export interface BackupLog {
   recipientEmail?: string;
 }
 
+export interface IntegrityScan {
+  id: string;
+  scannedAt: string;
+  triggeredBy: string;
+  orphanCount: number;
+  duplicateGroupCount: number;
+}
+
 export interface BackupScheduleSettings {
   enabled: boolean;
   frequency: "daily" | "weekly";
@@ -456,6 +468,7 @@ export class MemStorage implements IStorage {
   private serviceScheduleMap: Map<string, ServiceScheduleEntry> = new Map();
   private activityLogs: any[] = [];
   private backupLogs: BackupLog[] = [];
+  private integrityScans: IntegrityScan[] = [];
   private backupSchedule: BackupScheduleSettings = {
     enabled: true,
     frequency: "daily",
@@ -4732,6 +4745,19 @@ export class MemStorage implements IStorage {
       this.backupLogs = this.backupLogs.slice(-200);
     }
     return newLog;
+  }
+
+  async getIntegrityScans(): Promise<IntegrityScan[]> {
+    return [...this.integrityScans].sort((a, b) => b.scannedAt.localeCompare(a.scannedAt));
+  }
+
+  async addIntegrityScan(scan: Omit<IntegrityScan, "id">): Promise<IntegrityScan> {
+    const newScan: IntegrityScan = { ...scan, id: `is-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+    this.integrityScans.push(newScan);
+    if (this.integrityScans.length > 100) {
+      this.integrityScans = this.integrityScans.slice(-100);
+    }
+    return newScan;
   }
 
   async getBackupSchedule(): Promise<BackupScheduleSettings> {

@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import {
   AlertTriangle, CheckCircle2, Copy, Database, Download,
   RefreshCw, ExternalLink, CalendarClock, FlaskConical,
-  XCircle, Loader2, ShieldCheck, AlertCircle, Merge,
+  XCircle, Loader2, ShieldCheck, AlertCircle, Merge, History,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -108,6 +108,14 @@ interface DbStatusResponse {
   memStorageDisabled: boolean;
   checkedAt: string;
   counts: DbStatusCounts;
+}
+
+interface IntegrityScan {
+  id: string;
+  scannedAt: string;
+  triggeredBy: string;
+  orphanCount: number;
+  duplicateGroupCount: number;
 }
 
 interface HealthCheckItem {
@@ -1066,6 +1074,133 @@ function SaveSearchTestTab() {
   );
 }
 
+// ── Scan History Section ────────────────────────────────────────────────────────
+function ScanHistorySection() {
+  const { data: scans = [], isLoading, refetch, isFetching } = useQuery<IntegrityScan[]>({
+    queryKey: ["/api/admin/data-integrity/scan-history"],
+    refetchInterval: 30_000,
+  });
+
+  const lastOrphan = scans.find(s => s.orphanCount >= 0);
+  const lastDuplicate = scans.find(s => s.duplicateGroupCount >= 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Last scan summary */}
+      {(lastOrphan || lastDuplicate) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {lastOrphan && (
+            <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-orange-700 font-medium">Last Orphan Scan</p>
+                <p className="text-sm font-bold text-orange-900">
+                  {lastOrphan.orphanCount === 0 ? "No orphans found" : `${lastOrphan.orphanCount} orphan(s) found`}
+                </p>
+                <p className="text-xs text-orange-600">
+                  {format(new Date(lastOrphan.scannedAt), "d MMM yyyy, HH:mm")} · by {lastOrphan.triggeredBy}
+                </p>
+              </div>
+            </div>
+          )}
+          {lastDuplicate && (
+            <div className="flex items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+              <Copy className="h-5 w-5 text-yellow-500 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-yellow-700 font-medium">Last Duplicate Scan</p>
+                <p className="text-sm font-bold text-yellow-900">
+                  {lastDuplicate.duplicateGroupCount === 0 ? "No duplicates found" : `${lastDuplicate.duplicateGroupCount} duplicate group(s) found`}
+                </p>
+                <p className="text-xs text-yellow-600">
+                  {format(new Date(lastDuplicate.scannedAt), "d MMM yyyy, HH:mm")} · by {lastDuplicate.triggeredBy}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Full history list */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Scan History</CardTitle>
+              <CardDescription className="text-xs">Last 10 scans</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching
+                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full rounded" />)}
+            </div>
+          ) : scans.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+              <History className="h-8 w-8 text-gray-300" />
+              <p className="text-sm">No scans recorded yet. Run an orphan or duplicate scan to start tracking history.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Timestamp</TableHead>
+                  <TableHead className="text-xs">Scan Type</TableHead>
+                  <TableHead className="text-xs">Result</TableHead>
+                  <TableHead className="text-xs">Triggered By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scans.map(s => {
+                  const isOrphanScan = s.orphanCount >= 0;
+                  const isDupScan = s.duplicateGroupCount >= 0;
+                  const count = isOrphanScan ? s.orphanCount : s.duplicateGroupCount;
+                  const hasIssues = count > 0;
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {format(new Date(s.scannedAt), "d MMM yyyy, HH:mm:ss")}
+                      </TableCell>
+                      <TableCell>
+                        {isOrphanScan ? (
+                          <Badge className="bg-orange-100 text-orange-800 text-xs">Orphan Scan</Badge>
+                        ) : (
+                          <Badge className="bg-yellow-100 text-yellow-800 text-xs">Duplicate Scan</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {hasIssues ? (
+                          <span className="flex items-center gap-1 text-xs text-red-700">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            {count} issue(s) found
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-green-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Clean
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.triggeredBy}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function DataIntegrity() {
   const { data: orphanData } = useQuery<OrphansResponse>({
@@ -1217,6 +1352,9 @@ export default function DataIntegrity() {
                 </Card>
               </TabsContent>
             </Tabs>
+
+            {/* Scan history — visible at the bottom of the page */}
+            <ScanHistorySection />
           </div>
         </main>
       </div>

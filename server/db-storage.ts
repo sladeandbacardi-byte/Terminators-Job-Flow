@@ -61,7 +61,7 @@ import type {
 } from "@shared/schema";
 
 import type {
-  IStorage, BackupLog, BackupScheduleSettings, ContractOccurrence,
+  IStorage, BackupLog, BackupScheduleSettings, ContractOccurrence, IntegrityScan,
 } from "./storage";
 
 // ─── Contract occurrence helpers (pure functions, duplicated from storage.ts) ──
@@ -180,6 +180,7 @@ const SETTINGS_FILE = path.join(process.cwd(), ".local", "backup-settings.json")
 
 export class DbStorage implements IStorage {
   private backupLogs: BackupLog[] = [];
+  private integrityScans: IntegrityScan[] = [];
   private backupSchedule: BackupScheduleSettings = {
     enabled: true, frequency: "daily", dayOfWeek: 1, hourUTC: 21, minuteUTC: 30,
     recipientEmail: process.env.BACKUP_EMAIL_TO ?? "info@terminators.co.za",
@@ -1712,6 +1713,17 @@ export class DbStorage implements IStorage {
     this.backupLogs.push(entry);
     if (this.backupLogs.length > 200) this.backupLogs = this.backupLogs.slice(-200);
     this.saveSettings();
+    return entry;
+  }
+
+  async getIntegrityScans(): Promise<IntegrityScan[]> {
+    return [...this.integrityScans].sort((a, b) => b.scannedAt.localeCompare(a.scannedAt));
+  }
+
+  async addIntegrityScan(scan: Omit<IntegrityScan, "id">): Promise<IntegrityScan> {
+    const entry: IntegrityScan = { id: randomUUID(), ...scan };
+    this.integrityScans.push(entry);
+    if (this.integrityScans.length > 100) this.integrityScans = this.integrityScans.slice(-100);
     return entry;
   }
 

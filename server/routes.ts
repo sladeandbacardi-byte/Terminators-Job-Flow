@@ -3691,7 +3691,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // requireAdmin is defined earlier in this function (before the Backup section)
 
   // GET /api/admin/data-integrity/orphans
-  app.get("/api/admin/data-integrity/orphans", requireAuth, requireAdmin, async (_req, res) => {
+  app.get("/api/admin/data-integrity/orphans", requireAuth, requireAdmin, async (req, res) => {
     try {
       const [clients, jobs, invoices, contracts, quotes, serviceContracts] = await Promise.all([
         storage.getClients(),
@@ -3737,6 +3737,14 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         }
       }
 
+      const user = (req as any).user;
+      await storage.addIntegrityScan({
+        scannedAt: new Date().toISOString(),
+        triggeredBy: user?.username ?? "admin",
+        orphanCount: orphans.length,
+        duplicateGroupCount: -1,
+      }).catch(() => {});
+
       res.json({ orphans, totalClients: clients.length });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to scan orphans", details: err.message });
@@ -3744,7 +3752,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // GET /api/admin/data-integrity/duplicates
-  app.get("/api/admin/data-integrity/duplicates", requireAuth, requireAdmin, async (_req, res) => {
+  app.get("/api/admin/data-integrity/duplicates", requireAuth, requireAdmin, async (req, res) => {
     try {
       const clients = await storage.getClients();
       const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[\s\-.()+]/g, "");
@@ -3767,9 +3775,27 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       for (const [k, v] of Object.entries(byEmail)) { if (v.length > 1) groups.push({ field: "email", value: k, clients: v }); }
       for (const [k, v] of Object.entries(byName))  { if (v.length > 1) groups.push({ field: "name",  value: k, clients: v }); }
 
+      const user = (req as any).user;
+      await storage.addIntegrityScan({
+        scannedAt: new Date().toISOString(),
+        triggeredBy: user?.username ?? "admin",
+        orphanCount: -1,
+        duplicateGroupCount: groups.length,
+      }).catch(() => {});
+
       res.json({ groups, totalClients: clients.length });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to scan duplicates", details: err.message });
+    }
+  });
+
+  // GET /api/admin/data-integrity/scan-history
+  app.get("/api/admin/data-integrity/scan-history", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const scans = await storage.getIntegrityScans();
+      res.json(scans.slice(0, 10));
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch scan history", details: err.message });
     }
   });
 
