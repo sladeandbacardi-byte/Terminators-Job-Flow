@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Search, Plus, Package, Settings, Edit, Trash2, Upload, HelpCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -32,6 +33,7 @@ export default function Inventory() {
   const [alertsFilter, setAlertsFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   const departmentFilter = useDepartmentFilter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +70,17 @@ export default function Inventory() {
         variant: "destructive",
       });
     },
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: () => apiRequest('DELETE', '/api/inventory'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/alerts/stock'] });
+      setShowDeleteAllConfirm(false);
+      toast({ title: "All stock items deleted", description: "The stock list has been cleared." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete stock items.", variant: "destructive" }),
   });
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -359,6 +372,15 @@ export default function Inventory() {
                 variant="outline"
                 size="sm"
               />
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteAllConfirm(true)}
+                disabled={items.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete All
+              </Button>
               <div className="flex gap-1">
                 <input
                   ref={fileInputRef}
@@ -672,6 +694,27 @@ export default function Inventory() {
       </div>
       
       <MobileNavigation />
+
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete all stock items?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {items.length} stock item{items.length !== 1 ? "s" : ""}. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAllMutation.mutate()}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteAllMutation.isPending}
+            >
+              {deleteAllMutation.isPending ? "Deleting..." : "Yes, delete all"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

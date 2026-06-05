@@ -87,6 +87,7 @@ export default function ClientsPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [rentalFilter, setRentalFilter] = useState<string>("all"); // all | with | without | active | inactive
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showDeleteAllClients, setShowDeleteAllClients] = useState(false);
 
   const { user } = useAuth();
   const role = getDashboardRole(user ?? {});
@@ -156,6 +157,16 @@ export default function ClientsPage() {
         variant: "destructive" 
       });
     },
+  });
+
+  const deleteAllClientsMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/clients"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setShowDeleteAllClients(false);
+      toast({ description: "All clients deleted successfully." });
+    },
+    onError: () => toast({ description: "Failed to delete clients.", variant: "destructive" }),
   });
 
   const suspendMutation = useMutation({
@@ -253,6 +264,17 @@ export default function ClientsPage() {
             onExportCSV={handleExportCSV}
             entityName="Clients"
           />
+          {!isAccounts && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteAllClients(true)}
+              disabled={clients.length === 0}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete All
+            </Button>
+          )}
           {!isAccounts && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
@@ -706,6 +728,27 @@ export default function ClientsPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteAllClients} onOpenChange={setShowDeleteAllClients}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete all clients?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {clients.length} client{clients.length !== 1 ? "s" : ""} and their associated data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAllClientsMutation.mutate()}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteAllClientsMutation.isPending}
+            >
+              {deleteAllClientsMutation.isPending ? "Deleting..." : "Yes, delete all"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

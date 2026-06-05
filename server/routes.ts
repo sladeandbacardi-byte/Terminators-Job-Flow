@@ -360,6 +360,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/clients", async (req, res) => {
+    const count = await storage.deleteAllClients();
+    res.json({ deleted: count });
+  });
+
   app.delete("/api/clients/:id", async (req, res) => {
     const deleted = await storage.deleteClient(req.params.id);
     if (!deleted) {
@@ -410,6 +415,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(400).json({ error: "Invalid inventory item data" });
     }
+  });
+
+  app.delete("/api/inventory", async (req, res) => {
+    const count = await storage.deleteAllInventoryItems();
+    res.json({ deleted: count });
   });
 
   app.delete("/api/inventory/:id", async (req, res) => {

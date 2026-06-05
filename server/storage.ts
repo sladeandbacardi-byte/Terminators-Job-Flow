@@ -68,6 +68,7 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: string): Promise<boolean>;
+  deleteAllClients(): Promise<number>;
 
   // Inventory Items
   getInventoryItems(): Promise<InventoryItem[]>;
@@ -77,6 +78,7 @@ export interface IStorage {
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: string, item: Partial<InsertInventoryItem>): Promise<InventoryItem>;
   deleteInventoryItem(id: string): Promise<boolean>;
+  deleteAllInventoryItems(): Promise<number>;
 
   // Rental Contracts
   getRentalContracts(): Promise<RentalContract[]>;
@@ -2353,6 +2355,12 @@ export class MemStorage implements IStorage {
     return this.clients.delete(id);
   }
 
+  async deleteAllClients(): Promise<number> {
+    const count = this.clients.size;
+    this.clients.clear();
+    return count;
+  }
+
   // Inventory Items
   async getInventoryItems(): Promise<InventoryItem[]> {
     return Array.from(this.inventoryItems.values());
@@ -2398,6 +2406,12 @@ export class MemStorage implements IStorage {
 
   async deleteInventoryItem(id: string): Promise<boolean> {
     return this.inventoryItems.delete(id);
+  }
+
+  async deleteAllInventoryItems(): Promise<number> {
+    const count = this.inventoryItems.size;
+    this.inventoryItems.clear();
+    return count;
   }
 
   // Stock level management methods

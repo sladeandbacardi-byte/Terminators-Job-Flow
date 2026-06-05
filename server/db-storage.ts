@@ -1971,4 +1971,14 @@ export class DbStorage implements IStorage {
     const res = await db.delete(acceptedWorkflows).where(eq(acceptedWorkflows.id, id));
     return (res.rowCount ?? 0) > 0;
   }
+
+  async deleteAllClients(): Promise<number> {
+    const res = await db.delete(clients);
+    return res.rowCount ?? 0;
+  }
+
+  async deleteAllInventoryItems(): Promise<number> {
+    const res = await db.delete(inventoryItems);
+    return res.rowCount ?? 0;
+  }
 }
