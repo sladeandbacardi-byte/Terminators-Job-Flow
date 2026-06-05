@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Search, Plus, FileText, AlertTriangle, Edit, Trash2, History, Clock, User, Package, ListOrdered, FileSpreadsheet } from "lucide-react";
+import { Search, Plus, FileText, AlertTriangle, Edit, Trash2, History, Clock, User, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatZAR } from "@/components/forms/contract-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,10 +23,7 @@ import { getDashboardRole } from "@/lib/dashboardRole";
 import type { RentalContract, Client, InventoryItem, ContractDeletionHistory } from "@shared/schema";
 import { ServiceContractsContent } from "@/pages/service-contracts";
 
-type ContractTypeTab = "service" | "rental";
-
 export default function Contracts() {
-  const [contractTypeTab, setContractTypeTab] = useState<ContractTypeTab>("service");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingContract, setEditingContract] = useState<RentalContract | null>(null);
@@ -136,37 +133,15 @@ export default function Contracts() {
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
 
-          {/* ── Top-level contract type tabs ── */}
-          <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
-            <button
-              onClick={() => setContractTypeTab("service")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                contractTypeTab === "service"
-                  ? "bg-white text-blue-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <ListOrdered className="h-4 w-4" />
-              Service Contracts
-            </button>
-            <button
-              onClick={() => setContractTypeTab("rental")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                contractTypeTab === "rental"
-                  ? "bg-white text-blue-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              Rental Contracts
-            </button>
-          </div>
-
           {/* ── Service Contracts ── */}
-          {contractTypeTab === "service" && <ServiceContractsContent />}
+          <ServiceContractsContent />
 
           {/* ── Rental Contracts ── */}
-          {contractTypeTab === "rental" && (<>
+          <div className="mt-8">
+            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-gray-500" />
+              Rental Contracts
+            </h2>
           {/* Header Actions */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1 relative">
@@ -493,7 +468,7 @@ export default function Contracts() {
               </div>
             )}
           </div>
-          </>)}
+          </div>
         </main>
       </div>
 
