@@ -146,6 +146,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Equipment Checklists ────────────────────────────────────────────────────
+  app.get("/api/equipment-checklists", async (req, res) => {
+    const { date, workerId } = req.query as any;
+    const list = await storage.getEquipmentChecklists(date, workerId);
+    res.json(list);
+  });
+
+  app.get("/api/equipment-checklists/stats/today", async (req, res) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const all = await storage.getEquipmentChecklists(today);
+    res.json({
+      total: all.length,
+      passed: all.filter(c => c.status === "passed").length,
+      passedWithNotes: all.filter(c => c.status === "passed_with_notes").length,
+      failed: all.filter(c => c.status === "failed").length,
+      pending: all.filter(c => c.status === "pending").length,
+      criticalMissing: all.filter(c => c.hasCriticalMissing).length,
+    });
+  });
+
+  app.get("/api/equipment-checklists/:id", async (req, res) => {
+    const c = await storage.getEquipmentChecklist(req.params.id);
+    if (!c) return res.status(404).json({ error: "Not found" });
+    res.json(c);
+  });
+
+  app.post("/api/equipment-checklists", async (req, res) => {
+    const c = await storage.createEquipmentChecklist(req.body);
+    res.status(201).json(c);
+  });
+
+  app.patch("/api/equipment-checklists/:id", async (req, res) => {
+    const c = await storage.updateEquipmentChecklist(req.params.id, req.body);
+    res.json(c);
+  });
+
+  app.get("/api/equipment-checklists/:id/items", async (req, res) => {
+    const items = await storage.getEquipmentChecklistItems(req.params.id);
+    res.json(items);
+  });
+
+  app.post("/api/equipment-checklists/:id/items", async (req, res) => {
+    const items = await storage.replaceEquipmentChecklistItems(req.params.id, req.body);
+    res.json(items);
+  });
+
   app.patch("/api/mobile/jobs/:jobId/status", async (req, res) => {
     try {
       const { jobId } = req.params;

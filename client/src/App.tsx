@@ -46,7 +46,6 @@ import Permissions from "@/pages/permissions";
 import Settings from "@/pages/settings";
 import SystemLogs from "@/pages/system-logs";
 import TestingChecklist from "@/pages/testing-checklist";
-import ServiceContractsPage from "@/pages/service-contracts";
 import FinanceDashboard from "@/pages/finance-dashboard";
 import HRDashboard from "@/pages/hr-dashboard";
 import Expenses from "@/pages/expenses";
@@ -59,6 +58,7 @@ import DataIntegrity from "@/pages/data-integrity";
 import SalesDashboard from "@/pages/sales-dashboard";
 import CommissionReports from "@/pages/commission-reports";
 import AcceptedWork from "@/pages/accepted-work";
+import EquipmentChecklists from "@/pages/equipment-checklists";
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
@@ -121,7 +121,7 @@ function AuthenticatedApp() {
       <Route path="/settings" component={Settings} />
       <Route path="/system-logs" component={SystemLogs} />
       <Route path="/testing-checklist" component={TestingChecklist} />
-      <Route path="/service-contracts" component={ServiceContractsPage} />
+      <Route path="/service-contracts">{() => { window.location.replace("/contracts"); return null; }}</Route>
       <Route path="/pricing-library" component={PricingLibraryPage} />
       <Route path="/follow-ups" component={FollowUpsPage} />
       <Route path="/contracts-pending" component={ContractsPendingPage} />
@@ -133,6 +133,7 @@ function AuthenticatedApp() {
       <Route path="/sales-dashboard" component={SalesDashboard} />
       <Route path="/commission-reports" component={CommissionReports} />
       <Route path="/accepted-work" component={AcceptedWork} />
+      <Route path="/equipment-checklists" component={EquipmentChecklists} />
       <Route component={NotFound} />
     </Switch>
   );

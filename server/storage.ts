@@ -69,6 +69,12 @@ export interface IStorage {
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: string): Promise<boolean>;
   deleteAllClients(): Promise<number>;
+  getEquipmentChecklists(date?: string, workerId?: string): Promise<import("@shared/schema").EquipmentChecklist[]>;
+  getEquipmentChecklist(id: string): Promise<import("@shared/schema").EquipmentChecklist | undefined>;
+  createEquipmentChecklist(data: any): Promise<import("@shared/schema").EquipmentChecklist>;
+  updateEquipmentChecklist(id: string, data: any): Promise<import("@shared/schema").EquipmentChecklist>;
+  getEquipmentChecklistItems(checklistId: string): Promise<import("@shared/schema").EquipmentChecklistItem[]>;
+  replaceEquipmentChecklistItems(checklistId: string, items: any[]): Promise<import("@shared/schema").EquipmentChecklistItem[]>;
 
   // Inventory Items
   getInventoryItems(): Promise<InventoryItem[]>;
@@ -2362,6 +2368,13 @@ export class MemStorage implements IStorage {
     this.clients.clear();
     return count;
   }
+
+  async getEquipmentChecklists(date?: string, workerId?: string): Promise<import("@shared/schema").EquipmentChecklist[]> { return []; }
+  async getEquipmentChecklist(id: string): Promise<import("@shared/schema").EquipmentChecklist | undefined> { return undefined; }
+  async createEquipmentChecklist(data: any): Promise<import("@shared/schema").EquipmentChecklist> { return { ...data, id: Math.random().toString(36).slice(2), createdAt: new Date(), updatedAt: new Date() }; }
+  async updateEquipmentChecklist(id: string, data: any): Promise<import("@shared/schema").EquipmentChecklist> { return { ...data, id, updatedAt: new Date() }; }
+  async getEquipmentChecklistItems(checklistId: string): Promise<import("@shared/schema").EquipmentChecklistItem[]> { return []; }
+  async replaceEquipmentChecklistItems(checklistId: string, items: any[]): Promise<import("@shared/schema").EquipmentChecklistItem[]> { return []; }
 
   // Inventory Items
   async getInventoryItems(): Promise<InventoryItem[]> {

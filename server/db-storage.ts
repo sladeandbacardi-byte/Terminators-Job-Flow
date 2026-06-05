@@ -1972,6 +1972,52 @@ export class DbStorage implements IStorage {
     return (res.rowCount ?? 0) > 0;
   }
 
+  async getEquipmentChecklists(date?: string, workerId?: string): Promise<import("@shared/schema").EquipmentChecklist[]> {
+    const { equipmentChecklists } = await import("@shared/schema");
+    let q = db.select().from(equipmentChecklists).$dynamic();
+    if (date) q = q.where(eq(equipmentChecklists.date, date));
+    if (workerId) q = q.where(eq(equipmentChecklists.technicianId, workerId));
+    return (await q).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getEquipmentChecklist(id: string): Promise<import("@shared/schema").EquipmentChecklist | undefined> {
+    const { equipmentChecklists } = await import("@shared/schema");
+    const [row] = await db.select().from(equipmentChecklists).where(eq(equipmentChecklists.id, id));
+    return row;
+  }
+
+  async createEquipmentChecklist(data: any): Promise<import("@shared/schema").EquipmentChecklist> {
+    const { equipmentChecklists } = await import("@shared/schema");
+    const [row] = await db.insert(equipmentChecklists)
+      .values({ ...data, id: randomUUID(), createdAt: new Date(), updatedAt: new Date() })
+      .returning();
+    return row;
+  }
+
+  async updateEquipmentChecklist(id: string, data: any): Promise<import("@shared/schema").EquipmentChecklist> {
+    const { equipmentChecklists } = await import("@shared/schema");
+    const [row] = await db.update(equipmentChecklists)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(equipmentChecklists.id, id))
+      .returning();
+    return row;
+  }
+
+  async getEquipmentChecklistItems(checklistId: string): Promise<import("@shared/schema").EquipmentChecklistItem[]> {
+    const { equipmentChecklistItems } = await import("@shared/schema");
+    return db.select().from(equipmentChecklistItems).where(eq(equipmentChecklistItems.checklistId, checklistId));
+  }
+
+  async replaceEquipmentChecklistItems(checklistId: string, items: any[]): Promise<import("@shared/schema").EquipmentChecklistItem[]> {
+    const { equipmentChecklistItems } = await import("@shared/schema");
+    await db.delete(equipmentChecklistItems).where(eq(equipmentChecklistItems.checklistId, checklistId));
+    if (!items.length) return [];
+    const rows = await db.insert(equipmentChecklistItems)
+      .values(items.map(it => ({ ...it, id: randomUUID(), checklistId, createdAt: new Date() })))
+      .returning();
+    return rows;
+  }
+
   async logContractDeletion(entry: Omit<import("@shared/schema").ContractDeletionHistory, "id" | "deletedAt">): Promise<import("@shared/schema").ContractDeletionHistory> {
     const [row] = await db.insert(contractDeletionHistory)
       .values({ ...entry, id: randomUUID(), deletedAt: new Date() } as any)

@@ -1373,3 +1373,45 @@ export const insertAcceptedWorkflowSchema = createInsertSchema(acceptedWorkflows
 });
 export type InsertAcceptedWorkflow = z.infer<typeof insertAcceptedWorkflowSchema>;
 export type AcceptedWorkflow = typeof acceptedWorkflows.$inferSelect;
+
+// ─── EQUIPMENT CHECKLISTS ────────────────────────────────────────────────────
+
+export const equipmentChecklists = pgTable("equipment_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  checklistType: text("checklist_type").notNull().default("daily"),
+  date: text("date").notNull(),
+  teamId: varchar("team_id"),
+  teamName: text("team_name"),
+  vehicleId: varchar("vehicle_id"),
+  vehicleRegistration: text("vehicle_registration"),
+  technicianId: varchar("technician_id").notNull(),
+  technicianName: text("technician_name").notNull(),
+  status: text("status").notNull().default("pending"),
+  submittedAt: timestamp("submitted_at"),
+  notes: text("notes"),
+  jobId: varchar("job_id"),
+  serviceTypes: text("service_types").array(),
+  hasCriticalMissing: boolean("has_critical_missing").notNull().default(false),
+  supervisorOverride: boolean("supervisor_override").notNull().default(false),
+  supervisorName: text("supervisor_name"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const equipmentChecklistItems = pgTable("equipment_checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  checklistId: varchar("checklist_id").notNull(),
+  itemName: text("item_name").notNull(),
+  category: text("category").notNull(),
+  isCritical: boolean("is_critical").notNull().default(false),
+  present: text("present").notNull().default("yes"),
+  condition: text("condition").notNull().default("good"),
+  quantityTaken: integer("quantity_taken"),
+  notes: text("notes"),
+  photoUrl: text("photo_url"),
+  serviceType: text("service_type"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export type EquipmentChecklist = typeof equipmentChecklists.$inferSelect;
+export type EquipmentChecklistItem = typeof equipmentChecklistItems.$inferSelect;

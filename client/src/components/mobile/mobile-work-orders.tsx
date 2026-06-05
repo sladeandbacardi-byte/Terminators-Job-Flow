@@ -15,9 +15,13 @@ import {
   LogOut,
   RefreshCw,
   Menu,
-  X
+  X,
+  ClipboardCheck,
 } from "lucide-react";
 import { formatClientAddress, type Job, type Client, type Worker } from '@shared/schema';
+import { MobileEquipmentChecklist } from './mobile-equipment-checklist';
+
+type ActiveScreen = 'work-orders' | 'equipment-checklist';
 
 interface MobileWorkOrdersProps {
   worker: Worker;
@@ -29,6 +33,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showMenu, setShowMenu] = useState(false);
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('work-orders');
 
   const fetchWorkOrders = async () => {
     try {
@@ -113,6 +118,15 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
       setError('Unable to make phone call');
     }
   };
+
+  if (activeScreen === 'equipment-checklist') {
+    return (
+      <MobileEquipmentChecklist
+        worker={worker}
+        onBack={() => setActiveScreen('work-orders')}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -209,6 +223,21 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                   <p><strong>In Progress:</strong> {jobs.filter(j => j.status === 'in_progress').length}</p>
                   <p><strong>Scheduled:</strong> {jobs.filter(j => j.status === 'scheduled').length}</p>
                 </div>
+              </div>
+
+              <div className="border-b pb-4">
+                <h3 className="font-medium text-gray-900 mb-2">Tools</h3>
+                <button
+                  onClick={() => { setShowMenu(false); setActiveScreen('equipment-checklist'); }}
+                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-800 transition-colors"
+                  data-testid="button-equipment-checklist"
+                >
+                  <ClipboardCheck className="h-5 w-5 shrink-0" />
+                  <div className="text-left">
+                    <p className="font-semibold text-sm">Equipment Checklist</p>
+                    <p className="text-xs text-green-600">Daily & job-specific equipment checks</p>
+                  </div>
+                </button>
               </div>
 
               <div className="pt-4">

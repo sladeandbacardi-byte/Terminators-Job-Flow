@@ -2,9 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -184,7 +181,7 @@ function TabBtn({ active, icon: Icon, label, count, onClick }: {
 // Main Page
 // ══════════════════════════════════════════════════════════════════════════════
 
-export default function ServiceContractsPage() {
+export function ServiceContractsContent() {
   const { toast } = useToast();
   const [location] = useLocation();
   const [tab, setTab] = useState<TabId>("list");
@@ -407,13 +404,8 @@ export default function ServiceContractsPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Contracts" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
-
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
 
             {/* ── Tab bar ── */}
             <div className="flex overflow-x-auto border-b border-gray-200 px-1">
@@ -708,15 +700,9 @@ export default function ServiceContractsPage() {
               </div>
             )}
 
-          </div>
-        </main>
       </div>
 
-      <MobileNavigation />
-
-      {/* ════════════════════════════════════════════════════════════════════
-          Contract Form Dialog
-      ════════════════════════════════════════════════════════════════════ */}
+      {/* Contract Form Dialog */}
       <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setEditing(null); setForm({}); } }}>
         <DialogContent className="max-w-2xl max-h-[93vh] overflow-y-auto">
           <DialogHeader>
@@ -1022,6 +1008,8 @@ export default function ServiceContractsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
+
+export default ServiceContractsContent;
