@@ -605,10 +605,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contracts/deletion-history", async (_req, res) => {
+    const history = await storage.getContractDeletionHistory();
+    res.json(history);
+  });
+
   app.delete("/api/contracts/:id", async (req, res) => {
+    const contract = await storage.getRentalContract(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ error: "Rental contract not found" });
+    }
+    const { reason, deletedBy, clientName, itemName } = req.body ?? {};
     const deleted = await storage.deleteRentalContract(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Rental contract not found" });
+    }
+    if (reason) {
+      await storage.logContractDeletion({
+        contractId: req.params.id,
+        contractNumber: contract.contractNumber ?? null,
+        clientName: clientName ?? "Unknown",
+        itemName: itemName ?? "Unknown",
+        monthlyPrice: contract.monthlyPrice ?? contract.calculatedTotal ?? null,
+        startDate: contract.startDate ?? null,
+        endDate: contract.endDate ?? null,
+        reason,
+        deletedBy: deletedBy ?? null,
+        notes: contract.notes ?? null,
+      });
     }
     res.status(204).send();
   });

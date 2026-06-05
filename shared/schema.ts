@@ -309,6 +309,21 @@ export const insertRentalContractSchema = createInsertSchema(rentalContracts).om
   contractNumber: true,
 });
 
+export const contractDeletionHistory = pgTable("contract_deletion_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull(),
+  contractNumber: text("contract_number"),
+  clientName: text("client_name").notNull(),
+  itemName: text("item_name").notNull(),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  reason: text("reason").notNull(),
+  deletedBy: text("deleted_by"),
+  deletedAt: timestamp("deleted_at").notNull().default(sql`now()`),
+  notes: text("notes"),
+});
+
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,
   createdAt: true,
@@ -411,6 +426,8 @@ export type InventoryItem = typeof inventoryItems.$inferSelect;
 
 export type InsertRentalContract = z.infer<typeof insertRentalContractSchema>;
 export type RentalContract = typeof rentalContracts.$inferSelect;
+
+export type ContractDeletionHistory = typeof contractDeletionHistory.$inferSelect;
 
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;

@@ -8,8 +8,10 @@ import ContractForm from "@/components/forms/contract-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Plus, FileText, AlertTriangle, Edit, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Search, Plus, FileText, AlertTriangle, Edit, Trash2, History, Clock, User, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatZAR } from "@/components/forms/contract-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,13 +20,16 @@ import { ExportButton } from "@/components/export-button";
 import { exportContracts } from "@/lib/data-export";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
-import type { RentalContract, Client, InventoryItem } from "@shared/schema";
+import type { RentalContract, Client, InventoryItem, ContractDeletionHistory } from "@shared/schema";
 
 export default function Contracts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingContract, setEditingContract] = useState<RentalContract | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [deletingContract, setDeletingContract] = useState<RentalContract | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const { user } = useAuth();
   const role = getDashboardRole(user ?? {});
@@ -45,38 +50,24 @@ export default function Contracts() {
     queryKey: ['/api/inventory'],
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('DELETE', `/api/contracts/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/contracts'] });
-      toast({
-        title: "Success",
-        description: "Contract deleted successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete contract",
-        variant: "destructive",
-      });
-    },
+  const { data: deletionHistory = [] } = useQuery<ContractDeletionHistory[]>({
+    queryKey: ['/api/contracts/deletion-history'],
+    enabled: showHistory,
   });
 
-  const filteredContracts = contracts.filter(contract => {
-    const client = clients.find(c => c.id === contract.clientId);
-    const item = inventoryItems.find(i => i.id === contract.inventoryItemId);
-    
-    const matchesSearch = searchTerm === "" || 
-      client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contract.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "active" && contract.isActive) ||
-      (statusFilter === "inactive" && !contract.isActive);
-    
-    return matchesSearch && matchesStatus;
+  const deleteMutation = useMutation({
+    mutationFn: ({ id, reason, clientName, itemName }: { id: string; reason: string; clientName: string; itemName: string }) =>
+      apiRequest('DELETE', `/api/contracts/${id}`, { reason, clientName, itemName, deletedBy: (user as any)?.name ?? (user as any)?.username ?? "Unknown" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contracts/deletion-history'] });
+      setDeletingContract(null);
+      setDeleteReason("");
+      toast({ title: "Contract deleted", description: "The deletion reason has been recorded." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete contract", variant: "destructive" });
+    },
   });
 
   const getClientName = (clientId: string) => {
@@ -111,24 +102,34 @@ export default function Contracts() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (contract: RentalContract) => {
-    if (confirm(`Are you sure you want to delete this contract?`)) {
-      deleteMutation.mutate(contract.id);
-    }
-  };
-
   const handleFormSuccess = () => {
     setIsFormOpen(false);
     setEditingContract(null);
   };
 
+  const filteredContracts = contracts.filter(contract => {
+    const client = clients.find(c => c.id === contract.clientId);
+    const item = inventoryItems.find(i => i.id === contract.inventoryItemId);
+
+    const matchesSearch = searchTerm === "" ||
+      client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contract.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === "all" ||
+      (statusFilter === "active" && contract.isActive) ||
+      (statusFilter === "inactive" && !contract.isActive);
+
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="min-h-screen flex bg-gray-50" data-testid="contracts-page">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title="Rental Contracts" />
-        
+
         <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
           {/* Header Actions */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -142,7 +143,7 @@ export default function Contracts() {
                 data-testid="search-contracts"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -153,12 +154,24 @@ export default function Contracts() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
-              <ExportButton 
+              <ExportButton
                 onExportCSV={() => exportContracts(contracts)}
                 entityName="Contracts"
                 variant="outline"
                 size="sm"
               />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistory(!showHistory)}
+                className={showHistory ? "bg-gray-100" : ""}
+              >
+                <History className="h-4 w-4 mr-2" />
+                Deletion History
+                {deletionHistory.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-xs">{deletionHistory.length}</Badge>
+                )}
+              </Button>
               {!isSales && (
                 <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                   <DialogTrigger asChild>
@@ -187,6 +200,70 @@ export default function Contracts() {
             </div>
           </div>
 
+          {/* Deletion History Panel */}
+          {showHistory && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+              <div className="p-5 border-b border-gray-200 flex items-center gap-2">
+                <History className="h-5 w-5 text-gray-500" />
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Contract Deletion History</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">A permanent record of all deleted contracts and the reasons given</p>
+                </div>
+              </div>
+              {deletionHistory.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <History className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No deleted contracts on record yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {deletionHistory.map((entry) => (
+                    <div key={entry.id} className="p-4 hover:bg-gray-50">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            {entry.contractNumber && (
+                              <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                                {entry.contractNumber}
+                              </span>
+                            )}
+                            <span className="font-semibold text-gray-900 text-sm">{entry.clientName}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
+                            <span className="flex items-center gap-1"><Package className="h-3 w-3" />{entry.itemName}</span>
+                            {entry.monthlyPrice && (
+                              <span>{formatZAR(Number(entry.monthlyPrice))}/mo</span>
+                            )}
+                            {entry.startDate && (
+                              <span>{formatDate(entry.startDate)} – {entry.endDate ? formatDate(entry.endDate) : "open"}</span>
+                            )}
+                          </div>
+                          <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-sm text-amber-900">
+                            <span className="font-medium">Reason: </span>{entry.reason}
+                          </div>
+                          {entry.notes && (
+                            <p className="text-xs text-gray-500 mt-1">Notes: {entry.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0 text-xs text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(entry.deletedAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                          {entry.deletedBy && (
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />{entry.deletedBy}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Contracts List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6 border-b border-gray-200">
@@ -195,7 +272,7 @@ export default function Contracts() {
                 {filteredContracts.length} contract{filteredContracts.length !== 1 ? 's' : ''} found
               </p>
             </div>
-            
+
             {isLoading ? (
               <div className="p-6">
                 <div className="space-y-4">
@@ -239,10 +316,7 @@ export default function Contracts() {
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                      <ContractForm
-                        onSuccess={() => {}}
-                        onCancel={() => {}}
-                      />
+                      <ContractForm onSuccess={() => {}} onCancel={() => {}} />
                     </DialogContent>
                   </Dialog>
                 )}
@@ -253,7 +327,7 @@ export default function Contracts() {
                   {filteredContracts.map((contract) => {
                     const expiringSoon = isExpiringSoon(contract);
                     const daysUntilExpiry = getDaysUntilExpiry(contract);
-                    
+
                     return (
                       <div key={contract.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors" data-testid={`contract-${contract.id}`}>
                         <div className="flex justify-between items-start mb-4">
@@ -279,7 +353,7 @@ export default function Contracts() {
                                 Expires in {daysUntilExpiry} days
                               </Badge>
                             )}
-                            <Badge 
+                            <Badge
                               className={contract.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
                               data-testid={`contract-status-${contract.id}`}
                             >
@@ -287,7 +361,7 @@ export default function Contracts() {
                             </Badge>
                           </div>
                         </div>
-                        
+
                         {/* Pricing summary row */}
                         {(() => {
                           const hasNew = contract.unitPrice && contract.quantity && contract.billingFrequency;
@@ -352,7 +426,7 @@ export default function Contracts() {
                             <span className="font-medium">Notes:</span> {contract.notes}
                           </p>
                         )}
-                        
+
                         {!isSales && (
                           <div className="flex justify-between pt-4 border-t border-gray-200">
                             <Button
@@ -367,7 +441,7 @@ export default function Contracts() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDelete(contract)}
+                              onClick={() => { setDeletingContract(contract); setDeleteReason(""); }}
                               className="text-red-600 hover:text-red-700"
                               data-testid={`button-delete-contract-${contract.id}`}
                             >
@@ -385,8 +459,53 @@ export default function Contracts() {
           </div>
         </main>
       </div>
-      
+
       <MobileNavigation />
+
+      {/* Delete with reason dialog */}
+      <AlertDialog open={!!deletingContract} onOpenChange={(open) => { if (!open) { setDeletingContract(null); setDeleteReason(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete contract?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-3">
+                  You are about to permanently delete the contract for{" "}
+                  <strong>{deletingContract ? getClientName(deletingContract.clientId) : ""}</strong>
+                  {deletingContract && ` — ${getItemName(deletingContract.inventoryItemId)}`}.
+                </p>
+                <p className="mb-2 text-sm font-medium text-gray-700">Reason for deletion <span className="text-red-500">*</span></p>
+                <Textarea
+                  placeholder="e.g. Client cancelled service, contract expired, moved premises…"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  rows={3}
+                  className="text-sm"
+                />
+                <p className="text-xs text-gray-400 mt-1">This reason will be saved to the deletion history log.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deletingContract) return;
+                deleteMutation.mutate({
+                  id: deletingContract.id,
+                  reason: deleteReason.trim() || "No reason provided",
+                  clientName: getClientName(deletingContract.clientId),
+                  itemName: getItemName(deletingContract.inventoryItemId),
+                });
+              }}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete Contract"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -88,6 +88,8 @@ export interface IStorage {
   createRentalContract(contract: InsertRentalContract): Promise<RentalContract>;
   updateRentalContract(id: string, contract: Partial<InsertRentalContract>): Promise<RentalContract>;
   deleteRentalContract(id: string): Promise<boolean>;
+  logContractDeletion(entry: Omit<import("@shared/schema").ContractDeletionHistory, "id" | "deletedAt">): Promise<import("@shared/schema").ContractDeletionHistory>;
+  getContractDeletionHistory(): Promise<import("@shared/schema").ContractDeletionHistory[]>;
 
   // Jobs
   getJobs(): Promise<Job[]>;
@@ -2689,6 +2691,15 @@ export class MemStorage implements IStorage {
 
   async deleteRentalContract(id: string): Promise<boolean> {
     return this.rentalContracts.delete(id);
+  }
+
+  async logContractDeletion(entry: Omit<import("@shared/schema").ContractDeletionHistory, "id" | "deletedAt">): Promise<import("@shared/schema").ContractDeletionHistory> {
+    const row = { ...entry, id: Math.random().toString(36).slice(2), deletedAt: new Date() } as import("@shared/schema").ContractDeletionHistory;
+    return row;
+  }
+
+  async getContractDeletionHistory(): Promise<import("@shared/schema").ContractDeletionHistory[]> {
+    return [];
   }
 
   // Jobs

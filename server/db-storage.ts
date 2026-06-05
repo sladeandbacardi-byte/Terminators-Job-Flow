@@ -14,7 +14,7 @@ import {
   vehicles, vehicleAssignments, kmLogs, fuelFillups, vehicleInspections, vehicleIssues,
   serviceRecords, workshopJobs, teams, teamMembers, attendanceRecords, attendanceMemberRecords,
   serviceContracts, salesAppointments, expenses, serviceScheduleEntries, activityLogs,
-  treatmentReports, communicationNotes, acceptedWorkflows,
+  treatmentReports, communicationNotes, acceptedWorkflows, contractDeletionHistory,
 } from "@shared/schema";
 
 import type {
@@ -1970,6 +1970,17 @@ export class DbStorage implements IStorage {
   async deleteAcceptedWorkflow(id: string): Promise<boolean> {
     const res = await db.delete(acceptedWorkflows).where(eq(acceptedWorkflows.id, id));
     return (res.rowCount ?? 0) > 0;
+  }
+
+  async logContractDeletion(entry: Omit<import("@shared/schema").ContractDeletionHistory, "id" | "deletedAt">): Promise<import("@shared/schema").ContractDeletionHistory> {
+    const [row] = await db.insert(contractDeletionHistory)
+      .values({ ...entry, id: randomUUID(), deletedAt: new Date() } as any)
+      .returning();
+    return row;
+  }
+
+  async getContractDeletionHistory(): Promise<import("@shared/schema").ContractDeletionHistory[]> {
+    return db.select().from(contractDeletionHistory).orderBy(desc(contractDeletionHistory.deletedAt));
   }
 
   async deleteAllClients(): Promise<number> {
