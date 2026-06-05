@@ -4517,6 +4517,64 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+
+  // POST /api/admin/data-integrity/merge-clients
+  app.post("/api/admin/data-integrity/merge-clients", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { masterId, duplicateIds } = req.body as { masterId: string; duplicateIds: string[] };
+      if (!masterId || !Array.isArray(duplicateIds) || duplicateIds.length === 0) {
+        return res.status(400).json({ error: "masterId and duplicateIds[] are required" });
+      }
+
+      const master = await storage.getClient(masterId);
+      if (!master) return res.status(404).json({ error: "Master client not found" });
+
+      const dupSet = new Set(duplicateIds);
+
+      const [allJobs, allInvoices, allContracts, allQuotes, allServiceContracts] = await Promise.all([
+        storage.getJobs(),
+        storage.getInvoices(),
+        storage.getRentalContracts(),
+        storage.getQuoteSubmissions(),
+        storage.getServiceContracts(),
+      ]);
+
+      const jobsToMove     = allJobs.filter(j  => dupSet.has(j.clientId ?? ""));
+      const invoicesToMove = allInvoices.filter(i => dupSet.has(i.clientId ?? ""));
+      const contractsToMove = allContracts.filter(c => dupSet.has(c.clientId ?? ""));
+      const quotesToMove   = allQuotes.filter(q  => dupSet.has(q.clientId ?? ""));
+      const serviceContractsToMove = allServiceContracts.filter(sc => dupSet.has(sc.clientId ?? ""));
+
+      await Promise.all([
+        ...jobsToMove.map(j  => storage.updateJob(j.id, { clientId: masterId })),
+        ...invoicesToMove.map(i => storage.updateInvoice(i.id, { clientId: masterId })),
+        ...contractsToMove.map(c => storage.updateRentalContract(c.id, { clientId: masterId })),
+        ...quotesToMove.map(q  => storage.updateQuoteSubmission(q.id, { clientId: masterId } as any)),
+        ...serviceContractsToMove.map(sc => storage.updateServiceContract(sc.id, { clientId: masterId } as any)),
+      ]);
+
+      for (const dupId of duplicateIds) {
+        await storage.deleteClient(dupId);
+      }
+
+      res.json({
+        success: true,
+        masterId,
+        masterName: master.name,
+        deleted: duplicateIds.length,
+        reassigned: {
+          jobs:             jobsToMove.length,
+          invoices:         invoicesToMove.length,
+          contracts:        contractsToMove.length,
+          quotes:           quotesToMove.length,
+          serviceContracts: serviceContractsToMove.length,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to merge clients", details: err.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // ── Backup Scheduler ─────────────────────────────────────────────────────

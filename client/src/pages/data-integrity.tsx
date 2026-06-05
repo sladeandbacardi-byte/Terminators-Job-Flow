@@ -14,9 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import {
   AlertTriangle, CheckCircle2, Copy, Database, Download,
   RefreshCw, ExternalLink, CalendarClock, FlaskConical,
-  XCircle, Loader2, ShieldCheck, AlertCircle,
+  XCircle, Loader2, ShieldCheck, AlertCircle, Merge,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -503,9 +509,45 @@ function OrphansTab() {
 
 // ── Duplicates Tab ─────────────────────────────────────────────────────────────
 function DuplicatesTab() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
   const { data, isLoading, refetch } = useQuery<DuplicatesResponse>({
     queryKey: ["/api/admin/data-integrity/duplicates"],
   });
+
+  const [mergeGroup, setMergeGroup] = useState<DuplicateGroup | null>(null);
+  const [masterId, setMasterId] = useState<string>("");
+
+  const mergeMutation = useMutation({
+    mutationFn: (payload: { masterId: string; duplicateIds: string[] }) =>
+      apiRequest("POST", "/api/admin/data-integrity/merge-clients", payload),
+    onSuccess: async (res: any) => {
+      const data = await res.json();
+      const total = Object.values(data.reassigned as Record<string, number>).reduce((a, b) => a + b, 0);
+      toast({
+        title: "Clients merged",
+        description: `Kept "${data.masterName}". ${data.deleted} duplicate(s) removed. ${total} record(s) reassigned.`,
+      });
+      setMergeGroup(null);
+      setMasterId("");
+      qc.invalidateQueries({ queryKey: ["/api/admin/data-integrity/duplicates"] });
+      qc.invalidateQueries({ queryKey: ["/api/clients"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Merge failed", description: err.message ?? "Could not merge clients.", variant: "destructive" });
+    },
+  });
+
+  const openMerge = (g: DuplicateGroup) => {
+    setMergeGroup(g);
+    setMasterId(g.clients[0]?.id ?? "");
+  };
+
+  const confirmMerge = () => {
+    if (!mergeGroup || !masterId) return;
+    const duplicateIds = mergeGroup.clients.filter(c => c.id !== masterId).map(c => c.id);
+    mergeMutation.mutate({ masterId, duplicateIds });
+  };
 
   if (isLoading) return <LoadingRows />;
 
@@ -529,12 +571,18 @@ function DuplicatesTab() {
           {groups.map((g, idx) => (
             <Card key={idx} className="border-yellow-200">
               <CardHeader className="py-3 px-4">
-                <div className="flex items-center gap-2">
-                  <Badge className={FIELD_COLORS[g.field]}>
-                    {FIELD_LABELS[g.field]}
-                  </Badge>
-                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground font-mono">{g.value}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge className={FIELD_COLORS[g.field]}>
+                      {FIELD_LABELS[g.field]}
+                    </Badge>
+                    <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground font-mono">{g.value}</span>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => openMerge(g)}>
+                    <Merge className="h-3.5 w-3.5" />
+                    Merge
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="pt-0 pb-3 px-4">
@@ -568,6 +616,70 @@ function DuplicatesTab() {
       <p className="text-xs text-muted-foreground pt-2">
         {groups.length} duplicate group(s) found across {data?.totalClients ?? 0} clients.
       </p>
+
+      {/* Merge confirmation dialog */}
+      <Dialog open={!!mergeGroup} onOpenChange={open => { if (!open) { setMergeGroup(null); setMasterId(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Merge className="h-5 w-5 text-yellow-600" />
+              Merge Duplicate Clients
+            </DialogTitle>
+            <DialogDescription>
+              Select the <strong>master client</strong> to keep. All jobs, invoices, contracts, and quotes linked to the other clients will be moved to the master, and the duplicates will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+
+          {mergeGroup && (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge className={FIELD_COLORS[mergeGroup.field]}>{FIELD_LABELS[mergeGroup.field]}</Badge>
+                <span className="font-mono">{mergeGroup.value}</span>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium mb-2">Choose the master client:</p>
+                <RadioGroup value={masterId} onValueChange={setMasterId} className="space-y-2">
+                  {mergeGroup.clients.map(c => (
+                    <div key={c.id} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${masterId === c.id ? "border-blue-400 bg-blue-50" : "border-border hover:bg-muted/40"}`}
+                      onClick={() => setMasterId(c.id)}>
+                      <RadioGroupItem value={c.id} id={`master-${c.id}`} className="mt-0.5" />
+                      <Label htmlFor={`master-${c.id}`} className="cursor-pointer flex-1">
+                        <p className="text-sm font-medium">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
+                        </p>
+                        <Badge variant="outline" className="text-xs mt-1">{c.status}</Badge>
+                      </Label>
+                      {masterId === c.id && (
+                        <Badge className="bg-blue-100 text-blue-800 text-xs shrink-0">Master</Badge>
+                      )}
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                <strong>Warning:</strong> This action is irreversible. The {mergeGroup.clients.length - 1} other client record(s) will be permanently deleted after all their linked records are moved to the master.
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setMergeGroup(null); setMasterId(""); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmMerge}
+              disabled={!masterId || mergeMutation.isPending}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+            >
+              {mergeMutation.isPending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Merge className="h-4 w-4 mr-2" />}
+              Confirm Merge
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
