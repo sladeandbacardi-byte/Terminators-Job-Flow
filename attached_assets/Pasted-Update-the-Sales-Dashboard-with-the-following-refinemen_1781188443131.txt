@@ -1,0 +1,80 @@
+Update the Sales Dashboard with the following refinements.
+
+1. Improve stale lead wording in Needs Action Today.
+
+For stale leads, show:
+- "No activity for X days"
+- A red badge that says either "X days inactive" or "Stale by X days"
+
+Do not show confusing mixed day values without explanation.
+
+2. Make the top KPI cards clickable.
+
+KPI card click actions:
+- Total Leads: open Leads page
+- Active Pipeline: open Leads page filtered to active pipeline stages
+- Won / Converted: open Accepted Work page
+- Follow-ups Due: open Follow-ups page filtered to due/overdue
+- Accepted Work Pending: open Accepted Work page filtered to pending workflow items
+
+Add a subtle hover state so users know the cards are clickable.
+
+3. Improve Pending Quotes actions.
+
+Each Pending Quote row must have quick actions:
+- Open Quote
+- Add Follow-up Note
+- Mark Followed Up
+- Reschedule Follow-up
+- Mark Accepted
+- Mark Lost
+
+On desktop, show the main action button plus a three-dot menu for extra actions.
+On mobile, use a three-dot action menu only.
+
+4. Add a Pending Quotes summary above the table.
+
+Show:
+- Total number of pending quotes
+- Total once-off value
+- Total monthly recurring value
+- Number overdue
+- Oldest follow-up age
+
+Example:
+"3 pending quotes · R12,450 once-off · R3,800 monthly recurring · 3 overdue · oldest 12 days"
+
+5. Add a quick action to Today's Sales Diary.
+
+If no appointments are scheduled, show:
+- "+ Add Appointment"
+
+The button must open the Sales Diary appointment creation dialog.
+
+Appointment creation from the dashboard must allow:
+- Client / lead
+- Appointment type
+- Sales rep
+- Date
+- Start time
+- End time
+- Notes
+
+6. Add dashboard empty-state actions.
+
+If there are no follow-ups due, show:
+"No follow-ups due today."
+Add a small button:
+"View all follow-ups"
+
+If there are no diary appointments, show:
+"No appointments scheduled for today."
+Add:
+"+ Add Appointment"
+
+If there are no accepted work pending items, show:
+"All accepted work is up to date."
+Add:
+"View Accepted Work"
+
+The goal is to make the Sales Dashboard both informative and action-based, so sales reps can work directly from the dashboard without unnecessary navigation.
