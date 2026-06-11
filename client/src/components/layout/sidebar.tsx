@@ -44,7 +44,6 @@ const ALL_SECTIONS: NavSection[] = [
     icon: DollarSign,
     roles: ["admin", "manager", "sales"],
     items: [
-      { name: "Sales Dashboard",    href: "/sales-dashboard",    icon: LayoutDashboard, roles: ["admin", "manager", "sales"] },
       { name: "Leads",              href: "/leads",              icon: TrendingUp, roles: ["admin", "manager", "sales"] },
       { name: "Accepted Work",      href: "/accepted-work",      icon: CheckSquare, roles: ["admin", "manager", "sales"] },
       { name: "Sales Diary",        href: "/sales-diary",        icon: BookOpen,   roles: ["admin", "manager", "sales"] },
@@ -155,7 +154,7 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
-  const isDashboardActive = location === "/" || location === "/dashboard";
+  const isDashboardActive = location === "/" || location === "/dashboard" || location === "/sales-dashboard";
 
   return (
     <div className="bg-white shadow-lg w-64 hidden md:flex flex-col" data-testid="sidebar">

@@ -81,8 +81,8 @@ function AuthenticatedApp() {
   return (
     <Switch>
       <Route path="/mobile" component={Mobile} />
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/" component={SalesDashboard} />
+      <Route path="/dashboard" component={SalesDashboard} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/workers" component={Workers} />
       <Route path="/clients" component={Clients} />

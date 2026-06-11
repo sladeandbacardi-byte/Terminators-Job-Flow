@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "@/components/layout/sidebar";
 import MobileNavigation from "@/components/layout/mobile-nav";
 import { Badge } from "@/components/ui/badge";
