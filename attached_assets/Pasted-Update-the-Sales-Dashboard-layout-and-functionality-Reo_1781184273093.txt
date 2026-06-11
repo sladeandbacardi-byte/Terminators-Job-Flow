@@ -1,0 +1,110 @@
+Update the Sales Dashboard layout and functionality.
+
+Reorder the Sales Dashboard sections in this priority order:
+1. KPI cards
+2. Needs Action Today
+3. Today’s Sales Diary
+4. Pending Quotes
+5. Leads by Origination
+6. Salesperson Performance
+7. Service Type Breakdown
+
+Add a new dashboard section called "Needs Action Today".
+
+Needs Action Today must show:
+- Overdue follow-ups
+- Follow-ups due today
+- Stale leads
+- Accepted quotes with no contract created
+- Contracts sent but not signed
+- Client registrations outstanding
+- Service/installation scheduled before contract signed
+- Price increases due this month or next month
+
+Each item in Needs Action Today must show:
+- Client name
+- Related lead/quote/contract number
+- Assigned sales rep
+- Reason action is needed
+- Days overdue, if applicable
+- Quick action button
+
+Quick action buttons:
+- Open Lead
+- Open Quote
+- Add Follow-up Note
+- Mark Follow-up Complete
+- Reschedule
+- Create Contract
+- Mark Contract Sent
+- Mark Contract Signed
+- Send Registration Form
+- Schedule Service
+
+Add a "Today’s Sales Diary" section to the Sales Dashboard.
+
+Today’s Sales Diary must show appointments for the logged-in sales rep by default.
+
+Each diary item must show:
+- Time
+- Appointment type
+- Client / lead name
+- Site address
+- Contact person
+- Phone number
+- Status
+
+Add filter options:
+- My diary
+- All sales reps
+- Specific sales rep
+- Today
+- This week
+
+Add quick action buttons to each diary item:
+- Open Appointment
+- Mark Completed
+- Reschedule
+- Add Note
+- Create Quote
+- Open Lead
+
+Improve the Pending Quotes section.
+
+Each pending quote card must show:
+- Client name
+- Contact person
+- Quote number
+- Quote value
+- Monthly recurring value, if applicable
+- Department / service type
+- Quote status
+- Date sent
+- Days since sent
+- Follow-up due date
+- Days overdue
+- Assigned sales rep
+- Last follow-up note
+
+Add quick action buttons:
+- Open Quote
+- Call
+- Email
+- Add Follow-up Note
+- Mark Accepted
+- Mark Lost
+- Reschedule Follow-up
+
+Add a new KPI card called "Accepted Work Pending".
+
+This card must count accepted quotes that still need any of the following:
+- Client registration form
+- Service contract
+- Contract signature
+- Service / installation scheduling
+- Invoice creation
+
+Clicking the Accepted Work Pending KPI card must open the Accepted Work page filtered to pending items.
+
+Keep the dashboard clean and not too cluttered.
+The goal is for the Sales Dashboard to tell the sales rep exactly what they need to do today, not just show historical stats.
