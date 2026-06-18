@@ -58,6 +58,7 @@ import DataIntegrity from "@/pages/data-integrity";
 import SalesDashboard from "@/pages/sales-dashboard";
 import CommissionReports from "@/pages/commission-reports";
 import AcceptedWork from "@/pages/accepted-work";
+import SalesReports from "@/pages/sales-reports";
 import EquipmentChecklists from "@/pages/equipment-checklists";
 
 function AuthenticatedApp() {
@@ -133,6 +134,7 @@ function AuthenticatedApp() {
       <Route path="/sales-dashboard" component={SalesDashboard} />
       <Route path="/commission-reports" component={CommissionReports} />
       <Route path="/accepted-work" component={AcceptedWork} />
+      <Route path="/sales-reports" component={SalesReports} />
       <Route path="/equipment-checklists" component={EquipmentChecklists} />
       <Route component={NotFound} />
     </Switch>

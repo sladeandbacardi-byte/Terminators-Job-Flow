@@ -522,6 +522,16 @@ function CreateWorkflowDialog({
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
+const CONTRACTS_PENDING_CATEGORIES = [
+  { id: "no_contract",      label: "No contract created",          color: "bg-purple-100 text-purple-700",  filter: (w: AcceptedWorkflow) => !w.contractDrafted && w.workflowStatus !== "complete" },
+  { id: "not_sent",         label: "Contract not sent",            color: "bg-indigo-100 text-indigo-700",  filter: (w: AcceptedWorkflow) => w.contractDrafted && !w.contractSent },
+  { id: "not_signed",       label: "Contract sent, not signed",    color: "bg-red-100 text-red-700",        filter: (w: AcceptedWorkflow) => w.contractSent && !w.contractSigned },
+  { id: "reg_outstanding",  label: "Registration outstanding",     color: "bg-amber-100 text-amber-700",    filter: (w: AcceptedWorkflow) => w.regFormSent && !w.regFormReceived },
+  { id: "not_scheduled",    label: "Service not scheduled",        color: "bg-orange-100 text-orange-700",  filter: (w: AcceptedWorkflow) => w.contractSigned && !w.serviceScheduled && w.workflowStatus !== "complete" },
+  { id: "not_invoiced",     label: "Work done, not invoiced",      color: "bg-teal-100 text-teal-700",      filter: (w: AcceptedWorkflow) => w.readyToInvoice && !w.linkedInvoiceId },
+  { id: "aftersales_due",   label: "After-sales follow-up due",    color: "bg-pink-100 text-pink-700",      filter: (w: AcceptedWorkflow) => !!w.afterSalesFollowupDate && !w.afterSalesComplete },
+];
+
 export default function AcceptedWork() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -561,9 +571,16 @@ export default function AcceptedWork() {
     counts[w.workflowStatus] = (counts[w.workflowStatus] || 0) + 1;
   }
 
+  // Contracts pending counts per category
+  const contractsPendingCount = CONTRACTS_PENDING_CATEGORIES.reduce(
+    (sum, cat) => sum + workflows.filter(cat.filter).length, 0
+  );
+
   const filteredWorkflows = selectedStatus === "all"
     ? workflows
-    : workflows.filter(w => w.workflowStatus === selectedStatus);
+    : selectedStatus === "contracts_pending"
+      ? workflows.filter(w => CONTRACTS_PENDING_CATEGORIES.some(cat => cat.filter(w)))
+      : workflows.filter(w => w.workflowStatus === selectedStatus);
 
   // Total warnings
   const totalWarnings = workflows.reduce((acc, w) => acc + getWarnings(w).length, 0);
@@ -618,6 +635,19 @@ export default function AcceptedWork() {
             >
               All <span className="ml-1 text-xs opacity-75">({counts.all || 0})</span>
             </button>
+            {/* Contracts Pending special tab */}
+            {contractsPendingCount > 0 && (
+              <button
+                onClick={() => setSelectedStatus("contracts_pending")}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                  selectedStatus === "contracts_pending"
+                    ? "bg-gray-800 text-white border-gray-800"
+                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                }`}
+              >
+                Contracts Pending <span className="ml-1 text-xs opacity-75">({contractsPendingCount})</span>
+              </button>
+            )}
             {WORKFLOW_STATUSES.filter(s => counts[s.value]).map(s => (
               <button
                 key={s.value}
@@ -633,37 +663,68 @@ export default function AcceptedWork() {
             ))}
           </div>
 
-          {/* Cards */}
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
-            </div>
-          ) : filteredWorkflows.length === 0 ? (
-            <div className="text-center py-16">
-              <CheckCircle2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">
-                {selectedStatus === "all"
-                  ? "No workflows yet"
-                  : `No workflows at "${STATUS_LABELS[selectedStatus]}" stage`}
-              </p>
-              {selectedStatus === "all" && (
-                <p className="text-sm text-gray-400 mt-1">
-                  Workflows are created automatically when a lead is moved to "Accepted" in the Leads page,
-                  or click "+ New Workflow" above.
-                </p>
+          {/* ── Contracts Pending grouped view ─────────────────────────── */}
+          {selectedStatus === "contracts_pending" && !isLoading && (
+            <div className="space-y-4 mb-2">
+              {CONTRACTS_PENDING_CATEGORIES.map(cat => {
+                const catItems = workflows.filter(cat.filter);
+                if (catItems.length === 0) return null;
+                return (
+                  <div key={cat.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cat.color}`}>{cat.label}</span>
+                      <span className="text-xs text-gray-400">{catItems.length} workflow{catItems.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="space-y-2.5 pl-1">
+                      {catItems.map(w => (
+                        <WorkflowCard key={`${cat.id}-${w.id}`} w={w} workers={workers} onPatch={handlePatch} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {contractsPendingCount === 0 && (
+                <div className="text-center py-12">
+                  <CheckCircle2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">All contracts are up to date</p>
+                </div>
               )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredWorkflows.map(w => (
-                <WorkflowCard
-                  key={w.id}
-                  w={w}
-                  workers={workers}
-                  onPatch={handlePatch}
-                />
-              ))}
-            </div>
+          )}
+
+          {/* Cards — normal filtered view */}
+          {selectedStatus !== "contracts_pending" && (
+            isLoading ? (
+              <div className="flex justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : filteredWorkflows.length === 0 ? (
+              <div className="text-center py-16">
+                <CheckCircle2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">
+                  {selectedStatus === "all"
+                    ? "No workflows yet"
+                    : `No workflows at "${STATUS_LABELS[selectedStatus]}" stage`}
+                </p>
+                {selectedStatus === "all" && (
+                  <p className="text-sm text-gray-400 mt-1">
+                    Workflows are created automatically when a lead is moved to "Accepted" in the Leads page,
+                    or click "+ New Workflow" above.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredWorkflows.map(w => (
+                  <WorkflowCard
+                    key={w.id}
+                    w={w}
+                    workers={workers}
+                    onPatch={handlePatch}
+                  />
+                ))}
+              </div>
+            )
           )}
         </div>
       </main>
