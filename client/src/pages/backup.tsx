@@ -196,6 +196,11 @@ export default function BackupPage() {
   const lastEmailSuccess = emailLogs.find((l) => l.status === "success");
   const lastEmailFailed = emailLogs.find((l) => l.status === "failed");
 
+  const autoLogs = backupLogs.filter((l) => l.backupType === "email-auto");
+  const lastAutoRun = autoLogs[0] ?? null;
+  const lastAutoFailed =
+    lastAutoRun?.status === "failed" ? lastAutoRun : null;
+
   const emailSendMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/backup/email-send"),
     onSuccess: async (res: any) => {
@@ -355,6 +360,26 @@ export default function BackupPage() {
                 Download, email, or restore your data.
               </p>
             </div>
+
+            {/* Scheduled backup failure banner */}
+            {lastAutoFailed && (
+              <div className="rounded-lg border-2 border-red-300 bg-red-50 p-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-red-900">Last scheduled backup failed</p>
+                  <p className="text-sm text-red-700 mt-0.5">
+                    {formatDatetime(lastAutoFailed.datetime)}
+                    {lastAutoFailed.recipientEmail ? ` — to ${lastAutoFailed.recipientEmail}` : ""}
+                  </p>
+                  {lastAutoFailed.errorMessage && (
+                    <p className="text-sm text-red-800 mt-1 break-words">{lastAutoFailed.errorMessage}</p>
+                  )}
+                  <p className="text-xs text-red-600 mt-2">
+                    An alert email was automatically sent to the admin address. Use "Retry Backup Email" below to resend the backup.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Info banner */}
             <Card className="border-blue-200 bg-blue-50">

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
-import { runDailyBackupEmail, getBackupEmailConfig } from "./email-backup";
+import { runDailyBackupEmail, getBackupEmailConfig, sendBackupFailureAlert } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
 import { 
   insertDepartmentSchema, insertWorkerSchema, insertClientSchema,
@@ -4626,7 +4626,16 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
       lastScheduledRunMinute = runKey;
       console.log(`[Backup Scheduler] Running scheduled backup at ${runKey} UTC`);
-      await runDailyBackupEmail("auto", schedule.recipientEmail);
+      const result = await runDailyBackupEmail("auto", schedule.recipientEmail);
+      if (result.status === "failed") {
+        const errMsg = result.errorMessage ?? "Unknown error";
+        console.warn(`[Backup Scheduler] Backup failed — sending alert email. Error: ${errMsg}`);
+        try {
+          await sendBackupFailureAlert(errMsg);
+        } catch (alertErr: any) {
+          console.error("[Backup Scheduler] Could not send failure alert:", alertErr?.message ?? alertErr);
+        }
+      }
     } catch (err: any) {
       console.error("[Backup Scheduler] Error:", err?.message ?? err);
     }

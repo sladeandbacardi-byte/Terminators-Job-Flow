@@ -246,6 +246,48 @@ export async function runDailyBackupEmail(
   }
 }
 
+export async function sendBackupFailureAlert(errorMessage: string): Promise<void> {
+  const recipient = BACKUP_RECIPIENT;
+  const dateStr = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
+
+  const subject = `⚠️ Job Flow Nightly Backup FAILED — ${new Date().toISOString().split("T")[0]}`;
+
+  const bodyText =
+    `The nightly automated backup email FAILED.\n\n` +
+    `Time: ${dateStr}\n` +
+    `Error: ${errorMessage}\n\n` +
+    `Please log in to the Backup & Restore page to investigate and retry.\n\n` +
+    `This is an automated alert from Job Flow — The Terminators Field Service Management System.`;
+
+  const bodyHtml = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;">
+    <h2 style="color:#dc2626;margin-bottom:8px;">⚠️ Nightly Backup Failed</h2>
+    <p style="margin:4px 0;color:#6b7280;font-size:13px;">${dateStr}</p>
+    <div style="background:#fef2f2;border:1px solid #fca5a5;padding:14px;border-radius:6px;margin:16px 0;">
+      <p style="margin:0 0 8px 0;font-weight:bold;color:#991b1b;">The automated nightly backup email could not be delivered.</p>
+      <p style="margin:0;font-size:13px;color:#7f1d1d;word-break:break-word;"><strong>Error:</strong> ${errorMessage}</p>
+    </div>
+    <p>Please log in to the <strong>Backup &amp; Restore</strong> page to investigate and retry the backup.</p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
+    <p style="font-size:12px;color:#6b7280;">Automated alert from Job Flow — The Terminators Field Service Management System.</p>
+  </body></html>`;
+
+  if (DEMO_MODE) return;
+
+  if (EMAIL_PROVIDER === "brevo") {
+    const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+    const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY);
+    if (!smtpConfigured && !apiKeyConfigured) return;
+
+    if (smtpConfigured) {
+      await sendViaBrevoSmtp({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+    } else {
+      await sendViaBrevoApi({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+    }
+  } else {
+    await sendEmail({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+  }
+}
+
 export function getBackupEmailConfig() {
   const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
   const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY);
