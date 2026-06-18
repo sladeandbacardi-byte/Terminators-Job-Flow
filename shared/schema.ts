@@ -157,6 +157,7 @@ export const jobs = pgTable("jobs", {
   recurrenceDay: text("recurrence_day"),
   recurrenceCount: integer("recurrence_count"),
   recurrenceYears: integer("recurrence_years"),
+  completedDate: timestamp("completed_date"),
   jobNumber: text("job_number"),
   linkedQuoteId: varchar("linked_quote_id"),
   invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | ready_to_invoice | exported | invoiced | do_not_invoice
