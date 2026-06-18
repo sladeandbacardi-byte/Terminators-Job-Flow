@@ -174,7 +174,7 @@ export default function Emails() {
                 <p className="text-gray-500 mt-1">Send emails and WhatsApp messages to clients and staff</p>
               </div>
               <Button onClick={() => setShowEmailForm(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Compose Email
+                <Plus className="h-4 w-4 mr-2" /> Create Email
               </Button>
             </div>
 
@@ -412,10 +412,10 @@ export default function Emails() {
 
             {/* Compose Email Dialog */}
             <Dialog open={showEmailForm} onOpenChange={setShowEmailForm}>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Compose Email</DialogTitle>
-                  <DialogDescription>Send a custom email to one of your customers.</DialogDescription>
+                  <DialogTitle>Create Email</DialogTitle>
+                  <DialogDescription>Choose a template, fill in the details, then open in your email app to review and send.</DialogDescription>
                 </DialogHeader>
                 <CustomerEmailForm onSuccess={() => setShowEmailForm(false)} onCancel={() => setShowEmailForm(false)} />
               </DialogContent>
