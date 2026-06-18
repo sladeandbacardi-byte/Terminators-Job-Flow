@@ -97,6 +97,8 @@ interface BackupLog {
 
 interface EmailConfigResponse {
   recipient: string;
+  alertRecipient: string;
+  alertRecipientOverridden: boolean;
   sender: string;
   provider: string;
   brevoConfigured: boolean;
@@ -375,7 +377,7 @@ export default function BackupPage() {
                     <p className="text-sm text-red-800 mt-1 break-words">{lastAutoFailed.errorMessage}</p>
                   )}
                   <p className="text-xs text-red-600 mt-2">
-                    An alert email was automatically sent to the admin address. Use "Retry Backup Email" below to resend the backup.
+                    An alert email was automatically sent to <strong>{emailConfig?.alertRecipient ?? emailConfig?.recipient ?? "the admin address"}</strong>. Use "Retry Backup Email" below to resend the backup.
                   </p>
                 </div>
               </div>
@@ -459,6 +461,8 @@ export default function BackupPage() {
                       <code className="bg-amber-100 px-1 rounded">BREVO_API_KEY</code> in environment secrets.
                       Optionally set <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_TO</code> and{" "}
                       <code className="bg-amber-100 px-1 rounded">BACKUP_EMAIL_FROM</code> to override defaults.
+                      Set <code className="bg-amber-100 px-1 rounded">BACKUP_ALERT_EMAIL_TO</code> to send failure
+                      alerts to a different address than the backup recipient.
                     </p>
                   </div>
                 )}
@@ -533,10 +537,21 @@ export default function BackupPage() {
                   </Button>
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                  Both buttons always send to <strong>{emailConfig?.recipient ?? "info@terminators.co.za"}</strong>.
-                  The test email is identical to the daily email but clearly labelled as a TEST.
-                </p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>
+                    Both buttons always send to <strong>{emailConfig?.recipient ?? "info@terminators.co.za"}</strong>.
+                    The test email is identical to the daily email but clearly labelled as a TEST.
+                  </p>
+                  <p className="flex items-center gap-1 flex-wrap">
+                    <span>Failure alert emails go to:</span>
+                    <strong>{emailConfig?.alertRecipient ?? emailConfig?.recipient ?? "info@terminators.co.za"}</strong>
+                    {emailConfig?.alertRecipientOverridden ? (
+                      <span className="text-violet-600">(set via <code className="bg-muted px-0.5 rounded">BACKUP_ALERT_EMAIL_TO</code>)</span>
+                    ) : (
+                      <span className="text-muted-foreground/70">(same as backup recipient — set <code className="bg-muted px-0.5 rounded">BACKUP_ALERT_EMAIL_TO</code> to use a different address)</span>
+                    )}
+                  </p>
+                </div>
 
                 {emailConfig?.emailConfigured && emailConfig?.brevoDeliveryMethod === "api" && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-1">

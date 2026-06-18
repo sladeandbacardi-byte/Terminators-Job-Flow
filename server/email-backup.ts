@@ -7,6 +7,9 @@ const BACKUP_RECIPIENT =
   process.env.BACKUP_EMAIL_TO ??
   process.env.BACKUP_EMAIL_RECIPIENT ??
   "info@terminators.co.za";
+const BACKUP_ALERT_RECIPIENT =
+  process.env.BACKUP_ALERT_EMAIL_TO?.trim() ||
+  BACKUP_RECIPIENT;
 const BACKUP_SENDER =
   process.env.BACKUP_EMAIL_FROM ??
   process.env.SENDGRID_FROM_EMAIL ??
@@ -247,7 +250,7 @@ export async function runDailyBackupEmail(
 }
 
 export async function sendBackupFailureAlert(errorMessage: string): Promise<void> {
-  const recipient = BACKUP_RECIPIENT;
+  const recipient = BACKUP_ALERT_RECIPIENT;
   const dateStr = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
   const subject = `⚠️ Job Flow Nightly Backup FAILED — ${new Date().toISOString().split("T")[0]}`;
@@ -297,6 +300,8 @@ export function getBackupEmailConfig() {
 
   return {
     recipient: BACKUP_RECIPIENT,
+    alertRecipient: BACKUP_ALERT_RECIPIENT,
+    alertRecipientOverridden: BACKUP_ALERT_RECIPIENT !== BACKUP_RECIPIENT,
     sender: BACKUP_SENDER,
     provider: EMAIL_PROVIDER,
     brevoConfigured,
