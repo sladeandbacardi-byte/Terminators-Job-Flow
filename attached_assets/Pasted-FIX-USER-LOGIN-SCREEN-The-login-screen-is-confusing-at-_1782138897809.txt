@@ -1,0 +1,97 @@
+FIX USER LOGIN SCREEN
+
+The login screen is confusing at the moment.
+
+Issue:
+The “Select your profile” dropdown is hard to use and the Sign In button is disabled until a user is selected. Users are struggling to understand what to click.
+
+Simplify the login screen.
+
+Remove the dropdown-based login for now.
+
+Instead, use large clear login buttons/cards for each role:
+
+- Managing Member
+- Service Manager
+- Sales
+- Finance
+- Technician
+- Admin
+
+Each card should log the user in directly when clicked.
+
+Keep Demo Mode clearly labelled, but make the screen easier to understand.
+
+Login screen layout:
+
+1. Show the Job Flow full logo at the top.
+Use:
+public/images/job-flow-full-logo.png
+
+2. Add heading:
+Select Your Login
+
+3. Add role cards/buttons:
+- Managing Member
+  Full system access
+- Service Manager
+  Service jobs, calendar, teams, invoices
+- Sales
+  Leads, quotes, clients, follow-ups
+- Finance
+  Invoices, debtors, reports, backups
+- Technician
+  My jobs, field diary, vehicle checks
+- Admin
+  Users, roles, settings, backups
+
+4. When a user clicks a role card, immediately log them in and route them to the correct dashboard.
+
+Role routing:
+Managing Member -> main business dashboard
+Service Manager -> service dashboard
+Sales -> sales dashboard
+Finance -> finance dashboard
+Technician -> technician mobile/simple dashboard
+Admin -> admin dashboard/settings
+
+5. Remove the separate Sign In button unless it is actually needed.
+
+6. If keeping a dropdown for future real users, place it under a separate section called:
+Real User Login
+
+But for now, the main visible login should be simple role cards.
+
+7. Fix the broken logo issue.
+
+The logo is sometimes showing as broken image text:
+Job Flow Field Service Management
+
+Make sure all logo paths use the correct public path:
+
+/images/job-flow-full-logo.png
+/images/job-flow-header-logo.png
+/images/job-flow-icon.png
+/images/job-flow-dashboard-banner.png
+
+Login page must use:
+/images/job-flow-full-logo.png
+
+App header must use:
+/images/job-flow-header-logo.png
+
+Use object-fit: contain.
+Do not stretch the logo.
+Add fallback alt text only if the image fails, but the image should load correctly.
+
+8. After login, save the selected user/role in local state/session storage so refreshing the page does not immediately lose the login.
+
+9. Add a visible logout/switch user button in the top right:
+Switch User
+
+Clicking it should return to the login screen.
+
+10. Keep Demo Mode banner if demo data is being used:
+DEMO MODE - Sample data only. Destructive actions are disabled.
+
+END

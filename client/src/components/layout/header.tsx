@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Menu, LogOut, ChevronDown, User, FlaskConical, Bell, AlertTriangle, Wrench, CheckCircle, Info } from "lucide-react";
+import { Menu, LogOut, ChevronDown, User, FlaskConical, Bell, AlertTriangle, Wrench, CheckCircle, Info, UserCog } from "lucide-react";
 import { formatDateTime, getInitials } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -219,7 +219,11 @@ export default function Header({ title, onMobileMenuToggle }: HeaderProps) {
                     Profile
                   </DropdownMenuItem>
                 )}
-                {!isDemoMode && <DropdownMenuSeparator />}
+                <DropdownMenuItem onClick={handleLogout}>
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Switch User
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
                   {isDemoMode ? "Exit Demo Mode" : "Sign Out"}

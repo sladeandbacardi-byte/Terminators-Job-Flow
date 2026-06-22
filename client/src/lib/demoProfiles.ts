@@ -51,6 +51,22 @@ export const DEMO_PROFILES: DemoProfile[] = [
     },
   },
   {
+    key: "manager",
+    dashboardRole: "manager",
+    label: "Service Manager Demo",
+    description: "Service jobs, calendar, teams, invoices",
+    colorClass: "bg-teal-50 border-teal-200 text-teal-800 hover:bg-teal-100",
+    user: {
+      id: "demo-manager",
+      username: "Demo Service Manager",
+      email: "demo@demo.co.za",
+      firstName: "Demo",
+      lastName: "Manager",
+      role: "Service Manager",
+      departmentId: "div-6",
+    },
+  },
+  {
     key: "accounts",
     dashboardRole: "accounts",
     label: "Finance Demo",
