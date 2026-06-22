@@ -93,6 +93,8 @@ interface BackupLog {
   status: "success" | "failed";
   errorMessage?: string;
   recipientEmail?: string;
+  alertEmailStatus?: "success" | "failed" | "skipped";
+  alertEmailError?: string;
 }
 
 interface EmailConfigResponse {
@@ -376,9 +378,27 @@ export default function BackupPage() {
                   {lastAutoFailed.errorMessage && (
                     <p className="text-sm text-red-800 mt-1 break-words">{lastAutoFailed.errorMessage}</p>
                   )}
-                  <p className="text-xs text-red-600 mt-2">
-                    An alert email was automatically sent to <strong>{emailConfig?.alertRecipient ?? emailConfig?.recipient ?? "the admin address"}</strong>. Use "Retry Backup Email" below to resend the backup.
-                  </p>
+                  {lastAutoFailed.alertEmailStatus === "failed" ? (
+                    <div className="mt-2 rounded border border-orange-300 bg-orange-50 px-3 py-2">
+                      <p className="text-xs font-semibold text-orange-800">⚠️ Alert email also failed to send</p>
+                      {lastAutoFailed.alertEmailError && (
+                        <p className="text-xs text-orange-700 mt-0.5 break-words">{lastAutoFailed.alertEmailError}</p>
+                      )}
+                      <p className="text-xs text-orange-700 mt-1">The admin at <strong>{emailConfig?.alertRecipient ?? emailConfig?.recipient ?? "the alert address"}</strong> was NOT notified. Check your email configuration and retry the backup manually.</p>
+                    </div>
+                  ) : lastAutoFailed.alertEmailStatus === "skipped" ? (
+                    <p className="text-xs text-amber-700 mt-2">
+                      Alert email could not be sent — no email provider is configured. Check environment secrets.
+                    </p>
+                  ) : lastAutoFailed.alertEmailStatus === "success" ? (
+                    <p className="text-xs text-green-700 mt-2">
+                      An alert email was sent to <strong>{emailConfig?.alertRecipient ?? emailConfig?.recipient ?? "the admin address"}</strong>. Use "Retry Backup Email" below to resend the backup.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-red-600 mt-2">
+                      An alert email was automatically sent to <strong>{emailConfig?.alertRecipient ?? emailConfig?.recipient ?? "the admin address"}</strong>. Use "Retry Backup Email" below to resend the backup.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -925,6 +945,7 @@ export default function BackupPage() {
                             <TableHead className="text-xs font-semibold">Date &amp; Time</TableHead>
                             <TableHead className="text-xs font-semibold">Type</TableHead>
                             <TableHead className="text-xs font-semibold">Status</TableHead>
+                            <TableHead className="text-xs font-semibold">Alert Email</TableHead>
                             <TableHead className="text-xs font-semibold">Files</TableHead>
                             <TableHead className="text-xs font-semibold">Sizes</TableHead>
                             <TableHead className="text-xs font-semibold">Destination / Recipient</TableHead>
@@ -952,6 +973,23 @@ export default function BackupPage() {
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
                                     <AlertTriangle className="h-3.5 w-3.5" /> Failed
                                   </span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {log.status !== "failed" ? (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                ) : log.alertEmailStatus === "success" ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                                    <CheckCircle className="h-3.5 w-3.5" /> Sent
+                                  </span>
+                                ) : log.alertEmailStatus === "failed" ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-600" title={log.alertEmailError}>
+                                    <AlertTriangle className="h-3.5 w-3.5" /> Also failed
+                                  </span>
+                                ) : log.alertEmailStatus === "skipped" ? (
+                                  <span className="text-xs text-amber-600">Not configured</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Unknown</span>
                                 )}
                               </TableCell>
                               <TableCell className="text-xs">

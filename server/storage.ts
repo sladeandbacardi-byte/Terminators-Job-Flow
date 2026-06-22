@@ -342,6 +342,7 @@ export interface IStorage {
   // Backup Logs
   getBackupLogs(): Promise<BackupLog[]>;
   addBackupLog(log: Omit<BackupLog, "id">): Promise<BackupLog>;
+  updateBackupLog(id: string, patch: Partial<Omit<BackupLog, "id">>): Promise<BackupLog | null>;
 
   // Integrity Scan History
   getIntegrityScans(): Promise<IntegrityScan[]>;
@@ -409,6 +410,8 @@ export interface BackupLog {
   status: "success" | "failed";
   errorMessage?: string;
   recipientEmail?: string;
+  alertEmailStatus?: "success" | "failed" | "skipped";
+  alertEmailError?: string;
 }
 
 export interface IntegrityScan {
@@ -4745,6 +4748,13 @@ export class MemStorage implements IStorage {
       this.backupLogs = this.backupLogs.slice(-200);
     }
     return newLog;
+  }
+
+  async updateBackupLog(id: string, patch: Partial<Omit<BackupLog, "id">>): Promise<BackupLog | null> {
+    const idx = this.backupLogs.findIndex((l) => l.id === id);
+    if (idx === -1) return null;
+    this.backupLogs[idx] = { ...this.backupLogs[idx], ...patch };
+    return this.backupLogs[idx];
   }
 
   async getIntegrityScans(): Promise<IntegrityScan[]> {

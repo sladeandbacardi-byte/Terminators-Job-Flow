@@ -4630,10 +4630,24 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       if (result.status === "failed") {
         const errMsg = result.errorMessage ?? "Unknown error";
         console.warn(`[Backup Scheduler] Backup failed — sending alert email. Error: ${errMsg}`);
-        try {
-          await sendBackupFailureAlert(errMsg);
-        } catch (alertErr: any) {
-          console.error("[Backup Scheduler] Could not send failure alert:", alertErr?.message ?? alertErr);
+        const alertResult = await sendBackupFailureAlert(errMsg);
+        if (alertResult.skipped) {
+          console.warn("[Backup Scheduler] Alert email was skipped (no provider configured or demo mode).");
+        } else if (!alertResult.success) {
+          console.error(`[Backup Scheduler] Alert email also failed: ${alertResult.error}`);
+        } else {
+          console.log("[Backup Scheduler] Alert email sent successfully.");
+        }
+        if (result.logId) {
+          const alertEmailStatus = alertResult.skipped
+            ? "skipped"
+            : alertResult.success
+              ? "success"
+              : "failed";
+          await storage.updateBackupLog(result.logId, {
+            alertEmailStatus,
+            alertEmailError: alertResult.success ? undefined : alertResult.error,
+          });
         }
       }
     } catch (err: any) {

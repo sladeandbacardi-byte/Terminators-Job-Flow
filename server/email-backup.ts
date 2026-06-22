@@ -127,6 +127,7 @@ export async function runDailyBackupEmail(
   jsonFile: { name: string; sizeBytes: number };
   csvFile: { name: string; sizeBytes: number };
   errorMessage?: string;
+  logId?: string;
 }> {
   const recipient = recipientOverride?.trim() || BACKUP_RECIPIENT;
   const dateStr = new Date().toISOString().split("T")[0];
@@ -222,7 +223,7 @@ export async function runDailyBackupEmail(
       });
     }
 
-    await storage.addBackupLog({
+    const successLog = await storage.addBackupLog({
       datetime: new Date().toISOString(),
       backupType: logTypeFor(kind),
       fileNames: [jsonInfo.name, csvInfo.name],
@@ -232,10 +233,10 @@ export async function runDailyBackupEmail(
       recipientEmail: recipient,
     });
 
-    return { status: "success", recipient, jsonFile: jsonInfo, csvFile: csvInfo };
+    return { status: "success", recipient, jsonFile: jsonInfo, csvFile: csvInfo, logId: successLog.id };
   } catch (e: any) {
     const errMsg = e?.message ?? "Unknown email backup error";
-    await storage.addBackupLog({
+    const failedLog = await storage.addBackupLog({
       datetime: new Date().toISOString(),
       backupType: logTypeFor(kind),
       fileNames: [jsonInfo.name, csvInfo.name],
@@ -245,11 +246,13 @@ export async function runDailyBackupEmail(
       errorMessage: errMsg,
       recipientEmail: recipient,
     });
-    return { status: "failed", recipient, jsonFile: jsonInfo, csvFile: csvInfo, errorMessage: errMsg };
+    return { status: "failed", recipient, jsonFile: jsonInfo, csvFile: csvInfo, errorMessage: errMsg, logId: failedLog.id };
   }
 }
 
-export async function sendBackupFailureAlert(errorMessage: string): Promise<void> {
+export async function sendBackupFailureAlert(
+  errorMessage: string,
+): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
   const recipient = BACKUP_ALERT_RECIPIENT;
   const dateStr = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
@@ -274,20 +277,32 @@ export async function sendBackupFailureAlert(errorMessage: string): Promise<void
     <p style="font-size:12px;color:#6b7280;">Automated alert from Job Flow — The Terminators Field Service Management System.</p>
   </body></html>`;
 
-  if (DEMO_MODE) return;
+  if (DEMO_MODE) {
+    return { success: true, skipped: true };
+  }
 
-  if (EMAIL_PROVIDER === "brevo") {
-    const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-    const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY);
-    if (!smtpConfigured && !apiKeyConfigured) return;
+  try {
+    if (EMAIL_PROVIDER === "brevo") {
+      const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+      const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY);
+      if (!smtpConfigured && !apiKeyConfigured) {
+        console.warn("[Backup Alert] ⚠️ ALERT EMAIL NOT SENT — no email provider configured. Backup failure may go unnoticed.");
+        return { success: false, skipped: true, error: "No email provider configured (BREVO_API_KEY or SMTP credentials missing)" };
+      }
 
-    if (smtpConfigured) {
-      await sendViaBrevoSmtp({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+      if (smtpConfigured) {
+        await sendViaBrevoSmtp({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+      } else {
+        await sendViaBrevoApi({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+      }
     } else {
-      await sendViaBrevoApi({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+      await sendEmail({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
     }
-  } else {
-    await sendEmail({ to: recipient, from: BACKUP_SENDER, subject, text: bodyText, html: bodyHtml, attachments: [] });
+    return { success: true };
+  } catch (e: any) {
+    const errMsg: string = e?.message ?? "Unknown error sending alert email";
+    console.error(`[Backup Alert] ⚠️ ALERT EMAIL FAILED — ${errMsg}. Backup failure may go unnoticed. Recipient: ${recipient}`);
+    return { success: false, error: errMsg };
   }
 }
 

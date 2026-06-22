@@ -1716,6 +1716,14 @@ export class DbStorage implements IStorage {
     return entry;
   }
 
+  async updateBackupLog(id: string, patch: Partial<Omit<BackupLog, "id">>): Promise<BackupLog | null> {
+    const idx = this.backupLogs.findIndex((l) => l.id === id);
+    if (idx === -1) return null;
+    this.backupLogs[idx] = { ...this.backupLogs[idx], ...patch };
+    this.saveSettings();
+    return this.backupLogs[idx];
+  }
+
   async getIntegrityScans(): Promise<IntegrityScan[]> {
     return [...this.integrityScans].sort((a, b) => b.scannedAt.localeCompare(a.scannedAt));
   }
