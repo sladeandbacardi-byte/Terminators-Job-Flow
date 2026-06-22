@@ -52,9 +52,10 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     queryKey: ["/api/workers"],
   });
 
-  // Exclude field technicians (div-1 Pest Control, div-2 Sanitary Bins, div-3 Washroom, div-4 Deep Cleaning)
-  const FIELD_DEPT_IDS = ["div-1", "div-2", "div-3", "div-4"];
-  const workers = allWorkers.filter(w => w.isActive !== false && !FIELD_DEPT_IDS.includes(w.departmentId ?? ""));
+  // Exclude field technicians — any dept starting with div-1/2/3/4 (covers div-2-jackie, div-2-donovan, etc.)
+  const isFieldDept = (deptId: string | null | undefined) =>
+    ["div-1", "div-2", "div-3", "div-4"].some(prefix => (deptId ?? "").startsWith(prefix));
+  const workers = allWorkers.filter(w => w.isActive !== false && !isFieldDept(w.departmentId));
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {
