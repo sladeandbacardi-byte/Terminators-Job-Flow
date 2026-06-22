@@ -52,8 +52,9 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     queryKey: ["/api/workers"],
   });
 
-  // Exclude field technicians — only show management, admin, sales, accounts, coordinator
-  const workers = allWorkers.filter(w => w.isActive !== false && getDashboardRole(w) !== "service");
+  // Exclude field technicians (div-1 Pest Control, div-2 Sanitary Bins, div-3 Washroom, div-4 Deep Cleaning)
+  const FIELD_DEPT_IDS = ["div-1", "div-2", "div-3", "div-4"];
+  const workers = allWorkers.filter(w => w.isActive !== false && !FIELD_DEPT_IDS.includes(w.departmentId ?? ""));
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {
