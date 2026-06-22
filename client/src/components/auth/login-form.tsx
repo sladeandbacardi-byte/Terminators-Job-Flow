@@ -48,13 +48,12 @@ interface LoginFormProps {
 export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
-  const LOGIN_USER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4", "worker-5", "worker-6"];
-
   const { data: allWorkers = [], isLoading: workersLoading } = useQuery<Worker[]>({
     queryKey: ["/api/workers"],
   });
 
-  const workers = allWorkers.filter(w => LOGIN_USER_IDS.includes(w.id));
+  // Show all active workers — role preview badge tells the user what dashboard they'll see
+  const workers = allWorkers.filter(w => w.isActive !== false);
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {
