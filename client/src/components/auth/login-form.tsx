@@ -52,8 +52,8 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     queryKey: ["/api/workers"],
   });
 
-  // Show all active workers — role preview badge tells the user what dashboard they'll see
-  const workers = allWorkers.filter(w => w.isActive !== false);
+  // Exclude field technicians — only show management, admin, sales, accounts, coordinator
+  const workers = allWorkers.filter(w => w.isActive !== false && getDashboardRole(w) !== "service");
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {
