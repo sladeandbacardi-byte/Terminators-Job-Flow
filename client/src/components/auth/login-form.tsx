@@ -91,9 +91,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     enabled: showRealLogin,
   });
 
-  const isFieldDept = (deptId: string | null | undefined) =>
-    ["div-1", "div-2", "div-3", "div-4"].some(prefix => (deptId ?? "").startsWith(prefix));
-  const workers = allWorkers.filter(w => w.isActive !== false && !isFieldDept(w.departmentId));
+  const workers = allWorkers.filter(w => w.isActive !== false);
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {
