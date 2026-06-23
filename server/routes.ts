@@ -34,7 +34,34 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+
+  // Hardcoded staff list — used as fallback when DB is empty (e.g. fresh Railway deploy)
+  const HARDCODED_STAFF = [
+    { id: "worker-1",  name: "Julien Botha",       role: "Managing Member",                   departmentId: "div-6" },
+    { id: "worker-2",  name: "Maryka Venter",       role: "Pest Control Services Manager",     departmentId: "div-6" },
+    { id: "worker-3",  name: "Mariette Koekemoer",  role: "Hygiene Services Manager",          departmentId: "div-6" },
+    { id: "worker-4",  name: "Juli Holtshausen",    role: "Finance & HR Manager",              departmentId: "div-7" },
+    { id: "worker-5",  name: "Sheryl-Lyn Lee",      role: "Existing Clients Sales & Admin",    departmentId: "div-5" },
+    { id: "worker-6",  name: "Chane du Toit",       role: "Sales Rep",                         departmentId: "div-5" },
+    { id: "worker-7",  name: "Zuki Sandi",          role: "Ablution Deep Cleaning Supervisor", departmentId: "div-4" },
+    { id: "worker-8",  name: "Reece Ebrahim",       role: "Pest Control Operator",             departmentId: "div-1" },
+    { id: "worker-9",  name: "Garth du Preez",      role: "Pest Control Operator",             departmentId: "div-1" },
+    { id: "worker-10", name: "Michael Meyer",       role: "Pest Control Operator",             departmentId: "div-1" },
+    { id: "worker-11", name: "Xolani Ndzotoyi",     role: "Pest Control Operator",             departmentId: "div-1" },
+    { id: "worker-12", name: "Zain Abdol",          role: "Washroom Supervisor",               departmentId: "div-3" },
+    { id: "worker-13", name: "Leon Coltman",        role: "Pest Control Assistant",            departmentId: "div-1" },
+    { id: "worker-14", name: "Jackie Roelfse",      role: "Sanitary Bin B Team Supervisor",    departmentId: "div-2" },
+    { id: "worker-15", name: "Re-Althon",           role: "Sanitary Bin A Team Supervisor",    departmentId: "div-2" },
+    { id: "worker-16", name: "Belinda",             role: "Sanitary Bin Technician",           departmentId: "div-2" },
+    { id: "worker-17", name: "Racquel",             role: "Sanitary Bin Technician",           departmentId: "div-2" },
+    { id: "worker-18", name: "Asanda",              role: "Sanitary Bin Technician",           departmentId: "div-2" },
+    { id: "worker-19", name: "Nosipho",             role: "Deep Cleaning Technician",          departmentId: "div-4" },
+    { id: "worker-20", name: "Nini",                role: "Deep Cleaning Technician",          departmentId: "div-4" },
+    { id: "worker-21", name: "Babalwa",             role: "Deep Cleaning Technician",          departmentId: "div-4" },
+    { id: "worker-22", name: "Veronica",            role: "Daily Cleaning Technician",         departmentId: "div-8" },
+    { id: "worker-23", name: "Margrett",            role: "Daily Cleaning Technician",         departmentId: "div-8" },
+  ];
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -44,9 +71,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      // Get the worker/user by ID
-      const worker = await storage.getWorker(userId);
-      
+      // Get the worker/user by ID — fall back to hardcoded list if DB is empty
+      let worker = await storage.getWorker(userId);
+
+      if (!worker) {
+        const fallback = HARDCODED_STAFF.find(s => s.id === userId);
+        if (fallback) {
+          worker = { ...fallback, email: null, phone: null, isActive: true, createdAt: new Date(), employeeId: null, pin: null } as any;
+        }
+      }
+
       if (!worker) {
         return res.status(401).json({ message: "User not found" });
       }
@@ -212,17 +246,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public endpoint — lists staff for login screen (no auth required)
+  // Public endpoint — lists staff for login screen (no auth required).
+  // Falls back to hardcoded list if DB is empty or unavailable (e.g. fresh Railway deploy).
   app.get("/api/auth/staff", async (_req, res) => {
     try {
       const allWorkers = await storage.getWorkers();
-      const staff = allWorkers
+      const dbStaff = allWorkers
         .filter(w => w.isActive !== false)
         .map(w => ({ id: w.id, name: w.name, role: w.role, departmentId: w.departmentId }));
-      res.json(staff);
+      // If DB has workers, use them; otherwise fall back to hardcoded list
+      res.json(dbStaff.length > 0 ? dbStaff : HARDCODED_STAFF);
     } catch (err) {
-      console.error("[auth/staff] Failed to list staff:", err);
-      res.status(500).json({ error: "Failed to load staff list" });
+      console.error("[auth/staff] DB error, using hardcoded fallback:", err);
+      res.json(HARDCODED_STAFF);
     }
   });
 
