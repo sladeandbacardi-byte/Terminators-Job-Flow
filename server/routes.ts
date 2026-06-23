@@ -71,13 +71,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      // Get the worker/user by ID — fall back to hardcoded list if DB is empty
-      let worker = await storage.getWorker(userId);
+      // Get the worker/user by ID — fall back to hardcoded list if DB is empty or throws
+      let worker: any = null;
+      try {
+        worker = await storage.getWorker(userId);
+      } catch (dbErr) {
+        console.warn("DB unavailable during login, using hardcoded fallback:", dbErr);
+      }
 
       if (!worker) {
         const fallback = HARDCODED_STAFF.find(s => s.id === userId);
         if (fallback) {
-          worker = { ...fallback, email: null, phone: null, isActive: true, createdAt: new Date(), employeeId: null, pin: null } as any;
+          worker = { ...fallback, email: null, phone: null, isActive: true, createdAt: new Date(), employeeId: null, pin: null };
         }
       }
 
