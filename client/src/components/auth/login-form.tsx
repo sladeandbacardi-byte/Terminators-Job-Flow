@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
-  AlertCircle, Shield, Wrench, TrendingUp, DollarSign, Briefcase,
+  AlertCircle, Shield, Wrench, TrendingUp, DollarSign,
   Settings, ChevronRight, ChevronDown, ChevronUp, LogIn, User,
 } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
@@ -61,18 +61,6 @@ const ROLE_CARDS = [
     iconBg: "bg-amber-100",
     iconColor: "text-amber-600",
     profile: () => profileByKey("accounts"),
-  },
-  {
-    key: "service",
-    label: "Technician",
-    description: "My jobs, field diary, vehicle checks",
-    Icon: Briefcase,
-    border: "border-green-200",
-    bg: "bg-green-50 hover:bg-green-100 active:bg-green-200",
-    text: "text-green-900",
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
-    profile: () => profileByKey("service"),
   },
   {
     key: "admin-settings",
