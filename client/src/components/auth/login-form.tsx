@@ -1,15 +1,14 @@
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   AlertCircle, Shield, Wrench, TrendingUp, DollarSign,
-  Settings, ChevronRight, ChevronDown, ChevronUp, LogIn, User,
+  Settings, ChevronRight, ChevronDown, ChevronUp, LogIn, User, Loader2,
 } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
-import type { Worker } from "@shared/schema";
 
 const profileByKey = (key: string) => DEMO_PROFILES.find(p => p.key === key)!;
 
@@ -76,6 +75,13 @@ const ROLE_CARDS = [
   },
 ];
 
+interface StaffMember {
+  id: string;
+  name: string;
+  role: string | null;
+  departmentId: string | null;
+}
+
 interface LoginFormProps {
   onSuccess: (token: string, user: any) => void;
   onDemoLogin?: (profile: any) => void;
@@ -86,12 +92,29 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [loginError, setLoginError] = useState("");
 
-  const { data: allWorkers = [], isLoading: workersLoading } = useQuery<Worker[]>({
-    queryKey: ["/api/workers"],
-    enabled: showRealLogin,
-  });
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState("");
 
-  const workers = allWorkers.filter(w => w.isActive !== false);
+  useEffect(() => {
+    if (!showRealLogin || staff.length > 0) return;
+    setStaffLoading(true);
+    setStaffError("");
+    fetch("/api/auth/staff")
+      .then(r => {
+        if (!r.ok) throw new Error(`Server error ${r.status}`);
+        return r.json();
+      })
+      .then((data: StaffMember[]) => {
+        setStaff(data);
+        setStaffLoading(false);
+      })
+      .catch(err => {
+        setStaffError("Could not load staff list. Please try again.");
+        setStaffLoading(false);
+        console.error("[login] staff fetch failed:", err);
+      });
+  }, [showRealLogin]);
 
   const loginMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -177,28 +200,41 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 </Alert>
               )}
 
-              <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={workersLoading}>
-                <SelectTrigger>
-                  <SelectValue placeholder={workersLoading ? "Loading staff..." : "Choose your profile..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {workers.map(worker => {
-                    const role = getDashboardRole(worker);
-                    return (
-                      <SelectItem key={worker.id} value={worker.id}>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{worker.name}</span>
-                          <span className="text-xs text-gray-400">— {dashboardRoleLabels[role]}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              {staffError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{staffError}</AlertDescription>
+                </Alert>
+              )}
+
+              {staffLoading ? (
+                <div className="flex items-center gap-2 py-2 text-sm text-gray-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading staff...
+                </div>
+              ) : staff.length === 0 && !staffError ? (
+                <p className="text-sm text-gray-400 py-1">No staff accounts found.</p>
+              ) : (
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose your profile..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staff.map(member => {
+                      const roleLabel = dashboardRoleLabels[getDashboardRole(member)] ?? member.role ?? "Staff";
+                      return (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name} — {roleLabel}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
 
               <Button
                 onClick={() => selectedUserId && loginMutation.mutate(selectedUserId)}
-                disabled={loginMutation.isPending || !selectedUserId}
+                disabled={loginMutation.isPending || !selectedUserId || staffLoading}
                 className="w-full"
               >
                 <LogIn className="h-4 w-4 mr-2" />

@@ -212,6 +212,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint — lists staff for login screen (no auth required)
+  app.get("/api/auth/staff", async (_req, res) => {
+    try {
+      const allWorkers = await storage.getWorkers();
+      const staff = allWorkers
+        .filter(w => w.isActive !== false)
+        .map(w => ({ id: w.id, name: w.name, role: w.role, departmentId: w.departmentId }));
+      res.json(staff);
+    } catch (err) {
+      console.error("[auth/staff] Failed to list staff:", err);
+      res.status(500).json({ error: "Failed to load staff list" });
+    }
+  });
+
   app.post("/api/auth/logout", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const authHeader = req.headers.authorization;
