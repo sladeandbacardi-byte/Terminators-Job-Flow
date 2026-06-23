@@ -1,9 +1,19 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { execSync } from "child_process";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
 import { runDailyBackupEmail } from "./email-backup";
+
+// Auto-push schema on startup so Railway fresh deploys always have tables.
+try {
+  log("[startup] Syncing database schema...");
+  execSync("npx drizzle-kit push --force", { stdio: "inherit" });
+  log("[startup] Database schema ready.");
+} catch (err) {
+  console.error("[startup] db schema push failed (will continue):", err);
+}
 
 const app = express();
 app.use(express.json());
