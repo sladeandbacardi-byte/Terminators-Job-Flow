@@ -1,15 +1,28 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 
-neonConfig.webSocketConstructor = ws;
+const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+}
+
+if (connectionString.startsWith("wss://") || connectionString.startsWith("ws://")) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    `Invalid DATABASE_URL: expected postgres:// or postgresql://, ` +
+    `received ${connectionString.split("/")[0]}//... ` +
+    `Set DATABASE_URL to the standard Postgres connection string in Railway service variables.`
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export const pool = new Pool({
+  connectionString,
+  ssl: connectionString.includes("sslmode=require") || process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : false,
+});
+
+export const db = drizzle(pool, { schema });
