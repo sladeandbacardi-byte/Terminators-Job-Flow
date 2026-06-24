@@ -7,14 +7,15 @@ const { Pool } = pg;
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+  throw new Error("DATABASE_URL is missing. Set it to a postgres:// or postgresql:// connection string.");
 }
 
-if (connectionString.startsWith("wss://") || connectionString.startsWith("ws://")) {
+if (
+  !connectionString.startsWith("postgres://") &&
+  !connectionString.startsWith("postgresql://")
+) {
   throw new Error(
-    `Invalid DATABASE_URL: expected postgres:// or postgresql://, ` +
-    `received ${connectionString.split("/")[0]}//... ` +
-    `Set DATABASE_URL to the standard Postgres connection string in Railway service variables.`
+    `Invalid DATABASE_URL. Expected postgres:// or postgresql://, received ${connectionString.slice(0, 10)}...`
   );
 }
 
