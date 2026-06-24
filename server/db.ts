@@ -19,6 +19,16 @@ if (
   );
 }
 
+// Safe startup diagnostics — never prints password or full URL
+try {
+  const parsed = new URL(connectionString);
+  console.log(`[db] Database URL protocol: ${parsed.protocol.replace(":", "")}`);
+  console.log(`[db] Database URL host:     ${parsed.hostname}`);
+} catch {
+  console.log("[db] Database URL: present (could not parse host)");
+}
+console.log("[db] Database URL validation: passed");
+
 export const pool = new Pool({
   connectionString,
   ssl: connectionString.includes("sslmode=require") || process.env.NODE_ENV === "production"

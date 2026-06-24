@@ -5,6 +5,8 @@ import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
 import { runDailyBackupEmail } from "./email-backup";
 
+console.log("[startup] Job Flow server starting");
+
 // Global crash guards — log and keep running instead of exiting
 process.on("uncaughtException", (err) => {
   console.error("[uncaughtException]", err);
@@ -119,6 +121,7 @@ app.use((req, res, next) => {
 
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(port, "0.0.0.0", () => {
+    console.log(`[startup] Server listening on port: ${port}`);
     log(`serving on port ${port}`);
     log(`Mobile app available at: http://0.0.0.0:${port}/mobile`);
   });
