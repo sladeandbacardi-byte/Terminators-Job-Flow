@@ -11,7 +11,7 @@ import {
   Bell, Tag, Clock, PieChart,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getDashboardRole } from "@/lib/dashboardRole";
+import { getDashboardRole, getDefaultDashboardRoute } from "@/lib/dashboardRole";
 
 type NavItem = {
   name: string;
@@ -153,14 +153,17 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
-  const isDashboardActive = location === "/" || location === "/dashboard" || location === "/sales-dashboard";
+  const dashboardHref = getDefaultDashboardRoute(user ?? {});
+  const isDashboardActive = location === "/" || location === "/dashboard"
+    || location === "/sales-dashboard" || location === "/finance-dashboard"
+    || location === "/hr-dashboard";
 
   return (
     <div className="bg-white shadow-lg w-64 hidden md:flex flex-col" data-testid="sidebar">
       <nav className="p-3 space-y-1 overflow-y-auto flex-1" data-testid="navigation">
-        {/* Dashboard — top-level link */}
+        {/* Dashboard — top-level link, goes to the role-specific dashboard */}
         <Link
-          href="/"
+          href={dashboardHref}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-colors",
             isDashboardActive ? "bg-primary-50 text-primary-700" : "text-gray-700 hover:bg-gray-100"

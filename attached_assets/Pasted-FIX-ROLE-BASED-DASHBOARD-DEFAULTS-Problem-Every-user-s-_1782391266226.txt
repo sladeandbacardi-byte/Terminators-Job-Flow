@@ -1,0 +1,141 @@
+FIX ROLE-BASED DASHBOARD DEFAULTS
+
+Problem:
+Every user’s Dashboard seems to default to the Sales Dashboard.
+
+Example:
+Logged in user:
+Julien Botha
+Role:
+Managing Member
+
+But the page shows:
+Sales Dashboard
+
+This is wrong.
+
+Fix dashboard routing so the main Dashboard page loads the correct dashboard based on the logged-in user’s role.
+
+Rules:
+
+1. Managing Member
+   When role is Managing Member, Owner, Admin, or Super Admin:
+   Default dashboard must be:
+   Business Overview Dashboard
+
+It should show overview across:
+
+* Sales
+* Service
+* Finance
+* Operations
+* Staff
+* Fleet
+* Backups / system status
+
+It must not default to Sales Dashboard.
+
+2. Sales User
+   When role is Sales, Sales Rep, or Sales Manager:
+   Default dashboard must be:
+   Sales Dashboard
+
+3. Service User
+   When role is Service Manager, Service Coordinator, Service Admin, or Service:
+   Default dashboard must be:
+   Service Dashboard
+
+It should show:
+
+* Today’s jobs
+* Service calendar
+* Jobs not completed
+* Jobs ready to invoice
+* Field diaries due
+* Team workload
+* Stock alerts if relevant
+
+4. Finance User
+   When role is Finance, Accounts, Bookkeeper, or Finance Manager:
+   Default dashboard must be:
+   Finance Dashboard
+
+It should show:
+
+* Invoices
+* Debtors
+* Creditors
+* Sales vs expenses
+* Backup status
+* Sage export status
+
+5. Operations User
+   When role is Operations, HR, Fleet, or Operations Manager:
+   Default dashboard must be:
+   Operations Dashboard
+
+It should show:
+
+* Staff
+* Attendance
+* Teams
+* Vehicle inspections
+* Fuel fill-ups
+* Maintenance
+* Reported issues
+
+6. Technician
+   When role is Technician, Field Technician, Pest Control Operator, Hygiene Operator, or Worker:
+   Default dashboard must be:
+   Technician Dashboard / My Jobs
+
+It should show only:
+
+* My jobs today
+* My week
+* Field diary
+* Vehicle inspection
+* Fuel fill-up
+* Report issue
+
+7. Sidebar Dashboard Button
+   The Dashboard button in the sidebar must route the user to their own role dashboard.
+
+Do not route everyone to Sales Dashboard.
+
+8. Page Header
+   The page header and breadcrumb must match the actual dashboard.
+
+Examples:
+Managing Member -> Business Overview Dashboard
+Sales -> Sales Dashboard
+Service Manager -> Service Dashboard
+Finance -> Finance Dashboard
+Operations -> Operations Dashboard
+Technician -> My Jobs Dashboard
+
+9. Preserve direct module links
+   If the user clicks Sales > Dashboard or Sales Dashboard, then show Sales Dashboard.
+   But the general Dashboard button must show the role-specific dashboard.
+
+10. Add a helper function:
+
+getDefaultDashboardForRole(role)
+
+Example mapping:
+Managing Member -> /dashboard/business
+Admin -> /dashboard/business
+Sales -> /dashboard/sales
+Sales Rep -> /dashboard/sales
+Service Manager -> /dashboard/service
+Service Coordinator -> /dashboard/service
+Finance -> /dashboard/finance
+Operations -> /dashboard/operations
+Technician -> /dashboard/technician
+
+11. On login, redirect the user to their role-specific dashboard instead of always redirecting to /sales-dashboard.
+
+12. If role is unknown:
+    Default to Business Overview Dashboard for safety, not Sales Dashboard.
+
+END

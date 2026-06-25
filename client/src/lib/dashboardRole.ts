@@ -55,6 +55,20 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
   coordinator: "Coordinator",
 };
 
+/**
+ * Returns the URL the user should land on after login / clicking Dashboard.
+ * Never returns "/" to avoid a redirect loop with the RoleDashboard guard.
+ */
+export function getDefaultDashboardRoute(user: { departmentId?: string | null; role?: string | null }): string {
+  const role = getDashboardRole(user);
+  switch (role) {
+    case "sales":    return "/sales-dashboard";
+    case "accounts": return "/finance-dashboard";
+    // admin, manager, service, coordinator all use the polymorphic Dashboard page
+    default:         return "/dashboard";
+  }
+}
+
 export const dashboardRoleColors: Record<DashboardRole, string> = {
   admin:       "bg-indigo-600",
   manager:     "bg-teal-600",

@@ -1,10 +1,12 @@
 import { Switch, Route, useLocation } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LoginForm } from "@/components/auth/login-form";
+import { getDefaultDashboardRoute } from "@/lib/dashboardRole";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
@@ -61,8 +63,19 @@ import AcceptedWork from "@/pages/accepted-work";
 import SalesReports from "@/pages/sales-reports";
 import EquipmentChecklists from "@/pages/equipment-checklists";
 
+/** Redirects "/" to the role-appropriate dashboard — never shows SalesDashboard by default */
+function RoleDashboard() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate(getDefaultDashboardRoute(user ?? {}), { replace: true });
+  }, []);
+  return null;
+}
+
 function AuthenticatedApp() {
-  const { isAuthenticated, isLoading, login, loginDemo } = useAuth();
+  const { isAuthenticated, isLoading, login, loginDemo, user } = useAuth();
+  const [, navigate] = useLocation();
 
   if (isLoading) {
     return (
@@ -76,14 +89,22 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <LoginForm onSuccess={login} onDemoLogin={loginDemo} />;
+    const handleLogin = (token: string, userData: any) => {
+      login(token, userData);
+      navigate(getDefaultDashboardRoute(userData), { replace: true });
+    };
+    const handleDemoLogin = (profile: any) => {
+      loginDemo(profile);
+      navigate(getDefaultDashboardRoute(profile.user ?? {}), { replace: true });
+    };
+    return <LoginForm onSuccess={handleLogin} onDemoLogin={handleDemoLogin} />;
   }
 
   return (
     <Switch>
       <Route path="/mobile" component={Mobile} />
-      <Route path="/" component={SalesDashboard} />
-      <Route path="/dashboard" component={SalesDashboard} />
+      <Route path="/" component={RoleDashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/workers" component={Workers} />
       <Route path="/clients" component={Clients} />
