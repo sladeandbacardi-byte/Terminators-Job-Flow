@@ -84,29 +84,12 @@ interface StaffMember {
 
 // Client-side fallback — shown if /api/auth/staff returns empty or fails
 const FALLBACK_STAFF: StaffMember[] = [
-  { id: "worker-1",  name: "Julien Botha",       role: "Managing Member",                   departmentId: "div-6" },
-  { id: "worker-2",  name: "Maryka Venter",       role: "Pest Control Services Manager",     departmentId: "div-6" },
-  { id: "worker-3",  name: "Mariette Koekemoer",  role: "Hygiene Services Manager",          departmentId: "div-6" },
-  { id: "worker-4",  name: "Juli Holtshausen",    role: "Finance & HR Manager",              departmentId: "div-7" },
-  { id: "worker-5",  name: "Sheryl-Lyn Lee",      role: "Existing Clients Sales & Admin",    departmentId: "div-5" },
-  { id: "worker-6",  name: "Chane du Toit",       role: "Sales Rep",                         departmentId: "div-5" },
-  { id: "worker-7",  name: "Zuki Sandi",          role: "Ablution Deep Cleaning Supervisor", departmentId: "div-4" },
-  { id: "worker-8",  name: "Reece Ebrahim",       role: "Pest Control Operator",             departmentId: "div-1" },
-  { id: "worker-9",  name: "Garth du Preez",      role: "Pest Control Operator",             departmentId: "div-1" },
-  { id: "worker-10", name: "Michael Meyer",       role: "Pest Control Operator",             departmentId: "div-1" },
-  { id: "worker-11", name: "Xolani Ndzotoyi",     role: "Pest Control Operator",             departmentId: "div-1" },
-  { id: "worker-12", name: "Zain Abdol",          role: "Washroom Supervisor",               departmentId: "div-3" },
-  { id: "worker-13", name: "Leon Coltman",        role: "Pest Control Assistant",            departmentId: "div-1" },
-  { id: "worker-14", name: "Jackie Roelfse",      role: "Sanitary Bin B Team Supervisor",    departmentId: "div-2" },
-  { id: "worker-15", name: "Re-Althon",           role: "Sanitary Bin A Team Supervisor",    departmentId: "div-2" },
-  { id: "worker-16", name: "Belinda",             role: "Sanitary Bin Technician",           departmentId: "div-2" },
-  { id: "worker-17", name: "Racquel",             role: "Sanitary Bin Technician",           departmentId: "div-2" },
-  { id: "worker-18", name: "Asanda",              role: "Sanitary Bin Technician",           departmentId: "div-2" },
-  { id: "worker-19", name: "Nosipho",             role: "Deep Cleaning Technician",          departmentId: "div-4" },
-  { id: "worker-20", name: "Nini",                role: "Deep Cleaning Technician",          departmentId: "div-4" },
-  { id: "worker-21", name: "Babalwa",             role: "Deep Cleaning Technician",          departmentId: "div-4" },
-  { id: "worker-22", name: "Veronica",            role: "Daily Cleaning Technician",         departmentId: "div-8" },
-  { id: "worker-23", name: "Margrett",            role: "Daily Cleaning Technician",         departmentId: "div-8" },
+  { id: "worker-1", name: "Julien Botha",      role: "Managing Member",                departmentId: "div-6" },
+  { id: "worker-2", name: "Maryka Venter",     role: "Pest Control Services Manager",  departmentId: "div-6" },
+  { id: "worker-3", name: "Mariette Koekemoer",role: "Hygiene Services Manager",       departmentId: "div-6" },
+  { id: "worker-4", name: "Juli Holtshausen",  role: "Finance & HR Manager",           departmentId: "div-7" },
+  { id: "worker-5", name: "Sheryl-Lyn Lee",    role: "Existing Clients Sales & Admin", departmentId: "div-5" },
+  { id: "worker-6", name: "Chane du Toit",     role: "Sales Rep",                      departmentId: "div-5" },
 ];
 
 interface LoginFormProps {
