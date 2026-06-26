@@ -1,0 +1,529 @@
+FULL USER TEST OF JOB FLOW APP
+
+Please test the entire Job Flow app as if you are a real user in the business.
+
+The goal is to confirm that the app works from beginning to end:
+
+Lead → Quote → Accepted Work → Job → Schedule → Complete Job → Field Diary → Invoice → Finance
+
+Test every major user role and make sure each user sees the correct dashboard, menu items, permissions and workflow.
+
+IMPORTANT:
+Use demo/test data only.
+Do not delete real data.
+Do not use destructive actions unless in demo mode.
+If something fails, record the exact page, user role, button and error.
+
+TEST USERS / ROLES TO CHECK
+
+Test login and workflow for these roles:
+
+1. Managing Member
+2. Sales Rep
+3. Service Manager / Service Coordinator
+4. Finance User
+5. Technician
+6. Admin
+
+For each role, check:
+
+* Can the user log in?
+* Does the user land on the correct dashboard?
+* Does the left menu match that user’s permissions?
+* Can the user only see what they are meant to see?
+* Does the Dashboard button open the correct dashboard for that role?
+* Does refreshing the browser keep the user logged in?
+* Does Switch User / Logout work?
+
+ROLE DASHBOARD RULES
+
+Managing Member:
+Must open the Business Overview Dashboard.
+Must see Sales, Service, Finance, Operations and Admin.
+
+Sales Rep:
+Must open the Sales Dashboard.
+Must see Leads, Quotes, Accepted Work, Diary, Clients, Follow-ups, Reports and Email Center if allowed.
+
+Service Manager / Coordinator:
+Must open the Service Dashboard.
+Must see Jobs, Calendar, Field Diaries, Team Attendance, Clients, Staff, Stock, Suppliers and Purchase Orders if allowed.
+If this user also does invoicing, show Finance > Invoices.
+
+Finance User:
+Must open the Finance Dashboard.
+Must see Invoices, Debtors, Creditors, Sage Export, Reports, Backup & Restore if allowed.
+
+Technician:
+Must open the Technician / My Jobs Dashboard.
+Must only see:
+
+* Calendar
+* My Jobs
+* Field Diaries
+* Report Issue
+* Log KMs
+* Vehicle Inspection
+* Fuel Fill-up
+
+Technician must not see:
+
+* Sales
+* Quotes
+* Finance
+* Admin
+* Staff
+* Suppliers
+* Purchase Orders
+* Full client lists
+
+Admin:
+Must see system settings, users, roles, permissions, backup and logs.
+
+MAIN BUSINESS WORKFLOW TEST
+
+Please create a full test journey from Sales to Finance.
+
+STEP 1: CREATE A LEAD
+
+Log in as Sales Rep.
+
+Create a new lead with test data:
+
+Company:
+Test Client - Full Workflow
+
+Contact:
+John Test
+
+Phone:
+041 000 0000
+
+Email:
+[testclient@example.com](mailto:testclient@example.com)
+
+Address:
+123 Test Road, Port Elizabeth
+
+Lead source:
+Phone / Website / Referral
+
+Service needed:
+Washroom or Pest Control
+
+Notes:
+Client wants monthly service quote.
+
+Check:
+
+* Lead saves correctly.
+* Lead gets a document number, for example LEAD-2026-0001.
+* Lead appears in Leads list.
+* Lead appears on Sales Dashboard.
+* Lead can be assigned to a sales rep.
+* Follow-up date can be added.
+* Notes can be added.
+
+STEP 2: CONVERT LEAD TO QUOTE
+
+From the lead, click Create Quote.
+
+Check:
+
+* Client details auto-fill into the quote.
+* Lead document number remains linked.
+* Quote gets a document number, for example QT-2026-0001.
+* The quote can contain line items.
+
+Quote line item test:
+
+Department:
+Washroom
+
+Service/Product Type:
+Hand soap dispenser service
+
+Quantity:
+6
+
+Unit:
+Dispenser
+
+Unit Price:
+R150
+
+Frequency:
+Monthly
+
+Description:
+Supply and service hand soap dispensers monthly.
+
+Expected line total:
+R900 monthly
+
+Add second line item:
+
+Department:
+Sanitary Bins
+
+Service/Product Type:
+Sanitary bin rental and service
+
+Quantity:
+4
+
+Unit:
+Bin
+
+Unit Price:
+R180
+
+Frequency:
+Monthly
+
+Expected line total:
+R720 monthly
+
+Check:
+
+* Quote total calculates correctly.
+* Recurring monthly total shows correctly.
+* VAT calculation works if enabled.
+* Quote can be saved as Draft.
+* Quote can be marked Sent / Quoted.
+* Quote appears in Pending Quotes.
+* Quote appears on Sales Dashboard.
+
+STEP 3: ACCEPT QUOTE
+
+Mark the quote as Accepted.
+
+Check:
+
+* Quote status changes to Accepted.
+* Quote appears under Accepted Work.
+* The accepted quote still links back to the original lead.
+* Accepted Work shows what still needs to happen before Service takes over.
+
+STEP 4: CONVERT ACCEPTED QUOTE TO JOB OR CONTRACT
+
+Convert the accepted quote to a Job or Contract depending on quote type.
+
+If quote type is once-off:
+Convert to Job.
+
+If quote type is recurring:
+Convert to Contract and create scheduled jobs.
+
+For this test, create at least one Job.
+
+Check:
+
+* Job gets a document number, for example JOB-2026-0001.
+* Job links back to Quote QT number.
+* Job links back to Lead if available.
+* Client details carry forward.
+* Site address carries forward.
+* Service line items carry forward.
+* Job appears in Service > Jobs.
+* Job appears on Service Dashboard.
+* Sales user can see that the quote was converted.
+
+STEP 5: SERVICE SCHEDULING
+
+Log in as Service Manager / Service Coordinator.
+
+Open Service > Jobs.
+
+Find the new test job.
+
+Assign:
+Worker:
+Choose a technician.
+
+Date:
+Today or tomorrow.
+
+Time:
+09:00
+
+Department:
+Washroom or Pest Control.
+
+Status:
+Scheduled.
+
+Check:
+
+* Job saves assignment.
+* Job appears on Calendar.
+* Job appears in Today’s Schedule if scheduled for today.
+* Job appears on the assigned technician’s My Jobs page.
+* Job status colour is correct:
+  Scheduled = orange
+  In Progress = blue
+  Completed = green
+  Cancelled = red
+  Overdue = dark red
+  Pending = yellow/amber
+  Unassigned = grey
+
+STEP 6: TECHNICIAN JOB FLOW
+
+Log in as Technician assigned to the test job.
+
+Check:
+
+* Technician lands on My Jobs Dashboard.
+* Technician only sees their own jobs.
+* The test job appears under My Jobs Today or This Week.
+* Technician can open the job.
+
+Perform these actions:
+
+1. Start Job
+   Expected:
+   Job status changes to In Progress.
+
+2. Continue Job
+   Expected:
+   Current Job panel shows the job.
+
+3. Complete Job
+   Expected:
+   Job status changes to Completed or Awaiting Field Diary.
+
+STEP 7: FIELD DIARY
+
+As Technician, submit a field diary for the completed job.
+
+Field diary should capture:
+
+* Job number
+* Client
+* Arrival time
+* Completion time
+* Work completed
+* Notes
+* Products/chemicals used if relevant
+* Quantity used if relevant
+* Photos if supported
+* Customer name
+* Customer signature if supported
+* Technician name
+* Date submitted
+
+Check:
+
+* Field diary saves.
+* Field diary gets a document number, for example FD-2026-0001.
+* Field diary links to the Job number.
+* Technician can view submitted diary.
+* Service Manager can view submitted diary.
+* Job no longer shows Field Diary Due.
+* Job can now be marked Ready to Invoice.
+
+STEP 8: READY TO INVOICE
+
+Log in as Service Manager / Coordinator.
+
+Find the completed job.
+
+Mark:
+Ready to Invoice
+
+Check:
+
+* Job appears in Finance / Invoices as ready to invoice.
+* Service user can create invoice only if they have invoicing permission.
+* If no invoicing permission, they can only mark ready for Finance.
+
+STEP 9: CREATE INVOICE
+
+Log in as Finance User.
+
+Open Finance > Invoices.
+
+Find the job ready to invoice.
+
+Create invoice.
+
+Check:
+
+* Invoice gets document number, for example INV-2026-0001.
+* Invoice links back to:
+
+  * Job number
+  * Quote number
+  * Lead number if available
+  * Client
+* Invoice carries line items and totals correctly.
+* Invoice can be marked Draft / Sent / Paid / Overdue.
+* Debtors update when invoice is sent/unpaid.
+* Finance Dashboard updates.
+
+STEP 10: SAGE EXPORT
+
+If Sage Export exists:
+
+Check:
+
+* Invoice appears in Sage Export list.
+* Export includes invoice number, client, date, line items, VAT and total.
+* Export does not duplicate invoices already exported.
+* Export status updates correctly.
+
+STEP 11: REPORTING CHECK
+
+Check dashboards after the workflow:
+
+Sales Dashboard:
+
+* Lead count updated.
+* Quote count updated.
+* Accepted/converted count updated.
+* Follow-ups update if relevant.
+
+Service Dashboard:
+
+* Job count updated.
+* Completed jobs updated.
+* Field diary due count updated.
+* Today’s schedule updated.
+
+Finance Dashboard:
+
+* Invoice count updated.
+* Debtors updated.
+* Revenue updated.
+* Recent invoices updated.
+
+Managing Member Dashboard:
+
+* Sales, Service and Finance summaries update.
+
+STEP 12: TEAM ATTENDANCE TEST
+
+Log in as a team leader or service manager.
+
+Open Team Attendance.
+
+Create/submit attendance for today.
+
+Check:
+
+* Team members show correctly.
+* Present = green tick.
+* Absent = red cross.
+* Unticked after submission becomes absent or not confirmed according to rules.
+* HR/Admin can view attendance by date.
+* Attendance dashboard updates.
+
+STEP 13: FLEET TEST
+
+Log in as Technician.
+
+Test fleet actions:
+
+* Log KMs
+* Vehicle Inspection
+* Fuel Fill-up
+* Report Vehicle Issue
+
+Check:
+
+* Records save correctly.
+* Operations/Manager can view them.
+* Vehicle issue appears in maintenance/report issue section.
+* Technician cannot see full fleet admin unless permitted.
+
+STEP 14: BACKUP TEST
+
+Log in as Managing Member/Admin.
+
+Open Backup & Restore.
+
+Check:
+
+* Download JSON Backup works.
+* Download Excel Backup works.
+* Send Test Backup Email works.
+* Send Backup Email Now works.
+* Backup log records success/failure.
+* Email goes to [info@terminators.co.za](mailto:info@terminators.co.za).
+* Both JSON and Excel files attach.
+
+Do not expose API keys or secrets.
+
+STEP 15: ROLE PERMISSION TEST
+
+Confirm that users cannot access restricted sections by typing URLs manually.
+
+Examples:
+Technician should not access:
+
+* /quotes
+* /finance
+* /admin
+* /purchase-orders
+* /staff
+
+Sales user should not access:
+
+* backup settings
+* admin settings
+* full finance controls
+
+Finance user should not create service jobs unless permitted.
+
+If blocked, show:
+You do not have permission to access this page.
+
+STEP 16: ERROR HANDLING TEST
+
+Check that the app does not crash if:
+
+* Client list is empty.
+* Staff list is empty.
+* No jobs exist.
+* No quotes exist.
+* Database has no records.
+* User refreshes the page.
+* User switches role.
+* User opens a page directly by URL.
+
+Use clean empty states:
+
+* No records found.
+* No jobs scheduled.
+* No quotes pending.
+* No invoices found.
+
+FINAL OUTPUT REQUIRED
+
+After testing, provide a report with:
+
+1. What worked
+2. What failed
+3. Exact bugs found
+4. Pages affected
+5. Role affected
+6. Suggested fixes
+7. Priority:
+
+   * Critical
+   * High
+   * Medium
+   * Low
+
+Please fix critical issues first:
+
+* Login failures
+* Wrong dashboard per user
+* App crashes
+* Data not saving
+* Quote to job conversion failure
+* Job to invoice conversion failure
+* Permissions exposing restricted pages
+
+END

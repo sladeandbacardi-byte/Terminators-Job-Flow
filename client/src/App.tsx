@@ -6,7 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LoginForm } from "@/components/auth/login-form";
-import { getDefaultDashboardRoute } from "@/lib/dashboardRole";
+import { getDefaultDashboardRoute, getDashboardRole, type DashboardRole } from "@/lib/dashboardRole";
+import { ShieldOff } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
@@ -63,6 +64,37 @@ import AcceptedWork from "@/pages/accepted-work";
 import SalesReports from "@/pages/sales-reports";
 import EquipmentChecklists from "@/pages/equipment-checklists";
 
+function AccessDenied() {
+  const [, navigate] = useLocation();
+  const { user } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center max-w-sm px-6">
+        <div className="flex justify-center mb-4">
+          <div className="bg-red-100 rounded-full p-4">
+            <ShieldOff className="h-10 w-10 text-red-500" />
+          </div>
+        </div>
+        <h1 className="text-xl font-bold text-gray-800 mb-2">Access Denied</h1>
+        <p className="text-gray-500 text-sm mb-6">You do not have permission to access this page.</p>
+        <button
+          onClick={() => navigate(getDefaultDashboardRoute(user ?? {}), { replace: true })}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+        >
+          Go to my dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles: DashboardRole[] }) {
+  const { user } = useAuth();
+  const role = getDashboardRole(user ?? {});
+  if (!roles.includes(role)) return <AccessDenied />;
+  return <Component />;
+}
+
 /** Redirects "/" to the role-appropriate dashboard — never shows SalesDashboard by default */
 function RoleDashboard() {
   const { user } = useAuth();
@@ -106,25 +138,50 @@ function AuthenticatedApp() {
       <Route path="/" component={RoleDashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/jobs" component={Jobs} />
-      <Route path="/workers" component={Workers} />
       <Route path="/clients" component={Clients} />
       <Route path="/clients/:id" component={ClientProfile} />
       <Route path="/inventory" component={Inventory} />
       <Route path="/contracts" component={Contracts} />
-      <Route path="/invoices" component={Invoices} />
       <Route path="/emails" component={Emails} />
       <Route path="/reports" component={Reports} />
       <Route path="/custom-reports" component={CustomReports} />
-      <Route path="/suppliers" component={Suppliers} />
-      <Route path="/purchase-orders" component={PurchaseOrders} />
       <Route path="/calendar" component={Calendar} />
       <Route path="/jobs/:id/card" component={JobCard} />
       <Route path="/daily-department-card" component={DailyDepartmentCard} />
-      <Route path="/leads" component={Leads} />
-      <Route path="/sales-diary" component={SalesDiary} />
-      <Route path="/backup" component={Backup} />
+      {/* ── Sales (admin, manager, sales) ───────────────────────────────── */}
+      <Route path="/leads">{() => <ProtectedRoute component={Leads} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/quotes">{() => <ProtectedRoute component={Quotes} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/accepted-work">{() => <ProtectedRoute component={AcceptedWork} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/sales-diary">{() => <ProtectedRoute component={SalesDiary} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/sales-dashboard">{() => <ProtectedRoute component={SalesDashboard} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/follow-ups">{() => <ProtectedRoute component={FollowUpsPage} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/sales-reports">{() => <ProtectedRoute component={SalesReports} roles={["admin","manager","sales"]} />}</Route>
+      <Route path="/commission-reports">{() => <ProtectedRoute component={CommissionReports} roles={["admin","manager","sales"]} />}</Route>
+
+      {/* ── Finance (admin, accounts) ────────────────────────────────────── */}
+      <Route path="/finance-dashboard">{() => <ProtectedRoute component={FinanceDashboard} roles={["admin","accounts"]} />}</Route>
+      <Route path="/invoices">{() => <ProtectedRoute component={Invoices} roles={["admin","accounts","manager"]} />}</Route>
+      <Route path="/expenses">{() => <ProtectedRoute component={Expenses} roles={["admin","accounts"]} />}</Route>
+      <Route path="/debtors">{() => <ProtectedRoute component={Debtors} roles={["admin","accounts"]} />}</Route>
+      <Route path="/creditors">{() => <ProtectedRoute component={Creditors} roles={["admin","accounts"]} />}</Route>
+      <Route path="/sage-export">{() => <ProtectedRoute component={SageExport} roles={["admin","accounts"]} />}</Route>
+
+      {/* ── Admin-only ───────────────────────────────────────────────────── */}
+      <Route path="/backup">{() => <ProtectedRoute component={Backup} roles={["admin","manager"]} />}</Route>
+      <Route path="/users-roles">{() => <ProtectedRoute component={UsersRoles} roles={["admin","manager"]} />}</Route>
+      <Route path="/permissions">{() => <ProtectedRoute component={Permissions} roles={["admin","manager"]} />}</Route>
+      <Route path="/settings">{() => <ProtectedRoute component={Settings} roles={["admin","manager"]} />}</Route>
+      <Route path="/system-logs">{() => <ProtectedRoute component={SystemLogs} roles={["admin","manager"]} />}</Route>
+      <Route path="/data-integrity">{() => <ProtectedRoute component={DataIntegrity} roles={["admin","manager"]} />}</Route>
+      <Route path="/pricing-library">{() => <ProtectedRoute component={PricingLibraryPage} roles={["admin","manager"]} />}</Route>
+
+      {/* ── Suppliers / Purchase Orders (admin, manager, coordinator) ────── */}
+      <Route path="/suppliers">{() => <ProtectedRoute component={Suppliers} roles={["admin","manager","coordinator"]} />}</Route>
+      <Route path="/purchase-orders">{() => <ProtectedRoute component={PurchaseOrders} roles={["admin","manager","coordinator"]} />}</Route>
+      <Route path="/workers">{() => <ProtectedRoute component={Workers} roles={["admin","manager","coordinator","accounts"]} />}</Route>
+
+      {/* ── Service / Operations (open to service roles) ─────────────────── */}
       <Route path="/field-diaries" component={FieldDiaries} />
-      <Route path="/quotes" component={Quotes} />
       <Route path="/fleet" component={Fleet} />
       <Route path="/fleet/km-log" component={FleetKmLog} />
       <Route path="/fleet/inspection" component={FleetInspection} />
@@ -135,27 +192,11 @@ function AuthenticatedApp() {
       <Route path="/fleet/maintenance" component={FleetMaintenance} />
       <Route path="/attendance" component={Attendance} />
       <Route path="/team-management" component={TeamManagement} />
-      <Route path="/sage-export" component={SageExport} />
-      <Route path="/debtors" component={Debtors} />
-      <Route path="/creditors" component={Creditors} />
-      <Route path="/users-roles" component={UsersRoles} />
-      <Route path="/permissions" component={Permissions} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/system-logs" component={SystemLogs} />
       <Route path="/testing-checklist" component={TestingChecklist} />
       <Route path="/service-contracts">{() => { window.location.replace("/contracts"); return null; }}</Route>
-      <Route path="/pricing-library" component={PricingLibraryPage} />
-      <Route path="/follow-ups" component={FollowUpsPage} />
       <Route path="/contracts-pending" component={ContractsPendingPage} />
-      <Route path="/finance-dashboard" component={FinanceDashboard} />
       <Route path="/hr-dashboard" component={HRDashboard} />
-      <Route path="/expenses" component={Expenses} />
       <Route path="/service-scheduling" component={ServiceScheduling} />
-      <Route path="/data-integrity" component={DataIntegrity} />
-      <Route path="/sales-dashboard" component={SalesDashboard} />
-      <Route path="/commission-reports" component={CommissionReports} />
-      <Route path="/accepted-work" component={AcceptedWork} />
-      <Route path="/sales-reports" component={SalesReports} />
       <Route path="/equipment-checklists" component={EquipmentChecklists} />
       <Route component={NotFound} />
     </Switch>
