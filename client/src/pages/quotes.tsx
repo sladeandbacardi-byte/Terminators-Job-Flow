@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Phone, Mail, MapPin, Calendar, User,
   MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase, UserPlus,
-  Package, AlertCircle, RefreshCw, ClipboardList, FileCheck,
+  Package, AlertCircle, RefreshCw, ClipboardList, FileCheck, Plus,
 } from "lucide-react";
 import type { QuoteSubmission, Worker, Client, Department } from "@shared/schema";
 
@@ -77,6 +77,20 @@ const newClientSchema = z.object({
   industry:     z.string().optional(),
   departmentId: z.string().min(1, "Department required"),
 });
+
+const newQuoteSchema = z.object({
+  companyName:            z.string().min(2, "Company name required"),
+  contactPerson:          z.string().min(1, "Contact person required"),
+  email:                  z.string().email("Valid email required"),
+  phone:                  z.string().min(1, "Phone required"),
+  serviceType:            z.string().min(1, "Service type required"),
+  description:            z.string().min(1, "Description required"),
+  address:                z.string().optional(),
+  preferredContactMethod: z.string().default("email"),
+  quoteAmount:            z.string().optional(),
+  frequency:              z.string().optional(),
+});
+type NewQuoteForm = z.infer<typeof newQuoteSchema>;
 
 type ConvertJobForm = z.infer<typeof convertToJobSchema>;
 
@@ -1029,6 +1043,9 @@ export default function QuotesPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [statusFilter, setStatusFilter]   = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
+  const [showNewQuote, setShowNewQuote]   = useState(false);
+
+  const { toast } = useToast();
 
   const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: workers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
@@ -1046,6 +1063,27 @@ export default function QuotesPage() {
   });
 
   const countByStatus = (s: string) => quotes.filter(q => q.status === s).length;
+
+  const newQuoteForm = useForm<NewQuoteForm>({
+    resolver: zodResolver(newQuoteSchema),
+    defaultValues: {
+      companyName: "", contactPerson: "", email: "", phone: "",
+      serviceType: "", description: "", address: "",
+      preferredContactMethod: "email", quoteAmount: "", frequency: "",
+    },
+  });
+
+  const createQuoteMutation = useMutation({
+    mutationFn: (data: NewQuoteForm) =>
+      apiRequest("POST", "/api/quote-submissions", { ...data, status: "quoted", origination: "other" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      toast({ title: "Quote created successfully" });
+      setShowNewQuote(false);
+      newQuoteForm.reset();
+    },
+    onError: () => toast({ title: "Failed to create quote", variant: "destructive" }),
+  });
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -1068,8 +1106,13 @@ export default function QuotesPage() {
                   Manage quote requests from prospective clients
                 </p>
               </div>
-              <div className="text-sm text-muted-foreground">
-                <strong>{filtered.length}</strong> shown · <strong>{countByStatus("quoted")}</strong> pending · <strong>{countByStatus("converted")}</strong> accepted
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-muted-foreground">
+                  <strong>{filtered.length}</strong> shown · <strong>{countByStatus("quoted")}</strong> pending · <strong>{countByStatus("converted")}</strong> accepted
+                </div>
+                <Button onClick={() => setShowNewQuote(true)} className="gap-2">
+                  <Plus className="h-4 w-4" /> New Quote
+                </Button>
               </div>
             </div>
 
@@ -1132,6 +1175,121 @@ export default function QuotesPage() {
           </div>
         </main>
       </div>
+
+      {/* ── New Quote Dialog ─────────────────────────────────────────── */}
+      <Dialog open={showNewQuote} onOpenChange={setShowNewQuote}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> New Quote
+            </DialogTitle>
+          </DialogHeader>
+          <Form {...newQuoteForm}>
+            <form onSubmit={newQuoteForm.handleSubmit(data => createQuoteMutation.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={newQuoteForm.control} name="companyName" render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Company Name *</FormLabel>
+                    <FormControl><Input placeholder="e.g. ABC Holdings" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="contactPerson" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Person *</FormLabel>
+                    <FormControl><Input placeholder="Full name" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="phone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone *</FormLabel>
+                    <FormControl><Input placeholder="+27 ..." {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="email" render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Email *</FormLabel>
+                    <FormControl><Input type="email" placeholder="email@company.co.za" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="serviceType" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {Object.entries(SERVICE_LABELS).map(([v, l]) => (
+                          <SelectItem key={v} value={v}>{l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="frequency" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Frequency</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {FREQUENCY_OPTIONS.map(o => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="address" render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Address</FormLabel>
+                    <FormControl><Input placeholder="Site address" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="quoteAmount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quote Amount (R)</FormLabel>
+                    <FormControl><Input placeholder="e.g. 2500.00" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="preferredContactMethod" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preferred Contact</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="either">Either</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQuoteForm.control} name="description" render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Description / Requirements *</FormLabel>
+                    <FormControl><Textarea placeholder="Describe the service requirements..." rows={3} {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowNewQuote(false)}>Cancel</Button>
+                <Button type="submit" disabled={createQuoteMutation.isPending}>
+                  {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
