@@ -75,9 +75,7 @@ export const DAYS_OF_WEEK = [
 
 export const DIARY_OPTIONS = [
   'Pest Control',
-  'Sanitary Bins - Leon',
-  'Sanitary Bins - Team A',
-  'Sanitary Bins - Team B',
+  'Sanitary Bins',
   'Washroom',
   'Deep Cleaning',
 ] as const;
