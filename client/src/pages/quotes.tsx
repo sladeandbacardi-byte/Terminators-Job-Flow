@@ -1186,6 +1186,38 @@ export default function QuotesPage() {
           </DialogHeader>
           <Form {...newQuoteForm}>
             <form onSubmit={newQuoteForm.handleSubmit(data => createQuoteMutation.mutate(data))} className="space-y-4">
+
+              {/* ── Client picker ── */}
+              <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Auto-fill from existing client</p>
+                <Select
+                  onValueChange={clientId => {
+                    if (clientId === "__none__") return;
+                    const c = clients.find(cl => cl.id === clientId);
+                    if (!c) return;
+                    newQuoteForm.setValue("companyName",   c.name ?? "");
+                    newQuoteForm.setValue("contactPerson", c.contactPerson ?? "");
+                    newQuoteForm.setValue("email",         c.email ?? "");
+                    newQuoteForm.setValue("phone",         c.phone ?? "");
+                    newQuoteForm.setValue("address",       c.address ?? "");
+                  }}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Search and select a client…" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="__none__">— None (manual entry) —</SelectItem>
+                    {[...clients]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}{c.contactPerson ? ` · ${c.contactPerson}` : ""}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={newQuoteForm.control} name="companyName" render={({ field }) => (
                   <FormItem className="col-span-2">
