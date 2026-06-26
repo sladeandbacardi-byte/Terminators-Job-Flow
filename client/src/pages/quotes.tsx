@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -17,11 +17,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Phone, Mail, MapPin, Calendar, User,
   MessageSquare, ChevronDown, ChevronUp, Building2, Briefcase, UserPlus,
-  Package, AlertCircle, RefreshCw, ClipboardList, FileCheck, Plus,
+  Package, AlertCircle, RefreshCw, ClipboardList, FileCheck, Plus, Trash2,
 } from "lucide-react";
 import type { QuoteSubmission, Worker, Client, Department } from "@shared/schema";
 
@@ -78,19 +79,467 @@ const newClientSchema = z.object({
   departmentId: z.string().min(1, "Department required"),
 });
 
-const newQuoteSchema = z.object({
-  companyName:            z.string().min(2, "Company name required"),
-  contactPerson:          z.string().min(1, "Contact person required"),
-  email:                  z.string().email("Valid email required"),
-  phone:                  z.string().min(1, "Phone required"),
-  serviceType:            z.string().min(1, "Service type required"),
-  description:            z.string().min(1, "Description required"),
-  address:                z.string().optional(),
-  preferredContactMethod: z.string().default("email"),
-  quoteAmount:            z.string().optional(),
-  frequency:              z.string().optional(),
+// ── New Quote — department/service configuration ──────────────────────────────
+
+const DEPT_LABELS: Record<string, string> = {
+  pest_control:     "Pest Control",
+  hygiene_washroom: "Hygiene / Washroom",
+  sanitary_bins:    "Sanitary Bins",
+  deep_cleaning:    "Deep Cleaning",
+  dustmats:         "Dustmats",
+  coc:              "COC (Certificates)",
+  other:            "Other",
+};
+
+const DEPT_SERVICES: Record<string, string[]> = {
+  pest_control:     ["Monthly pest control","Rodent control","Cockroach treatment","Ant treatment","Flea treatment","Bed bug treatment","Fly control","Termite treatment","Once-off inspection","Other"],
+  hygiene_washroom: ["Hand soap dispenser","Paper towel dispenser","Toilet paper dispenser","Air freshener dispenser","Sanitary bin service","Seat sanitizer","Urinal sanitizer","Deep washroom clean","Other"],
+  sanitary_bins:    ["Sanitary bin rental and service","Sanitary bin collection only","Feminine hygiene service","Other"],
+  deep_cleaning:    ["Once-off deep clean","Kitchen deep clean","Washroom deep clean","Office deep clean","High-level cleaning","Floor cleaning","Other"],
+  coc:              ["Electrical COC single-phase","Electrical COC three-phase","Wood borer COC","Electrical + Wood borer COC","Other"],
+  dustmats:         ["Dustmat hire","Dustmat cleaning","Other"],
+  other:            ["Other"],
+};
+
+const ITEM_UNITS = ["Unit","Dispenser","Bin","Room","Site","Square metre","Hour","Visit","Treatment","Inspection","Certificate","Other"];
+
+const ITEM_FREQS = [
+  { value: "once_off",    label: "Once-off" },
+  { value: "weekly",      label: "Weekly" },
+  { value: "fortnightly", label: "Fortnightly" },
+  { value: "monthly",     label: "Monthly" },
+  { value: "bi_monthly",  label: "Every 2 Months" },
+  { value: "quarterly",   label: "Quarterly" },
+  { value: "biannual",    label: "6-Monthly" },
+  { value: "annual",      label: "Annually" },
+  { value: "on_demand",   label: "On Demand" },
+];
+
+const QUOTE_TYPES = [
+  { value: "once_off",  label: "Once-off Service" },
+  { value: "recurring", label: "Recurring Service" },
+  { value: "rental",    label: "Rental Contract" },
+  { value: "product",   label: "Product / Stock Sale" },
+  { value: "mixed",     label: "Mixed Quote" },
+];
+
+const QUOTE_STATUS_OPTIONS = [
+  { value: "draft",              label: "Draft" },
+  { value: "quoted",             label: "Quoted" },
+  { value: "sent",               label: "Sent" },
+  { value: "follow_up",          label: "Follow-up Required" },
+  { value: "accepted",           label: "Accepted" },
+  { value: "declined",           label: "Declined" },
+  { value: "converted",          label: "Converted to Job" },
+  { value: "converted_contract", label: "Converted to Contract" },
+];
+
+const VAT_MODES = [
+  { value: "exclusive", label: "VAT Exclusive (add 15%)" },
+  { value: "inclusive", label: "VAT Inclusive (15% included)" },
+  { value: "none",      label: "No VAT" },
+];
+
+const VAT_RATE = 0.15;
+
+interface QuoteLineItem {
+  id: string;
+  department: string;
+  serviceType: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  frequency: string;
+}
+
+const emptyItem = (): QuoteLineItem => ({
+  id: Math.random().toString(36).slice(2),
+  department: "pest_control",
+  serviceType: "",
+  description: "",
+  quantity: 1,
+  unit: "Unit",
+  unitPrice: 0,
+  frequency: "monthly",
 });
-type NewQuoteForm = z.infer<typeof newQuoteSchema>;
+
+const fmtZAR = (n: number) =>
+  `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// ── NewQuoteDialog ────────────────────────────────────────────────────────────
+
+interface NewQuoteDialogProps {
+  open: boolean;
+  onClose: () => void;
+  clients: Client[];
+}
+
+function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
+  const { toast } = useToast();
+  const [tab, setTab] = useState("client");
+
+  // Client fields
+  const [companyName,     setCompanyName]     = useState("");
+  const [contactPerson,   setContactPerson]   = useState("");
+  const [phone,           setPhone]           = useState("");
+  const [email,           setEmail]           = useState("");
+  const [siteAddress,     setSiteAddress]     = useState("");
+  const [billingAddress,  setBillingAddress]  = useState("");
+  const [preferredContact,setPreferredContact]= useState("email");
+  const [vatNumber,       setVatNumber]       = useState("");
+  const [companyReg,      setCompanyReg]      = useState("");
+
+  // Quote settings
+  const [quoteType,     setQuoteType]     = useState("once_off");
+  const [status,        setStatus]        = useState("draft");
+  const [vatMode,       setVatMode]       = useState("exclusive");
+  const [description,   setDescription]   = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+
+  // Line items
+  const [lineItems, setLineItems] = useState<QuoteLineItem[]>([emptyItem()]);
+
+  const reset = () => {
+    setTab("client");
+    setCompanyName(""); setContactPerson(""); setPhone(""); setEmail("");
+    setSiteAddress(""); setBillingAddress(""); setPreferredContact("email");
+    setVatNumber(""); setCompanyReg("");
+    setQuoteType("once_off"); setStatus("draft"); setVatMode("exclusive");
+    setDescription(""); setInternalNotes("");
+    setLineItems([emptyItem()]);
+  };
+
+  useEffect(() => { if (open) reset(); }, [open]);
+
+  const fillFromClient = (clientId: string) => {
+    const c = clients.find(cl => cl.id === clientId);
+    if (!c) return;
+    setCompanyName(c.name ?? "");
+    setContactPerson(c.contactPerson ?? "");
+    setEmail(c.email ?? "");
+    setPhone(c.phone ?? "");
+    setSiteAddress(c.address ?? "");
+  };
+
+  const updateItem = (id: string, changes: Partial<QuoteLineItem>) =>
+    setLineItems(prev => prev.map(i => i.id === id ? { ...i, ...changes } : i));
+  const removeItem = (id: string) =>
+    setLineItems(prev => prev.filter(i => i.id !== id));
+
+  // Calculations
+  const itemTotal     = (i: QuoteLineItem) => i.quantity * i.unitPrice;
+  const onceOffSub    = lineItems.filter(i => i.frequency === "once_off").reduce((s, i) => s + itemTotal(i), 0);
+  const monthlySub    = lineItems.filter(i => i.frequency === "monthly").reduce((s, i) => s + itemTotal(i), 0);
+  const otherSub      = lineItems.filter(i => i.frequency !== "once_off" && i.frequency !== "monthly").reduce((s, i) => s + itemTotal(i), 0);
+  const allSub        = lineItems.reduce((s, i) => s + itemTotal(i), 0);
+  const vatAmount     = vatMode === "exclusive" ? allSub * VAT_RATE
+                      : vatMode === "inclusive" ? allSub * VAT_RATE / (1 + VAT_RATE)
+                      : 0;
+  const grandTotal    = vatMode === "exclusive" ? allSub + vatAmount : allSub;
+
+  const mutation = useMutation({
+    mutationFn: (payload: object) =>
+      apiRequest("POST", "/api/quote-submissions", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      toast({ title: "Quote created" });
+      reset();
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to create quote", variant: "destructive" }),
+  });
+
+  const handleSubmit = () => {
+    if (!companyName.trim()) { setTab("client"); toast({ title: "Company name is required", variant: "destructive" }); return; }
+    if (!contactPerson.trim()) { setTab("client"); toast({ title: "Contact person is required", variant: "destructive" }); return; }
+    if (!email.trim()) { setTab("client"); toast({ title: "Email is required", variant: "destructive" }); return; }
+    if (!phone.trim()) { setTab("client"); toast({ title: "Phone is required", variant: "destructive" }); return; }
+    if (lineItems.length === 0) { setTab("items"); toast({ title: "Add at least one line item", variant: "destructive" }); return; }
+
+    const depts = [...new Set(lineItems.map(i => i.department))];
+    const primaryServiceType = depts.length === 1
+      ? (depts[0] === "hygiene_washroom" ? "washroom" : depts[0] === "coc" ? "pest_control" : depts[0] === "dustmats" ? "pest_control" : depts[0])
+      : "pest_control";
+
+    mutation.mutate({
+      companyName, contactPerson, email, phone,
+      address: siteAddress,
+      preferredContactMethod: preferredContact,
+      serviceType: primaryServiceType,
+      description: description || lineItems.map(i => i.description).filter(Boolean).join("; ") || "Quote",
+      internalNotes,
+      quoteType,
+      status,
+      lineItemsJson: JSON.stringify({
+        items: lineItems,
+        vatMode, billingAddress, vatNumber, companyReg,
+        onceOffSubtotal: onceOffSub.toFixed(2),
+        monthlySubtotal: monthlySub.toFixed(2),
+        vatAmount: vatAmount.toFixed(2),
+        grandTotal: grandTotal.toFixed(2),
+      }),
+      monthlyRecurring: monthlySub.toFixed(2),
+      quoteAmount: grandTotal.toFixed(2),
+      origination: "other",
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <FileText className="h-5 w-5 text-primary" /> New Quote
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={setTab} className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <TabsList className="mx-6 mt-3 mb-1 w-auto self-start shrink-0">
+            <TabsTrigger value="client">1. Client Details</TabsTrigger>
+            <TabsTrigger value="items">2. Quote Items</TabsTrigger>
+            <TabsTrigger value="summary">3. Notes &amp; Summary</TabsTrigger>
+          </TabsList>
+
+          {/* ── TAB 1: Client ──────────────────────────────────────────── */}
+          <TabsContent value="client" className="flex-1 overflow-y-auto px-6 pb-6 mt-2">
+            <div className="rounded-md border bg-muted/40 p-3 mb-5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Auto-fill from existing client</p>
+              <Select onValueChange={id => { if (id !== "__none__") fillFromClient(id); }}>
+                <SelectTrigger className="bg-white"><SelectValue placeholder="Search and select a client…" /></SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="__none__">— None (manual entry) —</SelectItem>
+                  {[...clients].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}{c.contactPerson ? ` · ${c.contactPerson}` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Company Name *</label>
+                <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. ABC Holdings" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Contact Person *</label>
+                <Input value={contactPerson} onChange={e => setContactPerson(e.target.value)} placeholder="Full name" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Phone *</label>
+                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+27 ..." />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Email *</label>
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@company.co.za" />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Site Address</label>
+                <Input value={siteAddress} onChange={e => setSiteAddress(e.target.value)} placeholder="Physical site address" />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Billing Address <span className="text-muted-foreground font-normal text-xs">(optional — if different)</span></label>
+                <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} placeholder="Leave blank if same as site address" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Preferred Contact</label>
+                <Select value={preferredContact} onValueChange={setPreferredContact}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="either">Either</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">VAT Number <span className="text-muted-foreground font-normal text-xs">(optional)</span></label>
+                <Input value={vatNumber} onChange={e => setVatNumber(e.target.value)} placeholder="e.g. 4123456789" />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Company Registration No. <span className="text-muted-foreground font-normal text-xs">(optional)</span></label>
+                <Input value={companyReg} onChange={e => setCompanyReg(e.target.value)} placeholder="e.g. 2021/123456/07" />
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-5">
+              <Button onClick={() => setTab("items")}>Next: Quote Items →</Button>
+            </div>
+          </TabsContent>
+
+          {/* ── TAB 2: Line Items ──────────────────────────────────────── */}
+          <TabsContent value="items" className="flex-1 overflow-y-auto px-6 pb-6 mt-2 space-y-3">
+            {lineItems.map((item, idx) => (
+              <div key={item.id} className="border rounded-lg p-4 bg-white space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">Item {idx + 1}</span>
+                  {lineItems.length > 1 && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 gap-1"
+                      onClick={() => removeItem(item.id)}>
+                      <Trash2 className="h-3.5 w-3.5" /> Remove
+                    </Button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Department</label>
+                    <Select value={item.department} onValueChange={v => updateItem(item.id, { department: v, serviceType: "" })}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{Object.entries(DEPT_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Service / Product Type</label>
+                    <Select value={item.serviceType} onValueChange={v => updateItem(item.id, { serviceType: v })}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type…" /></SelectTrigger>
+                      <SelectContent>{(DEPT_SERVICES[item.department] ?? ["Other"]).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <label className="text-xs font-medium">Description</label>
+                    <Input className="h-8 text-sm" value={item.description}
+                      onChange={e => updateItem(item.id, { description: e.target.value })}
+                      placeholder="Describe the work or product" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Qty</label>
+                    <Input type="number" min="1" className="h-8 text-sm" value={item.quantity}
+                      onChange={e => updateItem(item.id, { quantity: Math.max(1, Number(e.target.value) || 1) })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Unit</label>
+                    <Select value={item.unit} onValueChange={v => updateItem(item.id, { unit: v })}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{ITEM_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Unit Price (R)</label>
+                    <Input type="number" min="0" step="0.01" className="h-8 text-sm" value={item.unitPrice || ""}
+                      onChange={e => updateItem(item.id, { unitPrice: Number(e.target.value) || 0 })} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Frequency</label>
+                    <Select value={item.frequency} onValueChange={v => updateItem(item.id, { frequency: v })}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{ITEM_FREQS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end pt-0.5 border-t mt-1">
+                    <span className="text-sm text-muted-foreground mr-2">Line Total:</span>
+                    <span className="font-bold text-primary text-base">{fmtZAR(itemTotal(item))}</span>
+                    <span className="text-xs text-muted-foreground ml-1.5">
+                      / {ITEM_FREQS.find(f => f.value === item.frequency)?.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <Button variant="outline" className="w-full gap-2 border-dashed"
+              onClick={() => setLineItems(p => [...p, emptyItem()])}>
+              <Plus className="h-4 w-4" /> Add Line Item
+            </Button>
+
+            {lineItems.length > 0 && (
+              <div className="rounded-md bg-muted/50 p-3 flex flex-wrap gap-4 text-sm">
+                {onceOffSub > 0 && <span><span className="text-muted-foreground">Once-off: </span><strong>{fmtZAR(onceOffSub)}</strong></span>}
+                {monthlySub > 0 && <span><span className="text-muted-foreground">Monthly: </span><strong>{fmtZAR(monthlySub)}/mo</strong></span>}
+                {otherSub > 0  && <span><span className="text-muted-foreground">Other recurring: </span><strong>{fmtZAR(otherSub)}</strong></span>}
+              </div>
+            )}
+
+            <div className="flex justify-between pt-2">
+              <Button variant="outline" onClick={() => setTab("client")}>← Back</Button>
+              <Button onClick={() => setTab("summary")}>Next: Summary →</Button>
+            </div>
+          </TabsContent>
+
+          {/* ── TAB 3: Notes & Summary ─────────────────────────────────── */}
+          <TabsContent value="summary" className="flex-1 overflow-y-auto px-6 pb-6 mt-2 space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Quote Type</label>
+                <Select value={quoteType} onValueChange={setQuoteType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{QUOTE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Quote Status</label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{QUOTE_STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">VAT Treatment</label>
+                <Select value={vatMode} onValueChange={setVatMode}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{VAT_MODES.map(v => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Description / Requirements</label>
+                <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                  placeholder="Describe the work required…" />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-sm font-medium">Internal Notes <span className="text-muted-foreground font-normal text-xs">(staff only)</span></label>
+                <Textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} rows={2}
+                  placeholder="Notes not visible to the client…" />
+              </div>
+            </div>
+
+            {/* Totals panel */}
+            <div className="rounded-lg border bg-white p-4 space-y-2.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Quote Totals</h3>
+              {allSub === 0
+                ? <p className="text-sm text-muted-foreground">No line items — go to Quote Items to add them.</p>
+                : <>
+                    {onceOffSub > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>Once-off total</span><span className="font-medium">{fmtZAR(onceOffSub)}</span>
+                      </div>
+                    )}
+                    {monthlySub > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>Monthly recurring</span><span className="font-medium">{fmtZAR(monthlySub)} /mo</span>
+                      </div>
+                    )}
+                    {otherSub > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>Other recurring</span><span className="font-medium">{fmtZAR(otherSub)}</span>
+                      </div>
+                    )}
+                    {vatMode !== "none" && (
+                      <div className="border-t pt-2 flex justify-between text-sm">
+                        <span>{vatMode === "inclusive" ? "VAT (incl. 15%)" : "VAT (15%)"}</span>
+                        <span className="font-medium">{fmtZAR(vatAmount)}</span>
+                      </div>
+                    )}
+                    <div className="border-t pt-2 flex justify-between font-bold text-base">
+                      <span>Total {vatMode === "exclusive" ? "incl. VAT" : vatMode === "inclusive" ? "(VAT incl.)" : "(No VAT)"}</span>
+                      <span className="text-primary">{fmtZAR(grandTotal)}</span>
+                    </div>
+                  </>
+              }
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setTab("items")}>← Back</Button>
+              <Button onClick={handleSubmit} disabled={mutation.isPending} className="gap-2">
+                <FileText className="h-4 w-4" />
+                {mutation.isPending ? "Creating…" : "Create Quote"}
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 type ConvertJobForm = z.infer<typeof convertToJobSchema>;
 
@@ -1045,8 +1494,6 @@ export default function QuotesPage() {
   const [serviceFilter, setServiceFilter] = useState("all");
   const [showNewQuote, setShowNewQuote]   = useState(false);
 
-  const { toast } = useToast();
-
   const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: workers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: clients = [] }     = useQuery<Client[]>({ queryKey: ["/api/clients"] });
@@ -1063,27 +1510,6 @@ export default function QuotesPage() {
   });
 
   const countByStatus = (s: string) => quotes.filter(q => q.status === s).length;
-
-  const newQuoteForm = useForm<NewQuoteForm>({
-    resolver: zodResolver(newQuoteSchema),
-    defaultValues: {
-      companyName: "", contactPerson: "", email: "", phone: "",
-      serviceType: "", description: "", address: "",
-      preferredContactMethod: "email", quoteAmount: "", frequency: "",
-    },
-  });
-
-  const createQuoteMutation = useMutation({
-    mutationFn: (data: NewQuoteForm) =>
-      apiRequest("POST", "/api/quote-submissions", { ...data, status: "quoted", origination: "other" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
-      toast({ title: "Quote created successfully" });
-      setShowNewQuote(false);
-      newQuoteForm.reset();
-    },
-    onError: () => toast({ title: "Failed to create quote", variant: "destructive" }),
-  });
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -1176,152 +1602,7 @@ export default function QuotesPage() {
         </main>
       </div>
 
-      {/* ── New Quote Dialog ─────────────────────────────────────────── */}
-      <Dialog open={showNewQuote} onOpenChange={setShowNewQuote}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> New Quote
-            </DialogTitle>
-          </DialogHeader>
-          <Form {...newQuoteForm}>
-            <form onSubmit={newQuoteForm.handleSubmit(data => createQuoteMutation.mutate(data))} className="space-y-4">
-
-              {/* ── Client picker ── */}
-              <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Auto-fill from existing client</p>
-                <Select
-                  onValueChange={clientId => {
-                    if (clientId === "__none__") return;
-                    const c = clients.find(cl => cl.id === clientId);
-                    if (!c) return;
-                    newQuoteForm.setValue("companyName",   c.name ?? "");
-                    newQuoteForm.setValue("contactPerson", c.contactPerson ?? "");
-                    newQuoteForm.setValue("email",         c.email ?? "");
-                    newQuoteForm.setValue("phone",         c.phone ?? "");
-                    newQuoteForm.setValue("address",       c.address ?? "");
-                  }}
-                >
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Search and select a client…" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="__none__">— None (manual entry) —</SelectItem>
-                    {[...clients]
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(c => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}{c.contactPerson ? ` · ${c.contactPerson}` : ""}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={newQuoteForm.control} name="companyName" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Company Name *</FormLabel>
-                    <FormControl><Input placeholder="e.g. ABC Holdings" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="contactPerson" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contact Person *</FormLabel>
-                    <FormControl><Input placeholder="Full name" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone *</FormLabel>
-                    <FormControl><Input placeholder="+27 ..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="email" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Email *</FormLabel>
-                    <FormControl><Input type="email" placeholder="email@company.co.za" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="serviceType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Service *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {Object.entries(SERVICE_LABELS).map(([v, l]) => (
-                          <SelectItem key={v} value={v}>{l}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="frequency" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Frequency</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {FREQUENCY_OPTIONS.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="address" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Address</FormLabel>
-                    <FormControl><Input placeholder="Site address" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="quoteAmount" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quote Amount (R)</FormLabel>
-                    <FormControl><Input placeholder="e.g. 2500.00" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="preferredContactMethod" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Preferred Contact</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                        <SelectItem value="either">Either</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={newQuoteForm.control} name="description" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Description / Requirements *</FormLabel>
-                    <FormControl><Textarea placeholder="Describe the service requirements..." rows={3} {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowNewQuote(false)}>Cancel</Button>
-                <Button type="submit" disabled={createQuoteMutation.isPending}>
-                  {createQuoteMutation.isPending ? "Creating..." : "Create Quote"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <NewQuoteDialog open={showNewQuote} onClose={() => setShowNewQuote(false)} clients={clients} />
     </div>
   );
 }

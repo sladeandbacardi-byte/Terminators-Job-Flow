@@ -1,0 +1,339 @@
+REDESIGN NEW QUOTE WINDOW WITH FULL QUOTE DETAILS
+
+The current New Quote window is too basic.
+
+It currently captures client details, service, frequency, amount and description, but it does not properly capture:
+- quantity
+- product/service type
+- unit price
+- line items
+- once-off vs recurring work
+- contract/rental items
+- service frequency details
+- VAT
+- total calculation
+
+Please redesign the New Quote dialog so it works like a real quote form.
+
+The quote must have two sections:
+
+1. Client Details
+2. Quote Line Items / Service Details
+
+SECTION 1: CLIENT DETAILS
+
+Keep the existing “Auto-fill from existing client” picker at the top.
+
+When selecting an existing client, auto-fill:
+- Company name
+- Contact person
+- Phone
+- Email
+- Address
+- Preferred contact
+
+Client fields:
+- Company Name
+- Contact Person
+- Phone
+- Email
+- Site Address
+- Billing Address, optional
+- Preferred Contact
+- VAT Number, optional
+- Company Registration Number, optional
+
+Allow user to edit the auto-filled details before saving.
+
+SECTION 2: QUOTE DETAILS
+
+Add these fields:
+
+Quote Type:
+Dropdown:
+- Once-off Service
+- Recurring Service
+- Rental Contract
+- Product / Stock Sale
+- Mixed Quote
+
+Department:
+Dropdown:
+- Pest Control
+- Hygiene / Washroom
+- Sanitary Bins
+- Deep Cleaning
+- Dustmats
+- Electrical COC
+- Wood Borer COC
+- Other
+
+Service / Product Type:
+Dropdown based on department.
+
+Examples:
+
+Pest Control:
+- Monthly pest control
+- Rodent control
+- Cockroach treatment
+- Ant treatment
+- Flea treatment
+- Bed bug treatment
+- Fly control
+- Termite treatment
+- Once-off inspection
+- Other
+
+Hygiene / Washroom:
+- Hand soap dispenser
+- Paper towel dispenser
+- Toilet paper dispenser
+- Air freshener dispenser
+- Sanitary bin service
+- Seat sanitizer
+- Urinal sanitizer
+- Deep washroom clean
+- Other
+
+Sanitary Bins:
+- Sanitary bin rental and service
+- Sanitary bin collection only
+- Feminine hygiene service
+- Other
+
+Deep Cleaning:
+- Once-off deep clean
+- Kitchen deep clean
+- Washroom deep clean
+- Office deep clean
+- High-level cleaning
+- Floor cleaning
+- Other
+
+COC:
+- Electrical COC single-phase
+- Electrical COC three-phase
+- Wood borer COC
+- Electrical + Wood borer COC
+- Other
+
+Frequency:
+Dropdown:
+- Once-off
+- Weekly
+- Fortnightly
+- Monthly
+- Every 2 months
+- Quarterly
+- 6-monthly
+- Annually
+- On demand
+- Custom
+
+Quantity:
+Number field.
+
+Unit:
+Dropdown:
+- Unit
+- Dispenser
+- Bin
+- Room
+- Site
+- Square metre
+- Hour
+- Visit
+- Treatment
+- Inspection
+- Certificate
+- Other
+
+Unit Price:
+Currency field in ZAR.
+
+Line Total:
+Auto-calculate:
+quantity x unit price
+
+VAT:
+Toggle or dropdown:
+- VAT inclusive
+- VAT exclusive
+- No VAT
+
+VAT Amount:
+Auto-calculate if applicable.
+
+Total Including VAT:
+Auto-calculate.
+
+Description / Requirements:
+Textarea.
+This should describe the work required.
+
+Internal Notes:
+Textarea.
+Visible to staff only, not client-facing unless selected later.
+
+LINE ITEMS
+
+The quote must allow multiple line items.
+
+Add button:
++ Add Line Item
+
+Each line item must have:
+- Department
+- Service / Product Type
+- Description
+- Quantity
+- Unit
+- Unit Price
+- Frequency
+- Line Total
+
+Example line item:
+Department: Hygiene / Washroom
+Service Type: Hand soap dispenser
+Description: Supply and service hand soap dispensers
+Quantity: 6
+Unit: Dispenser
+Unit Price: R150
+Frequency: Monthly
+Line Total: R900 per month
+
+Another example:
+Department: Sanitary Bins
+Service Type: Sanitary bin rental and service
+Quantity: 8
+Unit: Bin
+Unit Price: R180
+Frequency: Monthly
+Line Total: R1,440 per month
+
+Another example:
+Department: Electrical COC
+Service Type: Electrical COC single-phase
+Quantity: 1
+Unit: Certificate
+Unit Price: R1,250
+Frequency: Once-off
+Line Total: R1,250 once-off
+
+QUOTE TOTALS SECTION
+
+At the bottom of the quote form, show:
+
+Once-off Total:
+R amount
+
+Recurring Monthly Total:
+R amount
+
+VAT:
+R amount
+
+Total Including VAT:
+R amount
+
+If the quote has recurring items, clearly show:
+Monthly recurring amount: R____
+
+If the quote has once-off items, clearly show:
+Once-off amount: R____
+
+QUOTE STATUS
+
+Add quote status:
+- Draft
+- Quoted
+- Sent
+- Follow-up Required
+- Accepted
+- Declined
+- Converted to Job
+- Converted to Contract
+
+DOCUMENT NUMBER
+
+Every quote must have a document number.
+
+Format:
+QT-YYYY-0001
+
+Example:
+QT-2026-0007
+
+Show the quote number on:
+- Quote card
+- Quote detail view
+- Converted job
+- Invoice if converted later
+
+CONVERSION RULES
+
+If quote is accepted:
+
+If Quote Type is Once-off Service:
+Convert to Job.
+
+If Quote Type is Recurring Service:
+Convert to Contract and create scheduled jobs.
+
+If Quote Type is Rental Contract:
+Convert to Rental Contract.
+
+If Quote Type is Product / Stock Sale:
+Convert to Invoice or Job depending on setup.
+
+If Quote Type is Mixed Quote:
+Allow user to choose:
+- Convert service lines to job
+- Convert recurring lines to contract
+- Convert product lines to invoice
+
+When converting, carry forward:
+- Client
+- Site address
+- Contact person
+- Quote number
+- Service/product line items
+- Quantity
+- Unit price
+- Frequency
+- Description
+- Notes
+
+QUOTE WINDOW LAYOUT
+
+Make the New Quote dialog wider.
+
+Recommended:
+Desktop modal width: 900px to 1100px
+Mobile: full screen
+
+Use tabs or sections:
+
+Tab 1: Client
+Tab 2: Quote Items
+Tab 3: Notes & Follow-up
+Tab 4: Summary
+
+Or use one scrollable form with clear section headers.
+
+IMPORTANT
+
+Do not rely on one single “Quote Amount” field anymore.
+
+Replace Quote Amount with calculated line items.
+
+Keep manual override option:
+Allow user with permission to override final quote amount.
+
+Add permission:
+canOverrideQuoteTotal
+
+Only Managing Member/Admin/Sales Manager can override quote total.
+
+END
