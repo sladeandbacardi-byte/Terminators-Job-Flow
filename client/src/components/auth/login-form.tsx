@@ -84,7 +84,7 @@ interface StaffMember {
 
 // Client-side fallback — shown if /api/auth/staff returns empty or fails
 const FALLBACK_STAFF: StaffMember[] = [
-  { id: "worker-1", name: "Julien Botha",      role: "Managing Member",                departmentId: "div-6" },
+  { id: "worker-1", name: "Julien Botha",      role: "Operations Manager",             departmentId: "div-6" },
   { id: "worker-2", name: "Maryka Venter",     role: "Pest Control Services Manager",  departmentId: "div-6" },
   { id: "worker-3", name: "Mariette Koekemoer",role: "Hygiene Services Manager",       departmentId: "div-6" },
   { id: "worker-4", name: "Juli Holtshausen",  role: "Finance & HR Manager",           departmentId: "div-7" },
