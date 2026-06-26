@@ -252,7 +252,7 @@ export class DbStorage implements IStorage {
 
     // ── Workers ──────────────────────────────────────────────────────────────
     const workerRows = [
-      { name: "Julien Botha",       email: "julien@terminators.co.za",    phone: "+27 82 123 0001", departmentId: "div-6", role: "Managing Member" },
+      { name: "Julien Botha",       email: "julien@terminators.co.za",    phone: "+27 82 123 0001", departmentId: "div-6", role: "Operations Manager" },
       { name: "Maryka Venter",      email: "service1@terminators.co.za",  phone: "+27 82 666 0748", departmentId: "div-6", role: "Pest Control Services Manager" },
       { name: "Mariette Koekemoer", email: "service@terminators.co.za",   phone: "+27 78 982 6249", departmentId: "div-6", role: "Hygiene Services Manager" },
       { name: "Juli Holtshausen",   email: "accounts@terminators.co.za",  phone: "+27 82 618 9711", departmentId: "div-7", role: "Finance & HR Manager" },

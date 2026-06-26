@@ -15,7 +15,7 @@ const profileByKey = (key: string) => DEMO_PROFILES.find(p => p.key === key)!;
 const ROLE_CARDS = [
   {
     key: "admin",
-    label: "Managing Member",
+    label: "Operations Manager",
     description: "Full system access",
     Icon: Shield,
     border: "border-indigo-200",

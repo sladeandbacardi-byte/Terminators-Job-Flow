@@ -32,7 +32,7 @@ interface DashboardMetrics {
 }
 
 const rolePageTitles: Record<DashboardRole, string> = {
-  admin:       "Managing Member Dashboard",
+  admin:       "Operations Manager Dashboard",
   manager:     "Service Manager Dashboard",
   sales:       "Sales Dashboard",
   service:     "My Jobs Dashboard",

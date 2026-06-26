@@ -7,6 +7,7 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
   // Owner/director keywords take priority over department
   if (
     role.includes("managing member") ||
+    role.includes("operations manager") ||
     role.includes("owner") ||
     role.includes("director") ||
     role === "md" ||
@@ -47,7 +48,7 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
 }
 
 export const dashboardRoleLabels: Record<DashboardRole, string> = {
-  admin:       "Managing Member",
+  admin:       "Operations Manager",
   manager:     "Service Manager",
   sales:       "Sales",
   service:     "Technician",

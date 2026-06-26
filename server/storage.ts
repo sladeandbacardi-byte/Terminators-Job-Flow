@@ -893,7 +893,7 @@ export class MemStorage implements IStorage {
     // Create workers based on actual organogram (Organogram 2026)
     const workers = [
       // Management — worker-1
-      { name: "Julien Botha",       email: "julien@terminators.co.za",    phone: "+27 82 123 0001", departmentId: "div-6", role: "Managing Member" },
+      { name: "Julien Botha",       email: "julien@terminators.co.za",    phone: "+27 82 123 0001", departmentId: "div-6", role: "Operations Manager" },
 
       // Managers — worker-2, worker-3, worker-4
       { name: "Maryka Venter",      email: "service1@terminators.co.za",  phone: "+27 82 666 0748", departmentId: "div-6", role: "Pest Control Services Manager" },
@@ -935,7 +935,7 @@ export class MemStorage implements IStorage {
       { name: "Veronica",           email: "veronica@terminators.co.za",  phone: "+27 82 123 0022", departmentId: "div-8", role: "Daily Cleaning Technician" },
       { name: "Margrett",           email: "margrett@terminators.co.za",  phone: "+27 82 123 0023", departmentId: "div-8", role: "Daily Cleaning Technician" },
     ];
-    // worker-1  = Julien Botha          (div-6 / Managing Member)
+    // worker-1  = Julien Botha          (div-6 / Operations Manager)
     // worker-2  = Maryka Venter         (div-6 / Pest Control Services Manager)
     // worker-3  = Mariette Koekemoer    (div-6 / Hygiene Services Manager)
     // worker-4  = Juli Holtshausen      (div-7 / Finance & HR Manager)
