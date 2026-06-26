@@ -60,10 +60,10 @@ const ALL_SECTIONS: NavSection[] = [
     icon: Wrench,
     roles: ["admin", "manager", "coordinator", "service", "accounts"],
     items: [
-      { name: "Jobs",             href: "/jobs",              icon: Briefcase,    roles: ["admin", "manager", "coordinator", "accounts"] },
-      { name: "My Jobs",          href: "/jobs",              icon: Briefcase,    roles: ["service"], tooltip: "Your main job list and daily work sheet." },
+      { name: "Once Off Jobs",             href: "/jobs",              icon: Briefcase,    roles: ["admin", "manager", "coordinator", "accounts"] },
+      { name: "Once Off Jobs",          href: "/jobs",              icon: Briefcase,    roles: ["service"], tooltip: "Your main job list and daily work sheet." },
       { name: "Calendar",              href: "/calendar",              icon: Calendar,      roles: ["admin", "manager", "coordinator", "service", "accounts"] },
-      { name: "Contracts",             href: "/contracts",             icon: ListOrdered,   roles: ["admin", "manager", "coordinator"] },
+      { name: "Recurring Service Contracts",             href: "/contracts",             icon: ListOrdered,   roles: ["admin", "manager", "coordinator"] },
       { name: "Equipment Checklists",  href: "/equipment-checklists",  icon: ClipboardCheck, roles: ["admin", "manager", "coordinator"] },
       { name: "Daily Diaries",         href: "/field-diaries",         icon: BookOpen,      roles: ["admin", "manager", "coordinator", "service"] },
       { name: "Stock Management",      href: "/inventory",             icon: Box,           roles: ["admin", "manager", "coordinator"] },
