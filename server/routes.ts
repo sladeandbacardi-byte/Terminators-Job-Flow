@@ -42,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { id: "worker-3", name: "Mariette Koekemoer", role: "Hygiene Services Manager",       departmentId: "div-6" },
     { id: "worker-4", name: "Juli Holtshausen",   role: "Finance & HR Manager",           departmentId: "div-7" },
     { id: "worker-5", name: "Sheryl-Lyn Lee",     role: "Existing Clients Sales & Admin", departmentId: "div-5" },
-    { id: "worker-6", name: "Chane du Toit",      role: "Sales Rep",                      departmentId: "div-5" },
+    { id: "worker-6", name: "Sales 2",             role: "Sales Rep",                      departmentId: "div-5" },
   ];
 
   // Authentication routes

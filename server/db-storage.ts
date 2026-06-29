@@ -257,7 +257,7 @@ export class DbStorage implements IStorage {
       { name: "Mariette Koekemoer", email: "service@terminators.co.za",   phone: "+27 78 982 6249", departmentId: "div-6", role: "Hygiene Services Manager" },
       { name: "Juli Holtshausen",   email: "accounts@terminators.co.za",  phone: "+27 82 618 9711", departmentId: "div-7", role: "Finance & HR Manager" },
       { name: "Sheryl-Lyn Lee",     email: "sales@terminators.co.za",     phone: "+27 82 889 2453", departmentId: "div-5", role: "Existing Clients Sales & Admin" },
-      { name: "Chane du Toit",      email: "sales2@terminators.co.za",    phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
+      { name: "Sales 2",             email: "sales2@terminators.co.za",    phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
       { name: "Zuki Sandi",         email: "zuki@terminators.co.za",      phone: "+27 82 123 0007", departmentId: "div-4", role: "Ablution Deep Cleaning Supervisor" },
       { name: "Reece Ebrahim",      email: "reece@terminators.co.za",     phone: "+27 82 123 0008", departmentId: "div-1", role: "Pest Control Operator" },
       { name: "Garth du Preez",     email: "garth@terminators.co.za",     phone: "+27 82 123 0009", departmentId: "div-1", role: "Pest Control Operator" },

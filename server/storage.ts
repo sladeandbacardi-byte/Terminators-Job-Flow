@@ -923,7 +923,7 @@ export class MemStorage implements IStorage {
 
       // Sales — worker-5, worker-6
       { name: "Sheryl-Lyn Lee",     email: "sales@terminators.co.za",     phone: "+27 82 889 2453", departmentId: "div-5", role: "Existing Clients Sales & Admin" },
-      { name: "Chane du Toit",      email: "sales2@terminators.co.za",    phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
+      { name: "Sales 2",             email: "sales2@terminators.co.za",    phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
 
       // Ablution Deep Cleaning — worker-7
       { name: "Zuki Sandi",         email: "zuki@terminators.co.za",      phone: "+27 82 123 0007", departmentId: "div-4", role: "Ablution Deep Cleaning Supervisor" },
@@ -961,7 +961,7 @@ export class MemStorage implements IStorage {
     // worker-3  = Mariette Koekemoer    (div-6 / Hygiene Services Manager)
     // worker-4  = Juli Holtshausen      (div-7 / Finance & HR Manager)
     // worker-5  = Sheryl-Lyn Lee        (div-5 / Existing Clients Sales & Admin)
-    // worker-6  = Chane du Toit         (div-5 / Sales Rep)
+    // worker-6  = Sales 2                (div-5 / Sales Rep)
     // worker-7  = Zuki Sandi            (div-4 / Ablution Deep Cleaning Supervisor)
     // worker-8  = Reece Ebrahim         (div-1 / Pest Control Operator)
     // worker-9  = Garth du Preez        (div-1 / Pest Control Operator)
@@ -2056,7 +2056,7 @@ export class MemStorage implements IStorage {
       { id: "sa-3", title: "Quote follow-up - Medicross Clinic", clientName: "Medicross Clinic", contactPerson: "Admin Manager", phone: "041 365 5000", siteAddress: "Medicross, Lorraine, PE", appointmentType: "quote_followup", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(0), startTime: "14:00", endTime: "14:30", estimatedDuration: 30, status: "confirmed", notes: "Follow up on washroom services quote sent 3 days ago.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: "quote-3", quoteId: null, departmentId: "div-5", createdAt: new Date() },
       { id: "sa-4", title: "Existing client visit - Spar Group PE", clientName: "Spar Group PE", contactPerson: "Mr. van Wyk", phone: "082 500 1234", siteAddress: "Spar DC, Target Field Rd, PE", appointmentType: "existing_client_visit", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(1), startTime: "09:00", endTime: "10:00", estimatedDuration: 60, status: "planned", notes: "Monthly check-in. Discuss contract renewal for next quarter.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
       { id: "sa-5", title: "Contract renewal - Murray & Roberts", clientName: "Murray & Roberts", contactPerson: "Facilities Manager", phone: "011 301 0000", siteAddress: "M&R Head Office, Bedfordview", appointmentType: "contract_renewal", appointmentTypeOther: null, assignedToId: "worker-6", date: relDay(1), startTime: "13:00", endTime: "14:00", estimatedDuration: 60, status: "planned", notes: "Annual review and contract renewal for deep cleaning services.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
-      { id: "sa-6", title: "Internal sales meeting - Q2 targets", clientName: "Internal", contactPerson: "Management", phone: "", siteAddress: "Head Office", appointmentType: "internal_meeting", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(2), startTime: "08:00", endTime: "09:00", estimatedDuration: 60, status: "confirmed", notes: "Q2 pipeline review and target setting with Sheryl-Lyn and Chane.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
+      { id: "sa-6", title: "Internal sales meeting - Q2 targets", clientName: "Internal", contactPerson: "Management", phone: "", siteAddress: "Head Office", appointmentType: "internal_meeting", appointmentTypeOther: null, assignedToId: "worker-5", date: relDay(2), startTime: "08:00", endTime: "09:00", estimatedDuration: 60, status: "confirmed", notes: "Q2 pipeline review and target setting with Sheryl-Lyn and Sales 2.", completionNote: null, clientFeedback: null, nextAction: null, followUpDate: null, leadId: null, quoteId: null, departmentId: "div-5", createdAt: new Date() },
     ];
     seedAppts.forEach(a => this.salesAppointments.set(a.id, a));
 
@@ -3891,7 +3891,7 @@ export class MemStorage implements IStorage {
     //   vehicle-2  HDF872EC  2013 VW Caddy            Jackie     (worker-14, div-2 Sanitary Bins)
     //   vehicle-3  JPC031EC  2020 VW Caddy            Garth      (worker-9,  div-1 Pest Control)
     //   vehicle-4  DJG667EC  2005 VW Caddy            Leon       (worker-13, div-1 Pest Control)
-    //   vehicle-5  HKY517EC  2015 Suzuki Celerio      Chane      (worker-6,  div-5 Sales)
+    //   vehicle-5  HKY517EC  2015 Suzuki Celerio      Sales 2    (worker-6,  div-5 Sales)
     //   vehicle-6  HRW489EC  2016 VW Caddy            Zain       (worker-12, div-3 Washroom)
     //   vehicle-7  KRM914EC  2023 Isuzu D-Max         Mike       (worker-10, div-1 Pest Control)
     //   vehicle-8  HRS116EC  2016 VW Caddy            Xolani/X   (worker-11, div-1 Pest Control)
@@ -3903,7 +3903,7 @@ export class MemStorage implements IStorage {
       { id: "vehicle-2",  name: "VW Caddy (Jackie)",          registration: "HDF872EC", make: "Volkswagen",   model: "Caddy",   year: "2013", departmentId: "div-2", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2020-01-01") },
       { id: "vehicle-3",  name: "VW Caddy (Garth)",           registration: "JPC031EC", make: "Volkswagen",   model: "Caddy",   year: "2020", departmentId: "div-1", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2020-06-01") },
       { id: "vehicle-4",  name: "VW Caddy (Leon)",            registration: "DJG667EC", make: "Volkswagen",   model: "Caddy",   year: "2005", departmentId: "div-1", isActive: true, vehicleStatus: "due_service", notes: "Front left tyre showing inner edge wear — needs attention.", createdAt: new Date("2020-01-01") },
-      { id: "vehicle-5",  name: "Suzuki Celerio (Chane)",     registration: "HKY517EC", make: "Suzuki",       model: "Celerio", year: "2015", departmentId: "div-5", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2020-01-01") },
+      { id: "vehicle-5",  name: "Suzuki Celerio (Sales 2)",   registration: "HKY517EC", make: "Suzuki",       model: "Celerio", year: "2015", departmentId: "div-5", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2020-01-01") },
       { id: "vehicle-6",  name: "VW Caddy (Zain)",            registration: "HRW489EC", make: "Volkswagen",   model: "Caddy",   year: "2016", departmentId: "div-3", isActive: true, vehicleStatus: "due_service", notes: "Service due — approaching next service interval.", createdAt: new Date("2020-01-01") },
       { id: "vehicle-7",  name: "Isuzu D-Max (Mike)",         registration: "KRM914EC", make: "Isuzu",        model: "D-Max",   year: "2023", departmentId: "div-1", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2023-03-01") },
       { id: "vehicle-8",  name: "VW Caddy (Xolani)",          registration: "HRS116EC", make: "Volkswagen",   model: "Caddy",   year: "2016", departmentId: "div-1", isActive: true, vehicleStatus: "workshop",    notes: "Clutch repair in progress at Gqeberha Auto.", createdAt: new Date("2020-01-01") },
@@ -3961,7 +3961,7 @@ export class MemStorage implements IStorage {
       { id: "km-12", vehicleId: "vehicle-9",  workerId: "worker-8",  logDate: td(1),  startOdometer: 36300,  endOdometer: 36410,  totalKm: 110, businessKm: 110, privateKm: 0,  notes: "Pest control treatments — Walmer area", createdAt: td(1) },
       // Julien — Toyota Surf (Management)
       { id: "km-13", vehicleId: "vehicle-10", workerId: "worker-1",  logDate: td(2),  startOdometer: 8130,   endOdometer: 8200,   totalKm: 70,  businessKm: 70,  privateKm: 0,  notes: "Client site visits — Boardwalk & Baywest", createdAt: td(2) },
-      // Chane — Celerio (Sales)
+      // Sales 2 — Celerio (Sales)
       { id: "km-14", vehicleId: "vehicle-5",  workerId: "worker-6",  logDate: td(3),  startOdometer: 141720, endOdometer: 141800, totalKm: 80,  businessKm: 75,  privateKm: 5,  notes: "Sales visits — new client prospects", createdAt: td(3) },
     ];
     kmLogsData.forEach(l => this.kmLogs.set(l.id, l));
