@@ -106,11 +106,12 @@ type ContractFormData = z.infer<typeof contractFormSchema>;
 
 interface ContractFormProps {
   contract?: RentalContract | null;
+  defaultClientId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export default function ContractForm({ contract, onSuccess, onCancel }: ContractFormProps) {
+export default function ContractForm({ contract, defaultClientId, onSuccess, onCancel }: ContractFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -163,7 +164,7 @@ export default function ContractForm({ contract, onSuccess, onCancel }: Contract
   const form = useForm<ContractFormData>({
     resolver: zodResolver(contractFormSchema),
     defaultValues: {
-      clientId:              contract?.clientId ?? "",
+      clientId:              contract?.clientId ?? defaultClientId ?? "",
       customerName:          contract?.customerName ?? "",
       departmentId:          contract?.departmentId ?? "",
       startDate:             contract ? new Date(contract.startDate) : new Date(),

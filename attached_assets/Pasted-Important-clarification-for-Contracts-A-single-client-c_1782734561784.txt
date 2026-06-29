@@ -1,0 +1,140 @@
+Important clarification for Contracts:
+
+A single client/customer can have multiple contracts, and those contracts can be different types.
+
+Do not classify the client itself as either a Service client or Rental client.
+
+The client is the parent record.
+
+Each contract linked to the client must have its own contractType.
+
+Contract Type options:
+- Service Contract
+- Rental Contract
+
+Example:
+
+Client: Greenacres Restaurant
+
+Contract 1:
+contractType: Service Contract
+serviceType: Washroom Service
+frequency: Monthly
+
+Contract 2:
+contractType: Rental Contract
+rentalItems: Aerosol A/F Unit, Aerosol Refill
+frequency: Monthly
+
+Contract 3:
+contractType: Service Contract
+serviceType: Pest Control
+frequency: Quarterly
+
+CLIENT PROFILE
+
+Client Profile > Contracts must show all contracts linked to that clientId in one combined list.
+
+Each row/card must show:
+
+- Contract Number
+- Contract Type
+- Service Type or Rental Items Summary
+- Frequency
+- Schedule Summary
+- Price / Total
+- Start Date
+- End Date
+- Next Increase Date
+- Status
+- View/Edit button
+
+Add filter chips inside the client Contracts tab:
+
+- All Contracts
+- Service Contracts
+- Rental Contracts
+- Active
+- Inactive
+
+CONTRACTS PAGE
+
+The main Contracts page must also show one combined list of all contract records.
+
+Filters:
+
+- All Contracts
+- Service Contracts
+- Rental Contracts
+- Active
+- Inactive
+- Contracts Ending
+- Increase Dates Due
+
+NEW CONTRACT FLOW
+
+There must be only one button:
+
++ New Contract
+
+When clicked, the user chooses:
+
+Contract Type:
+- Service Contract
+- Rental Contract
+
+The selected contract type determines which fields appear.
+
+But both contract types must:
+- link to the same central clientId
+- appear under the same client profile
+- appear in the same Contracts list
+- appear on the Calendar if scheduled
+- appear in backups
+- appear in Data Integrity checks
+
+DATA MODEL RULE
+
+Client has many Contracts.
+
+Each Contract belongs to one Client.
+
+The contract record must store:
+- contractId
+- clientId
+- contractType
+- contractNumber
+- activeStatus
+- contractStartDate
+- contractEndDate
+- nextIncreaseDate
+- frequency
+- schedule fields
+- price fields
+
+If service contracts and rental contracts remain in separate PostgreSQL tables internally, create a combined API/view for the UI so the user sees one contracts system.
+
+Do not duplicate the client record.
+
+Do not create separate service-client and rental-client records.
+
+CALENDAR
+
+The calendar must show scheduled contract occurrences from both:
+- Service Contracts
+- Rental Contracts
+
+A client with both contract types may therefore have multiple scheduled items on the calendar.
+
+TEST
+
+Test with Greenacres Restaurant:
+
+1. Create one Service Contract.
+2. Create one Rental Contract.
+3. Confirm both appear under Greenacres Restaurant > Contracts.
+4. Confirm the Contracts tab filter All Contracts shows both.
+5. Confirm Service Contracts filter shows only the service contract.
+6. Confirm Rental Contracts filter shows only the rental contract.
+7. Confirm both appear on the main Contracts list.
+8. Confirm both appear on Calendar if scheduled.

@@ -25,9 +25,10 @@ import {
   ArrowLeft, Building, Phone, Mail, MapPin, Edit, User, FileText,
   Briefcase, CreditCard, Calendar, ExternalLink, ClipboardList, Receipt,
   MessageSquare, FlaskConical, Package, FolderOpen, Plus, Trash2,
-  ChevronDown, ChevronRight, Printer,
+  ChevronDown, ChevronRight, Printer, Wrench,
 } from "lucide-react";
 import { ClientForm } from "@/components/forms/client-form";
+import ContractForm from "@/components/forms/contract-form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -173,6 +174,10 @@ export default function ClientProfilePage() {
   const [cnOpen, setCnOpen]         = useState(false);
   const [expandedTr, setExpandedTr] = useState<string | null>(null);
   const [expandedCn, setExpandedCn] = useState<string | null>(null);
+  const [contractFilter, setContractFilter]   = useState<"all"|"service"|"rental"|"active"|"inactive">("all");
+  const [showContractPicker, setShowContractPicker] = useState(false);
+  const [isRentalFormOpen, setIsRentalFormOpen]     = useState(false);
+  const [editingRental, setEditingRental]           = useState<any | null>(null);
 
   const [trForm, setTrForm] = useState<Partial<TreatmentReport>>({});
   const [cnForm, setCnForm] = useState<Partial<CommunicationNote>>({
@@ -231,7 +236,8 @@ export default function ClientProfilePage() {
   const otherJobs      = clientJobs.filter(j => !["in_progress","scheduled","completed"].includes(j.status));
 
   // Stats
-  const activeContractCount = clientContracts.filter(c => c.activeStatus).length;
+  const activeContractCount = clientContracts.filter(c => c.activeStatus).length
+    + clientRentalContracts.filter((c: any) => c.isActive ?? c.activeStatus).length;
   const openInvoiceCount    = clientInvoices.filter(i => i.status !== "paid" && i.status !== "cancelled").length;
 
   // Lookup helpers
@@ -575,137 +581,206 @@ export default function ClientProfilePage() {
 
               {/* ═══════════════════ CONTRACTS ══════════════════════════ */}
               <TabsContent value="contracts" className="mt-4">
+                {/* ── Header ── */}
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-muted-foreground">
                     {clientContracts.length + clientRentalContracts.length} contract{(clientContracts.length + clientRentalContracts.length) !== 1 ? "s" : ""}
                     {activeContractCount > 0 && ` · ${activeContractCount} active`}
                   </span>
-                  <div className="flex gap-2">
-                    <Link href={newContractUrl()}>
-                      <Button size="sm" variant="outline" className="gap-1">
-                        <Plus className="h-3.5 w-3.5" />Service Contract
-                      </Button>
-                    </Link>
-                    <Link href="/contracts">
-                      <Button size="sm" variant="outline" className="gap-1">
-                        <Plus className="h-3.5 w-3.5" />Rental Contract
-                      </Button>
-                    </Link>
-                  </div>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowContractPicker(true)}>
+                    <Plus className="h-3.5 w-3.5" />New Contract
+                  </Button>
                 </div>
 
-                {/* ── Rental Contracts ──────────────────────────────────── */}
-                {clientRentalContracts.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2 flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5" /> Rental Contracts ({clientRentalContracts.length})
-                    </h4>
+                {/* ── Filter chips ── */}
+                {(clientContracts.length + clientRentalContracts.length) > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {(["all","service","rental","active","inactive"] as const).map(f => {
+                      const label = f === "all" ? `All (${clientContracts.length + clientRentalContracts.length})`
+                        : f === "service" ? `Service (${clientContracts.length})`
+                        : f === "rental"  ? `Rental (${clientRentalContracts.length})`
+                        : f === "active"  ? `Active (${activeContractCount})`
+                        : `Inactive (${(clientContracts.length + clientRentalContracts.length) - activeContractCount})`;
+                      return (
+                        <button
+                          key={f}
+                          onClick={() => setContractFilter(f)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                            contractFilter === f
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── Unified list ── */}
+                {(() => {
+                  const combined: Array<{ type: "service" | "rental"; data: any }> = [
+                    ...clientContracts.map(c => ({ type: "service" as const, data: c })),
+                    ...clientRentalContracts.map(c => ({ type: "rental" as const, data: c })),
+                  ].filter(({ type, data }) => {
+                    if (contractFilter === "service") return type === "service";
+                    if (contractFilter === "rental")  return type === "rental";
+                    const active = type === "service" ? data.activeStatus : (data.isActive ?? data.activeStatus);
+                    if (contractFilter === "active")   return !!active;
+                    if (contractFilter === "inactive") return !active;
+                    return true;
+                  });
+
+                  if (combined.length === 0) {
+                    return (
+                      <Card>
+                        <CardContent className="py-8 text-center text-muted-foreground">
+                          {clientContracts.length + clientRentalContracts.length === 0
+                            ? "No contracts for this client yet."
+                            : "No contracts match this filter."}
+                        </CardContent>
+                      </Card>
+                    );
+                  }
+
+                  return (
                     <div className="space-y-2">
-                      {clientRentalContracts.map((rc: any) => {
+                      {combined.map(({ type, data: c }) => {
+                        const isService = type === "service";
+                        const active = isService ? c.activeStatus : (c.isActive ?? c.activeStatus);
                         const schedule = [
-                          rc.frequency,
-                          rc.dayOfWeek,
-                          rc.weekOfMonth ? `Week ${rc.weekOfMonth}` : undefined,
-                          rc.startTime ? `@ ${rc.startTime}` : undefined,
+                          c.frequency, c.dayOfWeek,
+                          c.weekOfMonth ? `Week ${c.weekOfMonth}` : undefined,
+                          c.startTime ? `@ ${c.startTime}` : undefined,
                         ].filter(Boolean).join(" · ");
+                        const price = isService
+                          ? (c.contractPrice ? `R${Number(c.contractPrice).toFixed(2)}` : null)
+                          : (c.calculatedTotal ? `R${Number(c.calculatedTotal).toFixed(2)}` : c.monthlyPrice ? `R${Number(c.monthlyPrice).toFixed(2)}/mo` : null);
+
                         return (
-                          <Card key={rc.id} className="border-purple-100">
+                          <Card key={c.id} className={isService ? "" : "border-purple-100"}>
                             <CardContent className="pt-3 pb-3">
                               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0 space-y-1">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    {rc.contractNumber && (
-                                      <span className="font-mono text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">{rc.contractNumber}</span>
+                                    {c.contractNumber && (
+                                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${isService ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"}`}>
+                                        {c.contractNumber}
+                                      </span>
                                     )}
-                                    <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">Rental</Badge>
-                                    <Badge className={rc.isActive || rc.activeStatus ? "bg-green-100 text-green-800 text-xs" : "bg-gray-100 text-gray-600 text-xs"}>
-                                      {(rc.isActive || rc.activeStatus) ? "Active" : "Inactive"}
+                                    <Badge className={isService
+                                      ? "bg-blue-100 text-blue-800 text-xs"
+                                      : "bg-purple-100 text-purple-800 text-xs"
+                                    }>
+                                      {isService
+                                        ? <><Wrench className="h-3 w-3 mr-1 inline" />Service</>
+                                        : <><Package className="h-3 w-3 mr-1 inline" />Rental</>
+                                      }
                                     </Badge>
+                                    <Badge className={active
+                                      ? "bg-green-100 text-green-800 text-xs"
+                                      : "bg-gray-100 text-gray-600 text-xs"
+                                    }>
+                                      {active ? "Active" : "Inactive"}
+                                    </Badge>
+                                    {isService && c.serviceType && (
+                                      <span className="text-sm font-medium text-gray-800">{c.serviceType}</span>
+                                    )}
                                   </div>
                                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
-                                    {rc.departmentId && <InfoPair label="Dept" value={getDeptName(rc.departmentId)} />}
+                                    {c.departmentId && <InfoPair label="Dept" value={getDeptName(c.departmentId)} />}
                                     {schedule && <InfoPair label="Schedule" value={schedule} className="col-span-2" />}
-                                    {(rc.assignedTeamName || rc.assignedTechnicianName) && (
-                                      <InfoPair label="Assigned" value={rc.assignedTeamName || rc.assignedTechnicianName} />
+                                    {(c.assignedTeamName || c.assignedTechnicianName) && (
+                                      <InfoPair label="Assigned" value={c.assignedTeamName || c.assignedTechnicianName} className="col-span-2" />
                                     )}
-                                    {rc.calculatedTotal && <InfoPair label="Value" value={`R ${Number(rc.calculatedTotal).toFixed(2)}`} />}
-                                    {rc.startDate && <InfoPair label="Start" value={format(new Date(rc.startDate), "dd MMM yyyy")} />}
-                                    {rc.endDate && <InfoPair label="End" value={format(new Date(rc.endDate), "dd MMM yyyy")} />}
+                                    {price && <InfoPair label="Price" value={price} />}
+                                    {isService && c.estimatedDuration && <InfoPair label="Duration" value={`${c.estimatedDuration} min`} />}
+                                    {c.startDate && <InfoPair label="Start" value={format(new Date(c.startDate), "dd MMM yyyy")} />}
+                                    {c.endDate && <InfoPair label="End" value={format(new Date(c.endDate), "dd MMM yyyy")} />}
+                                    {isService && c.increaseDate && <InfoPair label="Next Increase" value={format(new Date(c.increaseDate), "dd MMM yyyy")} />}
                                   </div>
-                                  {rc.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{rc.notes}</p>}
+                                  {c.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{c.notes}</p>}
                                 </div>
-                                <Link href="/contracts">
-                                  <Button variant="outline" size="sm" className="text-xs shrink-0">
-                                    <ExternalLink className="mr-1 h-3 w-3" />View / Edit
-                                  </Button>
-                                </Link>
+                                <div className="flex gap-1.5 shrink-0">
+                                  {!isService && (
+                                    <Button
+                                      variant="outline" size="sm" className="text-xs"
+                                      onClick={() => { setEditingRental(c); setIsRentalFormOpen(true); }}
+                                    >
+                                      <Edit className="mr-1 h-3 w-3" />Edit
+                                    </Button>
+                                  )}
+                                  <Link href={isService ? "/service-contracts" : "/contracts"}>
+                                    <Button variant="outline" size="sm" className="text-xs">
+                                      <ExternalLink className="mr-1 h-3 w-3" />View
+                                    </Button>
+                                  </Link>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
                         );
                       })}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
-                {/* ── Service Contracts ─────────────────────────────────── */}
-                {clientContracts.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
-                      <FileText className="h-3.5 w-3.5" /> Service Contracts ({clientContracts.length})
-                    </h4>
-                    <div className="space-y-2">
-                      {clientContracts.map(contract => {
-                        const schedule = [
-                          contract.frequency,
-                          contract.dayOfWeek,
-                          contract.weekOfMonth ? `Week ${contract.weekOfMonth}` : undefined,
-                          contract.startTime ? `@ ${contract.startTime}` : undefined,
-                        ].filter(Boolean).join(" · ");
-                        return (
-                          <Card key={contract.id}>
-                            <CardContent className="pt-3 pb-3">
-                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0 space-y-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {contract.contractNumber && (
-                                      <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{contract.contractNumber}</span>
-                                    )}
-                                    <span className="font-semibold text-sm">{contract.serviceType}</span>
-                                    <Badge className={contract.activeStatus ? "bg-green-100 text-green-800 text-xs" : "bg-gray-100 text-gray-600 text-xs"}>
-                                      {contract.activeStatus ? "Active" : "Inactive"}
-                                    </Badge>
-                                  </div>
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
-                                    <InfoPair label="Department" value={getDeptName(contract.departmentId)} />
-                                    {schedule && <InfoPair label="Schedule" value={schedule} className="col-span-2" />}
-                                    {(contract.assignedTeamName || contract.assignedTechnicianName) && (
-                                      <InfoPair label="Assigned" value={contract.assignedTeamName || contract.assignedTechnicianName} className="col-span-2" />
-                                    )}
-                                    {contract.contractPrice && <InfoPair label="Price" value={`R${Number(contract.contractPrice).toFixed(2)}`} />}
-                                    {contract.estimatedDuration && <InfoPair label="Duration" value={`${contract.estimatedDuration} min`} />}
-                                    {contract.startDate && <InfoPair label="Start" value={format(new Date(contract.startDate), "dd MMM yyyy")} />}
-                                    {contract.endDate && <InfoPair label="End" value={format(new Date(contract.endDate), "dd MMM yyyy")} />}
-                                  </div>
-                                  {contract.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{contract.notes}</p>}
-                                </div>
-                                <Link href="/service-contracts">
-                                  <Button variant="outline" size="sm" className="text-xs shrink-0">
-                                    <ExternalLink className="mr-1 h-3 w-3" />View / Edit
-                                  </Button>
-                                </Link>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+                {/* ── Contract Type Picker ── */}
+                <Dialog open={showContractPicker} onOpenChange={setShowContractPicker}>
+                  <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle>New Contract</DialogTitle>
+                      <DialogDescription>Choose the type of contract to create.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 gap-3 pt-2">
+                      <button
+                        onClick={() => { setShowContractPicker(false); window.location.href = newContractUrl(); }}
+                        className="flex items-center gap-4 p-4 border-2 border-blue-100 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left group"
+                      >
+                        <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                          <Wrench className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">Service Contract</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Recurring visits — pest control, washroom, hygiene</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
+                      </button>
+                      <button
+                        onClick={() => { setShowContractPicker(false); setEditingRental(null); setIsRentalFormOpen(true); }}
+                        className="flex items-center gap-4 p-4 border-2 border-purple-100 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-colors text-left group"
+                      >
+                        <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                          <Package className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">Rental Contract</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Equipment rentals — aerosol units, sanitary bins</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
+                      </button>
                     </div>
-                  </div>
-                )}
+                  </DialogContent>
+                </Dialog>
 
-                {clientContracts.length === 0 && clientRentalContracts.length === 0 && (
-                  <Card><CardContent className="py-8 text-center text-muted-foreground">No contracts for this client yet.</CardContent></Card>
-                )}
+                {/* ── Rental Contract Form ── */}
+                <Dialog open={isRentalFormOpen} onOpenChange={open => { setIsRentalFormOpen(open); if (!open) setEditingRental(null); }}>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{editingRental ? "Edit Rental Contract" : "New Rental Contract"}</DialogTitle>
+                      <DialogDescription>
+                        {editingRental ? "Update the rental contract details." : "Fill in the details to create a new rental contract."}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ContractForm
+                      contract={editingRental}
+                      defaultClientId={id}
+                      onSuccess={() => { setIsRentalFormOpen(false); setEditingRental(null); }}
+                      onCancel={() => { setIsRentalFormOpen(false); setEditingRental(null); }}
+                    />
+                  </DialogContent>
+                </Dialog>
               </TabsContent>
 
               {/* ═══════════════════ INVOICES ════════════════════════════ */}
