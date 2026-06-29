@@ -97,7 +97,10 @@ export const inventoryItems = pgTable("inventory_items", {
 export const rentalContracts = pgTable("rental_contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull(),
-  inventoryItemId: varchar("inventory_item_id").notNull(),
+  customerName: text("customer_name"),
+  departmentId: varchar("department_id"),
+  // Legacy single-item field — kept for backward compatibility; new contracts use rentalContractItems
+  inventoryItemId: varchar("inventory_item_id"),
   // Legacy field — kept for backward compatibility
   monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
   // Structured pricing fields
@@ -105,12 +108,46 @@ export const rentalContracts = pgTable("rental_contracts", {
   quantity: integer("quantity").default(1),
   billingFrequency: text("billing_frequency").default("monthly"),
   calculatedTotal: decimal("calculated_total", { precision: 10, scale: 2 }),
+  // Contract dates
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
+  lastPriceIncreaseDate: timestamp("last_price_increase_date"),
+  nextIncreaseDate: timestamp("next_increase_date"),
+  increasePercentage: text("increase_percentage"),
+  // Legacy column alias
   lastPriceIncrease: timestamp("last_price_increase"),
   isActive: boolean("is_active").notNull().default(true),
+  activeStatus: boolean("active_status").notNull().default(true),
   notes: text("notes"),
   contractNumber: text("contract_number"),
+  // Scheduling
+  frequency: text("frequency"),
+  weekOfMonth: integer("week_of_month"),
+  dayOfWeek: text("day_of_week"),
+  startTime: text("start_time"),
+  estimatedDuration: integer("estimated_duration"),
+  assignedTeamId: varchar("assigned_team_id"),
+  assignedTeamName: text("assigned_team_name"),
+  assignedTechnicianId: varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  routeSequence: integer("route_sequence"),
+  fixedTime: boolean("fixed_time").default(false),
+  invoiceRule: text("invoice_rule"),
+  address: text("address"),
+  googleMapsLink: text("google_maps_link"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const rentalContractItems = pgTable("rental_contract_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  rentalContractId: varchar("rental_contract_id").notNull(),
+  clientId: varchar("client_id").notNull(),
+  itemName: text("item_name").notNull(),
+  refillRule: text("refill_rule").default("Not Applicable"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
+  notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -309,6 +346,14 @@ export const insertRentalContractSchema = createInsertSchema(rentalContracts).om
   createdAt: true,
   contractNumber: true,
 });
+
+export const insertRentalContractItemSchema = createInsertSchema(rentalContractItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type RentalContractItem = typeof rentalContractItems.$inferSelect;
+export type InsertRentalContractItem = z.infer<typeof insertRentalContractItemSchema>;
 
 export const contractDeletionHistory = pgTable("contract_deletion_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

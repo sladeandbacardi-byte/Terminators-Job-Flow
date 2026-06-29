@@ -1,0 +1,355 @@
+BUG FIX: Rental Contract scheduling and calendar visibility
+
+Feedback from service user Mariette Koekemoer:
+
+She successfully loaded Greenacres Restaurant as a new client.
+
+She loaded these rental/service items:
+- Aerosol A/F Unit – including refills
+- Aerosol A/F Unit – excluding refills
+- Aerosol Refill
+
+But when she creates a new rental contract:
+1. The form does not give her the option to choose:
+   - start date
+   - end date
+   - last price increase / increase date
+2. The date picker only shows June’s calendar.
+3. Even if she selects 29 June 2026, the rental contract does not show on the Calendar.
+
+Please fix rental contracts end to end.
+
+IMPORTANT CONCEPT
+
+Rental contracts must behave like service contracts where scheduling is required.
+
+Rental contracts must save to PostgreSQL and link to the central client record using clientId.
+
+Do not create a separate duplicate client record.
+
+PART 1: RENTAL CONTRACT FORM FIELDS
+
+Update the Rental Contract form to include these sections:
+
+1. Client Details
+2. Rental Items / Service Lines
+3. Contract Dates
+4. Scheduling
+5. Pricing / Invoicing
+6. Notes
+
+Required fields:
+
+- clientId
+- clientName
+- rentalContractNumber
+- contractStartDate
+- contractEndDate
+- lastPriceIncreaseDate
+- nextIncreaseDate
+- increasePercentage
+- activeStatus
+- frequency
+- weekOfMonth
+- dayOfWeek
+- startTime
+- estimatedDuration
+- assignedTeam
+- assignedTechnician
+- routeSequence
+- fixedTime
+- invoiceRule
+- notes
+
+CONTRACT DATE FIELDS
+
+Add these visible fields to the rental contract form:
+
+- Contract Start Date
+- Contract End Date
+- Last Price Increase Date
+- Next Increase Date
+- Increase Percentage
+
+These must save to PostgreSQL.
+
+They must appear again when editing the rental contract.
+
+Do not hide them behind advanced settings.
+
+PART 2: RENTAL ITEMS / SERVICE LINES
+
+Rental contracts must allow multiple rental items/service lines.
+
+Add a section called:
+
+Rental Items
+
+Each line item must include:
+
+- itemName
+- refillRule
+- quantity
+- unitPrice
+- totalPrice
+- notes
+
+Refill Rule options:
+
+- Including Refills
+- Excluding Refills
+- Refill Only
+- On Demand Refills
+- Not Applicable
+
+Example item names:
+
+- Aerosol A/F Unit
+- Aerosol Refill
+- Soap Dispenser
+- Paper Towel Dispenser
+- Toilet Roll Dispenser
+- Sanitary Bin
+- Urinal Mat
+- Other
+
+The user must be able to add multiple lines, for example:
+
+1. Aerosol A/F Unit – Including Refills
+2. Aerosol A/F Unit – Excluding Refills
+3. Aerosol Refill
+
+Do not force the user to create a separate client for each item.
+
+All rental items must belong to the same rental contract and same clientId.
+
+PART 3: DATE PICKER BUG
+
+Fix the date picker.
+
+The date picker must allow the user to choose any valid date, not only dates in June.
+
+The user must be able to navigate months and years.
+
+Test specifically:
+- 29 June 2026
+- July 2026
+- August 2026
+- January 2027
+
+If the date picker is restricted by min/max date, remove the incorrect restriction.
+
+If the field is using current month only, fix it.
+
+PART 4: CALENDAR VISIBILITY
+
+Rental contracts with a schedule must appear on the Service Calendar.
+
+The calendar must display:
+
+- once-off jobs
+- service contracts
+- rental contracts
+
+Rental contracts must appear on the calendar when:
+- activeStatus = Active
+- contractStartDate is on or before the calendar date
+- contractEndDate is blank or on/after the calendar date
+- the schedule rule matches the calendar date
+
+Rental contracts must use the same scheduling logic as service contracts:
+
+Frequency options:
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+- On Demand
+
+Week of Month options:
+- Every Week
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Last Week
+
+Day of Week options:
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+If Frequency = On Demand:
+Do not automatically show on the calendar.
+
+If Frequency = Once-off:
+Show on the selected job/contract date.
+
+PART 5: SCHEDULE SUMMARY
+
+Every rental contract must generate a readable schedule summary.
+
+Examples:
+
+Monthly - Week 1 Monday at 08:00 - Route 1
+Weekly - Every Tuesday at 10:00
+2 x a week - Monday and Thursday at 08:00
+On Demand - Create job only when requested
+
+Show the schedule summary on:
+- Rental Contracts list
+- Client Profile > Contracts tab
+- Rental Contract detail page
+- Calendar occurrence detail
+
+PART 6: CLIENT PROFILE
+
+The rental contract must appear under:
+
+Client Profile > Contracts
+
+For each rental contract card/row, show:
+
+- Rental Contract Number
+- Rental Items summary
+- Frequency
+- Schedule Summary
+- Contract Start Date
+- Contract End Date
+- Last Price Increase Date
+- Next Increase Date
+- Increase Percentage
+- Price / Total
+- Status
+- View/Edit button
+
+For Greenacres Restaurant, after saving, the client profile must show the loaded rental contract and rental items.
+
+PART 7: POSTGRESQL / SCHEMA
+
+Make sure all new rental contract fields exist in:
+
+1. Drizzle schema
+2. PostgreSQL table/migration
+3. API insert/update/select logic
+4. frontend form state
+5. backup export
+6. Data Integrity checks
+
+Required PostgreSQL persistence:
+
+Rental contracts:
+- contractStartDate
+- contractEndDate
+- lastPriceIncreaseDate
+- nextIncreaseDate
+- increasePercentage
+- frequency
+- weekOfMonth
+- dayOfWeek
+- startTime
+- estimatedDuration
+- assignedTeam
+- assignedTechnician
+- routeSequence
+- fixedTime
+- invoiceRule
+- activeStatus
+- notes
+
+Rental items:
+- rentalContractId
+- clientId
+- itemName
+- refillRule
+- quantity
+- unitPrice
+- totalPrice
+- notes
+
+PART 8: ERROR HANDLING
+
+If the rental contract fails to save, do not silently close or show success.
+
+Show a clear error toast.
+
+If required fields are missing, show field-level validation.
+
+Do not show "saved successfully" unless:
+- rental contract saved to PostgreSQL
+- rental items saved to PostgreSQL
+- rental contract has valid clientId
+- rental contract can be refetched
+- rental contract appears under Client Profile > Contracts
+- rental contract appears in Rental Contracts list
+- rental contract appears on Calendar if scheduled
+
+PART 9: TEST USING MARIETTE'S EXAMPLE
+
+Run this exact test:
+
+1. Log in as Mariette Koekemoer / Hygiene Services Manager.
+2. Open or create client:
+   Greenacres Restaurant
+3. Create a new rental contract.
+4. Add rental items:
+   - Aerosol A/F Unit – Including Refills
+   - Aerosol A/F Unit – Excluding Refills
+   - Aerosol Refill
+5. Set Contract Start Date:
+   29 June 2026
+6. Set Contract End Date:
+   29 June 2027
+7. Set Last Price Increase Date:
+   29 June 2026
+8. Set Next Increase Date:
+   29 June 2027
+9. Set Frequency:
+   Monthly
+10. Set Week of Month:
+   Last Week
+11. Set Day of Week:
+   Monday
+12. Set Start Time:
+   08:00
+13. Save.
+14. Confirm success toast.
+15. Confirm it appears in Rental Contracts list.
+16. Confirm it appears under Greenacres Restaurant > Contracts.
+17. Open Calendar on 29 June 2026.
+18. Confirm the rental contract appears.
+19. Refresh page.
+20. Confirm everything is still saved.
+21. Restart server if possible.
+22. Confirm everything is still saved.
+
+PART 10: DATA INTEGRITY CHECK
+
+Update Admin > Data Integrity.
+
+Add checks:
+
+- Rental contracts missing clientId
+- Rental contracts missing start date
+- Active rental contracts missing frequency
+- Scheduled rental contracts missing schedule fields
+- Rental items missing rentalContractId
+- Rental items missing clientId
+- Rental contracts not appearing on calendar when scheduled
+- Rental contracts with date picker invalid dates
+
+IMPORTANT
+
+This is a real user issue from service admin.
+
+Do not continue adding new features until rental contract start date, end date, increase date, rental items and calendar visibility work properly.

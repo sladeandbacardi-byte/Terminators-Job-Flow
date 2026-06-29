@@ -638,6 +638,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(contracts);
   });
 
+  app.get("/api/contracts/deletion-history", async (_req, res) => {
+    const history = await storage.getContractDeletionHistory();
+    res.json(history);
+  });
+
   app.get("/api/contracts/:id", async (req, res) => {
     const contract = await storage.getRentalContract(req.params.id);
     if (!contract) {
@@ -658,16 +663,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = {
         ...req.body,
-        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
-        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
-        lastPriceIncrease: req.body.lastPriceIncrease ? new Date(req.body.lastPriceIncrease) : undefined,
+        startDate:            req.body.startDate            ? new Date(req.body.startDate)            : undefined,
+        endDate:              req.body.endDate              ? new Date(req.body.endDate)              : undefined,
+        lastPriceIncrease:    req.body.lastPriceIncrease    ? new Date(req.body.lastPriceIncrease)    : undefined,
+        lastPriceIncreaseDate:req.body.lastPriceIncreaseDate? new Date(req.body.lastPriceIncreaseDate): undefined,
+        nextIncreaseDate:     req.body.nextIncreaseDate     ? new Date(req.body.nextIncreaseDate)     : undefined,
+        // inventoryItemId is now optional
+        inventoryItemId: req.body.inventoryItemId || null,
       };
       const contract = insertRentalContractSchema.parse(data);
       const created = await storage.createRentalContract(contract);
+
+      // Save line items if provided
+      const items: any[] = req.body.items ?? [];
+      for (const item of items) {
+        if (!item.itemName) continue;
+        await storage.createRentalContractItem({
+          rentalContractId: created.id,
+          clientId: created.clientId,
+          itemName: item.itemName,
+          refillRule: item.refillRule ?? "Not Applicable",
+          quantity: Number(item.quantity) || 1,
+          unitPrice: item.unitPrice ?? null,
+          totalPrice: item.totalPrice ?? null,
+          notes: item.notes ?? null,
+        });
+      }
+
       res.status(201).json(created);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Contract creation error:", error);
-      res.status(400).json({ error: "Invalid rental contract data" });
+      res.status(400).json({ error: "Invalid rental contract data", details: error?.message });
     }
   });
 
@@ -675,22 +701,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = {
         ...req.body,
-        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
-        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
-        lastPriceIncrease: req.body.lastPriceIncrease ? new Date(req.body.lastPriceIncrease) : undefined,
+        startDate:            req.body.startDate            ? new Date(req.body.startDate)            : undefined,
+        endDate:              req.body.endDate              ? new Date(req.body.endDate)              : undefined,
+        lastPriceIncrease:    req.body.lastPriceIncrease    ? new Date(req.body.lastPriceIncrease)    : undefined,
+        lastPriceIncreaseDate:req.body.lastPriceIncreaseDate? new Date(req.body.lastPriceIncreaseDate): undefined,
+        nextIncreaseDate:     req.body.nextIncreaseDate     ? new Date(req.body.nextIncreaseDate)     : undefined,
+        inventoryItemId: req.body.inventoryItemId || null,
       };
       const updateData = insertRentalContractSchema.partial().parse(data);
       const updated = await storage.updateRentalContract(req.params.id, updateData);
+
+      // Replace line items if provided
+      if (Array.isArray(req.body.items)) {
+        await storage.deleteRentalContractItemsByContract(req.params.id);
+        for (const item of req.body.items) {
+          if (!item.itemName) continue;
+          await storage.createRentalContractItem({
+            rentalContractId: req.params.id,
+            clientId: updated.clientId,
+            itemName: item.itemName,
+            refillRule: item.refillRule ?? "Not Applicable",
+            quantity: Number(item.quantity) || 1,
+            unitPrice: item.unitPrice ?? null,
+            totalPrice: item.totalPrice ?? null,
+            notes: item.notes ?? null,
+          });
+        }
+      }
+
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Contract update error:", error);
-      res.status(400).json({ error: "Invalid rental contract data" });
+      res.status(400).json({ error: "Invalid rental contract data", details: error?.message });
     }
   });
 
-  app.get("/api/contracts/deletion-history", async (_req, res) => {
-    const history = await storage.getContractDeletionHistory();
-    res.json(history);
+  // Rental contract items
+  app.get("/api/contracts/:id/items", requireAuth, async (req, res) => {
+    try { res.json(await storage.getRentalContractItems(req.params.id)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.post("/api/contracts/:id/items", requireAuth, async (req, res) => {
+    try {
+      const contract = await storage.getRentalContract(req.params.id);
+      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      const item = await storage.createRentalContractItem({ ...req.body, rentalContractId: req.params.id, clientId: contract.clientId });
+      res.status(201).json(item);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.delete("/api/contract-items/:itemId", requireAuth, async (req, res) => {
+    try { res.json({ success: await storage.deleteRentalContractItem(req.params.itemId) }); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
   app.delete("/api/contracts/:id", async (req, res) => {

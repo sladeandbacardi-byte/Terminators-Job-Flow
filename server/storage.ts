@@ -97,6 +97,13 @@ export interface IStorage {
   logContractDeletion(entry: Omit<import("@shared/schema").ContractDeletionHistory, "id" | "deletedAt">): Promise<import("@shared/schema").ContractDeletionHistory>;
   getContractDeletionHistory(): Promise<import("@shared/schema").ContractDeletionHistory[]>;
 
+  // Rental Contract Items
+  getRentalContractItems(rentalContractId: string): Promise<import("@shared/schema").RentalContractItem[]>;
+  createRentalContractItem(item: import("@shared/schema").InsertRentalContractItem): Promise<import("@shared/schema").RentalContractItem>;
+  updateRentalContractItem(id: string, item: Partial<import("@shared/schema").InsertRentalContractItem>): Promise<import("@shared/schema").RentalContractItem>;
+  deleteRentalContractItem(id: string): Promise<boolean>;
+  deleteRentalContractItemsByContract(rentalContractId: string): Promise<boolean>;
+
   // Jobs
   getJobs(): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
@@ -2744,6 +2751,13 @@ export class MemStorage implements IStorage {
   async getContractDeletionHistory(): Promise<import("@shared/schema").ContractDeletionHistory[]> {
     return [];
   }
+
+  // Rental Contract Items (MemStorage stubs — production uses DbStorage)
+  async getRentalContractItems(_rentalContractId: string) { return []; }
+  async createRentalContractItem(_item: import("@shared/schema").InsertRentalContractItem): Promise<import("@shared/schema").RentalContractItem> { throw new Error("Use DbStorage"); }
+  async updateRentalContractItem(_id: string, _item: any): Promise<import("@shared/schema").RentalContractItem> { throw new Error("Use DbStorage"); }
+  async deleteRentalContractItem(_id: string) { return false; }
+  async deleteRentalContractItemsByContract(_rentalContractId: string) { return false; }
 
   // Jobs
   async getJobs(): Promise<Job[]> {

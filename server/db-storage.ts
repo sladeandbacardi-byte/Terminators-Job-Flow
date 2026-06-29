@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 
 import {
-  users, departments, workers, clients, inventoryItems, rentalContracts,
+  users, departments, workers, clients, inventoryItems, rentalContracts, rentalContractItems,
   jobs, invoices, invoiceItems, jobInventoryItems, notifications,
   emailTemplates, emailLogs, suppliers, purchaseOrders, purchaseOrderItems,
   calendarEvents, customReports, quoteSubmissions, pricingLibrary, salesFollowUps,
@@ -683,6 +683,33 @@ export class DbStorage implements IStorage {
   async deleteRentalContract(id: string): Promise<boolean> {
     const r = await db.delete(rentalContracts).where(eq(rentalContracts.id, id));
     return (r.rowCount ?? 0) > 0;
+  }
+
+  // ─── Rental Contract Items ────────────────────────────────────────────────
+
+  async getRentalContractItems(rentalContractId: string) {
+    return db.select().from(rentalContractItems).where(eq(rentalContractItems.rentalContractId, rentalContractId));
+  }
+
+  async createRentalContractItem(item: import("@shared/schema").InsertRentalContractItem) {
+    const [row] = await db.insert(rentalContractItems).values({ id: randomUUID(), ...item, createdAt: new Date() }).returning();
+    return row;
+  }
+
+  async updateRentalContractItem(id: string, item: Partial<import("@shared/schema").InsertRentalContractItem>) {
+    const [row] = await db.update(rentalContractItems).set(item).where(eq(rentalContractItems.id, id)).returning();
+    if (!row) throw new Error("Rental contract item not found");
+    return row;
+  }
+
+  async deleteRentalContractItem(id: string) {
+    const r = await db.delete(rentalContractItems).where(eq(rentalContractItems.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  async deleteRentalContractItemsByContract(rentalContractId: string) {
+    await db.delete(rentalContractItems).where(eq(rentalContractItems.rentalContractId, rentalContractId));
+    return true;
   }
 
   // ─── Jobs ────────────────────────────────────────────────────────────────
@@ -1770,15 +1797,77 @@ export class DbStorage implements IStorage {
   }
 
   async getContractOccurrences(start: Date, end: Date, opts?: { departmentId?: string; technicianId?: string; teamId?: string }): Promise<ContractOccurrence[]> {
+    // ── Service contracts ────────────────────────────────────────────────────
     let q = db.select().from(serviceContracts).where(eq(serviceContracts.activeStatus, true));
     if (opts?.departmentId) q = (q as any).where(and(eq(serviceContracts.activeStatus, true), eq(serviceContracts.departmentId, opts.departmentId)));
-    const contracts = await q;
+    const svcContracts = await q;
     let results: ContractOccurrence[] = [];
-    for (const c of contracts) {
+    for (const c of svcContracts) {
       if (opts?.technicianId && c.assignedTechnicianId !== opts.technicianId) continue;
       if (opts?.teamId && c.assignedTeamId !== opts.teamId) continue;
       results.push(...expandContract(c, start, end));
     }
+
+    // ── Rental contracts (those with a schedule frequency set) ────────────────
+    const rcs = await db.select().from(rentalContracts).where(
+      and(eq(rentalContracts.activeStatus, true), isNotNull(rentalContracts.frequency))
+    );
+    for (const rc of rcs) {
+      if (!rc.frequency || rc.frequency === "On Demand") continue;
+      if (opts?.departmentId && rc.departmentId && rc.departmentId !== opts.departmentId) continue;
+      if (opts?.technicianId && rc.assignedTechnicianId !== opts.technicianId) continue;
+      if (opts?.teamId && rc.assignedTeamId !== opts.teamId) continue;
+      // Shape rental contract into ServiceContract-compatible object for expander
+      const shaped = {
+        id: rc.id,
+        clientId: rc.clientId,
+        customerName: rc.customerName ?? "",
+        departmentId: rc.departmentId ?? "div-2", // default Sanitary/Hygiene
+        serviceType: "rental",
+        assignedTechnicianId: rc.assignedTechnicianId ?? null,
+        assignedTechnicianName: rc.assignedTechnicianName ?? null,
+        assignedTeamId: rc.assignedTeamId ?? null,
+        assignedTeamName: rc.assignedTeamName ?? null,
+        frequency: rc.frequency,
+        weekOfMonth: rc.weekOfMonth ?? null,
+        dayOfWeek: rc.dayOfWeek ?? null,
+        secondWeekOfMonth: null,
+        secondDayOfWeek: null,
+        secondStartTime: null,
+        annualMonth: null,
+        startDate: rc.startDate,
+        endDate: rc.endDate ?? null,
+        startTime: rc.startTime ?? null,
+        estimatedDuration: rc.estimatedDuration ?? null,
+        googleMapsLink: rc.googleMapsLink ?? null,
+        address: rc.address ?? null,
+        notes: rc.notes ?? null,
+        contractPrice: rc.calculatedTotal ?? null,
+        activeStatus: rc.activeStatus ?? true,
+        isServiceContract: false,
+        isRentalContract: true,
+        increaseDate: null,
+        increasePercentage: null,
+        routeOrder: rc.routeSequence ?? null,
+        contractNumber: rc.contractNumber ?? null,
+        ppu: null,
+        fixedTime: rc.fixedTime ?? false,
+        invoiceRule: rc.invoiceRule ?? null,
+        mustBeInvoiced: true,
+        financeNotes: null,
+        stockTrackingRequired: false,
+        refillRule: null,
+        stockNotes: null,
+        confirmWithClient: false,
+        createdAt: rc.createdAt,
+        updatedAt: rc.createdAt,
+        invoicingFrequency: null,
+      };
+      const occs = expandContract(shaped as any, start, end);
+      // Prefix rental occurrences with 'rc-occ-' to distinguish from service contract ones
+      results.push(...occs.map(o => ({ ...o, id: o.id.replace(/^occ-/, "rc-occ-"), serviceType: "rental" })));
+    }
+
     results.sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime());
     return results;
   }

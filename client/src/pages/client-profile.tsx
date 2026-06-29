@@ -187,15 +187,16 @@ export default function ClientProfilePage() {
     enabled: !!id,
   });
 
-  const { data: allJobs = [] }       = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
-  const { data: allInvoices = [] }   = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
-  const { data: allContracts = [] }  = useQuery<ServiceContract[]>({ queryKey: ["/api/service-contracts"] });
-  const { data: allQuotes = [] }     = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
-  const { data: departments = [] }   = useQuery<Department[]>({ queryKey: ["/api/departments"] });
-  const { data: allWorkers = [] }    = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
-  const { data: allClients = [] }    = useQuery<Client[]>({ queryKey: ["/api/clients"] });
-  const { data: allInventory = [] }  = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
-  const { data: allJobInv = [] }     = useQuery<JobInventoryItem[]>({ queryKey: ["/api/job-inventory"] });
+  const { data: allJobs = [] }        = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
+  const { data: allInvoices = [] }    = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: allContracts = [] }   = useQuery<ServiceContract[]>({ queryKey: ["/api/service-contracts"] });
+  const { data: allRentalContracts = [] } = useQuery<any[]>({ queryKey: ["/api/contracts"] });
+  const { data: allQuotes = [] }      = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
+  const { data: departments = [] }    = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: allWorkers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
+  const { data: allClients = [] }     = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+  const { data: allInventory = [] }   = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
+  const { data: allJobInv = [] }      = useQuery<JobInventoryItem[]>({ queryKey: ["/api/job-inventory"] });
 
   const { data: treatmentRpts = [] } = useQuery<TreatmentReport[]>({
     queryKey: ["/api/treatment-reports", id],
@@ -211,9 +212,10 @@ export default function ClientProfilePage() {
 
   // ── Derived lists ───────────────────────────────────────────────────────
 
-  const clientJobs      = allJobs.filter(j => j.clientId === id);
-  const clientInvoices  = allInvoices.filter(i => i.clientId === id);
-  const clientContracts = allContracts.filter(c => c.clientId === id);
+  const clientJobs          = allJobs.filter(j => j.clientId === id);
+  const clientInvoices      = allInvoices.filter(i => i.clientId === id);
+  const clientContracts     = allContracts.filter(c => c.clientId === id);
+  const clientRentalContracts = allRentalContracts.filter((c: any) => c.clientId === id);
   const clientQuotes    = allQuotes.filter(q =>
     q.clientId === id ||
     (client && q.companyName?.toLowerCase() === client.name?.toLowerCase())
@@ -575,72 +577,134 @@ export default function ClientProfilePage() {
               <TabsContent value="contracts" className="mt-4">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-muted-foreground">
-                    {clientContracts.length} contract{clientContracts.length !== 1 ? "s" : ""}
+                    {clientContracts.length + clientRentalContracts.length} contract{(clientContracts.length + clientRentalContracts.length) !== 1 ? "s" : ""}
                     {activeContractCount > 0 && ` · ${activeContractCount} active`}
                   </span>
-                  <Link href={newContractUrl()}>
-                    <Button size="sm" variant="outline" className="gap-1">
-                      <Plus className="h-3.5 w-3.5" />New Contract
-                    </Button>
-                  </Link>
-                </div>
-                {clientContracts.length === 0 ? (
-                  <Card><CardContent className="py-8 text-center text-muted-foreground">No service contracts for this client.</CardContent></Card>
-                ) : (
-                  <div className="space-y-3">
-                    {clientContracts.map(contract => {
-                      const schedule = [
-                        contract.frequency,
-                        contract.dayOfWeek,
-                        contract.weekOfMonth ? `Week ${contract.weekOfMonth}` : undefined,
-                        contract.startTime ? `@ ${contract.startTime}` : undefined,
-                      ].filter(Boolean).join(" · ");
-                      return (
-                        <Card key={contract.id}>
-                          <CardContent className="pt-4">
-                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0 space-y-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {contract.contractNumber && (
-                                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{contract.contractNumber}</span>
-                                  )}
-                                  <span className="font-semibold text-sm">{contract.serviceType}</span>
-                                  <Badge className={contract.activeStatus ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}>
-                                    {contract.activeStatus ? "Active" : "Inactive"}
-                                  </Badge>
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-0.5 text-xs text-muted-foreground">
-                                  <InfoPair label="Department" value={getDeptName(contract.departmentId)} />
-                                  {schedule && <InfoPair label="Schedule" value={schedule} className="col-span-2" />}
-                                  {(contract.assignedTeamName || contract.assignedTechnicianName) && (
-                                    <InfoPair label="Assigned" value={contract.assignedTeamName || contract.assignedTechnicianName} className="col-span-2" />
-                                  )}
-                                  {contract.contractPrice && <InfoPair label="Price" value={`R${Number(contract.contractPrice).toFixed(2)}`} />}
-                                  {contract.estimatedDuration && <InfoPair label="Duration" value={`${contract.estimatedDuration} min`} />}
-                                  {contract.startDate && <InfoPair label="Start" value={format(new Date(contract.startDate), "dd MMM yyyy")} />}
-                                  {contract.endDate && <InfoPair label="End" value={format(new Date(contract.endDate), "dd MMM yyyy")} />}
-                                  {contract.increaseDate && (
-                                    <InfoPair
-                                      label="Increase Date"
-                                      value={`${format(new Date(contract.increaseDate), "dd MMM yyyy")}${contract.increasePercentage ? ` (${contract.increasePercentage}%)` : ""}`}
-                                    />
-                                  )}
-                                </div>
-                                {contract.notes && (
-                                  <p className="text-xs text-muted-foreground border-t pt-2">{contract.notes}</p>
-                                )}
-                              </div>
-                              <Link href="/service-contracts">
-                                <Button variant="outline" size="sm" className="text-xs shrink-0">
-                                  <ExternalLink className="mr-1 h-3 w-3" />View / Edit
-                                </Button>
-                              </Link>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                  <div className="flex gap-2">
+                    <Link href={newContractUrl()}>
+                      <Button size="sm" variant="outline" className="gap-1">
+                        <Plus className="h-3.5 w-3.5" />Service Contract
+                      </Button>
+                    </Link>
+                    <Link href="/contracts">
+                      <Button size="sm" variant="outline" className="gap-1">
+                        <Plus className="h-3.5 w-3.5" />Rental Contract
+                      </Button>
+                    </Link>
                   </div>
+                </div>
+
+                {/* ── Rental Contracts ──────────────────────────────────── */}
+                {clientRentalContracts.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Package className="h-3.5 w-3.5" /> Rental Contracts ({clientRentalContracts.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {clientRentalContracts.map((rc: any) => {
+                        const schedule = [
+                          rc.frequency,
+                          rc.dayOfWeek,
+                          rc.weekOfMonth ? `Week ${rc.weekOfMonth}` : undefined,
+                          rc.startTime ? `@ ${rc.startTime}` : undefined,
+                        ].filter(Boolean).join(" · ");
+                        return (
+                          <Card key={rc.id} className="border-purple-100">
+                            <CardContent className="pt-3 pb-3">
+                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {rc.contractNumber && (
+                                      <span className="font-mono text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">{rc.contractNumber}</span>
+                                    )}
+                                    <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">Rental</Badge>
+                                    <Badge className={rc.isActive || rc.activeStatus ? "bg-green-100 text-green-800 text-xs" : "bg-gray-100 text-gray-600 text-xs"}>
+                                      {(rc.isActive || rc.activeStatus) ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                                    {rc.departmentId && <InfoPair label="Dept" value={getDeptName(rc.departmentId)} />}
+                                    {schedule && <InfoPair label="Schedule" value={schedule} className="col-span-2" />}
+                                    {(rc.assignedTeamName || rc.assignedTechnicianName) && (
+                                      <InfoPair label="Assigned" value={rc.assignedTeamName || rc.assignedTechnicianName} />
+                                    )}
+                                    {rc.calculatedTotal && <InfoPair label="Value" value={`R ${Number(rc.calculatedTotal).toFixed(2)}`} />}
+                                    {rc.startDate && <InfoPair label="Start" value={format(new Date(rc.startDate), "dd MMM yyyy")} />}
+                                    {rc.endDate && <InfoPair label="End" value={format(new Date(rc.endDate), "dd MMM yyyy")} />}
+                                  </div>
+                                  {rc.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{rc.notes}</p>}
+                                </div>
+                                <Link href="/contracts">
+                                  <Button variant="outline" size="sm" className="text-xs shrink-0">
+                                    <ExternalLink className="mr-1 h-3 w-3" />View / Edit
+                                  </Button>
+                                </Link>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Service Contracts ─────────────────────────────────── */}
+                {clientContracts.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5" /> Service Contracts ({clientContracts.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {clientContracts.map(contract => {
+                        const schedule = [
+                          contract.frequency,
+                          contract.dayOfWeek,
+                          contract.weekOfMonth ? `Week ${contract.weekOfMonth}` : undefined,
+                          contract.startTime ? `@ ${contract.startTime}` : undefined,
+                        ].filter(Boolean).join(" · ");
+                        return (
+                          <Card key={contract.id}>
+                            <CardContent className="pt-3 pb-3">
+                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {contract.contractNumber && (
+                                      <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{contract.contractNumber}</span>
+                                    )}
+                                    <span className="font-semibold text-sm">{contract.serviceType}</span>
+                                    <Badge className={contract.activeStatus ? "bg-green-100 text-green-800 text-xs" : "bg-gray-100 text-gray-600 text-xs"}>
+                                      {contract.activeStatus ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                                    <InfoPair label="Department" value={getDeptName(contract.departmentId)} />
+                                    {schedule && <InfoPair label="Schedule" value={schedule} className="col-span-2" />}
+                                    {(contract.assignedTeamName || contract.assignedTechnicianName) && (
+                                      <InfoPair label="Assigned" value={contract.assignedTeamName || contract.assignedTechnicianName} className="col-span-2" />
+                                    )}
+                                    {contract.contractPrice && <InfoPair label="Price" value={`R${Number(contract.contractPrice).toFixed(2)}`} />}
+                                    {contract.estimatedDuration && <InfoPair label="Duration" value={`${contract.estimatedDuration} min`} />}
+                                    {contract.startDate && <InfoPair label="Start" value={format(new Date(contract.startDate), "dd MMM yyyy")} />}
+                                    {contract.endDate && <InfoPair label="End" value={format(new Date(contract.endDate), "dd MMM yyyy")} />}
+                                  </div>
+                                  {contract.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{contract.notes}</p>}
+                                </div>
+                                <Link href="/service-contracts">
+                                  <Button variant="outline" size="sm" className="text-xs shrink-0">
+                                    <ExternalLink className="mr-1 h-3 w-3" />View / Edit
+                                  </Button>
+                                </Link>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {clientContracts.length === 0 && clientRentalContracts.length === 0 && (
+                  <Card><CardContent className="py-8 text-center text-muted-foreground">No contracts for this client yet.</CardContent></Card>
                 )}
               </TabsContent>
 
