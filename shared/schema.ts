@@ -1416,3 +1416,52 @@ export const equipmentChecklistItems = pgTable("equipment_checklist_items", {
 
 export type EquipmentChecklist = typeof equipmentChecklists.$inferSelect;
 export type EquipmentChecklistItem = typeof equipmentChecklistItems.$inferSelect;
+
+// ── Field Diaries ──────────────────────────────────────────────────────────────
+export const fieldDiaries = pgTable("field_diaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  diaryNumber: text("diary_number").notNull(),
+  jobId: varchar("job_id"),
+  jobNumber: text("job_number"),
+  clientId: varchar("client_id"),
+  clientName: text("client_name"),
+  workerId: varchar("worker_id"),
+  workerName: text("worker_name"),
+  departmentId: varchar("department_id"),
+  serviceDate: text("service_date"),
+  arrivalTime: text("arrival_time"),
+  departureTime: text("departure_time"),
+  workCompleted: text("work_completed"),
+  productsUsed: text("products_used"),
+  notes: text("notes"),
+  customerName: text("customer_name"),
+  customerSignature: text("customer_signature"),
+  technicianSignature: text("technician_signature"),
+  status: text("status").notNull().default("submitted"),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertFieldDiarySchema = createInsertSchema(fieldDiaries).omit({ id: true, createdAt: true });
+export type InsertFieldDiary = z.infer<typeof insertFieldDiarySchema>;
+export type FieldDiary = typeof fieldDiaries.$inferSelect;
+
+// ── Company Settings (singleton row id="singleton") ───────────────────────────
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id").primaryKey(),
+  companyName: text("company_name"),
+  tradingName: text("trading_name"),
+  vatNumber: text("vat_number"),
+  registrationNumber: text("registration_number"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  city: text("city"),
+  postalCode: text("postal_code"),
+  bankName: text("bank_name"),
+  bankAccount: text("bank_account"),
+  bankBranch: text("bank_branch"),
+  bankReference: text("bank_reference"),
+  defaultVatRate: text("default_vat_rate"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+export type CompanySettings = typeof companySettings.$inferSelect;

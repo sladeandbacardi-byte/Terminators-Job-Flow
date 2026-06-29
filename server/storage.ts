@@ -398,6 +398,20 @@ export interface IStorage {
   createAcceptedWorkflow(w: InsertAcceptedWorkflow): Promise<AcceptedWorkflow>;
   updateAcceptedWorkflow(id: string, w: Partial<InsertAcceptedWorkflow>): Promise<AcceptedWorkflow>;
   deleteAcceptedWorkflow(id: string): Promise<boolean>;
+
+  // Field Diaries
+  getFieldDiaries(): Promise<import("@shared/schema").FieldDiary[]>;
+  getFieldDiariesByJob(jobId: string): Promise<import("@shared/schema").FieldDiary[]>;
+  getFieldDiariesByWorker(workerId: string): Promise<import("@shared/schema").FieldDiary[]>;
+  getFieldDiary(id: string): Promise<import("@shared/schema").FieldDiary | undefined>;
+  createFieldDiary(d: import("@shared/schema").InsertFieldDiary): Promise<import("@shared/schema").FieldDiary>;
+  updateFieldDiary(id: string, d: Partial<import("@shared/schema").InsertFieldDiary>): Promise<import("@shared/schema").FieldDiary>;
+  deleteFieldDiary(id: string): Promise<boolean>;
+  generateFieldDiaryNumber(): Promise<string>;
+
+  // Company Settings
+  getCompanySettings(): Promise<import("@shared/schema").CompanySettings>;
+  updateCompanySettings(settings: Partial<import("@shared/schema").CompanySettings>): Promise<import("@shared/schema").CompanySettings>;
 }
 
 export interface BackupLog {
@@ -4987,6 +5001,22 @@ export class MemStorage implements IStorage {
   async createAcceptedWorkflow(_w: InsertAcceptedWorkflow): Promise<AcceptedWorkflow> { throw new Error("Use DbStorage for accepted workflows"); }
   async updateAcceptedWorkflow(_id: string, _w: Partial<InsertAcceptedWorkflow>): Promise<AcceptedWorkflow> { throw new Error("Use DbStorage for accepted workflows"); }
   async deleteAcceptedWorkflow(_id: string): Promise<boolean> { return false; }
+
+  // Field Diaries (MemStorage stubs — production uses DbStorage)
+  async getFieldDiaries() { return []; }
+  async getFieldDiariesByJob(_jobId: string) { return []; }
+  async getFieldDiariesByWorker(_workerId: string) { return []; }
+  async getFieldDiary(_id: string): Promise<import("@shared/schema").FieldDiary | undefined> { return undefined; }
+  async createFieldDiary(_d: import("@shared/schema").InsertFieldDiary): Promise<import("@shared/schema").FieldDiary> { throw new Error("Use DbStorage"); }
+  async updateFieldDiary(_id: string, _d: any): Promise<import("@shared/schema").FieldDiary> { throw new Error("Use DbStorage"); }
+  async deleteFieldDiary(_id: string) { return false; }
+  async generateFieldDiaryNumber() { return `FD-${new Date().getFullYear()}-0001`; }
+
+  // Company Settings (MemStorage stubs — production uses DbStorage)
+  async getCompanySettings(): Promise<import("@shared/schema").CompanySettings> {
+    return { id: "singleton", companyName: "The Terminators", tradingName: null, vatNumber: null, registrationNumber: null, phone: null, email: null, address: null, city: null, postalCode: null, bankName: null, bankAccount: null, bankBranch: null, bankReference: null, defaultVatRate: "15", updatedAt: new Date() };
+  }
+  async updateCompanySettings(_s: any): Promise<import("@shared/schema").CompanySettings> { throw new Error("Use DbStorage"); }
 
   async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {
     const contracts = Array.from(this.serviceContractsMap.values())

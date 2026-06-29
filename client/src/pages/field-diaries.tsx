@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   format, isToday, parseISO, addDays, subDays,
   startOfWeek, endOfWeek, addWeeks, subWeeks,
@@ -16,12 +17,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, User,
   Briefcase, CalendarDays, Phone, CheckCircle2, AlertCircle,
-  Circle, Loader2, X,
+  Circle, Loader2, X, PlusCircle, FileText, ClipboardList,
 } from "lucide-react";
-import type { Worker, Job, Client, Department } from "@shared/schema";
+import type { Worker, Job, Client, Department, FieldDiary } from "@shared/schema";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -563,6 +570,172 @@ function MonthView({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// ─── Submit Diary Modal ───────────────────────────────────────────────────────
+
+const EMPTY_DIARY = {
+  serviceDate: format(new Date(), "yyyy-MM-dd"),
+  arrivalTime: "",
+  departureTime: "",
+  workCompleted: "",
+  productsUsed: "",
+  customerName: "",
+  customerSignature: "",
+  notes: "",
+  jobId: "",
+  jobNumber: "",
+};
+
+function SubmitDiaryModal({
+  open, onClose, jobs, myWorker,
+}: {
+  open: boolean;
+  onClose: () => void;
+  jobs: Job[];
+  myWorker: Worker | null;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ ...EMPTY_DIARY });
+
+  const set = (f: keyof typeof EMPTY_DIARY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(prev => ({ ...prev, [f]: e.target.value }));
+
+  function onJobSelect(jobId: string) {
+    const job = jobs.find(j => j.id === jobId);
+    setForm(prev => ({
+      ...prev,
+      jobId,
+      jobNumber: job?.jobNumber ?? "",
+      serviceDate: job?.scheduledDate ? format(parseISO(job.scheduledDate as unknown as string), "yyyy-MM-dd") : prev.serviceDate,
+    }));
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/field-diaries", {
+      ...form,
+      workerId: myWorker?.id ?? null,
+      workerName: myWorker?.name ?? null,
+      clientId: jobs.find(j => j.id === form.jobId)?.clientId ?? null,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/field-diaries"] });
+      toast({ title: "Diary submitted", description: "Your field diary has been saved." });
+      setForm({ ...EMPTY_DIARY });
+      onClose();
+    },
+    onError: () => toast({ title: "Submit failed", description: "Could not save the diary. Please try again.", variant: "destructive" }),
+  });
+
+  const myJobs = myWorker
+    ? jobs.filter(j => j.workerId === myWorker.id).slice(0, 50)
+    : [];
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-green-600" />
+            Submit Field Diary
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Link to Job */}
+          <div className="space-y-1.5">
+            <Label>Link to Job (optional)</Label>
+            <Select value={form.jobId} onValueChange={onJobSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a job…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— No linked job —</SelectItem>
+                {myJobs.map(j => (
+                  <SelectItem key={j.id} value={j.id}>
+                    {j.jobNumber ? `${j.jobNumber} · ` : ""}{j.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>Service Date</Label>
+              <Input type="date" value={form.serviceDate} onChange={set("serviceDate")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Arrival Time</Label>
+              <Input type="time" value={form.arrivalTime} onChange={set("arrivalTime")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Departure Time</Label>
+              <Input type="time" value={form.departureTime} onChange={set("departureTime")} />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-1.5">
+            <Label>Work Completed <span className="text-red-500">*</span></Label>
+            <Textarea
+              rows={4}
+              value={form.workCompleted}
+              onChange={set("workCompleted")}
+              placeholder="Describe the work carried out on site…"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Products / Chemicals Used</Label>
+            <Textarea
+              rows={2}
+              value={form.productsUsed}
+              onChange={set("productsUsed")}
+              placeholder="e.g. Biflex SC 200ml, Rodex bait 50g…"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Additional Notes</Label>
+            <Textarea
+              rows={2}
+              value={form.notes}
+              onChange={set("notes")}
+              placeholder="Follow-up actions, observations…"
+            />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-1.5">
+            <Label>Customer Name</Label>
+            <Input value={form.customerName} onChange={set("customerName")} placeholder="Person on site" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Customer Signature</Label>
+            <Input value={form.customerSignature} onChange={set("customerSignature")} placeholder="Type full name to confirm" />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || !form.workCompleted.trim()}
+          >
+            {mutation.isPending
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</>
+              : <><FileText className="h-4 w-4 mr-2" />Submit Diary</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function FieldDiariesPage() {
   const { user } = useAuth();
   const dashboardRole = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
@@ -574,11 +747,13 @@ export default function FieldDiariesPage() {
   const [weekAnchor, setWeekAnchor]     = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [monthAnchor, setMonthAnchor]   = useState<Date>(startOfMonth(new Date()));
   const [deptFilter, setDeptFilter]     = useState<string>("all");
+  const [showDiaryModal, setShowDiaryModal] = useState(false);
 
   const { data: workers    = [] } = useQuery<Worker[]>    ({ queryKey: ["/api/workers"]     });
   const { data: jobs       = [] } = useQuery<Job[]>       ({ queryKey: ["/api/jobs"]        });
   const { data: clients    = [] } = useQuery<Client[]>    ({ queryKey: ["/api/clients"]     });
   const { data: departments= [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: diaries    = [] } = useQuery<FieldDiary[]>({ queryKey: ["/api/field-diaries"] });
 
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c    => [c.id, c])),    [clients]);
   const deptMap   = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d])), [departments]);
@@ -712,6 +887,15 @@ export default function FieldDiariesPage() {
                 </p>
               </div>
 
+              {/* Submit Diary button — always visible for staff with service role, also for managers */}
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white self-start"
+                onClick={() => setShowDiaryModal(true)}
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Submit Diary
+              </Button>
+
               {/* View toggle */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start">
                 {(["day", "week", "month"] as ViewMode[]).map(v => (
@@ -801,8 +985,69 @@ export default function FieldDiariesPage() {
             )}
 
           </div>
+
+          {/* ── Submitted Diaries list ── */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <FileText className="h-5 w-5 text-green-600" />
+                Submitted Diaries
+              </h2>
+              <span className="text-sm text-muted-foreground">{diaries.length} total</span>
+            </div>
+
+            {diaries.length === 0 ? (
+              <div className="rounded-lg border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+                No diaries submitted yet. Use "Submit Diary" to add your first entry.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {[...diaries].reverse().map(d => (
+                  <Card key={d.id} className="border shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="font-mono text-xs border-green-300 text-green-700">
+                              {d.diaryNumber ?? "FD-XXXX"}
+                            </Badge>
+                            {d.jobNumber && (
+                              <Badge variant="secondary" className="text-xs">{d.jobNumber}</Badge>
+                            )}
+                            <span className="text-sm font-medium">{d.workerName ?? "Unknown worker"}</span>
+                          </div>
+                          <p className="text-sm text-gray-700 line-clamp-2">{d.workCompleted}</p>
+                          {d.productsUsed && (
+                            <p className="text-xs text-muted-foreground">Products: {d.productsUsed}</p>
+                          )}
+                          {d.customerName && (
+                            <p className="text-xs text-muted-foreground">Signed by: {d.customerName}</p>
+                          )}
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground shrink-0 space-y-1">
+                          <div>{d.serviceDate ? format(parseISO(d.serviceDate as unknown as string), "d MMM yyyy") : "—"}</div>
+                          {d.arrivalTime && d.departureTime && (
+                            <div>{(d.arrivalTime as string).slice(0,5)} – {(d.departureTime as string).slice(0,5)}</div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
         </main>
       </div>
+
+      {/* Diary submission modal */}
+      <SubmitDiaryModal
+        open={showDiaryModal}
+        onClose={() => setShowDiaryModal(false)}
+        jobs={jobs}
+        myWorker={myWorker}
+      />
     </div>
   );
 }

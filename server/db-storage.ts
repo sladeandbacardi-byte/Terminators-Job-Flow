@@ -2058,4 +2058,65 @@ export class DbStorage implements IStorage {
     const res = await db.delete(inventoryItems);
     return res.rowCount ?? 0;
   }
+
+  async getFieldDiaries() {
+    const { fieldDiaries } = await import("@shared/schema");
+    return db.select().from(fieldDiaries).orderBy(desc(fieldDiaries.createdAt));
+  }
+  async getFieldDiariesByJob(jobId: string) {
+    const { fieldDiaries } = await import("@shared/schema");
+    return db.select().from(fieldDiaries).where(eq(fieldDiaries.jobId, jobId)).orderBy(desc(fieldDiaries.createdAt));
+  }
+  async getFieldDiariesByWorker(workerId: string) {
+    const { fieldDiaries } = await import("@shared/schema");
+    return db.select().from(fieldDiaries).where(eq(fieldDiaries.workerId, workerId)).orderBy(desc(fieldDiaries.createdAt));
+  }
+  async getFieldDiary(id: string) {
+    const { fieldDiaries } = await import("@shared/schema");
+    const [row] = await db.select().from(fieldDiaries).where(eq(fieldDiaries.id, id));
+    return row;
+  }
+  async createFieldDiary(d: import("@shared/schema").InsertFieldDiary) {
+    const { fieldDiaries } = await import("@shared/schema");
+    const [row] = await db.insert(fieldDiaries)
+      .values({ ...d, id: randomUUID(), submittedAt: new Date(), createdAt: new Date() })
+      .returning();
+    return row;
+  }
+  async updateFieldDiary(id: string, d: Partial<import("@shared/schema").InsertFieldDiary>) {
+    const { fieldDiaries } = await import("@shared/schema");
+    const [row] = await db.update(fieldDiaries).set(d).where(eq(fieldDiaries.id, id)).returning();
+    return row;
+  }
+  async deleteFieldDiary(id: string) {
+    const { fieldDiaries } = await import("@shared/schema");
+    const res = await db.delete(fieldDiaries).where(eq(fieldDiaries.id, id));
+    return (res.rowCount ?? 0) > 0;
+  }
+  async generateFieldDiaryNumber() {
+    const diaries = await this.getFieldDiaries();
+    const year = new Date().getFullYear();
+    return `FD-${year}-${String(diaries.length + 1).padStart(4, "0")}`;
+  }
+
+  async getCompanySettings() {
+    const { companySettings } = await import("@shared/schema");
+    const [row] = await db.select().from(companySettings).where(eq(companySettings.id, "singleton"));
+    if (!row) {
+      const [created] = await db.insert(companySettings)
+        .values({ id: "singleton", companyName: "The Terminators", defaultVatRate: "15", updatedAt: new Date() })
+        .returning();
+      return created;
+    }
+    return row;
+  }
+  async updateCompanySettings(settings: Partial<import("@shared/schema").CompanySettings>) {
+    const { companySettings } = await import("@shared/schema");
+    await this.getCompanySettings();
+    const [row] = await db.update(companySettings)
+      .set({ ...settings, id: "singleton", updatedAt: new Date() })
+      .where(eq(companySettings.id, "singleton"))
+      .returning();
+    return row;
+  }
 }

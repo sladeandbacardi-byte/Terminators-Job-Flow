@@ -4638,6 +4638,52 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
+  // ── Field Diaries ─────────────────────────────────────────────────────────
+  app.get("/api/field-diaries", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getFieldDiaries()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.get("/api/field-diaries/job/:jobId", requireAuth, async (req, res) => {
+    try { res.json(await storage.getFieldDiariesByJob(req.params.jobId)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.get("/api/field-diaries/worker/:workerId", requireAuth, async (req, res) => {
+    try { res.json(await storage.getFieldDiariesByWorker(req.params.workerId)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.get("/api/field-diaries/:id", requireAuth, async (req, res) => {
+    try {
+      const d = await storage.getFieldDiary(req.params.id);
+      if (!d) return res.status(404).json({ error: "Not found" });
+      res.json(d);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.post("/api/field-diaries", requireAuth, async (req, res) => {
+    try {
+      const diaryNumber = await storage.generateFieldDiaryNumber();
+      const diary = await storage.createFieldDiary({ ...req.body, diaryNumber });
+      res.status(201).json(diary);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.patch("/api/field-diaries/:id", requireAuth, async (req, res) => {
+    try { res.json(await storage.updateFieldDiary(req.params.id, req.body)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.delete("/api/field-diaries/:id", requireAuth, async (req, res) => {
+    try { res.json({ success: await storage.deleteFieldDiary(req.params.id) }); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Company Settings ──────────────────────────────────────────────────────
+  app.get("/api/settings/company", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getCompanySettings()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.patch("/api/settings/company", requireAuth, async (req, res) => {
+    try { res.json(await storage.updateCompanySettings(req.body)); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
   const httpServer = createServer(app);
 
   // ── Backup Scheduler ─────────────────────────────────────────────────────
