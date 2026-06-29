@@ -4799,5 +4799,207 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   }, 60_000);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOCK MANAGEMENT ROUTES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Seed default locations on first hit
+  (storage as any).seedDefaultStockLocations?.();
+
+  // ── Stock Locations ────────────────────────────────────────────────────────
+  app.get("/api/stock-locations", async (_req, res) => {
+    try { res.json(await (storage as any).getStockLocations()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/stock-locations", async (req, res) => {
+    try { res.status(201).json(await (storage as any).createStockLocation(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/stock-locations/:id", async (req, res) => {
+    try { res.json(await (storage as any).updateStockLocation(req.params.id, req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete("/api/stock-locations/:id", async (req, res) => {
+    try {
+      const ok = await (storage as any).deleteStockLocation(req.params.id);
+      res.json({ success: ok });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Stock Balances ──────────────────────────────────────────────────────────
+  app.get("/api/stock-balances", async (req, res) => {
+    try {
+      const { stockItemId, locationId } = req.query as Record<string, string>;
+      let data;
+      if (stockItemId) data = await (storage as any).getStockBalancesByItem(stockItemId);
+      else if (locationId) data = await (storage as any).getStockBalancesByLocation(locationId);
+      else data = await (storage as any).getStockBalances();
+      res.json(data);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Stock Movements ─────────────────────────────────────────────────────────
+  app.get("/api/stock-movements", async (req, res) => {
+    try {
+      const { stockItemId, jobId, clientId, technicianId, locationId } = req.query as Record<string, string>;
+      const filters = { stockItemId, jobId, clientId, technicianId, locationId };
+      res.json(await (storage as any).getStockMovements(filters));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/stock-movements", async (req, res) => {
+    try { res.status(201).json(await (storage as any).createStockMovement(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Transfer between locations (helper endpoint)
+  app.post("/api/stock-transfers", async (req, res) => {
+    try {
+      const { stockItemId, stockItemName, fromLocationId, fromLocationName, toLocationId, toLocationName, quantity, unitOfMeasure, notes, createdBy } = req.body;
+      const movement = await (storage as any).createStockMovement({
+        stockItemId, stockItemName,
+        movementType: "Transferred Between Locations",
+        fromLocationId, fromLocationName,
+        toLocationId, toLocationName,
+        quantity, unitOfMeasure, notes,
+        createdBy: createdBy ?? "System",
+      });
+      res.status(201).json(movement);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Picking Lists ───────────────────────────────────────────────────────────
+  app.get("/api/picking-lists", async (_req, res) => {
+    try { res.json(await (storage as any).getPickingLists()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/picking-lists/:id", async (req, res) => {
+    try {
+      const pl = await (storage as any).getPickingList(req.params.id);
+      if (!pl) return res.status(404).json({ error: "Not found" });
+      res.json(pl);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/picking-lists", async (req, res) => {
+    try { res.status(201).json(await (storage as any).createPickingList(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/picking-lists/:id", async (req, res) => {
+    try { res.json(await (storage as any).updatePickingList(req.params.id, req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete("/api/picking-lists/:id", async (req, res) => {
+    try { res.json({ success: await (storage as any).deletePickingList(req.params.id) }); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/picking-lists/:id/issue", async (req, res) => {
+    try {
+      const updated = await (storage as any).issuePickingList(req.params.id, req.body.issuedBy ?? "System");
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/picking-lists/:id/items", async (req, res) => {
+    try { res.json(await (storage as any).getPickingListItems(req.params.id)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/picking-lists/:id/items", async (req, res) => {
+    try { res.status(201).json(await (storage as any).upsertPickingListItem({ ...req.body, pickingListId: req.params.id })); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/picking-lists/:id/items/:itemId", async (req, res) => {
+    try { res.json(await (storage as any).updatePickingListItem(req.params.itemId, req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete("/api/picking-lists/:id/items/:itemId", async (req, res) => {
+    try { res.json({ success: await (storage as any).deletePickingListItem(req.params.itemId) }); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Stock Checks ────────────────────────────────────────────────────────────
+  app.get("/api/stock-checks", async (_req, res) => {
+    try { res.json(await (storage as any).getStockChecks()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/stock-checks/:id", async (req, res) => {
+    try {
+      const sc = await (storage as any).getStockCheck(req.params.id);
+      if (!sc) return res.status(404).json({ error: "Not found" });
+      res.json(sc);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/stock-checks", async (req, res) => {
+    try { res.status(201).json(await (storage as any).createStockCheck(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/stock-checks/:id", async (req, res) => {
+    try { res.json(await (storage as any).updateStockCheck(req.params.id, req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/stock-checks/:id/approve", async (req, res) => {
+    try {
+      const updated = await (storage as any).approveStockCheck(req.params.id, req.body.approvedBy ?? "System");
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/stock-checks/:id/items", async (req, res) => {
+    try { res.json(await (storage as any).getStockCheckItems(req.params.id)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/stock-checks/:id/items", async (req, res) => {
+    try { res.status(201).json(await (storage as any).upsertStockCheckItem({ ...req.body, stockCheckId: req.params.id })); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/stock-checks/:id/items/:itemId", async (req, res) => {
+    try { res.json(await (storage as any).updateStockCheckItem(req.params.itemId, req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Purchase Order Receive ──────────────────────────────────────────────────
+  app.post("/api/purchase-orders/:id/receive", async (req, res) => {
+    try {
+      const { receivedItems, locationId, locationName, receivedBy } = req.body as {
+        receivedItems: { itemId: string; quantityReceived: number }[];
+        locationId: string;
+        locationName: string;
+        receivedBy: string;
+      };
+      const po = await storage.getPurchaseOrder(req.params.id);
+      if (!po) return res.status(404).json({ error: "PO not found" });
+      const poItems = await storage.getPurchaseOrderItems(po.id);
+      const allInventory = await storage.getInventoryItems();
+      for (const ri of receivedItems) {
+        if (ri.quantityReceived <= 0) continue;
+        const poItem = poItems.find(p => p.id === ri.itemId);
+        if (!poItem) continue;
+        const invItem = allInventory.find(i => i.id === poItem.inventoryItemId);
+        // Update PO item received qty
+        await (storage as any).updatePurchaseOrderItem?.(poItem.id, { quantityReceived: ri.quantityReceived });
+        // Update master inventory quantity
+        await storage.updateInventoryQuantity(poItem.inventoryItemId, (invItem ? invItem.quantity : 0) + ri.quantityReceived);
+        // Create stock movement
+        await (storage as any).createStockMovement({
+          stockItemId: poItem.inventoryItemId,
+          stockItemName: invItem?.name ?? poItem.itemName ?? "Unknown",
+          movementType: "Received from Supplier",
+          toLocationId: locationId,
+          toLocationName: locationName,
+          quantity: String(ri.quantityReceived),
+          unitOfMeasure: invItem?.unitOfMeasure ?? "units",
+          purchaseOrderId: po.id,
+          notes: `Received on PO ${po.poNumber}`,
+          createdBy: receivedBy ?? "System",
+        });
+      }
+      // Mark PO as received if all items received
+      const updatedPO = await storage.updatePurchaseOrder(po.id, { status: "received", deliveryDate: new Date() });
+      res.json(updatedPO);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Job Inventory — client stock usage ─────────────────────────────────────
+  app.get("/api/job-inventory/by-client/:clientId", async (req, res) => {
+    try { res.json(await (storage as any).getJobInventoryItemsByClient(req.params.clientId)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   return httpServer;
 }

@@ -92,6 +92,14 @@ export const inventoryItems = pgTable("inventory_items", {
   supplier: text("supplier"), // Supplier information
   lastRestocked: timestamp("last_restocked"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  // Enhanced stock management fields
+  itemCode: text("item_code"),
+  category: text("category"), // Pest Control Chemical, Washroom Refill, etc.
+  unitOfMeasure: text("unit_of_measure").default("units"), // units, litres, kg, boxes, etc.
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  preferredSupplierId: varchar("preferred_supplier_id"),
+  activeStatus: boolean("active_status").default(true),
 });
 
 export const rentalContracts = pgTable("rental_contracts", {
@@ -260,6 +268,14 @@ export const jobInventoryItems = pgTable("job_inventory_items", {
   rentalStartDate: timestamp("rental_start_date"),
   rentalEndDate: timestamp("rental_end_date"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  // Stock tracking fields
+  clientId: varchar("client_id"),
+  technicianId: varchar("technician_id"),
+  technicianName: text("technician_name"),
+  contractId: varchar("contract_id"),
+  locationId: varchar("location_id"), // from which stock location was used
+  itemName: text("item_name"), // denormalized for quick display
+  unitOfMeasure: text("unit_of_measure"),
 });
 
 export const notifications = pgTable("notifications", {
@@ -554,6 +570,8 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  quantityReceived: integer("quantity_received").default(0),
+  itemName: text("item_name"), // denormalized
 });
 
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
@@ -1510,3 +1528,152 @@ export const companySettings = pgTable("company_settings", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 export type CompanySettings = typeof companySettings.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STOCK MANAGEMENT SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Stock Locations ──────────────────────────────────────────────────────────
+// WHERE stock physically lives: warehouse, vehicles, technicians, teams
+export const stockLocations = pgTable("stock_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  locationType: text("location_type").notNull(), // Warehouse, Vehicle, Technician, Team, Supplier, Client Site, Adjustment
+  assignedTechnicianId: varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  assignedTeamId: varchar("assigned_team_id"),
+  assignedTeamName: text("assigned_team_name"),
+  vehicleRegistration: text("vehicle_registration"),
+  activeStatus: boolean("active_status").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertStockLocationSchema = createInsertSchema(stockLocations).omit({ id: true, createdAt: true });
+export type InsertStockLocation = z.infer<typeof insertStockLocationSchema>;
+export type StockLocation = typeof stockLocations.$inferSelect;
+
+// ── Stock Balances ────────────────────────────────────────────────────────────
+// Quantity of each stock item at each location
+export const stockBalances = pgTable("stock_balances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stockItemId: varchar("stock_item_id").notNull(), // references inventory_items.id
+  locationId: varchar("location_id").notNull(),    // references stock_locations.id
+  quantityOnHand: decimal("quantity_on_hand", { precision: 10, scale: 2 }).notNull().default("0"),
+  quantityAllocated: decimal("quantity_allocated", { precision: 10, scale: 2 }).notNull().default("0"),
+  quantityAvailable: decimal("quantity_available", { precision: 10, scale: 2 }).notNull().default("0"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+export const insertStockBalanceSchema = createInsertSchema(stockBalances).omit({ id: true, updatedAt: true });
+export type InsertStockBalance = z.infer<typeof insertStockBalanceSchema>;
+export type StockBalance = typeof stockBalances.$inferSelect;
+
+// ── Stock Movements ───────────────────────────────────────────────────────────
+// Full audit trail of every stock movement
+export const stockMovements = pgTable("stock_movements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stockItemId: varchar("stock_item_id").notNull(),
+  stockItemName: text("stock_item_name").notNull(),
+  movementType: text("movement_type").notNull(),
+  // Received from Supplier | Issued to Technician | Issued to Vehicle | Used on Job |
+  // Returned to Store | Transferred Between Locations | Adjustment |
+  // Damaged / Lost | Stock Check Correction
+  fromLocationId: varchar("from_location_id"),
+  fromLocationName: text("from_location_name"),
+  toLocationId: varchar("to_location_id"),
+  toLocationName: text("to_location_name"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitOfMeasure: text("unit_of_measure"),
+  jobId: varchar("job_id"),
+  jobNumber: text("job_number"),
+  clientId: varchar("client_id"),
+  clientName: text("client_name"),
+  contractId: varchar("contract_id"),
+  technicianId: varchar("technician_id"),
+  technicianName: text("technician_name"),
+  purchaseOrderId: varchar("purchase_order_id"),
+  pickingListId: varchar("picking_list_id"),
+  notes: text("notes"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({ id: true, createdAt: true });
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+export type StockMovement = typeof stockMovements.$inferSelect;
+
+// ── Picking Lists ─────────────────────────────────────────────────────────────
+// Prepare stock before a job dispatch
+export const pickingLists = pgTable("picking_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pickingListNumber: text("picking_list_number"),
+  jobId: varchar("job_id"),
+  contractId: varchar("contract_id"),
+  clientId: varchar("client_id"),
+  clientName: text("client_name"),
+  assignedTechnicianId: varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  assignedTeamId: varchar("assigned_team_id"),
+  assignedTeamName: text("assigned_team_name"),
+  status: text("status").notNull().default("Draft"),
+  // Draft | Ready to Pick | Picked | Issued | Cancelled
+  requiredDate: timestamp("required_date"),
+  notes: text("notes"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+export const insertPickingListSchema = createInsertSchema(pickingLists).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPickingList = z.infer<typeof insertPickingListSchema>;
+export type PickingList = typeof pickingLists.$inferSelect;
+
+export const pickingListItems = pgTable("picking_list_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pickingListId: varchar("picking_list_id").notNull(),
+  stockItemId: varchar("stock_item_id").notNull(),
+  itemName: text("item_name").notNull(),
+  unitOfMeasure: text("unit_of_measure"),
+  quantityRequired: decimal("quantity_required", { precision: 10, scale: 2 }).notNull(),
+  quantityPicked: decimal("quantity_picked", { precision: 10, scale: 2 }).notNull().default("0"),
+  fromLocationId: varchar("from_location_id"),
+  fromLocationName: text("from_location_name"),
+  toLocationId: varchar("to_location_id"),
+  toLocationName: text("to_location_name"),
+  notes: text("notes"),
+});
+export const insertPickingListItemSchema = createInsertSchema(pickingListItems).omit({ id: true });
+export type InsertPickingListItem = z.infer<typeof insertPickingListItemSchema>;
+export type PickingListItem = typeof pickingListItems.$inferSelect;
+
+// ── Stock Checks ──────────────────────────────────────────────────────────────
+// Periodic physical stock counts
+export const stockChecks = pgTable("stock_checks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  checkNumber: text("check_number"),
+  locationId: varchar("location_id").notNull(),
+  locationName: text("location_name"),
+  checkedBy: text("checked_by").notNull(),
+  checkDate: timestamp("check_date").notNull().default(sql`now()`),
+  status: text("status").notNull().default("In Progress"),
+  // In Progress | Pending Approval | Approved | Cancelled
+  notes: text("notes"),
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertStockCheckSchema = createInsertSchema(stockChecks).omit({ id: true, createdAt: true });
+export type InsertStockCheck = z.infer<typeof insertStockCheckSchema>;
+export type StockCheck = typeof stockChecks.$inferSelect;
+
+export const stockCheckItems = pgTable("stock_check_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stockCheckId: varchar("stock_check_id").notNull(),
+  stockItemId: varchar("stock_item_id").notNull(),
+  itemName: text("item_name").notNull(),
+  unitOfMeasure: text("unit_of_measure"),
+  expectedQuantity: decimal("expected_quantity", { precision: 10, scale: 2 }).notNull().default("0"),
+  countedQuantity: decimal("counted_quantity", { precision: 10, scale: 2 }),
+  variance: decimal("variance", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+});
+export const insertStockCheckItemSchema = createInsertSchema(stockCheckItems).omit({ id: true });
+export type InsertStockCheckItem = z.infer<typeof insertStockCheckItemSchema>;
+export type StockCheckItem = typeof stockCheckItems.$inferSelect;

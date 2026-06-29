@@ -15,6 +15,8 @@ import {
   serviceRecords, workshopJobs, teams, teamMembers, attendanceRecords, attendanceMemberRecords,
   serviceContracts, salesAppointments, expenses, serviceScheduleEntries, activityLogs,
   treatmentReports, communicationNotes, acceptedWorkflows, contractDeletionHistory,
+  stockLocations, stockBalances, stockMovements, pickingLists, pickingListItems,
+  stockChecks, stockCheckItems,
 } from "@shared/schema";
 
 import type {
@@ -2212,5 +2214,234 @@ export class DbStorage implements IStorage {
       .where(eq(companySettings.id, "singleton"))
       .returning();
     return row;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOCK LOCATIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getStockLocations() {
+    return db.select().from(stockLocations).orderBy(asc(stockLocations.name));
+  }
+  async getStockLocation(id: string) {
+    const [row] = await db.select().from(stockLocations).where(eq(stockLocations.id, id));
+    return row;
+  }
+  async createStockLocation(data: import("@shared/schema").InsertStockLocation) {
+    const [row] = await db.insert(stockLocations).values({ id: randomUUID(), ...data, createdAt: new Date() }).returning();
+    return row;
+  }
+  async updateStockLocation(id: string, data: Partial<import("@shared/schema").InsertStockLocation>) {
+    const [row] = await db.update(stockLocations).set(data).where(eq(stockLocations.id, id)).returning();
+    return row;
+  }
+  async deleteStockLocation(id: string) {
+    const r = await db.delete(stockLocations).where(eq(stockLocations.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+  async seedDefaultStockLocations() {
+    const existing = await this.getStockLocations();
+    if (existing.length > 0) return existing;
+    const defaults = [
+      { name: "Main Store", locationType: "Warehouse" },
+      { name: "Pest Control Vehicle 1", locationType: "Vehicle" },
+      { name: "Pest Control Vehicle 2", locationType: "Vehicle" },
+      { name: "Washroom Vehicle", locationType: "Vehicle" },
+      { name: "Sanitary Bin Vehicle", locationType: "Vehicle" },
+      { name: "Dustmat Team", locationType: "Team" },
+      { name: "Deep Cleaning Team", locationType: "Team" },
+    ];
+    for (const d of defaults) await this.createStockLocation({ ...d, activeStatus: true });
+    return this.getStockLocations();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOCK BALANCES
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getStockBalances() {
+    return db.select().from(stockBalances);
+  }
+  async getStockBalancesByItem(stockItemId: string) {
+    return db.select().from(stockBalances).where(eq(stockBalances.stockItemId, stockItemId));
+  }
+  async getStockBalancesByLocation(locationId: string) {
+    return db.select().from(stockBalances).where(eq(stockBalances.locationId, locationId));
+  }
+  async getStockBalance(stockItemId: string, locationId: string) {
+    const [row] = await db.select().from(stockBalances)
+      .where(and(eq(stockBalances.stockItemId, stockItemId), eq(stockBalances.locationId, locationId)));
+    return row;
+  }
+  async upsertStockBalance(stockItemId: string, locationId: string, delta: number) {
+    const existing = await this.getStockBalance(stockItemId, locationId);
+    if (existing) {
+      const newQty = Math.max(0, Number(existing.quantityOnHand) + delta);
+      const [row] = await db.update(stockBalances)
+        .set({ quantityOnHand: String(newQty), quantityAvailable: String(newQty), updatedAt: new Date() })
+        .where(and(eq(stockBalances.stockItemId, stockItemId), eq(stockBalances.locationId, locationId)))
+        .returning();
+      return row;
+    } else {
+      const qty = Math.max(0, delta);
+      const [row] = await db.insert(stockBalances)
+        .values({ id: randomUUID(), stockItemId, locationId, quantityOnHand: String(qty), quantityAvailable: String(qty), quantityAllocated: "0", updatedAt: new Date() })
+        .returning();
+      return row;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOCK MOVEMENTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getStockMovements(filters?: { stockItemId?: string; jobId?: string; clientId?: string; technicianId?: string; locationId?: string }) {
+    let q = db.select().from(stockMovements).$dynamic();
+    if (filters?.stockItemId) q = q.where(eq(stockMovements.stockItemId, filters.stockItemId));
+    if (filters?.jobId) q = q.where(eq(stockMovements.jobId, filters.jobId));
+    if (filters?.clientId) q = q.where(eq(stockMovements.clientId, filters.clientId));
+    if (filters?.technicianId) q = q.where(eq(stockMovements.technicianId, filters.technicianId));
+    if (filters?.locationId) q = q.where(or(eq(stockMovements.fromLocationId, filters.locationId!), eq(stockMovements.toLocationId, filters.locationId!)));
+    return q.orderBy(desc(stockMovements.createdAt)).limit(500);
+  }
+  async createStockMovement(data: import("@shared/schema").InsertStockMovement) {
+    const [row] = await db.insert(stockMovements).values({ id: randomUUID(), ...data, createdAt: new Date() }).returning();
+    // Update balances
+    if (data.fromLocationId && Number(data.quantity) > 0) {
+      await this.upsertStockBalance(data.stockItemId, data.fromLocationId, -Number(data.quantity));
+    }
+    if (data.toLocationId && Number(data.quantity) > 0) {
+      await this.upsertStockBalance(data.stockItemId, data.toLocationId, Number(data.quantity));
+    }
+    return row;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PICKING LISTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getPickingLists() {
+    return db.select().from(pickingLists).orderBy(desc(pickingLists.createdAt));
+  }
+  async getPickingList(id: string) {
+    const [row] = await db.select().from(pickingLists).where(eq(pickingLists.id, id));
+    return row;
+  }
+  async createPickingList(data: import("@shared/schema").InsertPickingList) {
+    const count = (await this.getPickingLists()).length + 1;
+    const pickingListNumber = `PL-${new Date().getFullYear()}-${String(count).padStart(4, "0")}`;
+    const [row] = await db.insert(pickingLists).values({ id: randomUUID(), ...data, pickingListNumber, createdAt: new Date(), updatedAt: new Date() }).returning();
+    return row;
+  }
+  async updatePickingList(id: string, data: Partial<import("@shared/schema").InsertPickingList>) {
+    const [row] = await db.update(pickingLists).set({ ...data, updatedAt: new Date() }).where(eq(pickingLists.id, id)).returning();
+    return row;
+  }
+  async deletePickingList(id: string) {
+    await db.delete(pickingListItems).where(eq(pickingListItems.pickingListId, id));
+    const r = await db.delete(pickingLists).where(eq(pickingLists.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+  async getPickingListItems(pickingListId: string) {
+    return db.select().from(pickingListItems).where(eq(pickingListItems.pickingListId, pickingListId));
+  }
+  async upsertPickingListItem(data: import("@shared/schema").InsertPickingListItem) {
+    const [row] = await db.insert(pickingListItems).values({ id: randomUUID(), ...data }).returning();
+    return row;
+  }
+  async updatePickingListItem(id: string, data: Partial<import("@shared/schema").InsertPickingListItem>) {
+    const [row] = await db.update(pickingListItems).set(data).where(eq(pickingListItems.id, id)).returning();
+    return row;
+  }
+  async deletePickingListItem(id: string) {
+    const r = await db.delete(pickingListItems).where(eq(pickingListItems.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+  async issuePickingList(id: string, issuedBy: string) {
+    const pl = await this.getPickingList(id);
+    if (!pl) throw new Error("Picking list not found");
+    const items = await this.getPickingListItems(id);
+    for (const item of items) {
+      if (!item.fromLocationId || Number(item.quantityPicked) <= 0) continue;
+      await this.createStockMovement({
+        stockItemId: item.stockItemId, stockItemName: item.itemName,
+        movementType: "Issued to Technician",
+        fromLocationId: item.fromLocationId, fromLocationName: item.fromLocationName ?? undefined,
+        toLocationId: item.toLocationId ?? undefined, toLocationName: item.toLocationName ?? undefined,
+        quantity: item.quantityPicked, unitOfMeasure: item.unitOfMeasure ?? undefined,
+        jobId: pl.jobId ?? undefined, clientId: pl.clientId ?? undefined,
+        contractId: pl.contractId ?? undefined,
+        technicianId: pl.assignedTechnicianId ?? undefined, technicianName: pl.assignedTechnicianName ?? undefined,
+        pickingListId: id, notes: item.notes ?? undefined, createdBy: issuedBy,
+      });
+    }
+    return this.updatePickingList(id, { status: "Issued" });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOCK CHECKS
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getStockChecks() {
+    return db.select().from(stockChecks).orderBy(desc(stockChecks.createdAt));
+  }
+  async getStockCheck(id: string) {
+    const [row] = await db.select().from(stockChecks).where(eq(stockChecks.id, id));
+    return row;
+  }
+  async createStockCheck(data: import("@shared/schema").InsertStockCheck) {
+    const count = (await this.getStockChecks()).length + 1;
+    const checkNumber = `SC-${new Date().getFullYear()}-${String(count).padStart(4, "0")}`;
+    const [row] = await db.insert(stockChecks).values({ id: randomUUID(), ...data, checkNumber, createdAt: new Date() }).returning();
+    return row;
+  }
+  async updateStockCheck(id: string, data: Partial<import("@shared/schema").InsertStockCheck>) {
+    const [row] = await db.update(stockChecks).set(data).where(eq(stockChecks.id, id)).returning();
+    return row;
+  }
+  async getStockCheckItems(stockCheckId: string) {
+    return db.select().from(stockCheckItems).where(eq(stockCheckItems.stockCheckId, stockCheckId));
+  }
+  async upsertStockCheckItem(data: import("@shared/schema").InsertStockCheckItem) {
+    const [row] = await db.insert(stockCheckItems).values({ id: randomUUID(), ...data }).returning();
+    return row;
+  }
+  async updateStockCheckItem(id: string, data: Partial<import("@shared/schema").InsertStockCheckItem>) {
+    const [row] = await db.update(stockCheckItems).set(data).where(eq(stockCheckItems.id, id)).returning();
+    return row;
+  }
+  async approveStockCheck(id: string, approvedBy: string) {
+    const sc = await this.getStockCheck(id);
+    if (!sc) throw new Error("Stock check not found");
+    const items = await this.getStockCheckItems(id);
+    for (const item of items) {
+      if (item.countedQuantity === null || item.countedQuantity === undefined) continue;
+      const variance = Number(item.countedQuantity) - Number(item.expectedQuantity);
+      if (Math.abs(variance) < 0.001) continue;
+      // Create correction movement
+      await this.createStockMovement({
+        stockItemId: item.stockItemId, stockItemName: item.itemName,
+        movementType: "Stock Check Correction",
+        fromLocationId: variance < 0 ? sc.locationId : undefined,
+        toLocationId: variance > 0 ? sc.locationId : undefined,
+        fromLocationName: variance < 0 ? sc.locationName ?? undefined : undefined,
+        toLocationName: variance > 0 ? sc.locationName ?? undefined : undefined,
+        quantity: String(Math.abs(variance)),
+        unitOfMeasure: item.unitOfMeasure ?? undefined,
+        notes: `Stock check correction. Expected: ${item.expectedQuantity}, Counted: ${item.countedQuantity}`,
+        createdBy: approvedBy,
+      });
+      // Update variance on item
+      await this.updateStockCheckItem(item.id, { variance: String(variance) });
+    }
+    return this.updateStockCheck(id, { status: "Approved", approvedBy, approvedAt: new Date() });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ENHANCED JOB INVENTORY — get by client for stock usage reporting
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getJobInventoryItemsByClient(clientId: string) {
+    return db.select().from(jobInventoryItems).where(eq(jobInventoryItems.clientId, clientId)).orderBy(desc(jobInventoryItems.createdAt));
+  }
+  async getJobInventoryItemsByTechnician(technicianId: string) {
+    return db.select().from(jobInventoryItems).where(eq(jobInventoryItems.technicianId, technicianId)).orderBy(desc(jobInventoryItems.createdAt));
+  }
+  async getStockUsedOnJob(jobId: string) {
+    return db.select().from(jobInventoryItems).where(eq(jobInventoryItems.jobId, jobId)).orderBy(desc(jobInventoryItems.createdAt));
   }
 }

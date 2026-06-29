@@ -201,7 +201,11 @@ export default function ClientProfilePage() {
   const { data: allWorkers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: allClients = [] }     = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: allInventory = [] }   = useQuery<InventoryItem[]>({ queryKey: ["/api/inventory"] });
-  const { data: allJobInv = [] }      = useQuery<JobInventoryItem[]>({ queryKey: ["/api/job-inventory"] });
+  const { data: clientStockUsageRaw = [] } = useQuery<JobInventoryItem[]>({
+    queryKey: ["/api/job-inventory/by-client", id],
+    queryFn: () => fetch(`/api/job-inventory/by-client/${id}`).then(r => r.json()),
+    enabled: !!id,
+  });
 
   const { data: treatmentRpts = [] } = useQuery<TreatmentReport[]>({
     queryKey: ["/api/treatment-reports", id],
@@ -226,8 +230,7 @@ export default function ClientProfilePage() {
     (client && q.companyName?.toLowerCase() === client.name?.toLowerCase())
   );
 
-  const clientJobIds    = new Set(clientJobs.map(j => j.id));
-  const clientStockUsage = allJobInv.filter(i => clientJobIds.has(i.jobId));
+  const clientStockUsage = clientStockUsageRaw;
 
   // Job groups
   const inProgressJobs = clientJobs.filter(j => j.status === "in_progress");

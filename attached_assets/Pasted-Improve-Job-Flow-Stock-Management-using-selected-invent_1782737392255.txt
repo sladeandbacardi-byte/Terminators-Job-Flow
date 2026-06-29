@@ -1,0 +1,477 @@
+Improve Job Flow Stock Management using selected inventory features inspired by Eworks Manager.
+
+Do not copy Eworks visually.
+Use the concepts that suit Terminators:
+- static stock
+- mobile stock
+- purchase orders
+- picking lists
+- stock transfers
+- stock movement history
+- stock used on jobs
+- low stock reports
+
+IMPORTANT FOUNDATION
+
+PostgreSQL remains the source of truth.
+
+All stock records must save to PostgreSQL.
+
+Every stock usage record linked to a job must include:
+- clientId
+- jobId
+- technicianId
+- stockItemId
+
+Every stock movement must be traceable.
+
+PART 1: STOCK LOCATIONS
+
+Create stock locations.
+
+Stock Location types:
+
+- Warehouse / Store
+- Vehicle
+- Technician
+- Team
+- Supplier
+- Client Site
+- Adjustment
+
+Default locations:
+
+- Main Store
+- Pest Control Vehicle 1
+- Pest Control Vehicle 2
+- Washroom Vehicle
+- Sanitary Bin Vehicle
+- Dustmat Team
+- Deep Cleaning Team
+
+Each stock location must include:
+
+- locationId
+- locationName
+- locationType
+- assignedTechnician optional
+- assignedTeam optional
+- vehicleRegistration optional
+- activeStatus
+- notes
+
+PART 2: STOCK ITEMS
+
+Stock Items must include:
+
+- stockItemId
+- itemName
+- itemCode optional
+- category
+- department
+- unitOfMeasure
+- quantityOnHand
+- minimumStockLevel
+- preferredSupplier
+- costPrice
+- sellingPrice optional
+- activeStatus
+- notes
+
+Categories:
+
+- Pest Control Chemical
+- Pest Control Equipment
+- Washroom Refill
+- Hygiene Consumable
+- Sanitary Bin Consumable
+- Dustmat
+- Rental Equipment
+- Cleaning Chemical
+- PPE
+- Tools
+- Other
+
+PART 3: STOCK BALANCES BY LOCATION
+
+Do not only show one total quantity.
+
+Track stock by location.
+
+Example:
+
+Stock Item: Aerosol Refill
+Main Store: 50
+Washroom Vehicle: 12
+Technician: 3
+Total: 65
+
+Create stock balance records:
+
+- stockBalanceId
+- stockItemId
+- locationId
+- quantityAvailable
+- quantityAllocated
+- quantityOnHand
+
+PART 4: STOCK MOVEMENT HISTORY
+
+Create Stock Movement History.
+
+Every stock movement must create a history record.
+
+Movement types:
+
+- Received from Supplier
+- Issued to Technician
+- Issued to Vehicle
+- Used on Job
+- Returned to Store
+- Transferred Between Locations
+- Adjustment
+- Damaged / Lost
+- Stock Check Correction
+
+Each movement record must include:
+
+- movementId
+- stockItemId
+- stockItemName
+- movementType
+- fromLocationId optional
+- toLocationId optional
+- quantity
+- unitOfMeasure
+- jobId optional
+- clientId optional
+- contractId optional
+- technicianId optional
+- purchaseOrderId optional
+- notes
+- createdBy
+- createdAt
+
+Stock movement history must show:
+
+- who moved the stock
+- what stock moved
+- quantity
+- from where
+- to where
+- date/time
+- related job/client if applicable
+
+PART 5: PURCHASE ORDERS
+
+Improve Purchase Orders so they support stock receiving.
+
+Purchase Order fields:
+
+- purchaseOrderId
+- supplierId
+- supplierName
+- orderDate
+- expectedDeliveryDate
+- status
+- lineItems
+- total
+- notes
+
+Purchase Order status:
+
+- Draft
+- Sent
+- Approved
+- Awaiting Delivery
+- Partially Received
+- Received
+- Cancelled
+
+Each PO line item:
+
+- stockItemId
+- itemName
+- quantityOrdered
+- unitCost
+- totalCost
+- quantityReceived
+
+When stock is received:
+1. Update purchase order received quantities.
+2. Create stock movement:
+   Received from Supplier.
+3. Increase stock balance at selected location, usually Main Store.
+
+PART 6: PICKING LISTS FOR JOBS
+
+Create Picking Lists.
+
+Purpose:
+Before a job, the office or technician can prepare required stock.
+
+Picking List fields:
+
+- pickingListId
+- jobId optional
+- contractId optional
+- clientId optional
+- assignedTechnician
+- assignedTeam
+- status
+- requiredDate
+- notes
+
+Picking List status:
+
+- Draft
+- Ready to Pick
+- Picked
+- Issued
+- Cancelled
+
+Picking List items:
+
+- stockItemId
+- itemName
+- quantityRequired
+- quantityPicked
+- fromLocationId
+- toLocationId
+
+When a picking list is marked Issued:
+1. Move stock from Main Store to technician/vehicle/team location.
+2. Create stock movement records.
+3. Update stock balances.
+
+PART 7: TECHNICIAN MOBILE STOCK
+
+Technicians must be able to see their own stock on mobile.
+
+Technician view:
+
+My Stock
+
+Show:
+- stock item
+- quantity available
+- unit
+- location
+- low stock indicator
+
+Technician actions:
+
+- Use on Job
+- Return to Store
+- Transfer to Another Technician
+- Request Stock
+- Stock Check
+
+Technician stock usage on a job:
+
+When completing a job, technician can add:
+
+- stock item
+- quantity used
+- notes
+
+When saved:
+1. Create stock movement:
+   Used on Job.
+2. Reduce technician/vehicle stock balance.
+3. Link usage to jobId, clientId, contractId if applicable, and technicianId.
+4. Show usage under:
+   - Job
+   - Client Profile > Stock Usage
+   - Stock reports
+
+PART 8: STOCK TRANSFERS
+
+Allow managers/service admins to transfer stock.
+
+Transfer examples:
+
+- Main Store to Pest Control Vehicle 1
+- Main Store to Washroom Vehicle
+- Technician A to Technician B
+- Vehicle to Main Store
+
+Transfer must capture:
+
+- stock item
+- quantity
+- from location
+- to location
+- reason
+- notes
+
+When transfer is saved:
+1. Reduce fromLocation balance.
+2. Increase toLocation balance.
+3. Create stock movement history.
+
+PART 9: STOCK CHECKS
+
+Create Stock Check function.
+
+Users can perform stock checks by:
+
+- location
+- technician
+- vehicle
+- department
+- stock category
+
+Stock check fields:
+
+- stockCheckId
+- locationId
+- checkedBy
+- checkDate
+- status
+- notes
+
+Stock check line items:
+
+- stockItemId
+- expectedQuantity
+- countedQuantity
+- variance
+- notes
+
+If countedQuantity differs from expectedQuantity:
+Allow manager/admin to approve correction.
+
+When approved:
+1. Create stock movement:
+   Stock Check Correction.
+2. Update stock balance.
+3. Keep full audit history.
+
+PART 10: LOW STOCK REPORTS
+
+Add Low Stock alerts.
+
+Low stock should compare total available or selected location stock against minimumStockLevel.
+
+Reports:
+
+- Low Stock
+- Stock On Hand
+- Stock By Location
+- Stock Movement History
+- Stock Used By Job
+- Stock Used By Client
+- Stock Used By Technician
+- Stock Used By Contract
+- Daily Chemical Usage by PC Technician
+- Purchase Orders Awaiting Delivery
+- Picking Lists Not Issued
+
+PART 11: CLIENT PROFILE STOCK USAGE
+
+Client Profile > Stock Usage must show all stock used for that client.
+
+Each row:
+
+- Date
+- Job Number
+- Contract Number optional
+- Technician
+- Stock Item
+- Quantity Used
+- Unit
+- Notes
+
+PART 12: DATA INTEGRITY
+
+Update Admin > Data Integrity.
+
+Add checks:
+
+- stock items missing required fields
+- stock movements missing stockItemId
+- stock movements missing movementType
+- job stock usage missing clientId
+- job stock usage missing jobId
+- job stock usage missing technicianId
+- negative stock balances
+- purchase orders with received quantity greater than ordered quantity
+- picking lists issued without movement records
+- stock balances not matching movement history
+
+PART 13: BACKUP
+
+Backup must include:
+
+- stock items
+- stock locations
+- stock balances
+- stock movements
+- purchase orders
+- picking lists
+- stock checks
+- stock usage
+- technician daily chemical take
+
+PART 14: TESTS
+
+Run these tests:
+
+TEST 1: Create stock item
+1. Create stock item: Aerosol Refill.
+2. Set category: Washroom Refill.
+3. Set unit: units.
+4. Set minimum stock level.
+5. Confirm it saves to PostgreSQL.
+6. Refresh and confirm it remains.
+
+TEST 2: Receive stock from supplier
+1. Create purchase order.
+2. Add Aerosol Refill.
+3. Mark as received into Main Store.
+4. Confirm Main Store stock increases.
+5. Confirm movement history shows Received from Supplier.
+
+TEST 3: Transfer to vehicle
+1. Transfer Aerosol Refill from Main Store to Washroom Vehicle.
+2. Confirm Main Store decreases.
+3. Confirm Washroom Vehicle increases.
+4. Confirm movement history shows transfer.
+
+TEST 4: Use stock on job
+1. Open a washroom or pest control job.
+2. Add stock usage.
+3. Use Aerosol Refill quantity 1.
+4. Confirm technician/vehicle stock decreases.
+5. Confirm stock usage appears under Job.
+6. Confirm stock usage appears under Client Profile > Stock Usage.
+7. Confirm movement history shows Used on Job.
+
+TEST 5: Technician mobile stock
+1. Log in as technician.
+2. Open My Stock.
+3. Confirm technician sees stock assigned to them or their vehicle.
+4. Use stock on a job.
+5. Confirm balances update.
+
+TEST 6: Stock check
+1. Run a stock check for Main Store.
+2. Count stock.
+3. Enter variance.
+4. Approve correction as manager/admin.
+5. Confirm stock balance updates.
+6. Confirm movement history records correction.
+
+IMPORTANT
+
+Keep this simple and practical.
+
+Terminators needs to know:
+- what stock is in the store
+- what stock is in each vehicle/team
+- what stock was used on each job
+- who used it
+- when it was used
+- what client/job/contract it related to
+- what must be ordered
