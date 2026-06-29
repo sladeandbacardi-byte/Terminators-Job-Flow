@@ -1,0 +1,561 @@
+END-TO-END TEST REQUEST FOR JOB FLOW
+
+Please run a full end-to-end test of the Job Flow app as if it is being used by the business.
+
+The purpose is to test the complete workflow from Sales to Service to Finance, using the central PostgreSQL database and clientId links.
+
+This is not just a UI test.
+Please test:
+- permissions
+- saving
+- searching
+- PostgreSQL persistence
+- clientId linking
+- calendar visibility
+- client profile tabs
+- contracts
+- rental contracts
+- jobs
+- invoices
+- stock usage
+- treatment reports
+- backups
+- data integrity
+
+IMPORTANT FOUNDATION
+
+PostgreSQL is the production source of truth.
+
+There must be one central Clients table.
+
+Every record must link back to the central client using clientId.
+
+No duplicate client records may be created across Sales, Service, Jobs, Contracts, Quotes, Rental Contracts, Invoices, Reports, Documents, or Stock.
+
+Do not rely on frontend state only.
+
+Every important saved record must persist after:
+- page refresh
+- API refetch
+- server restart
+
+TEST USERS / ROLES
+
+Please test as each major user type:
+
+1. Admin / Manager
+2. Sales Rep
+3. Service Manager / Hygiene Services Manager
+4. Technician / Worker
+5. Finance User
+
+If existing seeded users are available, use them.
+If not, create test users for these roles.
+
+For each role, confirm:
+- correct menu access
+- correct permissions
+- correct ability to create/edit/view records
+- no unauthorized editing
+- no broken buttons
+- no stuck Saving states
+- clear error messages when not allowed
+
+PART 1: ADMIN DATABASE HEALTH TEST
+
+Log in as Admin.
+
+Go to Admin > Data Integrity.
+
+Run or manually confirm:
+
+1. PostgreSQL connection works.
+2. Storage type shows PostgreSQL.
+3. MemStorage is not used for production data.
+4. Clients count is shown.
+5. Jobs count is shown.
+6. Quotes count is shown.
+7. Service contracts count is shown.
+8. Rental contracts count is shown.
+9. Invoices count is shown.
+10. Workers count is shown.
+11. Purchase orders count is shown.
+12. No orphan jobs without clientId.
+13. No orphan quotes without clientId.
+14. No orphan invoices without clientId.
+15. No orphan service contracts without clientId.
+16. No orphan rental contracts without clientId.
+17. No orphan treatment reports without clientId.
+18. No orphan stock usage records without clientId.
+19. Backup status is visible.
+
+Expected result:
+Overall PASSED.
+
+PART 2: SALES END-TO-END FLOW
+
+Log in as Sales Rep.
+
+Test this flow:
+
+1. Create a new lead for a test client:
+   Business Name: E2E Test Client - Sales
+   Contact Person: Test Contact
+   Phone: 041 000 0000
+   Email: testclient@example.com
+   Address:
+   Street Number: 1
+   Street Name: Test Road
+   Suburb: Newton Park
+   City: Port Elizabeth
+   Province: Eastern Cape
+   Postal Code: 6045
+
+2. Save the lead.
+
+Confirm:
+- lead saves successfully
+- client is created in the central Clients table
+- lead links to clientId
+- lead appears in Leads list
+- client appears in Clients list
+- client profile opens
+
+3. Convert the lead to a quote.
+
+Quote details:
+- Department: Pest Control
+- Service Type: Rodent Service
+- Pest/Insect Type: Rodents
+- Quantity: 1
+- Unit Price: R850.00
+- Total Price: R850.00
+- VAT Included: Yes
+
+Confirm:
+- quote saves successfully
+- quote uses same clientId
+- quote appears in Quotes list
+- quote appears under Client Profile > Quotes
+- quote search works
+
+4. Convert quote to job.
+
+Job details:
+- Job Title: E2E Rodent Treatment
+- Date: choose a future date
+- Time: 10:00
+- Duration: 60 minutes
+- Department: Pest Control
+- Service Type: Rodent Service
+- Pest/Insect Type: Rodents
+- Quantity: 1
+- Unit Price: R850.00
+- Must Be Invoiced: Yes
+- Invoice Status: Not Ready or Ready to Invoice
+- Assign to technician/worker
+
+Confirm:
+- job saves successfully
+- job uses same clientId
+- job links to quoteId
+- job appears in Jobs list
+- job appears under Client Profile > Jobs
+- job appears on Calendar on the scheduled date
+- job appears in Daily Diary for that date
+- job search works
+
+PART 3: SERVICE CONTRACT FLOW
+
+Log in as Service Manager / Hygiene Services Manager.
+
+Open the same test client.
+
+Create a new Service Contract.
+
+Contract details:
+- Service Type: Sanitary Bins
+- Department: Hygiene / Service
+- Frequency: Monthly
+- Week of Month: Week 1
+- Day of Week: Monday
+- Start Time: 08:00
+- Estimated Duration: 30 minutes
+- Fixed Time: Yes
+- Route Sequence: 1
+- Assigned Team / Technician: choose available worker/team
+- Contract Start Date: today or future date
+- Contract End Date: one year from start
+- Increase Date: one year from start
+- Increase Percentage: 7%
+- Invoice Rule: Invoice monthly contract
+- Active Status: Active
+
+Confirm:
+- contract saves successfully
+- contract uses same clientId
+- schedule summary is generated correctly:
+  Monthly - Week 1 Monday at 08:00 - Route 1
+- contract appears in Contracts list
+- contract appears under Client Profile > Contracts
+- contract appears in Contracts > Schedule View if that tab exists
+- contract appears on Calendar on matching dates
+- contract appears in Daily Diary on matching dates
+- no duplicate calendar occurrences are created
+
+Refresh the page and confirm the contract is still visible.
+
+PART 4: RENTAL CONTRACT FLOW
+
+Log in as Service Manager / Hygiene Services Manager.
+
+Create or use client:
+E2E Test Client - Rental
+
+Create a Rental Contract.
+
+Rental contract details:
+- Contract Start Date: 29 June 2026
+- Contract End Date: 29 June 2027
+- Last Price Increase Date: 29 June 2026
+- Next Increase Date: 29 June 2027
+- Increase Percentage: 7%
+- Frequency: Monthly
+- Week of Month: Last Week
+- Day of Week: Monday
+- Start Time: 08:00
+- Fixed Time: Yes
+- Route Sequence: 1
+- Active Status: Active
+
+Add rental items:
+1. Aerosol A/F Unit - Including Refills
+   Quantity: 1
+   Unit Price: R100.00
+   Refill Rule: Including Refills
+
+2. Aerosol A/F Unit - Excluding Refills
+   Quantity: 1
+   Unit Price: R80.00
+   Refill Rule: Excluding Refills
+
+3. Aerosol Refill
+   Quantity: 1
+   Unit Price: R50.00
+   Refill Rule: Refill Only
+
+Confirm:
+- rental contract saves successfully
+- rental items save successfully
+- rental contract uses clientId
+- rental items link to rentalContractId and clientId
+- rental contract appears in Rental Contracts list
+- rental contract appears under Client Profile > Contracts
+- rental items summary appears on contract/client profile
+- calendar allows choosing months beyond June
+- rental contract appears on Calendar on 29 June 2026
+- rental contract appears in Daily Diary for 29 June 2026
+- refresh page and confirm all still exists
+
+PART 5: DAILY CALENDAR PER TECHNICIAN / TEAM
+
+Log in as Service Manager.
+
+Open Calendar.
+
+Confirm default view:
+- Day view
+
+Test filters:
+- Date
+- Technician
+- Team
+- Department
+- Service Type
+- Client
+- Area / Suburb
+- Status
+- Invoice Status
+- Contract / Once-off
+
+Confirm:
+- once-off jobs appear
+- service contract occurrences appear
+- rental contract occurrences appear
+- jobs are sorted by time and route sequence
+- filtering by technician/team works
+- clearing filters shows all again
+- Open Job button works
+- Open Client button works
+- Open Google Maps button works where a link exists
+
+Also confirm:
+- records are not hidden by stale filters without warning
+- there is a Clear Filters button or equivalent
+
+PART 6: TECHNICIAN MOBILE FLOW
+
+Log in as Technician / Worker.
+
+Open Today’s Jobs / Daily Diary.
+
+Confirm technician can see only assigned jobs unless their role allows more.
+
+For a Pest Control job, technician must see:
+- Client name
+- Address
+- Service type
+- Pest/Insect type
+- Special instructions
+- Scheduled time
+- Route sequence
+- Open in Google Maps
+- Start Job button
+
+Test:
+1. Start job.
+2. Add job notes.
+3. Add photo if available.
+4. Add stock/chemical usage.
+5. Complete treatment report.
+6. Capture customer signature.
+7. Mark all units checked/completed where applicable.
+8. Complete job.
+
+Confirm:
+- job status updates
+- treatment report saves
+- stock usage saves
+- customer signature saves
+- completed job appears under client profile
+- treatment report appears under Client Profile > Treatment Reports
+- stock usage appears under Client Profile > Stock Usage
+- job invoice status changes appropriately if Must Be Invoiced = Yes
+
+PART 7: TREATMENT REPORT TEST
+
+Use a Pest Control job.
+
+Create a treatment report.
+
+Required test fields:
+- Client
+- Job
+- Technician
+- Date
+- Pest Type: Rodents
+- Treatment Type: Baiting
+- Site Area: Storage area
+- Chemicals Used: test chemical
+- Quantity Used: 1
+- Treatment Notes: E2E test treatment report
+- Follow-up Required: Yes
+- Follow-up Date: choose future date
+- Customer Name: Test Customer
+- Customer Signature: capture or test signature
+
+Confirm:
+- report saves to PostgreSQL
+- report links to clientId
+- report links to jobId
+- report appears under Client Profile > Treatment Reports
+- report appears under Job > Reports/Documents
+- Print button works
+- report still exists after refresh
+
+PART 8: STOCK USAGE TEST
+
+Use a job assigned to technician.
+
+Add stock usage:
+- Stock Item: choose or create E2E Test Chemical
+- Quantity Used: 1
+- Unit: litres or units
+- Notes: E2E stock usage test
+
+Confirm:
+- stock usage saves to PostgreSQL
+- stock usage links to clientId
+- stock usage links to jobId
+- stock usage links to technicianId
+- stock usage appears under Job
+- stock usage appears under Client Profile > Stock Usage
+- stock usage appears in stock reports
+- stock quantity on hand reduces if stock control is active
+- low stock alert appears if below minimum level
+
+PART 9: FINANCE FLOW
+
+Log in as Finance User.
+
+Find completed job marked Ready to Invoice.
+
+Create invoice from job.
+
+Confirm:
+- invoice uses same clientId
+- invoice links to jobId
+- invoice line items are correct
+- quantity, unit price, VAT and total are correct
+- invoice appears in Invoices list
+- invoice appears under Client Profile > Invoices
+- job invoice status updates to Invoiced
+- invoice search works
+- finance user cannot edit restricted service contract fields unless allowed
+
+PART 10: CLIENT PROFILE CENTRAL HUB TEST
+
+Open each test client profile.
+
+Confirm all 9 tabs work:
+
+1. Details
+2. Jobs
+3. Contracts
+4. Invoices
+5. Treatment Reports
+6. Comm. Notes
+7. Stock Usage
+8. Documents
+9. Quotes
+
+Confirm quick-stats click through works.
+
+Confirm:
+- Jobs count correct
+- Active Contracts count correct
+- Open Invoices count correct
+- Treatment Reports count correct
+- Comm. Notes count correct
+
+Confirm all tabs use clientId and not client name only.
+
+PART 11: PERMISSIONS TEST
+
+Test role permissions.
+
+Admin / Manager:
+- can create/edit clients
+- can create/edit contracts
+- can create/edit jobs
+- can create/edit stock
+- can edit prices
+- can edit route sequence
+- can edit increase dates
+- can access Data Integrity
+
+Sales Rep:
+- can create leads
+- can create quotes
+- can create proposed jobs/contracts if allowed
+- cannot activate final service contracts unless permission allows
+- cannot edit restricted stock quantities
+
+Service Manager / Hygiene Services Manager:
+- can create clients
+- can create jobs
+- can create service contracts
+- can create rental contracts
+- can create stock usage
+- can view client profile
+- can edit service schedules if allowed
+
+Technician:
+- can view assigned jobs
+- can start/complete jobs
+- can add notes/photos/signatures
+- can complete treatment reports
+- can record stock/chemical usage
+- cannot edit client master details
+- cannot edit contract prices
+- cannot edit increase dates
+- cannot edit route sequence unless allowed
+
+Finance:
+- can view jobs ready to invoice
+- can create invoices
+- can update invoice status
+- cannot accidentally change service schedules or client master records unless allowed
+
+PART 12: BACKUP TEST
+
+Run backup/export.
+
+Confirm backup includes:
+- clients
+- leads
+- quotes
+- jobs
+- service contracts
+- rental contracts
+- invoices
+- purchase orders
+- expenses
+- workers
+- stock items
+- stock usage
+- treatment reports
+- communication notes
+- document metadata
+- backup logs
+
+Confirm backup report shows counts for each table.
+
+PART 13: SERVER RESTART PERSISTENCE TEST
+
+After creating all test records:
+
+1. Restart the server.
+2. Log back in.
+3. Search for the test clients.
+4. Confirm all records still exist:
+   - lead
+   - quote
+   - job
+   - service contract
+   - rental contract
+   - invoice
+   - treatment report
+   - stock usage
+   - communication notes
+5. Open Calendar and confirm scheduled jobs/contracts still show.
+6. Open Client Profile and confirm all tabs still show the linked records.
+
+Expected result:
+Overall PASSED.
+
+PART 14: ERROR HANDLING TEST
+
+Test failed saves.
+
+For each form:
+- Add Client
+- Add Job
+- Add Service Contract
+- Add Rental Contract
+- Add Stock Item
+- Add Treatment Report
+- Add Invoice
+
+Force a missing required field.
+
+Confirm:
+- form does not hang on Saving
+- button resets
+- clear error message appears
+- no partial/orphan record is created
+
+FINAL REPORT REQUIRED
+
+Please provide a test result summary:
+
+Overall: PASSED / FAILED
+
+For each section, show:
+- Passed / Failed
+- What was tested
+- Any bugs found
+- What was fixed
+- Any remaining issues
+
+Do not continue feature work until this end-to-end test passes or all failures are clearly listed.

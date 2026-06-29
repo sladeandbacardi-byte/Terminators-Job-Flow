@@ -56,7 +56,7 @@ export const clients = pgTable("clients", {
   contactPerson: text("contact_person"),
   businessType: text("business_type"),
   status: text("status").notNull().default('active'), // active, inactive, suspended
-  departmentId: varchar("department_id").notNull(),
+  departmentId: varchar("department_id"),
   taxNumber: text("tax_number"), // VAT Number
   companyRegistrationNumber: text("company_registration_number"),
   paymentTerms: text("payment_terms"),

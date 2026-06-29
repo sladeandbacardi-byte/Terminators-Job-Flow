@@ -1692,6 +1692,7 @@ export class DbStorage implements IStorage {
     const [
       depts, wrks, cls, inv, rc, jbs, invs, invItems, supps, pos, poItems,
       calEvts, reports, quotes, emTemplates, emLogs, notifs, scs, sas, exps, sses,
+      trRepts, commNotes, jobInvItems,
     ] = await Promise.all([
       db.select().from(departments),
       db.select().from(workers),
@@ -1714,6 +1715,9 @@ export class DbStorage implements IStorage {
       db.select().from(salesAppointments),
       db.select().from(expenses),
       db.select().from(serviceScheduleEntries),
+      db.select().from(treatmentReports),
+      db.select().from(communicationNotes),
+      db.select().from(jobInventoryItems),
     ]);
     return {
       exportedAt: new Date().toISOString(), version: "2.0", storageType: "postgresql",
@@ -1723,6 +1727,7 @@ export class DbStorage implements IStorage {
       calendarEvents: calEvts, customReports: reports, quoteSubmissions: quotes,
       emailTemplates: emTemplates, emailLogs: emLogs, notifications: notifs,
       serviceContracts: scs, salesAppointments: sas, expenses: exps, serviceScheduleEntries: sses,
+      treatmentReports: trRepts, communicationNotes: commNotes, jobInventoryItems: jobInvItems,
       backupLogs: this.backupLogs,
     };
   }
