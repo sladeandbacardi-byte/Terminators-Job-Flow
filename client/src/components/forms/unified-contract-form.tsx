@@ -402,7 +402,8 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   const summary = scheduleSummary(form, teams.find((t: any) => t.id === form.assignedTeamId)?.name ?? "");
   const showSecondDay = ["2 x a week", "Twice a month"].includes(form.frequency);
   const showWeek = ["Monthly","Every 2 months","Quarterly","Every 6 months","Annually","Twice a month"].includes(form.frequency);
-  const showDay = !["Daily","On Demand","Once-off","Annually"].includes(form.frequency);
+  const showDay = !["Daily","On Demand","Once-off"].includes(form.frequency);
+  const showOnceOffDate = ["Once-off","On Demand"].includes(form.frequency);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
@@ -601,6 +602,11 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
               <SelectContent>{FREQS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
+          {showOnceOffDate && (
+            <Field label="Service Date">
+              <Input type="date" value={form.contractStartDate} onChange={setStr("contractStartDate")} />
+            </Field>
+          )}
           {showWeek && (
             <Field label="Week of Month">
               <Select value={form.weekOfMonth} onValueChange={set("weekOfMonth")}>
