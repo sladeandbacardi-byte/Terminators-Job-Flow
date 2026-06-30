@@ -106,7 +106,7 @@ function RoleDashboard() {
 }
 
 function AuthenticatedApp() {
-  const { isAuthenticated, isLoading, login, loginDemo, user } = useAuth();
+  const { isAuthenticated, isLoading, login, user } = useAuth();
   const [, navigate] = useLocation();
 
   if (isLoading) {
@@ -125,11 +125,7 @@ function AuthenticatedApp() {
       login(token, userData);
       navigate(getDefaultDashboardRoute(userData), { replace: true });
     };
-    const handleDemoLogin = (profile: any) => {
-      loginDemo(profile);
-      navigate(getDefaultDashboardRoute(profile.user ?? {}), { replace: true });
-    };
-    return <LoginForm onSuccess={handleLogin} onDemoLogin={handleDemoLogin} />;
+    return <LoginForm onSuccess={handleLogin} />;
   }
 
   return (
