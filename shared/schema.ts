@@ -1677,3 +1677,95 @@ export const stockCheckItems = pgTable("stock_check_items", {
 export const insertStockCheckItemSchema = createInsertSchema(stockCheckItems).omit({ id: true });
 export type InsertStockCheckItem = z.infer<typeof insertStockCheckItemSchema>;
 export type StockCheckItem = typeof stockCheckItems.$inferSelect;
+
+// ── Unified Contracts ─────────────────────────────────────────────────────────
+// Single contract table replacing separate service/rental split
+export const unifiedContracts = pgTable("unified_contracts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Client
+  clientId: varchar("client_id").notNull(),
+  contactPerson: text("contact_person"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  address: text("address"),
+  googleMapsLink: text("google_maps_link"),
+  // Contract details
+  contractNumber: text("contract_number"),
+  department: text("department").notNull(),       // Pest Control | Hygiene | Washroom | Sanitary Bins | Dustmats | Deep Cleaning | Other
+  contractStartDate: text("contract_start_date"), // YYYY-MM-DD
+  contractEndDate: text("contract_end_date"),     // YYYY-MM-DD
+  lastPriceIncreaseDate: text("last_price_increase_date"),
+  nextIncreaseDate: text("next_increase_date"),
+  increasePercentage: text("increase_percentage"),
+  activeStatus: boolean("active_status").notNull().default(true),
+  specialInstructions: text("special_instructions"),
+  internalNotes: text("internal_notes"),
+  // Scheduling
+  frequency: text("frequency"),                   // Daily | Weekly | Monthly | etc.
+  weekOfMonth: integer("week_of_month"),           // 1-4, 5=Last
+  dayOfWeek: text("day_of_week"),
+  secondDayOfWeek: text("second_day_of_week"),
+  startTime: text("start_time"),                  // HH:MM
+  secondStartTime: text("second_start_time"),
+  estimatedDuration: integer("estimated_duration"), // minutes
+  fixedTime: boolean("fixed_time").default(false),
+  routeSequence: integer("route_sequence"),
+  assignedTeamId: varchar("assigned_team_id"),
+  assignedTeamName: text("assigned_team_name"),
+  assignedTechnicianId: varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  confirmWithClientBeforeService: boolean("confirm_with_client_before_service").default(false),
+  // Pricing / invoicing
+  invoiceRule: text("invoice_rule"),
+  mustBeInvoiced: boolean("must_be_invoiced").default(true),
+  financeNotes: text("finance_notes"),
+  // Notes
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+export const insertUnifiedContractSchema = createInsertSchema(unifiedContracts).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertUnifiedContract = z.infer<typeof insertUnifiedContractSchema>;
+export type UnifiedContract = typeof unifiedContracts.$inferSelect;
+
+// ── Contract Line Items ───────────────────────────────────────────────────────
+export const contractLineItems = pgTable("contract_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull(),
+  clientId: varchar("client_id").notNull(),
+  lineType: text("line_type").notNull().default("Service"), // Service | Rental Item | Product / Refill | Combined Service + Item | Other
+  itemServiceName: text("item_service_name").notNull(),
+  serviceCategory: text("service_category"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
+  refillRule: text("refill_rule").default("Not Applicable"), // Including Refills | Excluding Refills | Refill Only | On Demand Refills | Not Applicable
+  stockTrackingRequired: boolean("stock_tracking_required").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertContractLineItemSchema = createInsertSchema(contractLineItems).omit({
+  id: true, createdAt: true,
+});
+export type InsertContractLineItem = z.infer<typeof insertContractLineItemSchema>;
+export type ContractLineItem = typeof contractLineItems.$inferSelect;
+
+// ── Department Defaults ───────────────────────────────────────────────────────
+// Admin-configurable defaults for team/technician per department
+export const departmentDefaults = pgTable("department_defaults", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  department: text("department").notNull().unique(), // Pest Control | Hygiene | Washroom | etc.
+  defaultTeamId: varchar("default_team_id"),
+  defaultTeamName: text("default_team_name"),
+  defaultTechnicianId: varchar("default_technician_id"),
+  defaultTechnicianName: text("default_technician_name"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+export const insertDepartmentDefaultSchema = createInsertSchema(departmentDefaults).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertDepartmentDefault = z.infer<typeof insertDepartmentDefaultSchema>;
+export type DepartmentDefault = typeof departmentDefaults.$inferSelect;

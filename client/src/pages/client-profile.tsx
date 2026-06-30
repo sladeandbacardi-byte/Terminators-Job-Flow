@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { ClientForm } from "@/components/forms/client-form";
 import ContractForm from "@/components/forms/contract-form";
+import UnifiedContractForm from "@/components/forms/unified-contract-form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -174,8 +175,9 @@ export default function ClientProfilePage() {
   const [cnOpen, setCnOpen]         = useState(false);
   const [expandedTr, setExpandedTr] = useState<string | null>(null);
   const [expandedCn, setExpandedCn] = useState<string | null>(null);
-  const [contractFilter, setContractFilter]   = useState<"all"|"service"|"rental"|"active"|"inactive">("all");
-  const [showContractPicker, setShowContractPicker] = useState(false);
+  const [contractFilter, setContractFilter]   = useState<"all"|"unified"|"service"|"rental"|"active"|"inactive">("all");
+  const [showUnifiedForm, setShowUnifiedForm]       = useState(false);
+  const [editingUnified, setEditingUnified]         = useState<any | null>(null);
   const [isRentalFormOpen, setIsRentalFormOpen]     = useState(false);
   const [editingRental, setEditingRental]           = useState<any | null>(null);
 
@@ -196,6 +198,11 @@ export default function ClientProfilePage() {
   const { data: allInvoices = [] }    = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
   const { data: allContracts = [] }   = useQuery<ServiceContract[]>({ queryKey: ["/api/service-contracts"] });
   const { data: allRentalContracts = [] } = useQuery<any[]>({ queryKey: ["/api/contracts"] });
+  const { data: clientUnifiedContracts = [] } = useQuery<any[]>({
+    queryKey: ["/api/unified-contracts", { clientId: id }],
+    queryFn: () => fetch(`/api/unified-contracts?clientId=${id}`).then(r => r.json()),
+    enabled: !!id,
+  });
   const { data: allQuotes = [] }      = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: departments = [] }    = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: allWorkers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
@@ -239,7 +246,8 @@ export default function ClientProfilePage() {
   const otherJobs      = clientJobs.filter(j => !["in_progress","scheduled","completed"].includes(j.status));
 
   // Stats
-  const activeContractCount = clientContracts.filter(c => c.activeStatus).length
+  const activeContractCount = clientUnifiedContracts.filter((c: any) => c.activeStatus).length
+    + clientContracts.filter(c => c.activeStatus).length
     + clientRentalContracts.filter((c: any) => c.isActive ?? c.activeStatus).length;
   const openInvoiceCount    = clientInvoices.filter(i => i.status !== "paid" && i.status !== "cancelled").length;
 
@@ -587,23 +595,25 @@ export default function ClientProfilePage() {
                 {/* ── Header ── */}
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-muted-foreground">
-                    {clientContracts.length + clientRentalContracts.length} contract{(clientContracts.length + clientRentalContracts.length) !== 1 ? "s" : ""}
+                    {clientUnifiedContracts.length + clientContracts.length + clientRentalContracts.length} contract{(clientUnifiedContracts.length + clientContracts.length + clientRentalContracts.length) !== 1 ? "s" : ""}
                     {activeContractCount > 0 && ` · ${activeContractCount} active`}
                   </span>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowContractPicker(true)}>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditingUnified(null); setShowUnifiedForm(true); }}>
                     <Plus className="h-3.5 w-3.5" />New Contract
                   </Button>
                 </div>
 
                 {/* ── Filter chips ── */}
-                {(clientContracts.length + clientRentalContracts.length) > 0 && (
+                {(clientUnifiedContracts.length + clientContracts.length + clientRentalContracts.length) > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-3">
-                    {(["all","service","rental","active","inactive"] as const).map(f => {
-                      const label = f === "all" ? `All (${clientContracts.length + clientRentalContracts.length})`
-                        : f === "service" ? `Service (${clientContracts.length})`
-                        : f === "rental"  ? `Rental (${clientRentalContracts.length})`
+                    {(["all","unified","service","rental","active","inactive"] as const).map(f => {
+                      const total = clientUnifiedContracts.length + clientContracts.length + clientRentalContracts.length;
+                      const label = f === "all"     ? `All (${total})`
+                        : f === "unified" ? `Contracts (${clientUnifiedContracts.length})`
+                        : f === "service" ? `Legacy Service (${clientContracts.length})`
+                        : f === "rental"  ? `Legacy Rental (${clientRentalContracts.length})`
                         : f === "active"  ? `Active (${activeContractCount})`
-                        : `Inactive (${(clientContracts.length + clientRentalContracts.length) - activeContractCount})`;
+                        : `Inactive (${total - activeContractCount})`;
                       return (
                         <button
                           key={f}
@@ -621,12 +631,72 @@ export default function ClientProfilePage() {
                   </div>
                 )}
 
-                {/* ── Unified list ── */}
+                {/* ── Unified Contracts ── */}
+                {(contractFilter === "all" || contractFilter === "unified" || contractFilter === "active" || contractFilter === "inactive") && clientUnifiedContracts.filter(c => {
+                  if (contractFilter === "active") return !!c.activeStatus;
+                  if (contractFilter === "inactive") return !c.activeStatus;
+                  return true;
+                }).length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {clientUnifiedContracts.filter(c => {
+                      if (contractFilter === "active") return !!c.activeStatus;
+                      if (contractFilter === "inactive") return !c.activeStatus;
+                      return true;
+                    }).map((c: any) => {
+                      const schedule = [
+                        c.frequency, c.dayOfWeek,
+                        c.weekOfMonth ? `Week ${c.weekOfMonth}` : undefined,
+                        c.startTime ? `@ ${c.startTime}` : undefined,
+                      ].filter(Boolean).join(" · ");
+                      return (
+                        <Card key={c.id} className="border-green-100">
+                          <CardContent className="pt-3 pb-3">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {c.contractNumber && (
+                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-100">
+                                      {c.contractNumber}
+                                    </span>
+                                  )}
+                                  <Badge className="bg-green-100 text-green-800 text-xs">Contract</Badge>
+                                  {c.department && <Badge className="bg-gray-100 text-gray-700 text-xs">{c.department}</Badge>}
+                                  <Badge className={c.activeStatus ? "bg-green-100 text-green-800 text-xs" : "bg-gray-100 text-gray-600 text-xs"}>
+                                    {c.activeStatus ? "Active" : "Inactive"}
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                                  {schedule && <InfoPair label="Schedule" value={schedule} className="col-span-2" />}
+                                  {(c.assignedTeamName || c.assignedTechnicianName) && (
+                                    <InfoPair label="Assigned" value={c.assignedTeamName || c.assignedTechnicianName} className="col-span-2" />
+                                  )}
+                                  {c.contractStartDate && <InfoPair label="Start" value={c.contractStartDate} />}
+                                  {c.contractEndDate && <InfoPair label="End" value={c.contractEndDate} />}
+                                  {c.nextIncreaseDate && <InfoPair label="Next Increase" value={c.nextIncreaseDate} />}
+                                </div>
+                                {c.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{c.notes}</p>}
+                              </div>
+                              <div className="flex gap-1.5 shrink-0">
+                                <Button variant="outline" size="sm" className="text-xs"
+                                  onClick={() => { setEditingUnified(c); setShowUnifiedForm(true); }}>
+                                  <Edit className="mr-1 h-3 w-3" />Edit
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── Legacy Service + Rental contracts ── */}
                 {(() => {
                   const combined: Array<{ type: "service" | "rental"; data: any }> = [
                     ...clientContracts.map(c => ({ type: "service" as const, data: c })),
                     ...clientRentalContracts.map(c => ({ type: "rental" as const, data: c })),
                   ].filter(({ type, data }) => {
+                    if (contractFilter === "unified") return false;
                     if (contractFilter === "service") return type === "service";
                     if (contractFilter === "rental")  return type === "rental";
                     const active = type === "service" ? data.activeStatus : (data.isActive ?? data.activeStatus);
@@ -635,17 +705,16 @@ export default function ClientProfilePage() {
                     return true;
                   });
 
-                  if (combined.length === 0) {
+                  if (combined.length === 0 && clientUnifiedContracts.length === 0 && contractFilter === "all") {
                     return (
                       <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
-                          {clientContracts.length + clientRentalContracts.length === 0
-                            ? "No contracts for this client yet."
-                            : "No contracts match this filter."}
+                          No contracts for this client yet.
                         </CardContent>
                       </Card>
                     );
                   }
+                  if (combined.length === 0) return null;
 
                   return (
                     <div className="space-y-2">
@@ -676,15 +745,9 @@ export default function ClientProfilePage() {
                                       ? "bg-blue-100 text-blue-800 text-xs"
                                       : "bg-purple-100 text-purple-800 text-xs"
                                     }>
-                                      {isService
-                                        ? <><Wrench className="h-3 w-3 mr-1 inline" />Service</>
-                                        : <><Package className="h-3 w-3 mr-1 inline" />Rental</>
-                                      }
+                                      {isService ? "Legacy Service" : "Legacy Rental"}
                                     </Badge>
-                                    <Badge className={active
-                                      ? "bg-green-100 text-green-800 text-xs"
-                                      : "bg-gray-100 text-gray-600 text-xs"
-                                    }>
+                                    <Badge className={active ? "bg-green-100 text-green-800 text-xs" : "bg-gray-100 text-gray-600 text-xs"}>
                                       {active ? "Active" : "Inactive"}
                                     </Badge>
                                     {isService && c.serviceType && (
@@ -698,19 +761,15 @@ export default function ClientProfilePage() {
                                       <InfoPair label="Assigned" value={c.assignedTeamName || c.assignedTechnicianName} className="col-span-2" />
                                     )}
                                     {price && <InfoPair label="Price" value={price} />}
-                                    {isService && c.estimatedDuration && <InfoPair label="Duration" value={`${c.estimatedDuration} min`} />}
                                     {c.startDate && <InfoPair label="Start" value={format(new Date(c.startDate), "dd MMM yyyy")} />}
                                     {c.endDate && <InfoPair label="End" value={format(new Date(c.endDate), "dd MMM yyyy")} />}
-                                    {isService && c.increaseDate && <InfoPair label="Next Increase" value={format(new Date(c.increaseDate), "dd MMM yyyy")} />}
                                   </div>
                                   {c.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{c.notes}</p>}
                                 </div>
                                 <div className="flex gap-1.5 shrink-0">
                                   {!isService && (
-                                    <Button
-                                      variant="outline" size="sm" className="text-xs"
-                                      onClick={() => { setEditingRental(c); setIsRentalFormOpen(true); }}
-                                    >
+                                    <Button variant="outline" size="sm" className="text-xs"
+                                      onClick={() => { setEditingRental(c); setIsRentalFormOpen(true); }}>
                                       <Edit className="mr-1 h-3 w-3" />Edit
                                     </Button>
                                   )}
@@ -729,52 +788,32 @@ export default function ClientProfilePage() {
                   );
                 })()}
 
-                {/* ── Contract Type Picker ── */}
-                <Dialog open={showContractPicker} onOpenChange={setShowContractPicker}>
-                  <DialogContent className="max-w-sm">
+                {/* ── Unified Contract Form ── */}
+                <Dialog open={showUnifiedForm} onOpenChange={open => { if (!open) { setShowUnifiedForm(false); setEditingUnified(null); } }}>
+                  <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>New Contract</DialogTitle>
-                      <DialogDescription>Choose the type of contract to create.</DialogDescription>
+                      <DialogTitle>{editingUnified ? "Edit Contract" : "New Contract"}</DialogTitle>
+                      <DialogDescription>
+                        {editingUnified ? "Update contract details, items, and schedule." : "Create a contract with services, rental items, or both."}
+                      </DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 gap-3 pt-2">
-                      <button
-                        onClick={() => { setShowContractPicker(false); window.location.href = newContractUrl(); }}
-                        className="flex items-center gap-4 p-4 border-2 border-blue-100 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left group"
-                      >
-                        <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                          <Wrench className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">Service Contract</p>
-                          <p className="text-xs text-gray-500 mt-0.5">Recurring visits — pest control, washroom, hygiene</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
-                      </button>
-                      <button
-                        onClick={() => { setShowContractPicker(false); setEditingRental(null); setIsRentalFormOpen(true); }}
-                        className="flex items-center gap-4 p-4 border-2 border-purple-100 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-colors text-left group"
-                      >
-                        <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                          <Package className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">Rental Contract</p>
-                          <p className="text-xs text-gray-500 mt-0.5">Equipment rentals — aerosol units, sanitary bins</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
-                      </button>
-                    </div>
+                    <UnifiedContractForm
+                      contract={editingUnified}
+                      defaultClientId={id}
+                      onSuccess={() => {
+                        setShowUnifiedForm(false); setEditingUnified(null);
+                        qc.invalidateQueries({ queryKey: ["/api/unified-contracts", { clientId: id }] });
+                      }}
+                      onCancel={() => { setShowUnifiedForm(false); setEditingUnified(null); }}
+                    />
                   </DialogContent>
                 </Dialog>
 
-                {/* ── Rental Contract Form ── */}
+                {/* ── Legacy Rental Contract Form ── */}
                 <Dialog open={isRentalFormOpen} onOpenChange={open => { setIsRentalFormOpen(open); if (!open) setEditingRental(null); }}>
                   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>{editingRental ? "Edit Rental Contract" : "New Rental Contract"}</DialogTitle>
-                      <DialogDescription>
-                        {editingRental ? "Update the rental contract details." : "Fill in the details to create a new rental contract."}
-                      </DialogDescription>
+                      <DialogTitle>{editingRental ? "Edit Legacy Rental Contract" : "Legacy Rental Contract"}</DialogTitle>
                     </DialogHeader>
                     <ContractForm
                       contract={editingRental}

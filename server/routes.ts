@@ -5001,5 +5001,82 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Unified Contracts ───────────────────────────────────────────────────────
+  app.get("/api/unified-contracts", async (req, res) => {
+    try {
+      const { clientId } = req.query;
+      if (clientId) {
+        res.json(await (storage as any).getUnifiedContractsByClient(String(clientId)));
+      } else {
+        res.json(await (storage as any).getUnifiedContracts());
+      }
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/unified-contracts/:id", async (req, res) => {
+    try {
+      const row = await (storage as any).getUnifiedContract(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/unified-contracts", async (req, res) => {
+    try {
+      const { lineItems, ...contractData } = req.body;
+      const contract = await (storage as any).createUnifiedContract(contractData);
+      if (Array.isArray(lineItems) && lineItems.length > 0) {
+        await (storage as any).replaceContractLineItems(contract.id, contract.clientId, lineItems);
+      }
+      const items = await (storage as any).getContractLineItems(contract.id);
+      res.status(201).json({ ...contract, lineItems: items });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/unified-contracts/:id", async (req, res) => {
+    try {
+      const { lineItems, ...contractData } = req.body;
+      const contract = await (storage as any).updateUnifiedContract(req.params.id, contractData);
+      if (Array.isArray(lineItems)) {
+        await (storage as any).replaceContractLineItems(contract.id, contract.clientId, lineItems);
+      }
+      const items = await (storage as any).getContractLineItems(contract.id);
+      res.json({ ...contract, lineItems: items });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/unified-contracts/:id", async (req, res) => {
+    try {
+      await (storage as any).deleteUnifiedContract(req.params.id);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Contract Line Items ─────────────────────────────────────────────────────
+  app.get("/api/unified-contracts/:id/line-items", async (req, res) => {
+    try { res.json(await (storage as any).getContractLineItems(req.params.id)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Department Defaults ─────────────────────────────────────────────────────
+  app.get("/api/department-defaults", async (_req, res) => {
+    try { res.json(await (storage as any).getDepartmentDefaults()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/department-defaults/:department", async (req, res) => {
+    try {
+      const row = await (storage as any).getDepartmentDefault(decodeURIComponent(req.params.department));
+      res.json(row ?? null);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/department-defaults/:department", async (req, res) => {
+    try {
+      const row = await (storage as any).upsertDepartmentDefault(decodeURIComponent(req.params.department), req.body);
+      res.json(row);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   return httpServer;
 }

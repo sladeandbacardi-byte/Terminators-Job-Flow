@@ -17,6 +17,7 @@ import {
   treatmentReports, communicationNotes, acceptedWorkflows, contractDeletionHistory,
   stockLocations, stockBalances, stockMovements, pickingLists, pickingListItems,
   stockChecks, stockCheckItems,
+  unifiedContracts, contractLineItems, departmentDefaults,
 } from "@shared/schema";
 
 import type {
@@ -2443,5 +2444,111 @@ export class DbStorage implements IStorage {
   }
   async getStockUsedOnJob(jobId: string) {
     return db.select().from(jobInventoryItems).where(eq(jobInventoryItems.jobId, jobId)).orderBy(desc(jobInventoryItems.createdAt));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UNIFIED CONTRACTS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async generateUnifiedContractNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(contract_number,'-',3) AS INTEGER)),0)` })
+      .from(unifiedContracts)
+      .where(ilike(unifiedContracts.contractNumber, `CON-${year}-%`));
+    return `CON-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
+  }
+
+  async getUnifiedContracts() {
+    return db.select().from(unifiedContracts).orderBy(desc(unifiedContracts.createdAt));
+  }
+
+  async getUnifiedContractsByClient(clientId: string) {
+    return db.select().from(unifiedContracts).where(eq(unifiedContracts.clientId, clientId)).orderBy(desc(unifiedContracts.createdAt));
+  }
+
+  async getUnifiedContract(id: string) {
+    const [row] = await db.select().from(unifiedContracts).where(eq(unifiedContracts.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async createUnifiedContract(data: any) {
+    const contractNumber = await this.generateUnifiedContractNumber();
+    const [row] = await db.insert(unifiedContracts).values({
+      id: randomUUID(),
+      contractNumber,
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    return row;
+  }
+
+  async updateUnifiedContract(id: string, data: any) {
+    const [row] = await db.update(unifiedContracts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(unifiedContracts.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteUnifiedContract(id: string) {
+    await db.delete(contractLineItems).where(eq(contractLineItems.contractId, id));
+    await db.delete(unifiedContracts).where(eq(unifiedContracts.id, id));
+  }
+
+  // ── Contract Line Items ──────────────────────────────────────────────────────
+
+  async getContractLineItems(contractId: string) {
+    return db.select().from(contractLineItems).where(eq(contractLineItems.contractId, contractId)).orderBy(asc(contractLineItems.createdAt));
+  }
+
+  async createContractLineItem(data: any) {
+    const [row] = await db.insert(contractLineItems).values({ id: randomUUID(), ...data, createdAt: new Date() }).returning();
+    return row;
+  }
+
+  async updateContractLineItem(id: string, data: any) {
+    const [row] = await db.update(contractLineItems).set(data).where(eq(contractLineItems.id, id)).returning();
+    return row;
+  }
+
+  async deleteContractLineItem(id: string) {
+    await db.delete(contractLineItems).where(eq(contractLineItems.id, id));
+  }
+
+  async replaceContractLineItems(contractId: string, clientId: string, items: any[]) {
+    await db.delete(contractLineItems).where(eq(contractLineItems.contractId, contractId));
+    if (items.length > 0) {
+      await db.insert(contractLineItems).values(items.map(item => ({
+        id: randomUUID(), contractId, clientId, ...item, createdAt: new Date(),
+      })));
+    }
+  }
+
+  // ── Department Defaults ──────────────────────────────────────────────────────
+
+  async getDepartmentDefaults() {
+    return db.select().from(departmentDefaults).orderBy(asc(departmentDefaults.department));
+  }
+
+  async getDepartmentDefault(department: string) {
+    const [row] = await db.select().from(departmentDefaults).where(eq(departmentDefaults.department, department)).limit(1);
+    return row ?? null;
+  }
+
+  async upsertDepartmentDefault(department: string, data: any) {
+    const existing = await this.getDepartmentDefault(department);
+    if (existing) {
+      const [row] = await db.update(departmentDefaults)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(departmentDefaults.department, department))
+        .returning();
+      return row;
+    } else {
+      const [row] = await db.insert(departmentDefaults)
+        .values({ id: randomUUID(), department, ...data, createdAt: new Date(), updatedAt: new Date() })
+        .returning();
+      return row;
+    }
   }
 }

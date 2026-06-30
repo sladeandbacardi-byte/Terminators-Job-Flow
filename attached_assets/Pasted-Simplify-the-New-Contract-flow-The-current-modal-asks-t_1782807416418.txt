@@ -1,0 +1,489 @@
+Simplify the New Contract flow.
+
+The current modal asks the user to choose:
+- Service Contract
+- Rental Contract
+
+This is confusing and must be removed.
+
+BUSINESS RULE
+
+In Job Flow, a contract means recurring work or recurring supply for a client.
+
+A contract can include:
+- labour/service
+- physical rental/product items
+- both service and rental/product items together
+
+Do not force the user to choose Service Contract or Rental Contract at the start.
+
+Example:
+A sanitary bin contract includes:
+- placement of the bin at the client site
+- regular cleaning/service of the bin
+- replacement of the bin if it is too dirty to clean on site
+
+This is both a physical item and a recurring service.
+
+Therefore, the contract form must support combined contract lines.
+
+NEW CONTRACT BUTTON
+
+When the user clicks:
+
++ New Contract
+
+Do not show the Service Contract / Rental Contract choice modal.
+
+Instead, open the New Contract form directly.
+
+CONTRACT FORM STRUCTURE
+
+The New Contract form must have these sections:
+
+1. Client Details
+2. Contract Details
+3. Contract Items / Services
+4. Scheduling
+5. Pricing / Invoicing
+6. Stock / Refill Rules
+7. Notes / Documents
+
+CLIENT DETAILS
+
+Fields:
+
+- Client
+- Contact Person
+- Phone
+- Email
+- Address
+- Google Maps Link
+
+If New Contract is opened from the Client Profile, prefill these fields using the selected clientId.
+
+CONTRACT DETAILS
+
+Fields:
+
+- Contract Number
+- Department
+- Contract Start Date
+- Contract End Date
+- Last Price Increase Date
+- Next Increase Date
+- Increase Percentage
+- Active / Inactive
+- Special Instructions
+- Internal Notes
+
+DEPARTMENT OPTIONS
+
+Use department options such as:
+
+- Pest Control
+- Hygiene
+- Washroom
+- Sanitary Bins
+- Dustmats
+- Deep Cleaning
+- Other
+
+When the user selects a Department, automatically suggest the correct service types and default team/technician.
+
+CONTRACT ITEMS / SERVICES
+
+A contract must allow multiple contract lines.
+
+Each line can be a service, a rental/product item, or both.
+
+Each contract line must include:
+
+- Line Type
+- Item / Service Name
+- Service Category
+- Quantity
+- Unit Price
+- Total Price
+- Refill Rule if applicable
+- Stock Tracking Required
+- Notes
+
+Line Type options:
+
+- Service
+- Rental Item
+- Product / Refill
+- Combined Service + Item
+- Other
+
+Item / Service examples:
+
+Pest Control:
+- Rodent Service
+- Cockroach Service
+- Ant Treatment
+- Flea Treatment
+- Fly Control
+- Bed Bug Treatment
+- Termite Inspection
+- Wood Borer Treatment
+- Other Pest Control
+
+Sanitary Bins:
+- Sanitary Bin Placement
+- Sanitary Bin Service
+- Sanitary Bin Cleaning
+- Sanitary Bin Replacement
+- Sanitary Bin Rental
+- Sanitary Bin Refill / Consumables
+
+Washroom / Hygiene:
+- Aerosol A/F Unit
+- Aerosol Refill
+- Soap Dispenser
+- Soap Refill
+- Paper Towel Dispenser
+- Paper Towel Refill
+- Toilet Roll Dispenser
+- Toilet Roll Refill
+- Urinal Mat
+- Washroom Service
+
+Dustmats:
+- Dustmat Rental
+- Dustmat Replacement
+- Dustmat Cleaning
+
+Deep Cleaning:
+- Deep Cleaning Service
+- Once-off Deep Clean
+- Recurring Deep Clean
+
+REFILL RULE OPTIONS
+
+- Including Refills
+- Excluding Refills
+- Refill Only
+- On Demand Refills
+- Not Applicable
+
+EXAMPLE CONTRACT
+
+Client: Greenacres Restaurant
+Department: Hygiene
+
+Contract Items / Services:
+
+1. Aerosol A/F Unit
+   Line Type: Rental Item
+   Refill Rule: Excluding Refills
+   Quantity: 1
+
+2. Aerosol Refill
+   Line Type: Product / Refill
+   Refill Rule: Refill Only
+   Quantity: 1
+
+3. Monthly Washroom Service
+   Line Type: Service
+   Quantity: 1
+
+EXAMPLE SANITARY BIN CONTRACT
+
+Client: Example Client
+Department: Sanitary Bins
+
+Contract Items / Services:
+
+1. Sanitary Bin Placement
+   Line Type: Rental Item
+   Quantity: 2
+
+2. Sanitary Bin Service / Cleaning
+   Line Type: Service
+   Quantity: 2
+
+3. Sanitary Bin Replacement if required
+   Line Type: Combined Service + Item
+   Refill Rule: On Demand
+   Quantity: optional
+
+SCHEDULING
+
+Scheduling belongs to the contract.
+
+Fields:
+
+- Frequency
+- Week of Month
+- Day of Week
+- Second Day of Week if needed
+- Start Time
+- Second Start Time if needed
+- Estimated Duration
+- Fixed Time
+- Route Sequence
+- Assigned Team
+- Assigned Technician
+- Confirm With Client Before Service
+
+Frequency options:
+
+- Daily
+- 2 x a week
+- Weekly
+- Twice a month
+- Monthly
+- Every 2 months
+- Quarterly
+- Every 6 months
+- Annually
+- Once-off
+- On Demand
+
+Week of Month options:
+
+- Every Week
+- Week 1
+- Week 2
+- Week 3
+- Week 4
+- Last Week
+
+Day of Week options:
+
+- Monday
+- Tuesday
+- Wednesday
+- Thursday
+- Friday
+- Saturday
+- Sunday
+
+Fixed Time options:
+
+- Yes
+- No
+
+TEAM / TECHNICIAN AUTO-FILL
+
+When the user selects Department, auto-fill or suggest the default team/technician.
+
+Create a department assignment mapping.
+
+Examples:
+
+Department: Sanitary Bins
+Default Team: Jackie & Re-Alton
+
+Department: Washroom
+Default Team: Washroom Team
+
+Department: Dustmats
+Default Team: Dustmat Team
+
+Department: Pest Control
+Default Team/Technician: show available pest control technicians
+
+Department: Deep Cleaning
+Default Team: Deep Cleaning Team
+
+If there is only one default team/technician for that department:
+- auto-select it
+
+If there are multiple possible teams/technicians:
+- show a dropdown list
+- allow the user to choose
+
+The Assigned Team and Assigned Technician fields must pull from the live workers/teams list, not free text.
+
+If no team exists for that department:
+- leave blank
+- show "Select team/technician"
+- allow manager/admin to configure defaults later
+
+CREATE SETTINGS FOR DEFAULT ASSIGNMENTS
+
+Add an admin settings area:
+
+Admin > Service Settings > Department Defaults
+
+Allow admin/manager to configure:
+
+- Department
+- Default Team
+- Default Technician
+- Available Teams
+- Available Technicians
+
+This prevents hard-coding names in the UI.
+
+SCHEDULE SUMMARY
+
+Every contract must generate a readable schedule summary.
+
+Examples:
+
+- Monthly - Week 1 Monday at 08:00 - Jackie & Re-Alton - Route 1
+- Weekly - Every Tuesday at 10:00 - Washroom Team
+- Quarterly - Week 2 Wednesday at 09:00 - Pest Control
+- On Demand - Create job only when requested
+
+CALENDAR
+
+The Calendar must show contracts based on the contract schedule.
+
+Calendar rows must show:
+
+- Client
+- Department
+- Contract items/services summary
+- Assigned Team / Technician
+- Schedule time
+- Route Sequence
+- Status
+
+CLIENT PROFILE
+
+Client Profile > Contracts must show every contract linked to the clientId.
+
+Each row/card must show:
+
+- Contract Number
+- Department
+- Contract Items / Services summary
+- Frequency
+- Schedule Summary
+- Assigned Team / Technician
+- Price / Total
+- Start Date
+- End Date
+- Next Increase Date
+- Status
+- View/Edit button
+
+Do not split client contracts into separate rental and service areas.
+
+A client can have one contract with both service and rental/product lines.
+
+POSTGRESQL
+
+All contract fields and contract line items must save to PostgreSQL.
+
+Required tables or structures:
+
+Contracts:
+- contractId
+- clientId
+- contractNumber
+- department
+- contractStartDate
+- contractEndDate
+- lastPriceIncreaseDate
+- nextIncreaseDate
+- increasePercentage
+- frequency
+- weekOfMonth
+- dayOfWeek
+- secondDayOfWeek
+- startTime
+- secondStartTime
+- estimatedDuration
+- fixedTime
+- routeSequence
+- assignedTeamId
+- assignedTechnicianId
+- confirmWithClientBeforeService
+- activeStatus
+- notes
+- createdAt
+- updatedAt
+
+Contract Line Items:
+- contractLineItemId
+- contractId
+- clientId
+- lineType
+- itemServiceName
+- serviceCategory
+- quantity
+- unitPrice
+- totalPrice
+- refillRule
+- stockTrackingRequired
+- notes
+- createdAt
+- updatedAt
+
+If existing service contract and rental contract tables already exist, either:
+1. migrate toward one unified contracts table with contract line items, or
+2. create a unified API/view that presents them as one contract system to the user.
+
+The UI must behave as one Contracts system.
+
+DATA INTEGRITY
+
+Update Admin > Data Integrity checks:
+
+- contracts missing clientId
+- contracts missing department
+- contracts missing schedule fields where required
+- contract line items missing contractId
+- contract line items missing clientId
+- scheduled contracts not appearing on calendar
+- contracts without assigned team/technician where department requires it
+- duplicate route sequence for same department/week/day/team
+
+TEST
+
+Run this test:
+
+TEST 1: New combined sanitary bin contract
+1. Go to Service > Contracts.
+2. Click + New Contract.
+3. Confirm no Service/Rental choice modal appears.
+4. Select client.
+5. Select Department: Sanitary Bins.
+6. Confirm default team auto-selects Jackie & Re-Alton if configured.
+7. Add contract lines:
+   - Sanitary Bin Placement
+   - Sanitary Bin Service / Cleaning
+   - Sanitary Bin Replacement if required
+8. Set Frequency: Monthly.
+9. Set Week: Week 1.
+10. Set Day: Monday.
+11. Set Time: 08:00.
+12. Set Route Sequence: 1.
+13. Save.
+14. Confirm it appears in Contracts list.
+15. Confirm it appears under Client Profile > Contracts.
+16. Confirm it appears on Calendar.
+
+TEST 2: New washroom/aerosol contract
+1. Create contract for Greenacres Restaurant.
+2. Select Department: Washroom or Hygiene.
+3. Add lines:
+   - Aerosol A/F Unit
+   - Aerosol A/F Unit - Excluding Refills
+   - Aerosol Refill
+4. Set schedule.
+5. Save.
+6. Confirm all lines appear under one contract.
+
+TEST 3: Multiple technicians
+1. Select Department: Pest Control.
+2. Confirm available pest control technicians show in dropdown.
+3. Select one.
+4. Save contract.
+5. Confirm assigned technician persists after refresh.
+
+IMPORTANT
+
+The user should not have to decide if a contract is rental or service at the beginning.
+
+The contract can contain services, items, or both.
+
+The contract is recurring work/supply for a client.
+The contract line items describe what is included.
+The department determines the likely team/technician.
