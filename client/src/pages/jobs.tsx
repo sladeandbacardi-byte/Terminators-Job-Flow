@@ -615,7 +615,7 @@ export default function Jobs() {
                                       ...(job.description && { notes: job.description }),
                                       ...(worker && { workerId: worker.id, workerName: worker.name }),
                                     });
-                                    navigate(`/service-contracts?${params.toString()}`);
+                                    navigate(`/contracts`);
                                   }}
                                 >
                                   <FileSignature className="h-3 w-3 mr-1" /> Convert to Contract

@@ -680,7 +680,7 @@ export default function Contracts() {
                         {!isSales && (
                           <div className="flex sm:flex-col gap-2 shrink-0">
                             {isService ? (
-                              <Link href="/service-contracts">
+                              <Link href="/contracts">
                                 <Button variant="outline" size="sm" className="text-xs w-full">
                                   <Edit className="h-3.5 w-3.5 mr-1" />View/Edit
                                 </Button>

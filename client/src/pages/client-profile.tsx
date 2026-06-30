@@ -260,25 +260,6 @@ export default function ClientProfilePage() {
   const getJobWorker  = (jId: string)  => { const j = allJobs.find(x => x.id === jId); return j?.workerId ? getWorkerName(j.workerId) : undefined; };
   const getItemName   = (iId: string)  => allInventory.find(i => i.id === iId)?.name ?? iId;
 
-  // Build "New Contract" URL with as much client data pre-filled as possible
-  const newContractUrl = () => {
-    if (!client) return "/service-contracts";
-    const p = new URLSearchParams();
-    p.set("newContract", "1");
-    p.set("clientId", id!);
-    p.set("clientName", client.name);
-    if (client.contactPerson)   p.set("contactPerson", client.contactPerson);
-    if (client.phone)           p.set("phone", client.phone);
-    if (client.email)           p.set("email", client.email);
-    if (client.googleMapsLink)  p.set("googleMapsLink", client.googleMapsLink);
-    const addrParts = [
-      client.streetNumber, client.streetName, client.suburb,
-      client.city, client.province, client.postalCode,
-    ].filter(Boolean).join(", ");
-    if (addrParts) p.set("address", addrParts);
-    else if (client.address) p.set("address", client.address);
-    return `/service-contracts?${p.toString()}`;
-  };
 
   // ── Mutations ───────────────────────────────────────────────────────────
 
@@ -773,7 +754,7 @@ export default function ClientProfilePage() {
                                       <Edit className="mr-1 h-3 w-3" />Edit
                                     </Button>
                                   )}
-                                  <Link href={isService ? "/service-contracts" : "/contracts"}>
+                                  <Link href="/contracts">
                                     <Button variant="outline" size="sm" className="text-xs">
                                       <ExternalLink className="mr-1 h-3 w-3" />View
                                     </Button>

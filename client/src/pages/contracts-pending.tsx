@@ -170,9 +170,7 @@ export default function ContractsPendingPage() {
 
                         <div className="flex flex-col gap-1.5 shrink-0">
                           <Button size="sm" variant="default"
-                            onClick={() => navigate(
-                              `/service-contracts?newContract=1&serviceType=${encodeURIComponent(lead.serviceType)}&notes=${encodeURIComponent(lead.notes ?? "")}`
-                            )}
+                            onClick={() => navigate(`/contracts`)}
                             className="h-7 text-xs gap-1">
                             <FileText className="h-3 w-3" /> Create Contract
                           </Button>
