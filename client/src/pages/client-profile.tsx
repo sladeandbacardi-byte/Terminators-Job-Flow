@@ -674,31 +674,55 @@ export default function ClientProfilePage() {
                                           };
                                           return m[a] ?? a;
                                         })();
+                                        const stdPrice   = li.standardSellingPrice ? Number(li.standardSellingPrice) : null;
+                                        const discPct    = li.discountPercentage ? Number(li.discountPercentage) : 0;
+                                        const finalPrice = li.finalUnitPrice ? Number(li.finalUnitPrice) : (li.unitPrice ? Number(li.unitPrice) : null);
+                                        const qty        = Number(li.quantity) || 1;
+                                        const lineTotal  = finalPrice ? (qty * finalPrice) : null;
                                         return (
                                           <div key={li.id} className="flex items-start gap-1.5 text-xs">
                                             <span className="text-gray-300 mt-0.5">•</span>
-                                            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 flex-1">
-                                              <span className="text-gray-800 font-medium">{li.itemServiceName}</span>
-                                              <span className="text-gray-500">× {Number(li.quantity)}</span>
-                                              {li.unitPrice && Number(li.unitPrice) > 0 && (
-                                                <span className="text-gray-400">@ R{Number(li.unitPrice).toFixed(2)}/unit</span>
-                                              )}
-                                              <span className={`px-1 py-0.5 rounded text-xs font-medium ${
-                                                li.stockItemId ? "bg-blue-50 text-blue-600" : "bg-gray-50 text-gray-500"
-                                              }`}>
-                                                {li.stockItemId ? "Inventory" : "Service"}
-                                              </span>
-                                              {refillLabel && (
-                                                <span className="px-1 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-600">
-                                                  {refillLabel}
+                                            <div className="flex-1">
+                                              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                                                <span className="text-gray-800 font-medium">{li.itemServiceName}</span>
+                                                <span className="text-gray-500">× {qty}</span>
+                                                <span className={`px-1 py-0.5 rounded text-xs font-medium ${
+                                                  li.stockItemId ? "bg-blue-50 text-blue-600" : "bg-gray-50 text-gray-500"
+                                                }`}>
+                                                  {li.stockItemId ? "Inventory" : "Service"}
                                                 </span>
-                                              )}
-                                              {li.consumableItemName && li.consumableArrangement !== "Client Supplies Own Consumables" && (
-                                                <span className="text-gray-400 italic">↳ {li.consumableItemName}</span>
-                                              )}
-                                              {li.separateConsumablePrice && Number(li.separateConsumablePrice) > 0 && (
-                                                <span className="text-gray-400">Consumable: R{Number(li.separateConsumablePrice).toFixed(2)}</span>
-                                              )}
+                                                {refillLabel && (
+                                                  <span className="px-1 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-600">
+                                                    {refillLabel}
+                                                  </span>
+                                                )}
+                                                {li.manualPriceOverride && (
+                                                  <span className="px-1 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
+                                                    Manual price
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {/* Pricing breakdown */}
+                                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-gray-500">
+                                                {stdPrice !== null && (
+                                                  <span>Std: R{stdPrice.toFixed(2)}</span>
+                                                )}
+                                                {discPct > 0 && (
+                                                  <span className="text-green-600">{discPct}% off</span>
+                                                )}
+                                                {finalPrice !== null && (
+                                                  <span className="font-medium text-gray-700">Final: R{finalPrice.toFixed(2)}</span>
+                                                )}
+                                                {lineTotal !== null && (
+                                                  <span className="font-semibold text-gray-800">Total: R{lineTotal.toFixed(2)}</span>
+                                                )}
+                                                {li.consumableItemName && li.consumableArrangement !== "Client Supplies Own Consumables" && (
+                                                  <span className="italic text-gray-400">↳ {li.consumableItemName}</span>
+                                                )}
+                                                {li.separateConsumablePrice && Number(li.separateConsumablePrice) > 0 && (
+                                                  <span>Consumable: R{Number(li.separateConsumablePrice).toFixed(2)}</span>
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
                                         );

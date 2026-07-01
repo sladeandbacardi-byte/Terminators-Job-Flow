@@ -121,9 +121,10 @@ type CatalogItem = {
   lineType: string;
   serviceCategory: string;
   stockTrackingDefault: boolean;
-  unitPrice: string;
-  divId: string;     // div-1/2/3/4 for inventory items, "" for services
-  depts: string[];   // dept names for service items
+  sellingPrice: string;   // raw inventory sellingPrice (for standard price)
+  unitPrice: string;      // same as sellingPrice; kept for legacy compat
+  divId: string;
+  depts: string[];
   source: "inventory" | "service";
 };
 
@@ -134,7 +135,11 @@ type SimpleInclude = {
   lineType: string;
   serviceCategory: string;
   quantity: string;
-  unitPrice: string;
+  standardSellingPrice: string;
+  discountPercentage: string;
+  finalUnitPrice: string;
+  manualPriceOverride: boolean;
+  unitPrice: string;      // mirrors finalUnitPrice for backward compat
   refillRule: string;
   stockTrackingRequired: boolean;
   notes: string;
@@ -154,6 +159,10 @@ type LineItem = {
   itemServiceName: string;
   serviceCategory: string;
   quantity: string;
+  standardSellingPrice: string;
+  discountPercentage: string;
+  finalUnitPrice: string;
+  manualPriceOverride: boolean;
   unitPrice: string;
   totalPrice: string;
   refillRule: string;
@@ -231,6 +240,7 @@ function buildCatalog(inventoryItems: InventoryItem[], selectedDept: string): Ca
       lineType: inventoryItemToLineType(i),
       serviceCategory: i.category || "",
       stockTrackingDefault: true,
+      sellingPrice: String((i as any).sellingPrice || ""),
       unitPrice: String((i as any).sellingPrice || i.unitPrice || ""),
       divId: (i as any).departmentId || "",
       depts: [],
@@ -243,6 +253,7 @@ function buildCatalog(inventoryItems: InventoryItem[], selectedDept: string): Ca
     lineType: s.lineType,
     serviceCategory: s.category,
     stockTrackingDefault: false,
+    sellingPrice: "",
     unitPrice: "",
     divId: "",
     depts: s.depts,
@@ -272,6 +283,10 @@ const EMPTY_LINE = (): LineItem => ({
   itemServiceName: "",
   serviceCategory: "",
   quantity: "1",
+  standardSellingPrice: "",
+  discountPercentage: "0",
+  finalUnitPrice: "",
+  manualPriceOverride: false,
   unitPrice: "",
   totalPrice: "",
   refillRule: "Not Applicable",
@@ -531,25 +546,33 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   useEffect(() => {
     if (existingLines.length === 0) return;
     setHasLoadedExisting(true);
-    setSimpleItems(existingLines.map((li: any) => ({
-      _key: li.id,
-      stockItemId: li.stockItemId || "",
-      itemServiceName: li.itemServiceName || "",
-      lineType: li.lineType || "Service",
-      serviceCategory: li.serviceCategory || "",
-      quantity: String(li.quantity ?? "1"),
-      unitPrice: String(li.unitPrice ?? ""),
-      refillRule: li.refillRule || "Not Applicable",
-      stockTrackingRequired: li.stockTrackingRequired ?? false,
-      notes: li.notes || "",
-      consumableArrangement: li.consumableArrangement || "Not Applicable",
-      consumableIncludedInPrice: li.consumableIncludedInPrice ?? false,
-      consumableBillableSeparately: li.consumableBillableSeparately ?? false,
-      clientSuppliesOwnConsumables: li.clientSuppliesOwnConsumables ?? false,
-      consumableStockItemId: li.consumableStockItemId || "",
-      consumableItemName: li.consumableItemName || "",
-      separateConsumablePrice: String(li.separateConsumablePrice ?? ""),
-    })));
+    setSimpleItems(existingLines.map((li: any) => {
+      const stdPrice = String(li.standardSellingPrice ?? "");
+      const finalPrice = String(li.finalUnitPrice ?? li.unitPrice ?? "");
+      return {
+        _key: li.id,
+        stockItemId: li.stockItemId || "",
+        itemServiceName: li.itemServiceName || "",
+        lineType: li.lineType || "Service",
+        serviceCategory: li.serviceCategory || "",
+        quantity: String(li.quantity ?? "1"),
+        standardSellingPrice: stdPrice,
+        discountPercentage: String(li.discountPercentage ?? "0"),
+        finalUnitPrice: finalPrice,
+        manualPriceOverride: li.manualPriceOverride ?? false,
+        unitPrice: finalPrice || String(li.unitPrice ?? ""),
+        refillRule: li.refillRule || "Not Applicable",
+        stockTrackingRequired: li.stockTrackingRequired ?? false,
+        notes: li.notes || "",
+        consumableArrangement: li.consumableArrangement || "Not Applicable",
+        consumableIncludedInPrice: li.consumableIncludedInPrice ?? false,
+        consumableBillableSeparately: li.consumableBillableSeparately ?? false,
+        clientSuppliesOwnConsumables: li.clientSuppliesOwnConsumables ?? false,
+        consumableStockItemId: li.consumableStockItemId || "",
+        consumableItemName: li.consumableItemName || "",
+        separateConsumablePrice: String(li.separateConsumablePrice ?? ""),
+      };
+    }));
     setAdvancedMode(false);
   }, [existingLines.length]);
 
@@ -618,6 +641,7 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       toast({ title: "Already added", description: `${cat.name} is already in the list.` });
       return;
     }
+    const stdPrice = cat.sellingPrice || cat.unitPrice || "";
     setSimpleItems(items => [...items, {
       _key: Math.random().toString(36).slice(2),
       stockItemId: cat.stockItemId,
@@ -625,7 +649,11 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       lineType: cat.lineType,
       serviceCategory: cat.serviceCategory,
       quantity: "1",
-      unitPrice: cat.unitPrice,
+      standardSellingPrice: stdPrice,
+      discountPercentage: "0",
+      finalUnitPrice: stdPrice,
+      manualPriceOverride: false,
+      unitPrice: stdPrice,
       refillRule: "Not Applicable",
       stockTrackingRequired: cat.stockTrackingDefault,
       notes: "",
@@ -648,6 +676,32 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     setSimpleItems(items => items.map(i => {
       if (i._key !== key) return i;
       const updated: SimpleInclude = { ...i, [field]: val };
+
+      if (field === "discountPercentage" && !updated.manualPriceOverride) {
+        const std  = parseFloat(updated.standardSellingPrice) || 0;
+        const disc = Math.max(0, Math.min(100, parseFloat(val) || 0));
+        if (std > 0) {
+          const fp = (std * (1 - disc / 100)).toFixed(2);
+          updated.finalUnitPrice = fp;
+          updated.unitPrice = fp;
+        }
+      }
+      if (field === "finalUnitPrice") {
+        updated.manualPriceOverride = true;
+        updated.unitPrice = val;
+      }
+      if (field === "quantity" || field === "finalUnitPrice" || field === "unitPrice") {
+        const q = parseFloat(field === "quantity" ? val : updated.quantity) || 0;
+        const u = parseFloat(updated.finalUnitPrice || updated.unitPrice) || 0;
+        // totalPrice not on SimpleInclude, just keep unitPrice in sync
+        updated.unitPrice = updated.finalUnitPrice || updated.unitPrice;
+      }
+      if (field === "discountPercentage") {
+        const q = parseFloat(updated.quantity) || 0;
+        const u = parseFloat(updated.finalUnitPrice || updated.unitPrice) || 0;
+        // no totalPrice on SimpleInclude — computed on render
+      }
+
       if (field === "consumableArrangement") {
         Object.assign(updated, arrangementToBooleans(val));
         if (val === "Client Supplies Own Consumables") updated.stockTrackingRequired = false;
@@ -660,6 +714,18 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       return updated;
     }));
 
+  const resetSimpleItemPrice = (key: string) =>
+    setSimpleItems(items => items.map(i => {
+      if (i._key !== key) return i;
+      return {
+        ...i,
+        discountPercentage: "0",
+        finalUnitPrice: i.standardSellingPrice,
+        unitPrice: i.standardSellingPrice,
+        manualPriceOverride: false,
+      };
+    }));
+
   const setLinkedConsumableItem = (key: string, id: string, name: string) =>
     setSimpleItems(items => items.map(i =>
       i._key === key ? { ...i, consumableStockItemId: id, consumableItemName: name } : i
@@ -670,7 +736,7 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     setLineItems(simpleItems.length > 0
       ? simpleItems.map(i => {
           const q = parseFloat(i.quantity) || 1;
-          const u = parseFloat(i.unitPrice) || 0;
+          const u = parseFloat(i.finalUnitPrice || i.unitPrice) || 0;
           return {
             _key: i._key,
             stockItemId: i.stockItemId,
@@ -678,7 +744,11 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
             itemServiceName: i.itemServiceName,
             serviceCategory: i.serviceCategory,
             quantity: i.quantity,
-            unitPrice: i.unitPrice,
+            standardSellingPrice: i.standardSellingPrice,
+            discountPercentage: i.discountPercentage,
+            finalUnitPrice: i.finalUnitPrice,
+            manualPriceOverride: i.manualPriceOverride,
+            unitPrice: i.finalUnitPrice || i.unitPrice,
             totalPrice: q && u ? (q * u).toFixed(2) : "",
             refillRule: i.refillRule,
             stockTrackingRequired: i.stockTrackingRequired,
@@ -707,7 +777,11 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
         lineType: li.lineType,
         serviceCategory: li.serviceCategory,
         quantity: li.quantity,
-        unitPrice: li.unitPrice,
+        standardSellingPrice: li.standardSellingPrice,
+        discountPercentage: li.discountPercentage,
+        finalUnitPrice: li.finalUnitPrice,
+        manualPriceOverride: li.manualPriceOverride,
+        unitPrice: li.finalUnitPrice || li.unitPrice,
         refillRule: li.refillRule,
         stockTrackingRequired: li.stockTrackingRequired,
         notes: li.notes,
@@ -728,14 +802,45 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     setLineItems(items => items.map(li => {
       if (li._key !== key) return li;
       const updated = { ...li, [field]: val };
-      if (field === "quantity" || field === "unitPrice") {
+
+      if (field === "discountPercentage" && !updated.manualPriceOverride) {
+        const std  = parseFloat(updated.standardSellingPrice) || 0;
+        const disc = Math.max(0, Math.min(100, parseFloat(val) || 0));
+        if (std > 0) {
+          const fp = (std * (1 - disc / 100)).toFixed(2);
+          updated.finalUnitPrice = fp;
+          updated.unitPrice = fp;
+        }
+      }
+      if (field === "finalUnitPrice") {
+        updated.manualPriceOverride = true;
+        updated.unitPrice = val;
+      }
+
+      if (field === "quantity" || field === "finalUnitPrice" || field === "unitPrice" || field === "discountPercentage") {
         const q = parseFloat(field === "quantity" ? val : updated.quantity) || 0;
-        const u = parseFloat(field === "unitPrice" ? val : updated.unitPrice) || 0;
+        const u = parseFloat(updated.finalUnitPrice || updated.unitPrice) || 0;
         updated.totalPrice = q && u ? (q * u).toFixed(2) : "";
       }
       return updated;
     }));
   };
+
+  const resetLinePriceToSelling = (key: string) =>
+    setLineItems(items => items.map(li => {
+      if (li._key !== key) return li;
+      const q = parseFloat(li.quantity) || 0;
+      const u = parseFloat(li.standardSellingPrice) || 0;
+      return {
+        ...li,
+        discountPercentage: "0",
+        finalUnitPrice: li.standardSellingPrice,
+        unitPrice: li.standardSellingPrice,
+        manualPriceOverride: false,
+        totalPrice: q && u ? (q * u).toFixed(2) : "",
+      };
+    }));
+
   const addLine    = () => setLineItems(items => [...items, EMPTY_LINE()]);
   const removeLine = (key: string) => setLineItems(items => items.filter(li => li._key !== key));
 
@@ -743,8 +848,10 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   const getActiveLineItems = () => {
     if (advancedMode) return lineItems;
     return simpleItems.map(i => {
-      const q = parseFloat(i.quantity) || 1;
-      const u = parseFloat(i.unitPrice) || 0;
+      const q  = parseFloat(i.quantity) || 1;
+      const fp = parseFloat(i.finalUnitPrice || i.unitPrice) || 0;
+      const std = parseFloat(i.standardSellingPrice) || 0;
+      const disc = parseFloat(i.discountPercentage) || 0;
       return {
         _key: i._key,
         stockItemId: i.stockItemId,
@@ -752,8 +859,13 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
         itemServiceName: i.itemServiceName,
         serviceCategory: i.serviceCategory,
         quantity: String(q),
-        unitPrice: i.unitPrice || "0",
-        totalPrice: u ? (q * u).toFixed(2) : "0",
+        standardSellingPrice: i.standardSellingPrice || null,
+        discountPercentage: i.discountPercentage || "0",
+        discountAmount: std && disc ? (std * disc / 100).toFixed(2) : null,
+        finalUnitPrice: fp ? String(fp) : null,
+        manualPriceOverride: i.manualPriceOverride,
+        unitPrice: fp ? String(fp) : (i.unitPrice || "0"),
+        totalPrice: fp ? (q * fp).toFixed(2) : "0",
         refillRule: i.refillRule,
         stockTrackingRequired: i.stockTrackingRequired,
         notes: i.notes,
@@ -779,10 +891,15 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
         routeSequence:     form.routeSequence     ? Number(form.routeSequence)     : null,
         lineItems: activeLineItems.map(({ _key, ...li }) => ({
           ...li,
-          stockItemId: li.stockItemId || null,
-          quantity:    li.quantity    || "1",
-          unitPrice:   li.unitPrice   || null,
-          totalPrice:  li.totalPrice  || null,
+          stockItemId:          li.stockItemId          || null,
+          quantity:             li.quantity             || "1",
+          standardSellingPrice: (li as any).standardSellingPrice || null,
+          discountPercentage:   (li as any).discountPercentage   ?? "0",
+          discountAmount:       (li as any).discountAmount       || null,
+          finalUnitPrice:       (li as any).finalUnitPrice       || null,
+          manualPriceOverride:  (li as any).manualPriceOverride  ?? false,
+          unitPrice:            li.unitPrice   || null,
+          totalPrice:           li.totalPrice  || null,
         })),
       };
       if (contract?.id) {
@@ -1006,23 +1123,68 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                         </button>
                       </div>
 
-                      {/* Qty / Price / Total */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <Field label="Quantity">
+                      {/* Pricing grid */}
+                      {item.stockItemId && !item.standardSellingPrice && (
+                        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded px-2 py-1 mb-2">
+                          No selling price set for this item. Enter a price manually below.
+                        </p>
+                      )}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <Field label="Qty">
                           <Input className="h-8 text-xs" type="number" min="0" step="0.5"
                             value={item.quantity}
                             onChange={e => updateSimpleItem(item._key, "quantity", e.target.value)} />
                         </Field>
-                        <Field label="Unit Price (R)">
-                          <Input className="h-8 text-xs" type="number" min="0" step="0.01"
-                            value={item.unitPrice} placeholder="0.00"
-                            onChange={e => updateSimpleItem(item._key, "unitPrice", e.target.value)} />
+                        <Field label="Std Price (R)">
+                          <Input className="h-8 text-xs bg-white text-gray-500" readOnly tabIndex={-1}
+                            value={item.standardSellingPrice ? Number(item.standardSellingPrice).toFixed(2) : ""}
+                            placeholder="—" />
+                        </Field>
+                        <Field label="Discount %">
+                          <Input className="h-8 text-xs" type="number" min="0" max="100" step="0.5"
+                            value={item.discountPercentage}
+                            onChange={e => updateSimpleItem(item._key, "discountPercentage", e.target.value)}
+                            disabled={item.manualPriceOverride}
+                            placeholder="0" />
+                        </Field>
+                        <Field label="Final Price (R)">
+                          <Input className={`h-8 text-xs ${item.manualPriceOverride ? "border-orange-300 bg-orange-50" : ""}`}
+                            type="number" min="0" step="0.01"
+                            value={item.finalUnitPrice || item.unitPrice} placeholder="0.00"
+                            onChange={e => updateSimpleItem(item._key, "finalUnitPrice", e.target.value)} />
                         </Field>
                         <Field label="Total (R)">
                           <Input className="h-8 text-xs bg-white" readOnly tabIndex={-1}
-                            value={total} placeholder="—" />
+                            value={(() => {
+                              const q = parseFloat(item.quantity) || 0;
+                              const u = parseFloat(item.finalUnitPrice || item.unitPrice) || 0;
+                              return q && u ? (q * u).toFixed(2) : "";
+                            })()}
+                            placeholder="—" />
                         </Field>
                       </div>
+
+                      {/* Manual override warning + reset */}
+                      {item.manualPriceOverride && (
+                        <div className="flex items-center justify-between mt-1.5 px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
+                          <span>⚠ Price manually adjusted from standard selling price.</span>
+                          {item.standardSellingPrice && (
+                            <button type="button" onClick={() => resetSimpleItemPrice(item._key)}
+                              className="ml-2 text-xs font-medium text-blue-600 hover:underline whitespace-nowrap">
+                              Reset to Selling Price
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {!item.manualPriceOverride && item.standardSellingPrice && parseFloat(item.discountPercentage) > 0 && (
+                        <div className="flex items-center justify-between mt-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                          <span>{item.discountPercentage}% discount applied.</span>
+                          <button type="button" onClick={() => resetSimpleItemPrice(item._key)}
+                            className="ml-2 text-xs font-medium text-gray-500 hover:underline">
+                            Reset to Selling Price
+                          </button>
+                        </div>
+                      )}
 
                       {/* Notes */}
                       <Input className="h-7 text-xs mt-2" value={item.notes}
@@ -1101,11 +1263,11 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                 {/* Grand total */}
                 {simpleItems.length > 1 && (
                   <div className="flex justify-end pt-1">
-                    <span className="text-xs text-gray-500 font-medium pr-1">Total:</span>
+                    <span className="text-xs text-gray-500 font-medium pr-1">Contract Total:</span>
                     <span className="text-xs font-bold text-gray-800">
                       R {simpleItems.reduce((sum, i) => {
                         const q = parseFloat(i.quantity) || 0;
-                        const u = parseFloat(i.unitPrice) || 0;
+                        const u = parseFloat(i.finalUnitPrice || i.unitPrice) || 0;
                         return sum + (q * u);
                       }, 0).toFixed(2)}
                     </span>
@@ -1156,14 +1318,26 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 mt-1">
                     <Field label="Qty">
                       <Input className="h-8 text-xs" type="number" value={li.quantity}
                         onChange={e => updateLine(li._key, "quantity", e.target.value)} min="0" step="0.5" />
                     </Field>
-                    <Field label="Unit Price (R)">
-                      <Input className="h-8 text-xs" type="number" value={li.unitPrice}
-                        onChange={e => updateLine(li._key, "unitPrice", e.target.value)} placeholder="0.00" step="0.01" />
+                    <Field label="Std Price (R)">
+                      <Input className="h-8 text-xs bg-white text-gray-500" readOnly tabIndex={-1}
+                        value={li.standardSellingPrice ? Number(li.standardSellingPrice).toFixed(2) : ""}
+                        placeholder="—" />
+                    </Field>
+                    <Field label="Discount %">
+                      <Input className="h-8 text-xs" type="number" min="0" max="100" step="0.5"
+                        value={li.discountPercentage} placeholder="0"
+                        onChange={e => updateLine(li._key, "discountPercentage", e.target.value)}
+                        disabled={li.manualPriceOverride} />
+                    </Field>
+                    <Field label="Final Price (R)">
+                      <Input className={`h-8 text-xs ${li.manualPriceOverride ? "border-orange-300 bg-orange-50" : ""}`}
+                        type="number" value={li.finalUnitPrice || li.unitPrice}
+                        onChange={e => updateLine(li._key, "finalUnitPrice", e.target.value)} placeholder="0.00" step="0.01" />
                     </Field>
                     <Field label="Total (R)">
                       <Input className="h-8 text-xs bg-white" value={li.totalPrice} readOnly placeholder="Auto" tabIndex={-1} />
@@ -1175,6 +1349,15 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                       </Select>
                     </Field>
                   </div>
+                  {li.manualPriceOverride && (
+                    <div className="flex items-center justify-between mt-1 px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
+                      <span>⚠ Price manually adjusted.</span>
+                      {li.standardSellingPrice && (
+                        <button type="button" onClick={() => resetLinePriceToSelling(li._key)}
+                          className="ml-2 text-xs font-medium text-blue-600 hover:underline">Reset to Selling Price</button>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-4 mt-2">
                     <div className="flex items-center gap-1.5">
                       <Switch checked={li.stockTrackingRequired}

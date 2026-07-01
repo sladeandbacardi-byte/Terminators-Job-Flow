@@ -1746,6 +1746,11 @@ export const contractLineItems = pgTable("contract_line_items", {
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
+  standardSellingPrice: decimal("standard_selling_price", { precision: 10, scale: 2 }),
+  discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
+  finalUnitPrice: decimal("final_unit_price", { precision: 10, scale: 2 }),
+  manualPriceOverride: boolean("manual_price_override").default(false),
   refillRule: text("refill_rule").default("Not Applicable"),
   // ── Consumable arrangement (all departments) ──────────────────────────────
   consumableArrangement: text("consumable_arrangement").default("Not Applicable"),
