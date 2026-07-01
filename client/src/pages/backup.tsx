@@ -827,6 +827,7 @@ export default function BackupPage() {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   {[
                     "Clients", "Jobs",
+                    "Contracts", "Contract Line Items",
                     "Quotes", "Invoices",
                     "Rental Contracts", "Stock",
                     "Staff", "Teams & Attendance",

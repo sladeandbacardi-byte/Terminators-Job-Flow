@@ -2525,6 +2525,10 @@ export class DbStorage implements IStorage {
     }
   }
 
+  async getAllContractLineItems() {
+    return db.select().from(contractLineItems).orderBy(asc(contractLineItems.createdAt));
+  }
+
   // ── Department Defaults ──────────────────────────────────────────────────────
 
   async getDepartmentDefaults() {

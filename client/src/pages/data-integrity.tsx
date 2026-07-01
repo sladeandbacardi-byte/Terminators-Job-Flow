@@ -99,6 +99,8 @@ interface DbStatusCounts {
   quotes: number;
   serviceContracts: number;
   rentalContracts: number;
+  unifiedContracts: number;
+  contractLineItems: number;
   purchaseOrders: number;
   activityLogs: number;
   backupLogs: number;
@@ -175,8 +177,10 @@ const DB_COUNT_LABELS: Array<{ key: keyof DbStatusCounts; label: string }> = [
   { key: "jobs",             label: "Jobs" },
   { key: "invoices",         label: "Invoices" },
   { key: "quotes",           label: "Quotes / Leads" },
-  { key: "serviceContracts", label: "Service Contracts" },
-  { key: "rentalContracts",  label: "Rental Contracts" },
+  { key: "unifiedContracts", label: "Contracts" },
+  { key: "contractLineItems",label: "Contract Line Items" },
+  { key: "serviceContracts", label: "Legacy Service Contracts" },
+  { key: "rentalContracts",  label: "Legacy Rental Contracts" },
   { key: "purchaseOrders",   label: "Purchase Orders" },
   { key: "activityLogs",     label: "Activity Logs" },
   { key: "backupLogs",       label: "Backup Logs" },

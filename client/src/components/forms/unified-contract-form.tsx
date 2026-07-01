@@ -24,6 +24,16 @@ export const DEPARTMENTS = [
   "Dustmats", "Deep Cleaning", "Other",
 ] as const;
 
+// Maps contract department names → database department IDs (div-N)
+const DEPT_TO_DIV_ID: Record<string, string> = {
+  "Pest Control":  "div-1",
+  "Sanitary Bins": "div-2",
+  "Hygiene":       "div-2",
+  "Washroom":      "div-3",
+  "Dustmats":      "div-3",
+  "Deep Cleaning": "div-4",
+};
+
 const FREQS = [
   "Daily", "2 x a week", "Weekly", "Twice a month", "Monthly",
   "Every 2 months", "Quarterly", "Every 6 months", "Annually",
@@ -324,16 +334,21 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   // Auto-fill team/technician when department changes
   useEffect(() => {
     if (!form.department) return;
+    const divId = DEPT_TO_DIV_ID[form.department];
+    const deptWorkers = divId
+      ? workers.filter(w => (w as any).departmentId === divId && w.isActive !== false)
+      : workers.filter(w => w.isActive !== false);
     const def = deptDefaults.find((d: any) => d.department === form.department);
-    if (!def) return;
-    setForm(f => ({
-      ...f,
-      assignedTeamId: f.assignedTeamId || def.defaultTeamId || "",
-      assignedTeamName: f.assignedTeamName || def.defaultTeamName || "",
-      assignedTechnicianId: f.assignedTechnicianId || def.defaultTechnicianId || "",
-      assignedTechnicianName: f.assignedTechnicianName || def.defaultTechnicianName || "",
-    }));
-  }, [form.department, deptDefaults]);
+    setForm(f => {
+      const teamId   = def?.defaultTeamId       || f.assignedTeamId       || "";
+      const teamName = def?.defaultTeamName      || f.assignedTeamName     || "";
+      // If dept default exists, use it; else auto-select if exactly one tech in department
+      const singleTech = !def && deptWorkers.length === 1 ? deptWorkers[0] : null;
+      const techId   = def?.defaultTechnicianId  || (singleTech?.id    ?? f.assignedTechnicianId   ?? "");
+      const techName = def?.defaultTechnicianName || (singleTech?.name  ?? f.assignedTechnicianName ?? "");
+      return { ...f, assignedTeamId: teamId, assignedTeamName: teamName, assignedTechnicianId: techId, assignedTechnicianName: techName };
+    });
+  }, [form.department, deptDefaults, workers]);
 
   const set = (key: keyof FormData) => (val: any) =>
     setForm(f => ({ ...f, [key]: val }));
@@ -398,7 +413,10 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   const suggestedItems = SERVICE_ITEMS_BY_DEPT[form.department] ?? [];
   const selectedClient = clients.find(c => c.id === form.clientId);
   const teamOptions = teams.filter((t: any) => t.isActive !== false);
-  const techOptions = workers.filter(w => w.isActive !== false);
+  const divId = form.department ? DEPT_TO_DIV_ID[form.department] : undefined;
+  const techOptions = workers.filter(w =>
+    w.isActive !== false && (!divId || (w as any).departmentId === divId)
+  );
   const summary = scheduleSummary(form, teams.find((t: any) => t.id === form.assignedTeamId)?.name ?? "");
   const showSecondDay = ["2 x a week", "Twice a month"].includes(form.frequency);
   const showWeek = ["Monthly","Every 2 months","Quarterly","Every 6 months","Annually","Twice a month"].includes(form.frequency);

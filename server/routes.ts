@@ -2827,7 +2827,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]),
       ]);
 
-      // ── 3. Quotes ───────────────────────────────────────────────────────────
+      // ── 3. Contracts ────────────────────────────────────────────────────────
+      const unifiedContractsData: any[] = await (storage as any).getUnifiedContracts();
+      const allLineItemsData: any[] = await (storage as any).getAllContractLineItems();
+      addSheet("Contracts", [
+        ["Contract #", "Client", "Department", "Frequency", "Start Date", "End Date", "Active", "Assigned Team", "Assigned Technician", "Invoice Rule", "Special Instructions"],
+        ...unifiedContractsData.map((c: any) => [
+          c.contractNumber ?? c.id,
+          clientMap.get(c.clientId) ?? c.clientId,
+          c.department ?? "",
+          c.frequency ?? "",
+          dateStr(c.contractStartDate),
+          dateStr(c.contractEndDate),
+          c.activeStatus ? "Yes" : "No",
+          c.assignedTeamName ?? "",
+          c.assignedTechnicianName ?? "",
+          c.invoiceRule ?? "",
+          c.specialInstructions ?? "",
+        ]),
+      ]);
+      addSheet("Contract Line Items", [
+        ["Contract #", "Client", "Line Type", "Item / Service", "Category", "Qty", "Unit Price (ZAR)", "Total Price (ZAR)", "Refill Rule", "Stock Tracking", "Notes"],
+        ...allLineItemsData.map((li: any) => {
+          const contract = unifiedContractsData.find((c: any) => c.id === li.contractId);
+          return [
+            contract?.contractNumber ?? li.contractId,
+            clientMap.get(li.clientId) ?? li.clientId,
+            li.lineType ?? "",
+            li.itemServiceName ?? "",
+            li.serviceCategory ?? "",
+            li.quantity ?? "",
+            zar(li.unitPrice),
+            zar(li.totalPrice),
+            li.refillRule ?? "",
+            li.stockTrackingRequired ? "Yes" : "No",
+            li.notes ?? "",
+          ];
+        }),
+      ]);
+
+      // ── 4. Quotes ───────────────────────────────────────────────────────────
       addSheet("Quotes", [
         ["Quote #", "Company", "Contact Name", "Phone", "Email", "Services Requested", "Status", "Received Date", "Message"],
         ...(backup.quoteSubmissions as any[]).map((q: any) => [
@@ -4331,7 +4370,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const [
         clients, workers, jobs, invoices, quotes,
         serviceContracts, rentalContracts, purchaseOrders,
-        activityLogs, backupLogs,
+        activityLogs, backupLogs, unifiedContracts, contractLineItems,
       ] = await Promise.all([
         storage.getClients(),
         storage.getWorkers(),
@@ -4343,6 +4382,8 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         storage.getPurchaseOrders(),
         storage.getActivityLogs(),
         storage.getBackupLogs(),
+        (storage as any).getUnifiedContracts(),
+        (storage as any).getAllContractLineItems(),
       ]);
 
       res.json({
@@ -4350,16 +4391,18 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         memStorageDisabled: true,
         checkedAt: new Date(checkedAt).toISOString(),
         counts: {
-          clients:          clients.length,
-          workers:          workers.length,
-          jobs:             jobs.length,
-          invoices:         invoices.length,
-          quotes:           quotes.length,
-          serviceContracts: serviceContracts.length,
-          rentalContracts:  rentalContracts.length,
-          purchaseOrders:   purchaseOrders.length,
-          activityLogs:     activityLogs.length,
-          backupLogs:       backupLogs.length,
+          clients:           clients.length,
+          workers:           workers.length,
+          jobs:              jobs.length,
+          invoices:          invoices.length,
+          quotes:            quotes.length,
+          serviceContracts:  serviceContracts.length,
+          rentalContracts:   rentalContracts.length,
+          unifiedContracts:  unifiedContracts.length,
+          contractLineItems: contractLineItems.length,
+          purchaseOrders:    purchaseOrders.length,
+          activityLogs:      activityLogs.length,
+          backupLogs:        backupLogs.length,
         },
       });
     } catch (err: any) {
@@ -4487,6 +4530,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         "rental_contracts", "service_contracts", "quote_submissions",
         "purchase_orders", "inventory_items", "suppliers", "departments",
         "expenses", "calendar_events", "notifications",
+        "unified_contracts", "contract_line_items",
       ];
       const tableResult = await db.execute(sql`
         SELECT table_name FROM information_schema.tables
