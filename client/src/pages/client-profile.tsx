@@ -663,14 +663,14 @@ export default function ClientProfilePage() {
                                     <div className="space-y-1">
                                       {c.lineItems.map((li: any) => {
                                         const refillLabel = (() => {
-                                          const a = li.refillArrangement;
+                                          const a = li.consumableArrangement;
                                           if (!a || a === "Not Applicable") return null;
                                           const m: Record<string, string> = {
-                                            "Refills Included in Rental":  "Refills included",
-                                            "Refills Charged Separately":  "Billed separately",
-                                            "Client Supplies Own Refills": "Client supplies",
-                                            "On Demand Refills":           "On demand",
-                                            "Refill Only":                 "Refill only",
+                                            "Consumables Included":             "Consumables included",
+                                            "Consumables Charged Separately":   "Billed separately",
+                                            "Client Supplies Own Consumables":  "Client supplies",
+                                            "On Demand Consumables":            "On demand",
+                                            "Consumable Only":                  "Consumable only",
                                           };
                                           return m[a] ?? a;
                                         })();
@@ -693,11 +693,11 @@ export default function ClientProfilePage() {
                                                   {refillLabel}
                                                 </span>
                                               )}
-                                              {li.linkedRefillItemName && li.refillArrangement !== "Client Supplies Own Refills" && (
-                                                <span className="text-gray-400 italic">↳ {li.linkedRefillItemName}</span>
+                                              {li.consumableItemName && li.consumableArrangement !== "Client Supplies Own Consumables" && (
+                                                <span className="text-gray-400 italic">↳ {li.consumableItemName}</span>
                                               )}
-                                              {li.separateRefillPrice && Number(li.separateRefillPrice) > 0 && (
-                                                <span className="text-gray-400">Refill: R{Number(li.separateRefillPrice).toFixed(2)}</span>
+                                              {li.separateConsumablePrice && Number(li.separateConsumablePrice) > 0 && (
+                                                <span className="text-gray-400">Consumable: R{Number(li.separateConsumablePrice).toFixed(2)}</span>
                                               )}
                                             </div>
                                           </div>

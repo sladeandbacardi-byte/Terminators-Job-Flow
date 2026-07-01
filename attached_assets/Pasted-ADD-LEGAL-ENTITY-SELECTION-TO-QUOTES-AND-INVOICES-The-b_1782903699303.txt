@@ -1,0 +1,256 @@
+ADD LEGAL ENTITY SELECTION TO QUOTES AND INVOICES
+
+The business operates through two legal entities:
+
+1. Terminators CC
+2. Terminators Pty Ltd
+
+Quotes and invoices must allow the user to select which legal entity is issuing the document.
+
+This must apply to:
+
+* Quotes
+* Accepted Work
+* Jobs created from quotes
+* Invoices
+* Rental Contracts / Service Contracts where relevant
+* Reports / exports / PDFs / email templates
+
+LEGAL ENTITY SETUP
+
+Create a Legal Entities settings section under Admin.
+
+Admin / Managing Member must be able to add and edit legal entities.
+
+Each legal entity must have:
+
+* Entity name
+* Trading name, optional
+* Registration number
+* VAT number
+* Physical address
+* Postal address
+* Phone
+* Email
+* Banking details
+* Default payment terms
+* Logo, optional
+* Invoice footer text
+* Quote footer text
+* Active / inactive status
+
+Default entities:
+
+Entity 1:
+Terminators CC
+
+Entity 2:
+Terminators Pty Ltd
+
+QUOTE FORM CHANGES
+
+In the New Quote window, add a required field near the top:
+
+Issuing Entity *
+
+Dropdown options:
+
+* Terminators CC
+* Terminators Pty Ltd
+
+This field must be required before saving a quote.
+
+If there is a default entity, preselect it, but allow users with permission to change it.
+
+Quote must store:
+
+legalEntityId
+legalEntityName
+legalEntityRegistrationNumber
+legalEntityVatNumber
+legalEntityBankDetails
+legalEntityAddress
+
+The quote PDF / print / email must show the selected legal entity details.
+
+QUOTE TO JOB CONVERSION
+
+When a quote is accepted and converted to a job:
+
+Carry the selected legal entity forward to the job.
+
+Job must store:
+
+sourceQuoteId
+sourceQuoteNumber
+legalEntityId
+legalEntityName
+
+The job does not need to display all legal details everywhere, but it must keep the selected legal entity so the invoice is created correctly later.
+
+JOB TO INVOICE CONVERSION
+
+When a job is converted to an invoice:
+
+Default the invoice legal entity to the same entity selected on the original quote.
+
+Example:
+
+Quote QT-2026-0004 issued by Terminators CC
+↓
+Job JOB-2026-0021 linked to that quote
+↓
+Invoice INV-2026-0015 must default to Terminators CC
+
+Allow Finance/Admin/Managing Member to change the invoice entity before finalising the invoice, but show a warning:
+
+This invoice entity differs from the original quote entity. Continue?
+
+INVOICE FORM CHANGES
+
+In the invoice creation/edit screen, add required field:
+
+Issuing Entity *
+
+Dropdown options:
+
+* Terminators CC
+* Terminators Pty Ltd
+
+Invoice must store:
+
+legalEntityId
+legalEntityName
+legalEntityRegistrationNumber
+legalEntityVatNumber
+legalEntityBankDetails
+legalEntityAddress
+
+Invoice PDF / print / email must show the selected legal entity details.
+
+DOCUMENT NUMBERING
+
+Each legal entity should have separate document numbering, if possible.
+
+Preferred:
+
+Quotes:
+CC: QT-CC-2026-0001
+Pty: QT-PTY-2026-0001
+
+Invoices:
+CC: INV-CC-2026-0001
+Pty: INV-PTY-2026-0001
+
+Rental Contracts:
+CC: RC-CC-2026-0001
+Pty: RC-PTY-2026-0001
+
+If changing document numbering is too disruptive now, keep the existing numbering but still store the selected legal entity.
+
+Recommended later:
+Separate numbering per legal entity.
+
+FILTERING AND REPORTS
+
+Add legal entity filter to:
+
+* Quotes
+* Accepted Work
+* Jobs
+* Invoices
+* Debtors
+* Revenue reports
+* Sage Export
+* Commission reports
+* Backup Excel export
+
+Filters:
+All Entities
+Terminators CC
+Terminators Pty Ltd
+
+DASHBOARDS
+
+Finance Dashboard:
+Allow filtering by legal entity.
+
+Show:
+
+* Revenue by entity
+* Debtors by entity
+* Invoices by entity
+
+Managing Member Dashboard:
+Show combined totals by default, with optional entity filter.
+
+Sales Dashboard:
+Show quotes by selected entity if needed.
+
+SAGE EXPORT
+
+Sage Export must include the legal entity.
+
+Do not mix CC and Pty invoices in the same export unless user chooses All Entities.
+
+Add export filter:
+
+Legal Entity:
+
+* Terminators CC
+* Terminators Pty Ltd
+* All Entities
+
+If All Entities is selected, clearly show which entity each invoice belongs to.
+
+PERMISSIONS
+
+Managing Member:
+Can create/edit legal entities.
+Can change entity on quotes and invoices.
+
+Admin:
+Can create/edit legal entities if permitted.
+
+Sales:
+Can select legal entity on quote creation.
+Can change entity only while quote is Draft.
+
+Finance:
+Can select/change legal entity on invoices before invoice is finalised/sent.
+
+Technician:
+No access to legal entity settings.
+
+VALIDATION RULES
+
+1. A quote cannot be saved without an issuing entity.
+2. An invoice cannot be saved without an issuing entity.
+3. A quote PDF must show the selected entity.
+4. An invoice PDF must show the selected entity.
+5. Invoice should default to the quote’s entity when converted from a job.
+6. If invoice entity differs from quote entity, show warning.
+7. Inactive entities should not appear in new quote/invoice dropdowns, but must remain visible on old documents.
+
+BACKUP AND EXPORT
+
+Excel backup must include legal entity fields on:
+
+* Quotes
+* Jobs
+* Invoices
+* Contracts
+* Debtors
+* Reports
+
+JSON backup must preserve legal entity data and links.
+
+UI WORDING
+
+Use label:
+Issuing Entity
+
+Helper text:
+Select which legal entity is issuing this quote or invoice.
+
+END

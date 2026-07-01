@@ -1743,14 +1743,14 @@ export const contractLineItems = pgTable("contract_line_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
   refillRule: text("refill_rule").default("Not Applicable"),
-  // ── Refill arrangement (Washroom / Hygiene) ──────────────────────────────
-  refillArrangement: text("refill_arrangement").default("Not Applicable"),
-  refillIncludedInPrice: boolean("refill_included_in_price").default(false),
-  refillBillableSeparately: boolean("refill_billable_separately").default(false),
-  clientSuppliesOwnRefills: boolean("client_supplies_own_refills").default(false),
-  linkedRefillStockItemId: varchar("linked_refill_stock_item_id"),
-  linkedRefillItemName: text("linked_refill_item_name"),
-  separateRefillPrice: decimal("separate_refill_price", { precision: 10, scale: 2 }),
+  // ── Consumable arrangement (all departments) ──────────────────────────────
+  consumableArrangement: text("consumable_arrangement").default("Not Applicable"),
+  consumableIncludedInPrice: boolean("consumable_included_in_price").default(false),
+  consumableBillableSeparately: boolean("consumable_billable_separately").default(false),
+  clientSuppliesOwnConsumables: boolean("client_supplies_own_consumables").default(false),
+  consumableStockItemId: varchar("consumable_stock_item_id"),
+  consumableItemName: text("consumable_item_name"),
+  separateConsumablePrice: decimal("separate_consumable_price", { precision: 10, scale: 2 }),
   // ─────────────────────────────────────────────────────────────────────────
   stockTrackingRequired: boolean("stock_tracking_required").default(false),
   notes: text("notes"),
