@@ -305,8 +305,8 @@ export default function Contracts() {
             {([
               { key: "all",     label: "All Contracts",     count: counts.all },
               { key: "unified", label: "Contracts",         count: counts.unified, icon: ListOrdered },
-              { key: "service", label: "Legacy Service",    count: counts.service, icon: Wrench },
-              { key: "rental",  label: "Legacy Rental",     count: counts.rental,  icon: Package },
+              { key: "service", label: "Service",    count: counts.service, icon: Wrench },
+              { key: "rental",  label: "Rental",     count: counts.rental,  icon: Package },
               { key: "active",  label: "Active",            count: counts.active },
               { key: "inactive",label: "Inactive",          count: counts.inactive },
               { key: "ending",  label: "Ending Soon",       icon: Calendar },
