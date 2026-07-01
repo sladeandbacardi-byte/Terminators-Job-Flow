@@ -1,0 +1,287 @@
+Update the Contract Includes section so it can select items from Stock Management / Inventory.
+
+Currently the Contract Includes section uses a fixed hard-coded list of items such as:
+- Aerosol A/F Unit
+- Aerosol Refill
+- Soap Dispenser
+- Soap Refill
+- Paper Towel Dispenser
+
+This is not enough.
+
+The system already has inventory items under Service > Stock Management, for example:
+- Hand Sanitizer Dispenser - Automatic
+- Hand Sanitizer Refill - 1L
+
+These inventory items must be selectable when creating or editing a contract.
+
+BUSINESS RULE
+
+Inventory is the master list for physical items.
+
+Contract Includes must allow the user to select:
+1. Inventory items/products
+2. Service items that are not physical stock
+
+Examples:
+
+Inventory items:
+- Hand Sanitizer Dispenser - Automatic
+- Hand Sanitizer Refill - 1L
+- Aerosol Refill
+- Soap Refill
+- Paper Towel Dispenser
+- Sanitary Bin
+- Dustmat
+
+Service items:
+- Sanitary Bin Service / Exchange
+- Pest Control Service
+- Rodent Service
+- Cockroach Service
+- Deep Cleaning Service
+- Washroom Service
+
+CONTRACT INCLUDES SECTION
+
+Change the Contract Includes section to show:
+
+1. Search Inventory / Service Item
+2. Select item from dropdown
+3. Quantity
+4. Unit Price
+5. Total
+6. Refill Rule if applicable
+7. Stock Tracking Required
+8. Notes
+
+The item dropdown must pull from:
+- stock_items / inventory items from PostgreSQL
+- predefined service items
+
+Do not hard-code the list only in the frontend.
+
+DROPDOWN BEHAVIOUR
+
+When the user types "hand", the dropdown must show inventory items like:
+- Hand Sanitizer Dispenser - Automatic
+- Hand Sanitizer Refill - 1L
+
+When the user selects an inventory item, prefill:
+
+- itemName
+- stockItemId
+- category
+- department
+- unitOfMeasure
+- default unit price if available
+- stockTrackingRequired = true by default
+
+If the selected item is a service item, then:
+- stockItemId can be blank/null
+- stockTrackingRequired = false by default
+
+CONTRACT LINE ITEM DATA
+
+Each contract line item must store:
+
+- contractLineItemId
+- contractId
+- clientId
+- stockItemId optional
+- itemServiceName
+- lineType
+- serviceCategory
+- quantity
+- unitPrice
+- totalPrice
+- refillRule
+- stockTrackingRequired
+- notes
+
+If the item is selected from inventory:
+- stockItemId must be saved
+- itemServiceName must copy the inventory item name
+- stockTrackingRequired should default to true
+
+If the item is a service:
+- stockItemId may be null
+- itemServiceName must still save
+- stockTrackingRequired should default to false
+
+LINE TYPE OPTIONS
+
+Use simple line type options:
+
+- Inventory Item
+- Service
+- Refill / Consumable
+- Rental Equipment
+- Other
+
+If the selected inventory item category is Rental, set lineType to Rental Equipment.
+
+If the selected inventory item category is Washroom Refill or Hygiene Consumable, set lineType to Refill / Consumable.
+
+If manually selected service item, set lineType to Service.
+
+DEPARTMENT FILTERING
+
+When the user selects a Department on the contract, filter the item dropdown to show relevant items first.
+
+Example:
+
+Department: Washroom
+Show first:
+- Hand Sanitizer Dispenser - Automatic
+- Hand Sanitizer Refill - 1L
+- Aerosol A/F Unit
+- Aerosol Refill
+- Soap Dispenser
+- Soap Refill
+- Paper Towel Dispenser
+- Paper Towel Refill
+- Toilet Roll Dispenser
+- Toilet Roll Refill
+- Urinal Mat
+- Washroom Service
+
+Department: Sanitary Bins
+Show first:
+- Sanitary Bin
+- Sanitary Bin Consumables
+- Sanitary Bin Service / Exchange
+- Sanitary Bin Cleaning
+- Sanitary Bin Replacement
+
+Department: Pest Control
+Show first:
+- Pest Control Service
+- Rodent Service
+- Cockroach Service
+- Bait Stations
+- Rodent Bait
+- Chemicals linked to Pest Control
+
+But still allow search across all inventory if needed.
+
+QUICK ADD BUTTONS
+
+The simple quick-add buttons can stay, but they must be backed by real items where possible.
+
+For example:
+If "Hand Sanitizer Dispenser - Automatic" exists in inventory, selecting it must use the stockItemId.
+
+If a quick-add item does not exist in inventory, it can be saved as a service/manual item.
+
+Better:
+Replace the fixed quick-add list with department-based suggestions generated from inventory + common services.
+
+ADVANCED MODE
+
+Keep the user interface simple.
+
+Default view:
+- Search/select item
+- Quantity
+- Price
+- Notes
+
+Advanced view only:
+- Line Type
+- Refill Rule
+- Stock Tracking Required
+- Service Category
+
+Do not show too many fields by default.
+
+STOCK LINKING
+
+If a contract includes inventory items with stockTrackingRequired = true, then later job completion must be able to track stock usage against those items.
+
+Example:
+Contract includes:
+- Hand Sanitizer Refill - 1L
+
+When technician completes the job, the stock usage screen should suggest:
+- Hand Sanitizer Refill - 1L
+
+This helps the technician record what was used.
+
+CLIENT PROFILE
+
+Client Profile > Contracts must show a clean summary of contract includes.
+
+Example:
+
+Contract Includes:
+- Hand Sanitizer Dispenser - Automatic x 1
+- Hand Sanitizer Refill - 1L x 1
+- Washroom Service x 1
+
+If the item is linked to inventory, show a small badge:
+Inventory
+
+If it is a service-only line, show:
+Service
+
+POSTGRESQL
+
+Make sure the contract line item table includes stockItemId.
+
+If missing, add it.
+
+Update:
+- Drizzle schema
+- PostgreSQL migration
+- API insert/update/select logic
+- backup export
+- Data Integrity checks
+
+DATA INTEGRITY
+
+Add checks:
+
+- contract line item missing contractId
+- contract line item missing clientId
+- inventory-linked contract line item missing stockItemId
+- contract line item with stockItemId that does not exist in stock_items
+- contract line item with stockTrackingRequired = true but no stockItemId
+
+TEST
+
+Run this exact test:
+
+1. Go to Service > Stock Management.
+2. Confirm these inventory items exist:
+   - Hand Sanitizer Dispenser - Automatic
+   - Hand Sanitizer Refill - 1L
+
+3. Go to Service > Contracts.
+4. Click New Contract.
+5. Select a client.
+6. Select Department: Washroom.
+7. In Contract Includes, search "hand".
+8. Confirm the dropdown shows:
+   - Hand Sanitizer Dispenser - Automatic
+   - Hand Sanitizer Refill - 1L
+
+9. Select Hand Sanitizer Dispenser - Automatic.
+10. Confirm quantity and price can be entered.
+11. Confirm stockTrackingRequired defaults to true.
+12. Add Hand Sanitizer Refill - 1L.
+13. Save the contract.
+14. Confirm the contract saves successfully.
+15. Confirm both items appear under Client Profile > Contracts.
+16. Confirm both line items are linked to stockItemId.
+17. Refresh page.
+18. Confirm the contract and items are still saved.
+
+IMPORTANT
+
+Inventory items must not be manually duplicated inside the contract form.
+
+Stock Management / Inventory is the master source for physical items.
+
+Contracts must select physical items from inventory.
+Services can be selected from a predefined service list.

@@ -4587,6 +4587,22 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       }
     } catch (e: any) { checks.push(fail("Contract Line Items Integrity", "Could not check", e.message)); }
 
+    // 9d. stockItemId cross-reference integrity
+    try {
+      const allInvIds = new Set((await storage.getInventoryItems()).map((i: any) => i.id));
+      const trackingNoStock  = contractLineItemsAll.filter((li: any) => li.stockTrackingRequired && !li.stockItemId);
+      const badStockRef      = contractLineItemsAll.filter((li: any) => li.stockItemId && !allInvIds.has(li.stockItemId));
+      if (trackingNoStock.length === 0 && badStockRef.length === 0) {
+        const linked = contractLineItemsAll.filter((li: any) => li.stockItemId).length;
+        checks.push(pass("Stock Item References", `${linked} line item(s) linked to inventory; all references valid`));
+      } else {
+        const msgs: string[] = [];
+        if (trackingNoStock.length) msgs.push(`${trackingNoStock.length} line item(s) have stock tracking enabled but no stockItemId`);
+        if (badStockRef.length)     msgs.push(`${badStockRef.length} line item(s) reference a stockItemId that does not exist in inventory`);
+        checks.push(warn("Stock Item References", msgs.join("; ")));
+      }
+    } catch (e: any) { checks.push(fail("Stock Item References", "Could not check", e.message)); }
+
     // 10. No missing required columns (spot-check critical columns added during migration)
     try {
       const criticalChecks: { table: string; column: string }[] = [
@@ -4605,6 +4621,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         { table: "unified_contracts",   column: "department" },
         { table: "contract_line_items", column: "contract_id" },
         { table: "contract_line_items", column: "item_service_name" },
+        { table: "contract_line_items", column: "stock_item_id" },
       ];
       const colResult = await db.execute(sql`
         SELECT table_name, column_name FROM information_schema.columns

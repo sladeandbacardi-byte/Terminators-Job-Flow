@@ -1735,7 +1735,8 @@ export const contractLineItems = pgTable("contract_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   contractId: varchar("contract_id").notNull(),
   clientId: varchar("client_id").notNull(),
-  lineType: text("line_type").notNull().default("Service"), // Service | Rental Item | Product / Refill | Combined Service + Item | Other
+  stockItemId: varchar("stock_item_id"), // optional, references inventory_items.id
+  lineType: text("line_type").notNull().default("Service"), // Inventory Item | Service | Refill / Consumable | Rental Equipment | Other
   itemServiceName: text("item_service_name").notNull(),
   serviceCategory: text("service_category"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
