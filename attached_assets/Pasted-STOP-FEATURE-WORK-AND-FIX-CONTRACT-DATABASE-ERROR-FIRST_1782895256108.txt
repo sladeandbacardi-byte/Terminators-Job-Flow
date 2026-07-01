@@ -1,0 +1,125 @@
+STOP FEATURE WORK AND FIX CONTRACT DATABASE ERROR FIRST
+
+The New Contract form is still failing with:
+
+500: relation "unified_contracts" does not exist
+
+This means the app is trying to save contracts to a PostgreSQL table called unified_contracts, but that table has not been created.
+
+This is a blocking database/schema bug.
+
+Do not continue UI changes until contract saving works.
+
+REQUIRED FIX
+
+1. Check the backend API route used by Create Contract.
+2. Confirm which table it is trying to write to.
+3. If the API expects unified_contracts, create the unified_contracts table in PostgreSQL.
+4. Create the related contract_line_items table if the form saves contract items/services.
+5. Update Drizzle schema to match the PostgreSQL tables exactly.
+6. Run the migration.
+7. Restart the app.
+8. Confirm the contract can save successfully.
+
+DATABASE TABLE: unified_contracts
+
+Create table with fields similar to:
+
+- id
+- client_id
+- contract_number
+- department
+- contract_start_date
+- contract_end_date
+- last_price_increase_date
+- next_increase_date
+- increase_percentage
+- frequency
+- week_of_month
+- day_of_week
+- second_day_of_week
+- start_time
+- second_start_time
+- estimated_duration
+- fixed_time
+- route_sequence
+- assigned_team_id
+- assigned_technician_id
+- confirm_with_client_before_service
+- invoice_rule
+- active_status
+- special_instructions
+- internal_notes
+- created_at
+- updated_at
+- created_by
+- updated_by
+
+DATABASE TABLE: contract_line_items
+
+Create table with fields similar to:
+
+- id
+- contract_id
+- client_id
+- line_type
+- item_service_name
+- service_category
+- quantity
+- unit_price
+- total_price
+- refill_rule
+- stock_tracking_required
+- notes
+- created_at
+- updated_at
+
+The contract_line_items.contract_id must link to unified_contracts.id.
+
+IMPORTANT
+
+Make sure Drizzle schema field names and actual PostgreSQL column names match.
+
+Previous bugs happened because the app tried to write fields that did not exist in PostgreSQL.
+
+Do not let that happen again.
+
+TEST AFTER FIX
+
+Run this exact test:
+
+1. Log in as Mariette Koekemoer.
+2. Go to Service > Contracts.
+3. Click New Contract.
+4. Select a client.
+5. Select Department: Sanitary Bins.
+6. Add a simple included service:
+   Sanitary Bin Service
+7. Set:
+   Frequency: Monthly
+   Week: Week 1
+   Day: Wednesday
+   Start Time: 08:00
+   Duration: 60
+   Route Sequence: 1
+8. Click Create Contract.
+9. Confirm there is no 500 error.
+10. Confirm success toast appears.
+11. Confirm contract appears in Contracts list.
+12. Confirm contract appears under Client Profile > Contracts.
+13. Refresh page.
+14. Confirm contract is still there.
+
+DATA INTEGRITY
+
+Add checks under Admin > Data Integrity:
+
+- unified_contracts table exists
+- contract_line_items table exists
+- contracts can be created
+- contract line items can be created
+- contracts missing clientId
+- contract line items missing contractId
+- contract line items missing clientId
+
+Do not show "Create Contract" as successful unless the contract is saved to PostgreSQL and refetched successfully.

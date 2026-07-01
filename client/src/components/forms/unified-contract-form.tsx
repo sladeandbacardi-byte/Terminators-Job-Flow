@@ -64,33 +64,34 @@ const INVOICE_RULES = [
 ] as const;
 
 const SERVICE_ITEMS_BY_DEPT: Record<string, string[]> = {
-  "Pest Control": [
-    "Rodent Service","Cockroach Service","Ant Treatment","Flea Treatment",
-    "Fly Control","Bed Bug Treatment","Termite Inspection","Wood Borer Treatment",
-    "Other Pest Control",
-  ],
-  "Sanitary Bins": [
-    "Sanitary Bin Placement","Sanitary Bin Service","Sanitary Bin Cleaning",
-    "Sanitary Bin Replacement","Sanitary Bin Rental","Sanitary Bin Refill / Consumables",
-  ],
-  "Hygiene": [
-    "Aerosol A/F Unit","Aerosol Refill","Soap Dispenser","Soap Refill",
-    "Paper Towel Dispenser","Paper Towel Refill","Toilet Roll Dispenser",
-    "Toilet Roll Refill","Urinal Mat","Washroom Service",
-  ],
-  "Washroom": [
-    "Aerosol A/F Unit","Aerosol Refill","Soap Dispenser","Soap Refill",
-    "Paper Towel Dispenser","Paper Towel Refill","Toilet Roll Dispenser",
-    "Toilet Roll Refill","Urinal Mat","Washroom Service",
-  ],
-  "Dustmats": [
-    "Dustmat Rental","Dustmat Replacement","Dustmat Cleaning",
-  ],
-  "Deep Cleaning": [
-    "Deep Cleaning Service","Once-off Deep Clean","Recurring Deep Clean",
-  ],
+  "Pest Control": ["Pest Control Service","Inspection","Treatment","Monitoring","Baiting","Follow-up","COC Inspection","Other"],
+  "Sanitary Bins": ["Sanitary Bin Placement","Sanitary Bin Service / Exchange","Sanitary Bin Cleaning","Sanitary Bin Replacement if needed","Consumables / Refills"],
+  "Hygiene": ["Aerosol A/F Unit","Aerosol Refill","Soap Dispenser","Soap Refill","Paper Towel Dispenser","Paper Towel Refill","Toilet Roll Dispenser","Toilet Roll Refill","Urinal Mat","Washroom Service","On-demand Refills"],
+  "Washroom": ["Aerosol A/F Unit","Aerosol Refill","Soap Dispenser","Soap Refill","Paper Towel Dispenser","Paper Towel Refill","Toilet Roll Dispenser","Toilet Roll Refill","Urinal Mat","Washroom Service","On-demand Refills"],
+  "Dustmats": ["Dustmat Rental","Dustmat Replacement","Dustmat Cleaning"],
+  "Deep Cleaning": ["Deep Cleaning Service","Recurring Deep Clean","Once-off Deep Clean","Hygiene Deep Clean"],
   "Other": [],
 };
+
+type DeptIncludesConfig = {
+  items: string[];
+  quantityLabel: string;
+  showRefillRule?: boolean;
+  showPestType?: boolean;
+  showAreaScope?: boolean;
+};
+const DEPT_INCLUDES_CONFIG: Record<string, DeptIncludesConfig> = {
+  "Sanitary Bins": { items: SERVICE_ITEMS_BY_DEPT["Sanitary Bins"], quantityLabel: "Number of bins" },
+  "Hygiene":       { items: SERVICE_ITEMS_BY_DEPT["Hygiene"],       quantityLabel: "Quantity", showRefillRule: true },
+  "Washroom":      { items: SERVICE_ITEMS_BY_DEPT["Washroom"],      quantityLabel: "Quantity", showRefillRule: true },
+  "Pest Control":  { items: SERVICE_ITEMS_BY_DEPT["Pest Control"],  quantityLabel: "Quantity / Units", showPestType: true },
+  "Dustmats":      { items: SERVICE_ITEMS_BY_DEPT["Dustmats"],      quantityLabel: "Number of mats" },
+  "Deep Cleaning": { items: SERVICE_ITEMS_BY_DEPT["Deep Cleaning"], quantityLabel: "Quantity", showAreaScope: true },
+};
+const PEST_TYPES = [
+  "Rodents","Cockroaches","Ants","Fleas","Flies","Bed Bugs",
+  "Termites","Wood Borer","Birds","Stored Product Insects","Other",
+];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,13 @@ type LineItem = {
   refillRule: string;
   stockTrackingRequired: boolean;
   notes: string;
+};
+
+type SimpleInclude = {
+  name: string;
+  checked: boolean;
+  quantity: string;
+  unitPrice: string;
 };
 
 type FormData = {
@@ -300,20 +308,35 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
 
   const [lineItems, setLineItems] = useState<LineItem[]>([EMPTY_LINE()]);
 
+  // Simple mode state
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [simpleItems, setSimpleItems] = useState<SimpleInclude[]>([]);
+  const [simpleStockTracking, setSimpleStockTracking] = useState(false);
+  const [simpleNotes, setSimpleNotes] = useState("");
+  const [simpleRefillRule, setSimpleRefillRule] = useState("Not Applicable");
+  const [simplePestType, setSimplePestType] = useState("");
+  const [simpleTreatmentType, setSimpleTreatmentType] = useState("");
+  const [simpleAreaScope, setSimpleAreaScope] = useState("");
+
   useEffect(() => {
-    if (existingLines.length > 0) {
-      setLineItems(existingLines.map((li: any) => ({
-        _key: li.id,
-        lineType: li.lineType ?? "Service",
-        itemServiceName: li.itemServiceName ?? "",
-        serviceCategory: li.serviceCategory ?? "",
-        quantity: String(li.quantity ?? "1"),
-        unitPrice: String(li.unitPrice ?? ""),
-        totalPrice: String(li.totalPrice ?? ""),
-        refillRule: li.refillRule ?? "Not Applicable",
-        stockTrackingRequired: li.stockTrackingRequired ?? false,
-        notes: li.notes ?? "",
-      })));
+    if (existingLines.length === 0) return;
+    const config = DEPT_INCLUDES_CONFIG[form.department];
+    if (!config) { setAdvancedMode(true); setLineItems(existingLines.map((li: any) => ({ _key: li.id, lineType: li.lineType ?? "Service", itemServiceName: li.itemServiceName ?? "", serviceCategory: li.serviceCategory ?? "", quantity: String(li.quantity ?? "1"), unitPrice: String(li.unitPrice ?? ""), totalPrice: String(li.totalPrice ?? ""), refillRule: li.refillRule ?? "Not Applicable", stockTrackingRequired: li.stockTrackingRequired ?? false, notes: li.notes ?? "" }))); return; }
+    const knownNames = new Set(config.items);
+    const allMatch = existingLines.every((li: any) => knownNames.has(li.itemServiceName));
+    if (allMatch) {
+      const first = existingLines[0] as any;
+      setSimpleRefillRule(first?.refillRule ?? "Not Applicable");
+      setSimpleStockTracking(first?.stockTrackingRequired ?? false);
+      setSimpleNotes(first?.notes ?? "");
+      setSimplePestType(first?.serviceCategory ?? "");
+      setSimpleItems(config.items.map(name => {
+        const match = existingLines.find((li: any) => li.itemServiceName === name) as any;
+        return { name, checked: !!match, quantity: match ? String(match.quantity ?? "1") : "1", unitPrice: match ? String(match.unitPrice ?? "") : "" };
+      }));
+    } else {
+      setAdvancedMode(true);
+      setLineItems(existingLines.map((li: any) => ({ _key: li.id, lineType: li.lineType ?? "Service", itemServiceName: li.itemServiceName ?? "", serviceCategory: li.serviceCategory ?? "", quantity: String(li.quantity ?? "1"), unitPrice: String(li.unitPrice ?? ""), totalPrice: String(li.totalPrice ?? ""), refillRule: li.refillRule ?? "Not Applicable", stockTrackingRequired: li.stockTrackingRequired ?? false, notes: li.notes ?? "" })));
     }
   }, [existingLines.length]);
 
@@ -331,6 +354,21 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     }));
   }, [form.clientId, clients]);
 
+  // Reset simple mode items when department changes
+  useEffect(() => {
+    if (!form.department) return;
+    const config = DEPT_INCLUDES_CONFIG[form.department];
+    if (config && !advancedMode) {
+      setSimpleItems(config.items.map(name => ({ name, checked: false, quantity: "1", unitPrice: "" })));
+      setSimpleStockTracking(false);
+      setSimpleNotes("");
+      setSimpleRefillRule("Not Applicable");
+      setSimplePestType("");
+      setSimpleTreatmentType("");
+      setSimpleAreaScope("");
+    }
+  }, [form.department]); // eslint-disable-line
+
   // Auto-fill team/technician when department changes
   useEffect(() => {
     if (!form.department) return;
@@ -342,7 +380,6 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     setForm(f => {
       const teamId   = def?.defaultTeamId       || f.assignedTeamId       || "";
       const teamName = def?.defaultTeamName      || f.assignedTeamName     || "";
-      // If dept default exists, use it; else auto-select if exactly one tech in department
       const singleTech = !def && deptWorkers.length === 1 ? deptWorkers[0] : null;
       const techId   = def?.defaultTechnicianId  || (singleTech?.id    ?? f.assignedTechnicianId   ?? "");
       const techName = def?.defaultTechnicianName || (singleTech?.name  ?? f.assignedTechnicianName ?? "");
@@ -356,7 +393,7 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   const setStr = (key: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
 
-  // Line item helpers
+  // Advanced line item helpers
   const updateLine = (key: string, field: keyof LineItem, val: any) => {
     setLineItems(items => items.map(li => {
       if (li._key !== key) return li;
@@ -369,18 +406,50 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       return updated;
     }));
   };
-
   const addLine = () => setLineItems(items => [...items, EMPTY_LINE()]);
   const removeLine = (key: string) => setLineItems(items => items.filter(li => li._key !== key));
 
+  // Simple mode helpers
+  const toggleSimpleItem = (name: string, checked: boolean) =>
+    setSimpleItems(items => items.map(i => i.name === name ? { ...i, checked } : i));
+  const updateSimpleItem = (name: string, field: "quantity" | "unitPrice", val: string) =>
+    setSimpleItems(items => items.map(i => i.name === name ? { ...i, [field]: val } : i));
+
+  const buildLineItemsFromSimple = (): Omit<LineItem, "_key">[] => {
+    const config = DEPT_INCLUDES_CONFIG[form.department];
+    return simpleItems
+      .filter(i => i.checked)
+      .map(i => {
+        const q = parseFloat(i.quantity) || 1;
+        const u = parseFloat(i.unitPrice) || 0;
+        return {
+          lineType: "Service",
+          itemServiceName: i.name,
+          serviceCategory: simplePestType || simpleAreaScope || "",
+          quantity: String(q),
+          unitPrice: i.unitPrice || "0",
+          totalPrice: u ? (q * u).toFixed(2) : "0",
+          refillRule: config?.showRefillRule ? simpleRefillRule : "Not Applicable",
+          stockTrackingRequired: simpleStockTracking,
+          notes: simpleNotes,
+        };
+      });
+  };
+
+  const getActiveLineItems = () => {
+    if (advancedMode) return lineItems;
+    return buildLineItemsFromSimple().map((li, i) => ({ ...li, _key: `simple_${i}` }));
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const activeLineItems = getActiveLineItems();
       const payload = {
         ...form,
         weekOfMonth: form.weekOfMonth ? Number(form.weekOfMonth) : null,
         estimatedDuration: form.estimatedDuration ? Number(form.estimatedDuration) : null,
         routeSequence: form.routeSequence ? Number(form.routeSequence) : null,
-        lineItems: lineItems.map(({ _key, ...li }) => ({
+        lineItems: activeLineItems.map(({ _key, ...li }) => ({
           ...li,
           quantity: li.quantity || "1",
           unitPrice: li.unitPrice || null,
@@ -397,26 +466,32 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       toast({ title: contract ? "Contract updated" : "Contract created", description: "Saved successfully." });
       onSuccess();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Contract could not be saved", description: e.message, variant: "destructive" }),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clientId) { toast({ title: "Client required", description: "Please select a client.", variant: "destructive" }); return; }
     if (!form.department) { toast({ title: "Department required", description: "Please select a department.", variant: "destructive" }); return; }
-    if (lineItems.some(li => !li.itemServiceName.trim())) {
-      toast({ title: "Line item name required", description: "Please fill in all item/service names.", variant: "destructive" }); return;
+    if (advancedMode) {
+      if (lineItems.some(li => !li.itemServiceName.trim())) {
+        toast({ title: "Line item name required", description: "Please fill in all item/service names.", variant: "destructive" }); return;
+      }
+    } else {
+      if (!simpleItems.some(i => i.checked)) {
+        toast({ title: "Nothing selected", description: "Please tick at least one item to include in this contract.", variant: "destructive" }); return;
+      }
     }
     saveMutation.mutate();
   };
 
-  const suggestedItems = SERVICE_ITEMS_BY_DEPT[form.department] ?? [];
   const selectedClient = clients.find(c => c.id === form.clientId);
   const teamOptions = teams.filter((t: any) => t.isActive !== false);
   const divId = form.department ? DEPT_TO_DIV_ID[form.department] : undefined;
   const techOptions = workers.filter(w =>
     w.isActive !== false && (!divId || (w as any).departmentId === divId)
   );
+  const deptConfig = DEPT_INCLUDES_CONFIG[form.department] ?? null;
   const summary = scheduleSummary(form, teams.find((t: any) => t.id === form.assignedTeamId)?.name ?? "");
   const showSecondDay = ["2 x a week", "Twice a month"].includes(form.frequency);
   const showWeek = ["Monthly","Every 2 months","Quarterly","Every 6 months","Annually","Twice a month"].includes(form.frequency);
@@ -506,109 +581,176 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
         </Field>
       </Section>
 
-      {/* ── 3. Contract Items / Services ── */}
-      <Section icon={Package} title="3. Contract Items / Services">
-        {suggestedItems.length > 0 && (
-          <div className="mb-1">
-            <p className="text-xs text-gray-500 mb-1.5">Quick add:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {suggestedItems.map(name => (
-                <button
-                  key={name} type="button"
-                  onClick={() => setLineItems(items => [...items, { ...EMPTY_LINE(), itemServiceName: name }])}
-                  className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors"
-                >
-                  + {name}
-                </button>
+      {/* ── 3. Contract Includes ── */}
+      <Section icon={Package} title="3. Contract Includes">
+        {!advancedMode ? (
+          /* ── Simple mode ── */
+          <div className="space-y-3">
+            {!deptConfig ? (
+              <p className="text-sm text-gray-400 py-3 text-center">Select a department above to see contract options.</p>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500">Tick what is included in this contract:</p>
+                <div className="space-y-2">
+                  {simpleItems.map(item => (
+                    <div key={item.name}>
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={e => toggleSimpleItem(item.name, e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 accent-blue-600"
+                        />
+                        <span className={`text-sm ${item.checked ? "font-medium text-gray-900" : "text-gray-600"}`}>{item.name}</span>
+                      </label>
+                      {item.checked && (
+                        <div className="ml-7 mt-1.5 grid grid-cols-3 gap-2">
+                          <Field label={deptConfig.quantityLabel}>
+                            <Input className="h-8 text-xs" type="number" min="0" step="0.5"
+                              value={item.quantity}
+                              onChange={e => updateSimpleItem(item.name, "quantity", e.target.value)} />
+                          </Field>
+                          <Field label="Unit Price (R)">
+                            <Input className="h-8 text-xs" type="number" min="0" step="0.01"
+                              value={item.unitPrice} placeholder="0.00"
+                              onChange={e => updateSimpleItem(item.name, "unitPrice", e.target.value)} />
+                          </Field>
+                          <Field label="Total (R)">
+                            <Input className="h-8 text-xs bg-gray-50" readOnly tabIndex={-1}
+                              value={item.quantity && item.unitPrice
+                                ? (parseFloat(item.quantity || "0") * parseFloat(item.unitPrice || "0")).toFixed(2)
+                                : ""} />
+                          </Field>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Shared extras per department type */}
+                {deptConfig.showRefillRule && (
+                  <Field label="Refill Rule">
+                    <Select value={simpleRefillRule} onValueChange={setSimpleRefillRule}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{REFILL_RULES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+                )}
+                {deptConfig.showPestType && (
+                  <Row>
+                    <Field label="Pest / Insect Type">
+                      <Select value={simplePestType} onValueChange={setSimplePestType}>
+                        <SelectTrigger><SelectValue placeholder="Select type…" /></SelectTrigger>
+                        <SelectContent>{PEST_TYPES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Treatment Type">
+                      <Input value={simpleTreatmentType} onChange={e => setSimpleTreatmentType(e.target.value)} placeholder="e.g. Gel bait, spray…" />
+                    </Field>
+                  </Row>
+                )}
+                {deptConfig.showAreaScope && (
+                  <Field label="Area / Scope">
+                    <Input value={simpleAreaScope} onChange={e => setSimpleAreaScope(e.target.value)} placeholder="e.g. Full building, Kitchen only…" />
+                  </Field>
+                )}
+
+                {/* Stock tracking */}
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="text-sm text-gray-700 font-medium">Stock tracking required?</span>
+                  <button type="button" onClick={() => setSimpleStockTracking(true)}
+                    className={`px-3 py-1 text-xs rounded border transition-colors ${simpleStockTracking ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+                    Yes
+                  </button>
+                  <button type="button" onClick={() => setSimpleStockTracking(false)}
+                    className={`px-3 py-1 text-xs rounded border transition-colors ${!simpleStockTracking ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+                    No
+                  </button>
+                </div>
+
+                <Field label="Notes">
+                  <Textarea rows={2} value={simpleNotes} onChange={e => setSimpleNotes(e.target.value)} placeholder="Notes about these services…" />
+                </Field>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                const built = buildLineItemsFromSimple();
+                if (built.length > 0) setLineItems(built.map((li, i) => ({ ...li, _key: `simple_${i}` })));
+                else if (lineItems.every(l => !l.itemServiceName)) setLineItems([EMPTY_LINE()]);
+                setAdvancedMode(true);
+              }}
+              className="text-xs text-blue-600 hover:underline mt-1"
+            >
+              Advanced: edit line items →
+            </button>
+          </div>
+        ) : (
+          /* ── Advanced mode ── */
+          <div>
+            <div className="space-y-3">
+              {lineItems.map((li, idx) => (
+                <div key={li._key} className="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-bold text-gray-500 w-5 shrink-0">{idx + 1}</span>
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Field label="Line Type">
+                        <Select value={li.lineType} onValueChange={v => updateLine(li._key, "lineType", v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{LINE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Item / Service Name *">
+                        <Input className="h-8 text-xs" value={li.itemServiceName}
+                          onChange={e => updateLine(li._key, "itemServiceName", e.target.value)}
+                          placeholder="Item or service name" />
+                      </Field>
+                    </div>
+                    {lineItems.length > 1 && (
+                      <button type="button" onClick={() => removeLine(li._key)} className="shrink-0 text-red-400 hover:text-red-600 p-1">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                    <Field label="Qty">
+                      <Input className="h-8 text-xs" type="number" value={li.quantity} onChange={e => updateLine(li._key, "quantity", e.target.value)} min="0" step="0.5" />
+                    </Field>
+                    <Field label="Unit Price (R)">
+                      <Input className="h-8 text-xs" type="number" value={li.unitPrice} onChange={e => updateLine(li._key, "unitPrice", e.target.value)} placeholder="0.00" step="0.01" />
+                    </Field>
+                    <Field label="Total (R)">
+                      <Input className="h-8 text-xs bg-gray-50" value={li.totalPrice} readOnly placeholder="Auto" tabIndex={-1} />
+                    </Field>
+                    <Field label="Refill Rule">
+                      <Select value={li.refillRule} onValueChange={v => updateLine(li._key, "refillRule", v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>{REFILL_RULES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2">
+                    <div className="flex items-center gap-1.5">
+                      <Switch checked={li.stockTrackingRequired} onCheckedChange={v => updateLine(li._key, "stockTrackingRequired", v)} className="scale-75" />
+                      <span className="text-xs text-gray-500">Track stock</span>
+                    </div>
+                    <Input className="h-7 text-xs flex-1" value={li.notes} onChange={e => updateLine(li._key, "notes", e.target.value)} placeholder="Line notes…" />
+                  </div>
+                </div>
               ))}
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                <Plus className="h-3.5 w-3.5 mr-1" />Add Line
+              </Button>
+              <button type="button" onClick={() => setAdvancedMode(false)} className="text-xs text-gray-400 hover:text-gray-600 hover:underline">
+                ← Back to simple mode
+              </button>
             </div>
           </div>
         )}
-
-        <div className="space-y-3">
-          {lineItems.map((li, idx) => (
-            <div key={li._key} className="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold text-gray-500 w-5 shrink-0">{idx + 1}</span>
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Field label="Line Type">
-                    <Select value={li.lineType} onValueChange={v => updateLine(li._key, "lineType", v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{LINE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Item / Service Name *">
-                    {suggestedItems.length > 0 ? (
-                      <Select value={li.itemServiceName} onValueChange={v => updateLine(li._key, "itemServiceName", v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select or type…" /></SelectTrigger>
-                        <SelectContent>
-                          {suggestedItems.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-                          <SelectItem value="__custom__">Other (type below)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        className="h-8 text-xs"
-                        value={li.itemServiceName}
-                        onChange={e => updateLine(li._key, "itemServiceName", e.target.value)}
-                        placeholder="Item or service name"
-                      />
-                    )}
-                  </Field>
-                </div>
-                {lineItems.length > 1 && (
-                  <button type="button" onClick={() => removeLine(li._key)} className="shrink-0 text-red-400 hover:text-red-600 p-1">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              {li.itemServiceName === "__custom__" && (
-                <Input
-                  className="h-8 text-xs mb-2"
-                  placeholder="Type item/service name…"
-                  value={li.serviceCategory}
-                  onChange={e => updateLine(li._key, "serviceCategory", e.target.value)}
-                />
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Field label="Qty">
-                  <Input className="h-8 text-xs" type="number" value={li.quantity} onChange={e => updateLine(li._key, "quantity", e.target.value)} min="0" step="0.5" />
-                </Field>
-                <Field label="Unit Price (R)">
-                  <Input className="h-8 text-xs" type="number" value={li.unitPrice} onChange={e => updateLine(li._key, "unitPrice", e.target.value)} placeholder="0.00" step="0.01" />
-                </Field>
-                <Field label="Total (R)">
-                  <Input className="h-8 text-xs" value={li.totalPrice} readOnly placeholder="Auto" tabIndex={-1} />
-                </Field>
-                <Field label="Refill Rule">
-                  <Select value={li.refillRule} onValueChange={v => updateLine(li._key, "refillRule", v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>{REFILL_RULES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                  </Select>
-                </Field>
-              </div>
-              <div className="flex items-center gap-4 mt-2">
-                <div className="flex items-center gap-1.5">
-                  <Switch
-                    checked={li.stockTrackingRequired}
-                    onCheckedChange={v => updateLine(li._key, "stockTrackingRequired", v)}
-                    className="scale-75"
-                  />
-                  <span className="text-xs text-gray-500">Track stock</span>
-                </div>
-                <Input
-                  className="h-7 text-xs flex-1"
-                  value={li.notes}
-                  onChange={e => updateLine(li._key, "notes", e.target.value)}
-                  placeholder="Line notes…"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={addLine} className="mt-1">
-          <Plus className="h-3.5 w-3.5 mr-1" />Add Line
-        </Button>
       </Section>
 
       {/* ── 4. Scheduling ── */}

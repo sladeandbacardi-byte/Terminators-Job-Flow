@@ -1,0 +1,249 @@
+Simplify the Contract Items / Services section.
+
+The current design is too complicated for service users.
+
+It currently shows:
+- Quick add buttons
+- Line Type dropdown
+- Item / Service Name dropdown
+- Quantity
+- Unit Price
+- Total
+- Refill Rule
+- Track Stock
+- Multiple editable lines
+
+This is too much for normal contract loading.
+
+Replace it with a simpler department-based contract includes section.
+
+SECTION NAME
+
+Rename:
+Contract Items / Services
+
+To:
+Contract Includes
+
+BUSINESS RULE
+
+The user should not need to build complex line items manually.
+
+Most contracts should be created by choosing simple included services/items based on the selected department.
+
+The system can still save these as contract line items in PostgreSQL behind the scenes, but the user interface must be simple.
+
+DEPARTMENT-BASED OPTIONS
+
+When Department = Sanitary Bins, show:
+
+Contract Includes:
+- Sanitary Bin Placement
+- Sanitary Bin Service / Exchange
+- Sanitary Bin Cleaning
+- Sanitary Bin Replacement if needed
+- Consumables / Refills
+
+Then show simple fields:
+
+- Number of bins
+- Price per service / month
+- Stock tracking required: Yes / No
+- Notes
+
+When the user ticks options, create contract line items behind the scenes.
+
+Do not show Line Type unless the user clicks Advanced.
+
+When Department = Washroom or Hygiene, show:
+
+Contract Includes:
+- Aerosol A/F Unit
+- Aerosol Refill
+- Soap Dispenser
+- Soap Refill
+- Paper Towel Dispenser
+- Paper Towel Refill
+- Toilet Roll Dispenser
+- Toilet Roll Refill
+- Urinal Mat
+- Washroom Service
+- On-demand Refills
+
+Then show simple fields:
+
+- Quantity
+- Refill rule
+- Price per month / service
+- Stock tracking required: Yes / No
+- Notes
+
+Refill rule options:
+- Including Refills
+- Excluding Refills
+- Refill Only
+- On Demand Refills
+- Not Applicable
+
+When Department = Pest Control, show:
+
+Contract Includes:
+- Pest Control Service
+- Inspection
+- Treatment
+- Monitoring
+- Baiting
+- Follow-up
+- COC Inspection
+- Other
+
+Then show:
+
+- Pest / Insect Type
+- Treatment Type
+- Quantity
+- Price per service
+- Notes
+
+Pest / Insect Type options:
+- Rodents
+- Cockroaches
+- Ants
+- Fleas
+- Flies
+- Bed Bugs
+- Termites
+- Wood Borer
+- Birds
+- Stored Product Insects
+- Other
+
+When Department = Dustmats, show:
+
+Contract Includes:
+- Dustmat Rental
+- Dustmat Replacement
+- Dustmat Cleaning
+
+Then show:
+
+- Number of mats
+- Price per service / month
+- Notes
+
+When Department = Deep Cleaning, show:
+
+Contract Includes:
+- Deep Cleaning Service
+- Recurring Deep Clean
+- Once-off Deep Clean
+- Hygiene Deep Clean
+
+Then show:
+
+- Area / scope
+- Quantity
+- Price
+- Notes
+
+ADVANCED MODE
+
+Add a small link/button:
+
+Advanced: edit line items
+
+Only when the user clicks Advanced should the system show:
+
+- Line Type
+- Item / Service Name
+- Quantity
+- Unit Price
+- Total
+- Refill Rule
+- Track Stock
+- Add Line
+- Delete Line
+
+Default mode must be simple.
+
+Most users should never need to use Advanced mode.
+
+PRICING
+
+In simple mode, show pricing clearly:
+
+- Quantity
+- Unit Price
+- Total Price
+
+For Sanitary Bins, label quantity as:
+Number of bins
+
+For Dustmats, label quantity as:
+Number of mats
+
+For Pest Control, label quantity as:
+Quantity / Units
+
+For Washroom, label quantity as:
+Quantity
+
+The total price should calculate automatically.
+
+STOCK TRACKING
+
+Do not show Track Stock as a switch on every line in simple mode.
+
+Instead show one clear field:
+
+Stock tracking required?
+- Yes
+- No
+
+If Yes, later allow linking stock items.
+
+Do not make stock tracking part of the basic contract loading unless required.
+
+SAVE STRUCTURE
+
+Behind the scenes, still save to:
+
+unified_contracts
+contract_line_items
+
+But the UI must feel simple.
+
+If the user selected Sanitary Bin Service / Exchange and Quantity = 2, save a contract line item like:
+
+lineType: Combined Service + Item
+itemServiceName: Sanitary Bin Service / Exchange
+quantity: 2
+unitPrice: entered price
+refillRule: Not Applicable
+stockTrackingRequired: selected value
+
+TEST
+
+Test with a service user:
+
+1. Create new contract.
+2. Select Department: Sanitary Bins.
+3. Confirm the Contract Includes section shows simple checkbox options.
+4. Tick:
+   - Sanitary Bin Placement
+   - Sanitary Bin Service / Exchange
+5. Enter Number of bins: 2.
+6. Enter Price: R50.
+7. Save.
+8. Confirm the contract saves.
+9. Confirm the contract appears in Contracts list.
+10. Confirm the contract appears on Client Profile > Contracts.
+11. Confirm line items are saved behind the scenes.
+
+IMPORTANT
+
+The main user should see a simple contract loading screen.
+
+The advanced line item editor must be hidden by default.
+
+Do not make service users choose line type and item/service name for every line unless they intentionally open Advanced mode.
