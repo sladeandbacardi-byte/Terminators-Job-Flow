@@ -1,0 +1,253 @@
+URGENT BUG FIX: unified_contracts table missing and contract save fails
+
+The New Contract form now opens correctly, but when clicking Create Contract it fails with:
+
+500: relation "unified_contracts" does not exist
+
+This means the frontend/API is trying to save to a PostgreSQL table called unified_contracts, but the table does not exist.
+
+Please fix the database/schema/migration properly.
+
+DO NOT fix this only in the frontend.
+
+PART 1: CREATE POSTGRESQL TABLES
+
+Create the required PostgreSQL tables for the unified contract system.
+
+Required table:
+
+unified_contracts
+
+Suggested fields:
+
+- id / contractId
+- clientId
+- contractNumber
+- department
+- contractStartDate
+- contractEndDate
+- lastPriceIncreaseDate
+- nextIncreaseDate
+- increasePercentage
+- frequency
+- weekOfMonth
+- dayOfWeek
+- secondDayOfWeek
+- startTime
+- secondStartTime
+- estimatedDuration
+- fixedTime
+- routeSequence
+- assignedTeamId
+- assignedTechnicianId
+- confirmWithClientBeforeService
+- invoiceRule
+- activeStatus
+- specialInstructions
+- internalNotes
+- createdAt
+- updatedAt
+- createdBy
+- updatedBy
+
+Also create table:
+
+contract_line_items
+
+Fields:
+
+- id / contractLineItemId
+- contractId
+- clientId
+- lineType
+- itemServiceName
+- serviceCategory
+- quantity
+- unitPrice
+- totalPrice
+- refillRule
+- stockTrackingRequired
+- notes
+- createdAt
+- updatedAt
+
+Make sure contract_line_items.contractId links to unified_contracts.id.
+
+PART 2: UPDATE DRIZZLE SCHEMA
+
+Update the Drizzle schema to include:
+
+- unifiedContracts
+- contractLineItems
+
+Make sure the schema field names match the API insert/update/select code exactly.
+
+Previous bugs happened because Drizzle tried to write columns that did not exist in PostgreSQL.
+
+Do not repeat that.
+
+After updating schema, run the migration or create the missing tables safely.
+
+PART 3: BACKEND API
+
+Check all contract API routes.
+
+The Create Contract button must save:
+
+1. The main contract record into unified_contracts.
+2. The contract line items into contract_line_items.
+3. All records must include clientId.
+4. The saved contract must be refetched after save.
+5. Only then show success.
+
+If save fails, show a clear error and reset the Create Contract button.
+
+Do not leave the modal stuck or half-saved.
+
+PART 4: DATA INTEGRITY
+
+Update Admin > Data Integrity.
+
+Add checks:
+
+- unified_contracts table exists
+- contract_line_items table exists
+- contracts missing clientId
+- contract line items missing contractId
+- contract line items missing clientId
+- active contracts missing frequency
+- scheduled contracts missing schedule fields
+- contracts not appearing in client profile
+- contracts not appearing in calendar when scheduled
+
+PART 5: BACKUP
+
+Update backup export to include:
+
+- unified_contracts
+- contract_line_items
+
+Backup report must show counts for both.
+
+PART 6: MENU WORDING
+
+Rename the left menu item:
+
+Recurring Service Contracts
+
+to:
+
+Contracts
+
+The app should not call them recurring service contracts anymore.
+
+Business rule:
+
+A contract is recurring work or recurring supply for a client.
+It can include:
+- service/labour
+- rental/product items
+- both service and items together
+
+PART 7: TEAM / TECHNICIAN AUTO-FILL
+
+The contract form currently shows:
+
+Assigned Team: No team assigned
+Assigned Technician: No technician assigned
+
+This must be improved.
+
+When the user selects Department, automatically suggest the correct team/technician.
+
+Use live workers/teams from PostgreSQL, not free text.
+
+Rules:
+
+If Department = Sanitary Bins:
+Auto-select configured Sanitary Bins team if one exists.
+
+If Department = Washroom or Hygiene:
+Auto-select configured Washroom/Hygiene team if one exists.
+
+If Department = Dustmats:
+Auto-select configured Dustmat team if one exists.
+
+If Department = Pest Control:
+Show available Pest Control technicians in a dropdown.
+If only one Pest Control technician exists, auto-select that technician.
+If multiple exist, allow user to choose.
+
+If Department = Deep Cleaning:
+Auto-select configured Deep Cleaning team if one exists.
+
+Add or confirm this settings area:
+
+Admin > Service Settings > Department Defaults
+
+Allow admin to configure:
+
+- Department
+- Default Team
+- Default Technician
+- Available Teams
+- Available Technicians
+
+If no default exists, show:
+Select team/technician
+
+Do not block saving only because no default exists, unless the department requires assignment.
+
+PART 8: TEST REQUIRED
+
+Run this exact test:
+
+1. Log in as Mariette Koekemoer.
+2. Go to Service > Contracts.
+3. Click New Contract.
+4. Confirm no Service/Rental choice modal appears.
+5. Select or create a client.
+6. Select Department: Pest Control.
+7. Add line item:
+   - Line Type: Service
+   - Item/Service Name: Rodent Service
+   - Quantity: 1
+   - Unit Price: 850
+8. Set schedule:
+   - Frequency: Monthly
+   - Week of Month: Week 1
+   - Day of Week: Wednesday
+   - Start Time: 08:00
+   - Duration: 60
+   - Route Sequence: 1
+9. Confirm assigned technician dropdown shows Pest Control technicians.
+10. Select technician.
+11. Click Create Contract.
+12. Confirm no 500 error.
+13. Confirm success toast appears.
+14. Confirm contract appears in Contracts list.
+15. Confirm contract appears under Client Profile > Contracts.
+16. Confirm contract appears on Calendar on matching dates.
+17. Refresh page.
+18. Confirm contract and line items are still saved.
+
+Also test:
+
+1. Create Sanitary Bin contract.
+2. Confirm department default team is suggested.
+3. Save.
+4. Confirm it appears on Calendar and Client Profile.
+
+PART 9: ERROR HANDLING
+
+If the table is missing or any database error occurs, show:
+
+"Contract could not be saved. Please contact admin. Database error: [short reason]"
+
+Do not show a generic stuck state.
+
+Do not show success unless the record was saved and refetched successfully.
+
+IMPORTANT
+
+Do not continue feature work until the unified_contracts and contract_line_items tables exist and contract creation works end to end.
