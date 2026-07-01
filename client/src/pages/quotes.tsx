@@ -179,6 +179,22 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
   const { toast } = useToast();
   const [tab, setTab] = useState("client");
 
+  // Legal entity
+  const [legalEntityId,   setLegalEntityId]   = useState("");
+  const [legalEntityName, setLegalEntityName] = useState("");
+
+  const { data: legalEntities = [] } = useQuery<import("@shared/schema").LegalEntity[]>({
+    queryKey: ["/api/legal-entities"],
+  });
+
+  // Auto-select default entity when list loads
+  useEffect(() => {
+    if (legalEntities.length > 0 && !legalEntityId) {
+      const def = legalEntities.find(e => e.isDefault && e.isActive) ?? legalEntities.find(e => e.isActive);
+      if (def) { setLegalEntityId(def.id); setLegalEntityName(def.name); }
+    }
+  }, [legalEntities]);
+
   // Client fields
   const [companyName,     setCompanyName]     = useState("");
   const [contactPerson,   setContactPerson]   = useState("");
@@ -202,6 +218,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
 
   const reset = () => {
     setTab("client");
+    setLegalEntityId(""); setLegalEntityName("");
     setCompanyName(""); setContactPerson(""); setPhone(""); setEmail("");
     setSiteAddress(""); setBillingAddress(""); setPreferredContact("email");
     setVatNumber(""); setCompanyReg("");
@@ -251,6 +268,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
   });
 
   const handleSubmit = () => {
+    if (!legalEntityId) { toast({ title: "Issuing entity is required", variant: "destructive" }); return; }
     if (!companyName.trim()) { setTab("client"); toast({ title: "Company name is required", variant: "destructive" }); return; }
     if (!contactPerson.trim()) { setTab("client"); toast({ title: "Contact person is required", variant: "destructive" }); return; }
     if (!email.trim()) { setTab("client"); toast({ title: "Email is required", variant: "destructive" }); return; }
@@ -271,6 +289,8 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
       internalNotes,
       quoteType,
       status,
+      legalEntityId: legalEntityId || undefined,
+      legalEntityName: legalEntityName || undefined,
       lineItemsJson: JSON.stringify({
         items: lineItems,
         vatMode, billingAddress, vatNumber, companyReg,
@@ -289,9 +309,31 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5 text-primary" /> New Quote
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-4">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <FileText className="h-5 w-5 text-primary" /> New Quote
+            </DialogTitle>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Issuing Entity <span className="text-red-500">*</span></span>
+              <Select
+                value={legalEntityId}
+                onValueChange={id => {
+                  setLegalEntityId(id);
+                  const e = legalEntities.find(x => x.id === id);
+                  setLegalEntityName(e?.name ?? "");
+                }}
+              >
+                <SelectTrigger className={`w-52 h-8 text-sm ${!legalEntityId ? "border-red-300" : ""}`}>
+                  <SelectValue placeholder="Select entity…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {legalEntities.filter(e => e.isActive).map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -817,6 +859,11 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
           </div>
 
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {(quote as any).legalEntityName && (
+              <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                {(quote as any).legalEntityName}
+              </span>
+            )}
             <Badge variant="outline" className="text-xs font-medium">
               {SERVICE_LABELS[quote.serviceType] ?? quote.serviceType}
             </Badge>

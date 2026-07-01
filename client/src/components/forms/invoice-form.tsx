@@ -34,6 +34,8 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
         subtotal: invoice.subtotal ?? "0.00",
         vatAmount: invoice.taxAmount ?? "0.00",
         totalAmount: invoice.total ?? "0.00",
+        legalEntityId: (invoice as any).legalEntityId ?? "",
+        legalEntityName: (invoice as any).legalEntityName ?? "",
         lineItems: invoiceItems.length > 0
           ? invoiceItems.map(i => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total }))
           : [{ description: "", quantity: "1", unitPrice: "0.00", total: "0.00" }],
@@ -53,6 +55,8 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
         paidAmount: "0.00",
         notes: data.notes ?? "",
         terms: data.terms ?? "Payment due within 30 days.",
+        legalEntityId: data.legalEntityId || undefined,
+        legalEntityName: data.legalEntityName || undefined,
       };
       const res = await apiRequest("POST", "/api/invoices", invoiceData);
       const created = await res.json();
@@ -85,6 +89,8 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
         taxAmount: data.vatAmount,
         total: data.totalAmount,
         notes: data.notes ?? "",
+        legalEntityId: data.legalEntityId || undefined,
+        legalEntityName: data.legalEntityName || undefined,
         terms: data.terms ?? "Payment due within 30 days.",
       };
       return apiRequest("PUT", `/api/invoices/${invoice!.id}`, invoiceData);

@@ -1,5 +1,6 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Plus, Trash2, FileText, Receipt, Briefcase, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { Worker, Client } from "@shared/schema";
+import type { Worker, Client, LegalEntity } from "@shared/schema";
 import { ORIGINATION_OPTIONS } from "@shared/schema";
 import { documentFormSchema, type DocumentFormValues, type DocType } from "./document-form-schema";
 
@@ -125,6 +126,10 @@ export default function DocumentForm({
   const cfg = DOC_CONFIG[docType];
   const Icon = cfg.icon;
   const [linkedClientId, setLinkedClientId] = useState("");
+
+  const { data: legalEntities = [] } = useQuery<LegalEntity[]>({
+    queryKey: ["/api/legal-entities"],
+  });
 
   const dueDefault = new Date();
   dueDefault.setDate(dueDefault.getDate() + 30);
@@ -275,6 +280,41 @@ export default function DocumentForm({
 
         {/* ── body ── */}
         <div className={`border border-t-0 ${cfg.border} rounded-b-lg p-5 space-y-5`}>
+
+          {/* ── ISSUING ENTITY (invoice & quote) ── */}
+          {(docType === "invoice" || docType === "quote") && (
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Issuing Entity</p>
+              <FormField control={form.control} name="legalEntityId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Issuing Entity <span className="text-red-500">*</span></FormLabel>
+                  <Select
+                    onValueChange={id => {
+                      field.onChange(id);
+                      const entity = legalEntities.find(e => e.id === id);
+                      form.setValue("legalEntityName", entity?.name ?? "");
+                    }}
+                    value={field.value ?? ""}
+                  >
+                    <FormControl>
+                      <SelectTrigger className={!field.value ? "border-orange-300" : ""}>
+                        <SelectValue placeholder="Select which legal entity is issuing this document…" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {legalEntities.filter(e => e.isActive).map(e => (
+                        <SelectItem key={e.id} value={e.id}>
+                          <span className="font-medium">{e.name}</span>
+                          {e.tradingName && <span className="text-muted-foreground ml-1 text-xs">t/a {e.tradingName}</span>}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </section>
+          )}
 
           {/* ── CLIENT SECTION ── */}
           <section>

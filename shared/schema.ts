@@ -243,6 +243,8 @@ export const invoices = pgTable("invoices", {
   sageStatus: varchar("sage_status"), // Store Sage invoice status
   linkedJobId: varchar("linked_job_id"),
   linkedQuoteId: varchar("linked_quote_id"),
+  legalEntityId: varchar("legal_entity_id"),
+  legalEntityName: text("legal_entity_name"),
 });
 
 export const invoiceItems = pgTable("invoice_items", {
@@ -727,6 +729,8 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   clientFlags: text("client_flags"),                          // JSON array: ["bad_payer","high_profile",...]
   expectedServiceTime: text("expected_service_time"),         // e.g. "Monthly", "Bi-weekly"
   departmentId: varchar("department_id"),
+  legalEntityId: varchar("legal_entity_id"),
+  legalEntityName: text("legal_entity_name"),
 });
 
 // Marketing channel options for the Origination field on every lead
@@ -1779,3 +1783,32 @@ export const insertDepartmentDefaultSchema = createInsertSchema(departmentDefaul
 });
 export type InsertDepartmentDefault = z.infer<typeof insertDepartmentDefaultSchema>;
 export type DepartmentDefault = typeof departmentDefaults.$inferSelect;
+
+// ── Legal Entities ────────────────────────────────────────────────────────────
+export const legalEntities = pgTable("legal_entities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  tradingName: text("trading_name"),
+  registrationNumber: text("registration_number"),
+  vatNumber: text("vat_number"),
+  physicalAddress: text("physical_address"),
+  postalAddress: text("postal_address"),
+  phone: text("phone"),
+  email: text("email"),
+  bankName: text("bank_name"),
+  bankAccount: text("bank_account"),
+  bankBranch: text("bank_branch"),
+  bankAccountType: text("bank_account_type"),
+  defaultPaymentTerms: text("default_payment_terms"),
+  invoiceFooter: text("invoice_footer"),
+  quoteFooter: text("quote_footer"),
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+export const insertLegalEntitySchema = createInsertSchema(legalEntities).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertLegalEntity = z.infer<typeof insertLegalEntitySchema>;
+export type LegalEntity = typeof legalEntities.$inferSelect;

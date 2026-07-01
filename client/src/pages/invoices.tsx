@@ -287,20 +287,23 @@ export default function Invoices() {
                               <span>Issued: {formatDate(new Date(invoice.issueDate))}</span>
                               <span>Due: {formatDate(new Date(invoice.dueDate))}</span>
                             </div>
-                            {(invoice.linkedJobId || invoice.linkedQuoteId) && (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                {invoice.linkedJobId && (
-                                  <span className="text-xs font-mono text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
-                                    Job: {invoice.linkedJobId}
-                                  </span>
-                                )}
-                                {invoice.linkedQuoteId && (
-                                  <span className="text-xs font-mono text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">
-                                    Quote: {invoice.linkedQuoteId}
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {(invoice as any).legalEntityName && (
+                                <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                                  {(invoice as any).legalEntityName}
+                                </span>
+                              )}
+                              {invoice.linkedJobId && (
+                                <span className="text-xs font-mono text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                                  Job: {invoice.linkedJobId}
+                                </span>
+                              )}
+                              {invoice.linkedQuoteId && (
+                                <span className="text-xs font-mono text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">
+                                  Quote: {invoice.linkedQuoteId}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         

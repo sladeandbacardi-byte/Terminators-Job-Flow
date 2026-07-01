@@ -25,6 +25,7 @@ import {
   insertServiceScheduleEntrySchema,
   insertTreatmentReportSchema,
   insertCommunicationNoteSchema,
+  insertLegalEntitySchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -5242,6 +5243,35 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     try {
       const row = await (storage as any).upsertDepartmentDefault(decodeURIComponent(req.params.department), req.body);
       res.json(row);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Legal Entities ──────────────────────────────────────────────────────────
+
+  app.get("/api/legal-entities", async (_req, res) => {
+    try { res.json(await storage.getLegalEntities()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/legal-entities/:id", async (req, res) => {
+    try {
+      const entity = await storage.getLegalEntity(req.params.id);
+      if (!entity) return res.status(404).json({ error: "Not found" });
+      res.json(entity);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/legal-entities", async (req, res) => {
+    try {
+      const data = insertLegalEntitySchema.parse(req.body);
+      res.status(201).json(await storage.createLegalEntity(data));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.put("/api/legal-entities/:id", async (req, res) => {
+    try {
+      const entity = await storage.updateLegalEntity(req.params.id, req.body);
+      res.json(entity);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

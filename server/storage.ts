@@ -419,6 +419,12 @@ export interface IStorage {
   // Company Settings
   getCompanySettings(): Promise<import("@shared/schema").CompanySettings>;
   updateCompanySettings(settings: Partial<import("@shared/schema").CompanySettings>): Promise<import("@shared/schema").CompanySettings>;
+
+  // Legal Entities
+  getLegalEntities(): Promise<import("@shared/schema").LegalEntity[]>;
+  getLegalEntity(id: string): Promise<import("@shared/schema").LegalEntity | undefined>;
+  createLegalEntity(entity: import("@shared/schema").InsertLegalEntity): Promise<import("@shared/schema").LegalEntity>;
+  updateLegalEntity(id: string, entity: Partial<import("@shared/schema").InsertLegalEntity>): Promise<import("@shared/schema").LegalEntity>;
 }
 
 export interface BackupLog {
@@ -5031,6 +5037,12 @@ export class MemStorage implements IStorage {
     return { id: "singleton", companyName: "The Terminators", tradingName: null, vatNumber: null, registrationNumber: null, phone: null, email: null, address: null, city: null, postalCode: null, bankName: null, bankAccount: null, bankBranch: null, bankReference: null, defaultVatRate: "15", updatedAt: new Date() };
   }
   async updateCompanySettings(_s: any): Promise<import("@shared/schema").CompanySettings> { throw new Error("Use DbStorage"); }
+
+  // Legal Entities (MemStorage stubs — production uses DbStorage)
+  async getLegalEntities(): Promise<import("@shared/schema").LegalEntity[]> { return []; }
+  async getLegalEntity(_id: string): Promise<import("@shared/schema").LegalEntity | undefined> { return undefined; }
+  async createLegalEntity(_entity: import("@shared/schema").InsertLegalEntity): Promise<import("@shared/schema").LegalEntity> { throw new Error("Use DbStorage"); }
+  async updateLegalEntity(_id: string, _entity: Partial<import("@shared/schema").InsertLegalEntity>): Promise<import("@shared/schema").LegalEntity> { throw new Error("Use DbStorage"); }
 
   async getContractOccurrences(start: Date, end: Date, opts: { departmentId?: string; technicianId?: string; teamId?: string } = {}): Promise<ContractOccurrence[]> {
     const contracts = Array.from(this.serviceContractsMap.values())

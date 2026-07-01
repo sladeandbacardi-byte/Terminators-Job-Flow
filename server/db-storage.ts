@@ -17,7 +17,7 @@ import {
   treatmentReports, communicationNotes, acceptedWorkflows, contractDeletionHistory,
   stockLocations, stockBalances, stockMovements, pickingLists, pickingListItems,
   stockChecks, stockCheckItems,
-  unifiedContracts, contractLineItems, departmentDefaults,
+  unifiedContracts, contractLineItems, departmentDefaults, legalEntities,
 } from "@shared/schema";
 
 import type {
@@ -2554,5 +2554,31 @@ export class DbStorage implements IStorage {
         .returning();
       return row;
     }
+  }
+
+  // ── Legal Entities ────────────────────────────────────────────────────────────
+
+  async getLegalEntities() {
+    return db.select().from(legalEntities).orderBy(asc(legalEntities.name));
+  }
+
+  async getLegalEntity(id: string) {
+    const [row] = await db.select().from(legalEntities).where(eq(legalEntities.id, id)).limit(1);
+    return row;
+  }
+
+  async createLegalEntity(data: import("@shared/schema").InsertLegalEntity) {
+    const [row] = await db.insert(legalEntities)
+      .values({ id: randomUUID(), ...data, createdAt: new Date(), updatedAt: new Date() })
+      .returning();
+    return row;
+  }
+
+  async updateLegalEntity(id: string, data: Partial<import("@shared/schema").InsertLegalEntity>) {
+    const [row] = await db.update(legalEntities)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(legalEntities.id, id))
+      .returning();
+    return row;
   }
 }

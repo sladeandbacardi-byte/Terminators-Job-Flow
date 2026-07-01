@@ -32,6 +32,8 @@ export const documentFormSchema = z.object({
   notes: z.string().optional(),
   origination: z.string().optional(),
   originationOther: z.string().optional(),
+  legalEntityId: z.string().optional(),
+  legalEntityName: z.string().optional(),
 });
 
 export type DocumentFormValues = z.infer<typeof documentFormSchema>;
