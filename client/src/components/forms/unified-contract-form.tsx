@@ -12,7 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Trash2, ChevronDown, ChevronUp, User, FileText, Package,
-  Calendar, DollarSign, Box, StickyNote, Wrench, Search,
+  Calendar, DollarSign, Box, StickyNote, Wrench, Search, X,
 } from "lucide-react";
 import type { Client, Worker, Team, InventoryItem } from "@shared/schema";
 
@@ -356,6 +356,79 @@ function Field({ label, children }: { label: string; children: any }) {
     <div className="space-y-1">
       <Label className="text-xs font-medium text-gray-600">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+function RefillItemSelector({
+  value, name, onChange, catalog,
+}: {
+  value: string; name: string;
+  onChange: (id: string, name: string) => void;
+  catalog: CatalogItem[];
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen]   = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const invItems = catalog.filter(i => i.source === "inventory");
+  const q = query.trim().toLowerCase();
+  const filtered = q ? invItems.filter(i => i.name.toLowerCase().includes(q)) : invItems;
+  const displayValue = value ? name : "";
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+        <Input
+          className="h-8 text-xs pl-6 pr-6"
+          value={open ? query : displayValue}
+          placeholder="Type to search refill items…"
+          onFocus={() => { setQuery(""); setOpen(true); }}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        />
+        {value && !open && (
+          <button
+            type="button"
+            className="absolute right-1.5 top-1.5 text-gray-400 hover:text-gray-600"
+            onMouseDown={e => { e.preventDefault(); onChange("", ""); setQuery(""); }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 w-full mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.map(item => (
+            <button
+              key={item.stockItemId}
+              type="button"
+              className={`w-full text-left px-2.5 py-1.5 text-xs border-b border-gray-50 last:border-0 hover:bg-blue-50 transition-colors ${value === item.stockItemId ? "bg-blue-50 font-medium text-blue-700" : "text-gray-800"}`}
+              onMouseDown={e => {
+                e.preventDefault();
+                onChange(item.stockItemId, item.name);
+                setQuery("");
+                setOpen(false);
+              }}
+            >
+              {item.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && filtered.length === 0 && (
+        <div className="absolute z-50 w-full mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg px-2.5 py-2 text-xs text-gray-400">
+          {q ? `No items found for "${q}"` : "No items available"}
+        </div>
+      )}
     </div>
   );
 }
@@ -978,34 +1051,12 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                             item.refillArrangement === "Refills Charged Separately" ||
                             item.refillArrangement === "On Demand Refills") && (
                             <Field label="Linked Refill Item">
-                              <Select
-                                value={item.linkedRefillStockItemId || "__none__"}
-                                onValueChange={v => {
-                                  if (v === "__none__") { setLinkedRefillItem(item._key, "", ""); return; }
-                                  const inv = (inventoryItems as any[]).find(i => i.id === v);
-                                  setLinkedRefillItem(item._key, inv?.id ?? "", inv?.name ?? v);
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Select refill item from inventory…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__none__">— None —</SelectItem>
-                                  {(inventoryItems as any[])
-                                    .filter(i => i.activeStatus !== false)
-                                    .sort((a: any, b: any) => {
-                                      const aR = (a.category || "").toLowerCase().includes("refill") || (a.category || "").toLowerCase().includes("consumable");
-                                      const bR = (b.category || "").toLowerCase().includes("refill") || (b.category || "").toLowerCase().includes("consumable");
-                                      if (aR && !bR) return -1;
-                                      if (!aR && bR) return  1;
-                                      return a.name.localeCompare(b.name);
-                                    })
-                                    .map((i: any) => (
-                                      <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
-                                    ))
-                                  }
-                                </SelectContent>
-                              </Select>
+                              <RefillItemSelector
+                                value={item.linkedRefillStockItemId}
+                                name={item.linkedRefillItemName}
+                                catalog={catalog}
+                                onChange={(id, name) => setLinkedRefillItem(item._key, id, name)}
+                              />
                             </Field>
                           )}
 
