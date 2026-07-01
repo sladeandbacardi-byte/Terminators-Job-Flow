@@ -884,6 +884,21 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
   const saveMutation = useMutation({
     mutationFn: async () => {
       const activeLineItems = getActiveLineItems();
+
+      // ── Data integrity checks ─────────────────────────────────────────────
+      for (const li of activeLineItems) {
+        const name = (li as any).itemServiceName || "Unknown item";
+        const disc = parseFloat((li as any).discountPercentage ?? "0");
+        const finalP = parseFloat((li as any).finalUnitPrice ?? "0");
+        const override = (li as any).manualPriceOverride;
+
+        if (disc < 0 || disc > 100)
+          throw new Error(`"${name}": Discount % must be between 0 and 100.`);
+        if (finalP < 0)
+          throw new Error(`"${name}": Final unit price cannot be negative.`);
+        if (override && !finalP)
+          throw new Error(`"${name}": Manual price override is set but no final price entered.`);
+      }
       const payload = {
         ...form,
         weekOfMonth:       form.weekOfMonth       ? Number(form.weekOfMonth)       : null,

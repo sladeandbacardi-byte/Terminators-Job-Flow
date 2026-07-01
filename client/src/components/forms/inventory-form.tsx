@@ -14,6 +14,8 @@ import { z } from "zod";
 
 const inventoryFormSchema = insertInventoryItemSchema.extend({
   unitPrice: z.string().optional().transform((val) => val && val !== "" ? val : undefined),
+  costPrice: z.string().optional().transform((val) => val && val !== "" ? val : undefined),
+  sellingPrice: z.string().optional().transform((val) => val && val !== "" ? val : undefined),
   quantity: z.number().min(0, "Quantity must be 0 or greater"),
 });
 
@@ -44,6 +46,8 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
       maxStockLevel: item?.maxStockLevel || 100,
       reorderPoint: item?.reorderPoint || 20,
       unitPrice: item?.unitPrice || undefined,
+      costPrice: (item as any)?.costPrice || undefined,
+      sellingPrice: (item as any)?.sellingPrice || undefined,
       description: item?.description || "",
       departmentId: item?.departmentId || undefined,
       location: item?.location || "",
@@ -206,25 +210,75 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="unitPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Unit Price (ZAR)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      placeholder="0.00" 
-                      {...field} 
-                      data-testid="input-unit-price"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          </div>
+
+          {/* Pricing Section */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Pricing (ZAR)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="costPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-600">Cost Price <span className="text-xs font-normal text-gray-400">(what you pay)</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-cost-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="sellingPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-green-700 font-semibold">Selling Price <span className="text-xs font-normal text-gray-400">(charged to client)</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="border-green-300 focus:border-green-500"
+                        {...field}
+                        data-testid="input-selling-price"
+                      />
+                    </FormControl>
+                    <p className="text-xs text-green-600 mt-0.5">Auto-fills in contracts</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="unitPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-500">Unit Price <span className="text-xs font-normal text-gray-400">(legacy / internal)</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-unit-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
 
           {/* Stock Level Management */}

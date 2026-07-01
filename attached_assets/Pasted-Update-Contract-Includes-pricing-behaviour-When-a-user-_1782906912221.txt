@@ -1,0 +1,235 @@
+Update Contract Includes pricing behaviour.
+
+When a user selects an inventory item, product, refill, consumable, dispenser, rental item, or stock item in the Contract Includes section, the system must automatically pre-populate the selling price from Stock Management / Inventory.
+
+CURRENT REQUIREMENT
+
+Stock Management / Inventory is the master source for item pricing.
+
+If an inventory item has a selling price, that selling price must prefill on the contract line.
+
+Example:
+Inventory Item:
+Hand Sanitizer Refill - 1L
+Selling Price: R35.00
+
+When selected in Contract Includes:
+Unit Price must auto-fill as R35.00.
+
+PRICE FIELDS ON CONTRACT LINE
+
+Each contract line must include:
+
+- Inventory Item / Service
+- Quantity
+- Standard Selling Price
+- Discount Percentage
+- Discount Amount optional
+- Final Unit Price
+- Total Price
+- Manual Price Override
+- Notes
+
+UI BEHAVIOUR
+
+When an item is selected from inventory:
+
+1. Fetch the item from PostgreSQL.
+2. Read the sellingPrice field.
+3. Populate:
+   - Standard Selling Price
+   - Final Unit Price
+   - Unit Price
+
+4. Set Discount Percentage to 0%.
+5. Calculate Total Price as:
+   Quantity x Final Unit Price
+
+DISCOUNT OPTION
+
+Add a discount field:
+
+Discount %
+
+Default:
+0%
+
+If user enters a discount percentage, calculate:
+
+Final Unit Price = Standard Selling Price - discount
+
+Example:
+Standard Selling Price: R35.00
+Discount: 10%
+Final Unit Price: R31.50
+
+Total Price = Quantity x Final Unit Price
+
+MANUAL PRICE ADJUSTMENT
+
+The user must also be able to manually adjust the Final Unit Price.
+
+If the user manually changes Final Unit Price, set:
+
+manualPriceOverride = true
+
+Show a small warning/note:
+"Price manually adjusted from standard selling price."
+
+Do not overwrite a manually adjusted price unless the user re-selects the item or clicks Reset Price.
+
+RESET PRICE BUTTON
+
+Add a small button or link:
+
+Reset to Selling Price
+
+When clicked:
+- reset Discount % to 0
+- reset Final Unit Price to Standard Selling Price
+- set manualPriceOverride = false
+- recalculate Total Price
+
+CONTRACT LINE DATA
+
+Update contract line items to save these fields:
+
+- stockItemId optional
+- itemServiceName
+- quantity
+- standardSellingPrice
+- discountPercentage
+- discountAmount
+- finalUnitPrice
+- totalPrice
+- manualPriceOverride
+- notes
+
+Make sure these fields save to PostgreSQL.
+
+Update:
+- Drizzle schema
+- PostgreSQL migration
+- API insert/update/select logic
+- contract edit form
+- client profile contract display
+- backup export
+- data integrity checks
+
+PRICE SOURCE
+
+Use this logic:
+
+If selected item is from inventory:
+- use inventory.sellingPrice as standardSellingPrice
+
+If selected item has no sellingPrice:
+- leave price blank or 0
+- allow user to enter price manually
+- show note:
+  "No selling price set for this item."
+
+If selected line is a service-only item:
+- use predefined service price if available
+- otherwise allow manual entry
+
+PERMISSIONS
+
+Managers/admins can always adjust prices and discounts.
+
+Service managers can adjust prices if their role allows contract pricing.
+
+Technicians must not adjust contract pricing.
+
+If a user does not have price edit permission:
+- show the price as read-only
+- do not show discount field
+- do not allow manual override
+
+CONTRACT SUMMARY
+
+Client Profile > Contracts must display:
+
+- Item / Service Name
+- Quantity
+- Standard Selling Price
+- Discount %
+- Final Unit Price
+- Total Price
+
+Example:
+Hand Sanitizer Refill - 1L
+Qty: 1
+Standard: R35.00
+Discount: 10%
+Final: R31.50
+Total: R31.50
+
+DATA INTEGRITY
+
+Add checks:
+
+- inventory-linked contract line missing stockItemId
+- inventory-linked contract line missing standardSellingPrice
+- finalUnitPrice lower than 0
+- discountPercentage less than 0 or greater than 100
+- totalPrice does not equal quantity x finalUnitPrice
+- manualPriceOverride true but finalUnitPrice missing
+
+TEST
+
+Run this exact test:
+
+1. Go to Service > Stock Management.
+2. Confirm item exists:
+   Hand Sanitizer Refill - 1L
+3. Confirm it has Selling Price:
+   R35.00
+
+4. Go to Service > Contracts.
+5. Click New Contract.
+6. Select a client.
+7. Select Department: Washroom.
+8. In Contract Includes, search "hand".
+9. Select:
+   Hand Sanitizer Refill - 1L
+
+Expected:
+- Standard Selling Price auto-fills as R35.00
+- Final Unit Price auto-fills as R35.00
+- Discount % defaults to 0
+- Total calculates correctly
+
+10. Enter Discount %:
+    10
+
+Expected:
+- Final Unit Price changes to R31.50
+- Total recalculates correctly
+
+11. Manually change Final Unit Price to R30.00.
+
+Expected:
+- manualPriceOverride becomes true
+- warning appears:
+  Price manually adjusted from standard selling price.
+
+12. Click Reset to Selling Price.
+
+Expected:
+- discount returns to 0
+- final unit price returns to R35.00
+- manual override warning disappears
+
+13. Save contract.
+14. Open Client Profile > Contracts.
+15. Confirm the item, discount, final price and total saved correctly.
+16. Refresh page.
+17. Confirm values persist.
+
+IMPORTANT
+
+Do not make the user retype selling prices that already exist in inventory.
+
+Inventory selling price must pre-populate contract pricing automatically.
+The user may then apply a discount or manually adjust the final price if their role allows it.
