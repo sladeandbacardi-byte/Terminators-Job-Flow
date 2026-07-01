@@ -1,0 +1,433 @@
+Update the contract consumable/refill logic so it applies to all departments, not only Washroom.
+
+The current logic refers too much to Washroom refills.
+
+In Terminators, many departments have equipment/units that require consumables.
+
+Examples:
+
+Washroom:
+- Paper Towel Dispenser + Paper Towel Refill
+- Soap Dispenser + Soap Refill
+- Aerosol A/F Unit + Aerosol Refill
+- Hand Sanitizer Dispenser + Hand Sanitizer Refill
+
+Pest Control:
+- Rodent Bait Station + Rodent Bait
+- Fly Unit + Glue Board / Tube
+- Monitoring Station + Bait / Consumable
+
+Sanitary Bins:
+- Sanitary Bin + Sani Powder
+- Sanitary Bin + Plastic Liner / Packet
+- Sanitary Bin + Deodoriser / Consumable
+
+BUSINESS RULE
+
+A contract can include equipment, rental items, services, and consumables.
+
+Some consumables are included in the contract price.
+Some consumables are charged separately.
+Some clients supply their own consumables.
+Some consumables are only supplied on demand.
+
+This logic must apply across:
+- Washroom
+- Pest Control
+- Sanitary Bins
+- Dustmats if needed
+- Other departments if needed
+
+RENAME REFILL WORDING
+
+Replace the narrow wording:
+
+Refill Arrangement
+
+with a more general label:
+
+Consumable Arrangement
+
+Use this wording in the UI.
+
+CONSUMABLE ARRANGEMENT OPTIONS
+
+Use these options:
+
+- Consumables Included
+- Consumables Charged Separately
+- Client Supplies Own Consumables
+- On Demand Consumables
+- Consumable Only
+- Not Applicable
+
+The older Washroom wording can still be displayed where useful, but the underlying logic must be general.
+
+GENERAL CONTRACT LINE STRUCTURE
+
+For each contract included item, allow:
+
+- Equipment / Unit Item
+- Service Item
+- Linked Consumable Item
+- Quantity
+- Monthly / Service Price
+- Consumable Arrangement
+- Separate Consumable Price if charged separately
+- Stock Tracking Required
+- Notes
+
+Equipment / Unit Item examples:
+- Paper Towel Dispenser
+- Soap Dispenser
+- Aerosol A/F Unit
+- Hand Sanitizer Dispenser
+- Rodent Bait Station
+- Fly Unit
+- Monitoring Station
+- Sanitary Bin
+- Dustmat
+
+Linked Consumable Item examples:
+- Paper Towel Refill
+- Soap Refill
+- Aerosol Refill
+- Hand Sanitizer Refill
+- Rodent Bait
+- Glue Board
+- Fly Tube
+- Sani Powder
+- Plastic Liner / Packet
+- Deodoriser
+- Other Consumable
+
+RULE BEHAVIOUR
+
+If Consumable Arrangement = Consumables Included:
+
+Meaning:
+Consumables are supplied by Terminators and included in the contract price.
+
+Billing:
+- do not bill consumables separately
+- contract price includes consumables
+
+Stock:
+- stock usage must still be recorded
+- stock must reduce when consumables are used
+- usage is not separately billable
+
+Example:
+Rodent bait stations with bait refills included in the monthly pest control contract.
+
+If Consumable Arrangement = Consumables Charged Separately:
+
+Meaning:
+Terminators supplies the consumable, but charges the client separately when used.
+
+Billing:
+- consumable usage becomes billable
+- usage should appear under Jobs To Be Invoiced or invoice extras
+
+Stock:
+- stock reduces when consumable is used
+
+Example:
+Client rents paper towel dispenser but pays separately for paper towel refills.
+
+If Consumable Arrangement = Client Supplies Own Consumables:
+
+Meaning:
+The client rents/uses equipment or receives service from Terminators, but buys the consumables elsewhere.
+
+Billing:
+- do not bill consumables
+- do not create consumable invoice lines
+
+Stock:
+- do not deduct Terminators stock by default
+- stock tracking for consumable defaults to No
+
+Example:
+Client rents dispenser from Terminators but buys refills from another supplier.
+
+If Consumable Arrangement = On Demand Consumables:
+
+Meaning:
+Consumables are supplied only when requested or used.
+
+Billing:
+- consumable is billable only when supplied
+
+Stock:
+- deduct stock only when supplied
+
+Example:
+Extra sani powder supplied on request.
+
+If Consumable Arrangement = Consumable Only:
+
+Meaning:
+This line is only for consumable supply, not equipment rental or service.
+
+Billing:
+- bill according to price/rule
+
+Stock:
+- deduct stock when supplied
+
+If Consumable Arrangement = Not Applicable:
+
+Meaning:
+No consumable logic applies.
+
+Use for ordinary service-only contract lines.
+
+DATA MODEL
+
+Update contract line items to support general consumable logic.
+
+Fields should include:
+
+- contractLineItemId
+- contractId
+- clientId
+- lineType
+- equipmentStockItemId optional
+- equipmentItemName
+- serviceItemName optional
+- consumableStockItemId optional
+- consumableItemName
+- quantity
+- unitPrice
+- totalPrice
+- monthlyOrServicePrice
+- consumableArrangement
+- consumableIncludedInPrice true/false
+- consumableBillableSeparately true/false
+- clientSuppliesOwnConsumables true/false
+- separateConsumablePrice
+- stockTrackingRequired
+- notes
+- createdAt
+- updatedAt
+
+LINE TYPE OPTIONS
+
+Use these line types:
+
+- Equipment / Unit
+- Service
+- Consumable
+- Combined Equipment + Consumable
+- Combined Service + Consumable
+- Rental Equipment
+- Other
+
+DEFAULT LOGIC
+
+If consumableArrangement = Consumables Included:
+- consumableIncludedInPrice = true
+- consumableBillableSeparately = false
+- clientSuppliesOwnConsumables = false
+- stockTrackingRequired = true if linked consumable exists
+
+If consumableArrangement = Consumables Charged Separately:
+- consumableIncludedInPrice = false
+- consumableBillableSeparately = true
+- clientSuppliesOwnConsumables = false
+- stockTrackingRequired = true if linked consumable exists
+
+If consumableArrangement = Client Supplies Own Consumables:
+- consumableIncludedInPrice = false
+- consumableBillableSeparately = false
+- clientSuppliesOwnConsumables = true
+- stockTrackingRequired = false for consumable
+- consumableStockItemId optional
+
+If consumableArrangement = On Demand Consumables:
+- consumableIncludedInPrice = false
+- consumableBillableSeparately = true when supplied
+- clientSuppliesOwnConsumables = false
+- stockTrackingRequired = true if Terminators supplies it
+
+DEPARTMENT-SPECIFIC EXAMPLES
+
+When Department = Pest Control:
+
+Allow examples like:
+- Rodent Bait Station
+  Linked Consumable: Rodent Bait
+  Consumable Arrangement: Consumables Included
+
+- Fly Unit
+  Linked Consumable: Glue Board / Fly Tube
+  Consumable Arrangement: Consumables Charged Separately or Included
+
+When Department = Sanitary Bins:
+
+Allow examples like:
+- Sanitary Bin
+  Linked Consumable: Sani Powder
+  Consumable Arrangement: Consumables Included
+
+- Sanitary Bin
+  Linked Consumable: Plastic Liner / Packet
+  Consumable Arrangement: Consumables Included or Charged Separately
+
+When Department = Washroom:
+
+Allow examples like:
+- Paper Towel Dispenser
+  Linked Consumable: Paper Towel Refill
+  Consumable Arrangement: Consumables Included / Charged Separately / Client Supplies Own
+
+UI REQUIREMENTS
+
+In the Contract Includes section, when an item is selected, show a simple field:
+
+Consumable Arrangement:
+[dropdown]
+
+Linked Consumable:
+[search inventory dropdown]
+
+Show Linked Consumable only when needed.
+
+Show Separate Consumable Price only when:
+- Consumables Charged Separately
+- On Demand Consumables
+- Consumable Only
+
+Do not show unnecessary fields for service-only lines.
+
+If a user selects Pest Control, Sanitary Bins, or Washroom, the item search should prioritize inventory and service items from that department.
+
+INVENTORY LINKING
+
+Equipment and consumables must both come from Stock Management / Inventory where possible.
+
+Examples:
+- Rodent Bait Station from inventory
+- Rodent Bait from inventory
+- Sanitary Bin from inventory
+- Sani Powder from inventory
+- Plastic Liner from inventory
+- Paper Towel Dispenser from inventory
+- Paper Towel Refill from inventory
+
+Do not hard-code everything in the contract form.
+
+Inventory is the master list for physical items and consumables.
+
+JOB COMPLETION / STOCK USAGE
+
+When a technician completes a job linked to a contract, stock usage must follow the consumable arrangement.
+
+If Consumables Included:
+- deduct stock
+- do not mark consumable as separately billable
+
+If Consumables Charged Separately:
+- deduct stock
+- mark consumable as separately billable / ready to invoice
+
+If Client Supplies Own Consumables:
+- do not deduct Terminators stock by default
+- do not bill consumable
+- allow note that client supplies own consumables
+
+If On Demand Consumables:
+- deduct stock only when supplied
+- mark billable if supplied
+
+If technician records Terminators stock on a contract marked Client Supplies Own Consumables, show warning:
+"This contract says the client supplies their own consumables. Are you sure Terminators stock was used?"
+
+CLIENT PROFILE SUMMARY
+
+Client Profile > Contracts should show this clearly.
+
+Examples:
+
+Rodent Bait Stations x 10
+Consumables Included: Rodent Bait
+
+Sanitary Bins x 5
+Consumables Included: Sani Powder and Plastic Liners
+
+Paper Towel Dispenser x 1
+Client Supplies Own Consumables
+
+Paper Towel Dispenser x 1
+Consumables Charged Separately: Paper Towel Refill at R80
+
+REPORTING
+
+Reports must support:
+
+- equipment/units installed at clients
+- consumables included
+- consumables charged separately
+- clients supplying own consumables
+- consumables used but not billable
+- consumables used and billable
+- stock usage by client
+- stock usage by contract
+- stock usage by technician
+- stock usage by department
+
+DATA INTEGRITY
+
+Add checks:
+
+- consumable arrangement missing on contract line where linked consumable exists
+- consumableStockItemId missing where stockTrackingRequired = true
+- Consumables Included but consumableBillableSeparately = true
+- Consumables Charged Separately but separateConsumablePrice missing
+- Client Supplies Own Consumables but stockTrackingRequired = true
+- Client Supplies Own Consumables but consumableBillableSeparately = true
+
+TESTS
+
+Test these cases:
+
+TEST 1: Pest control bait stations with bait included
+1. Create Pest Control contract.
+2. Add Rodent Bait Station.
+3. Link consumable: Rodent Bait.
+4. Set Consumable Arrangement: Consumables Included.
+5. Save.
+6. Complete job and record bait used.
+7. Confirm stock reduces.
+8. Confirm bait is not separately billable.
+
+TEST 2: Sanitary bins with sani powder included
+1. Create Sanitary Bin contract.
+2. Add Sanitary Bin.
+3. Link consumable: Sani Powder.
+4. Set Consumable Arrangement: Consumables Included.
+5. Save.
+6. Complete job and record sani powder used.
+7. Confirm stock reduces.
+8. Confirm no separate billing.
+
+TEST 3: Washroom dispenser with refill charged separately
+1. Create Washroom contract.
+2. Add Paper Towel Dispenser.
+3. Link consumable: Paper Towel Refill.
+4. Set Consumable Arrangement: Consumables Charged Separately.
+5. Add separate consumable price.
+6. Save.
+7. Complete job and record refill used.
+8. Confirm stock reduces.
+9. Confirm refill is ready to invoice separately.
+
+TEST 4: Client supplies own consumables
+1. Create Washroom contract.
+2. Add Paper Towel Dispenser.
+3. Set Consumable Arrangement: Client Supplies Own Consumables.
+4. Save.
+5. Complete job.
+6. Confirm no Terminators refill stock is deducted.
+7. Confirm no refill charge is created.

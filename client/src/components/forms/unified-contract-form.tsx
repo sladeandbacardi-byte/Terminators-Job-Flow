@@ -583,16 +583,32 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     const deptWorkers = divId
       ? workers.filter(w => (w as any).departmentId === divId && w.isActive !== false)
       : workers.filter(w => w.isActive !== false);
+    const deptTeams = divId
+      ? (teams as any[]).filter(t => (t as any).departmentId === divId && t.isActive !== false)
+      : [];
     const def = deptDefaults.find((d: any) => d.department === form.department);
     setForm(f => {
-      const teamId   = def?.defaultTeamId       || f.assignedTeamId       || "";
-      const teamName = def?.defaultTeamName      || f.assignedTeamName     || "";
+      // Only carry over existing team/tech if they belong to the current department
+      const existingTeamOk = f.assignedTeamId
+        ? deptTeams.some((t: any) => t.id === f.assignedTeamId)
+        : false;
+      const existingTechOk = f.assignedTechnicianId
+        ? deptWorkers.some(w => w.id === f.assignedTechnicianId)
+        : false;
+
+      // Team: default > existing (if still valid) > single team > blank
+      const singleTeam = !def && deptTeams.length === 1 ? deptTeams[0] : null;
+      const teamId   = def?.defaultTeamId   || (existingTeamOk ? f.assignedTeamId   : "") || singleTeam?.id   || "";
+      const teamName = def?.defaultTeamName || (existingTeamOk ? f.assignedTeamName : "") || singleTeam?.name || "";
+
+      // Technician: default > existing (if still valid) > single worker > blank
       const singleTech = !def && deptWorkers.length === 1 ? deptWorkers[0] : null;
-      const techId   = def?.defaultTechnicianId  || (singleTech?.id    ?? f.assignedTechnicianId   ?? "");
-      const techName = def?.defaultTechnicianName || (singleTech?.name  ?? f.assignedTechnicianName ?? "");
+      const techId   = def?.defaultTechnicianId   || (existingTechOk ? f.assignedTechnicianId   : "") || singleTech?.id   || "";
+      const techName = def?.defaultTechnicianName || (existingTechOk ? f.assignedTechnicianName : "") || singleTech?.name || "";
+
       return { ...f, assignedTeamId: teamId, assignedTeamName: teamName, assignedTechnicianId: techId, assignedTechnicianName: techName };
     });
-  }, [form.department, deptDefaults, workers]);
+  }, [form.department, deptDefaults, workers, teams]);
 
   const set    = (key: keyof FormData) => (val: any) => setForm(f => ({ ...f, [key]: val }));
   const setStr = (key: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -802,8 +818,10 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const selectedClient = clients.find(c => c.id === form.clientId);
-  const teamOptions = teams.filter((t: any) => t.isActive !== false);
   const divId = form.department ? DEPT_TO_DIV_ID[form.department] : undefined;
+  const teamOptions = teams.filter((t: any) =>
+    t.isActive !== false && (!divId || (t as any).departmentId === divId)
+  );
   const techOptions = workers.filter(w =>
     w.isActive !== false && (!divId || (w as any).departmentId === divId)
   );

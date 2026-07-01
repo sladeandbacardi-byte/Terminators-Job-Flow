@@ -1,0 +1,135 @@
+Fix department default assignment on the Contract form.
+
+When a user selects a department, the Assigned Team and Assigned Technician fields must auto-fill from the department defaults.
+
+Current issue:
+When Department = Washroom, the Assigned Team dropdown only shows "No team assigned".
+
+Business rule:
+There is only one Washroom department, one Washroom team, and one Washroom technician.
+
+For Washroom:
+- Assigned Team must auto-fill to Zain
+- Assigned Technician must auto-fill to Zain
+
+The user should not have to select this manually.
+
+REQUIREMENTS
+
+1. Department Defaults
+
+Create or update the department default mapping:
+
+Department: Washroom
+Default Team: Zain
+Default Technician: Zain
+
+Department: Hygiene / Washroom
+Default Team: Zain
+Default Technician: Zain
+
+If the app uses "Hygiene" as the department label instead of "Washroom", apply the same default.
+
+2. Auto-fill Behaviour
+
+When Department is selected or changed:
+
+- Look up department defaults.
+- If one default team exists, auto-select it.
+- If one default technician exists, auto-select it.
+- If multiple teams/technicians exist, show dropdown options.
+- If no default exists, show "No team assigned" / "No technician assigned".
+
+3. Dropdown Behaviour
+
+For Washroom, do not show only "No team assigned".
+
+The Assigned Team dropdown must include:
+- Zain
+
+The Assigned Technician dropdown must include:
+- Zain
+
+If Zain is the only option, auto-select Zain.
+
+4. Worker / Team Source
+
+Use live workers/teams from PostgreSQL.
+
+Do not use free text.
+
+If Zain exists as a worker but not as a team, either:
+- allow assigning Zain as the technician and leave team optional, or
+- create/use a Washroom Team linked to Zain.
+
+Preferred:
+Team: Washroom Team
+Technician: Zain
+
+But if the business wants the team name as Zain, then:
+Team: Zain
+Technician: Zain
+
+5. Admin Settings
+
+Add or update:
+
+Admin > Service Settings > Department Defaults
+
+Allow admin/manager to configure:
+
+- Department
+- Default Team
+- Default Technician
+- Available Teams
+- Available Technicians
+
+Preload this default:
+
+Department: Washroom
+Default Team: Zain
+Default Technician: Zain
+
+6. Save Behaviour
+
+When the contract is saved, it must save:
+
+- assignedTeamId
+- assignedTeamName
+- assignedTechnicianId
+- assignedTechnicianName
+
+The saved contract must show Zain in:
+
+- Contracts list
+- Client Profile > Contracts
+- Calendar
+- Daily Diaries
+
+7. Test
+
+Run this exact test:
+
+1. Log in as Mariette Koekemoer.
+2. Go to Service > Contracts.
+3. Click New Contract.
+4. Select Department: Washroom.
+5. Confirm Assigned Team auto-fills to Zain.
+6. Confirm Assigned Technician auto-fills to Zain.
+7. Save the contract.
+8. Confirm the contract appears in the Contracts list with Zain.
+9. Open Client Profile > Contracts and confirm Zain shows.
+10. Open Calendar for the matching date and confirm the job/contract shows under Zain.
+11. Refresh page and confirm the assignment persists.
+
+Also test:
+
+1. Select another department with multiple technicians, such as Pest Control.
+2. Confirm a dropdown appears with available pest control technicians.
+3. Confirm user can choose the correct technician.
+
+IMPORTANT
+
+For departments with only one team/technician, auto-fill the assignment.
+
+Do not make service users manually select the only available person.

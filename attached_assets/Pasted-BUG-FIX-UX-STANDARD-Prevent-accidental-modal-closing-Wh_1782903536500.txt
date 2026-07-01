@@ -1,0 +1,146 @@
+BUG FIX / UX STANDARD: Prevent accidental modal closing
+
+When a user opens any form window/modal, clicking outside the modal must NOT close it.
+
+This applies to all create/edit forms in Job Flow, including but not limited to:
+
+- New Contract
+- Edit Contract
+- New Client
+- Edit Client
+- New Job
+- Edit Job
+- New Quote
+- Edit Quote
+- New Invoice
+- Edit Invoice
+- Add Stock Item
+- Edit Stock Item
+- Add Purchase Order
+- Edit Purchase Order
+- Treatment Report
+- Communication Note
+- Stock Usage
+- Equipment Checklist
+- Any other modal form where data can be entered
+
+REQUIRED BEHAVIOUR
+
+A modal/form must only close when the user does one of these:
+
+1. Clicks the X close button
+2. Clicks Cancel
+3. Saves successfully
+4. Confirms they want to discard unsaved changes
+
+DO NOT close the modal when:
+- user clicks outside the modal
+- user clicks on the dark overlay/background
+- user accidentally taps outside the form on mobile
+- user presses Escape while there are unsaved changes, unless confirmation is shown
+
+UNSAVED CHANGES PROTECTION
+
+If the user has entered or changed any data in the modal and then clicks X or Cancel, show a confirmation dialog:
+
+"You have unsaved changes. Are you sure you want to close this form?"
+
+Buttons:
+- Keep Editing
+- Discard Changes
+
+If user chooses Keep Editing:
+- keep the modal open
+- preserve all entered data
+
+If user chooses Discard Changes:
+- close the modal
+- clear the temporary form state
+
+If there are no unsaved changes:
+- X and Cancel can close normally
+
+SAVE BEHAVIOUR
+
+When Save/Create/Update is clicked:
+
+1. Disable the save button.
+2. Show Saving...
+3. Send data to API.
+4. If save succeeds:
+   - show success toast
+   - refetch the saved record
+   - close the modal
+   - update the list/view
+5. If save fails:
+   - keep the modal open
+   - reset button from Saving...
+   - show clear error toast/message
+   - preserve all entered form data
+
+Do not close the modal on failed save.
+
+Do not clear form data on failed save.
+
+TECHNICAL REQUIREMENT
+
+If using Dialog / Modal components, set them so outside click does not close the modal.
+
+For example:
+- prevent close on overlay click
+- prevent close on pointerDownOutside
+- prevent close on interactOutside
+- disable dismissible overlay behaviour
+- handle Escape key carefully
+
+Apply this globally where possible so all modals behave consistently.
+
+TEST REQUIRED
+
+Test these forms:
+
+1. New Contract
+2. New Client
+3. New Job
+4. Add Stock Item
+5. Treatment Report
+6. Communication Note
+
+For each test:
+
+A. Open the modal.
+B. Enter data.
+C. Click outside the modal.
+Expected:
+- modal stays open
+- data remains
+
+D. Click X.
+Expected:
+- unsaved changes warning appears
+
+E. Click Keep Editing.
+Expected:
+- modal stays open
+- data remains
+
+F. Click X again and choose Discard Changes.
+Expected:
+- modal closes
+
+G. Reopen modal, enter data, click Save.
+Expected:
+- modal closes only after successful save
+
+H. Force a failed save.
+Expected:
+- modal stays open
+- entered data remains
+- error message appears
+- save button resets
+
+IMPORTANT
+
+This is a data safety issue.
+
+Users must not lose work because they accidentally clicked outside a modal.
