@@ -19,7 +19,7 @@ const FALLBACK_STAFF: StaffMember[] = [
   { id: "worker-3", name: "Mariette Koekemoer", role: "Hygiene Services Manager",       departmentId: "div-6" },
   { id: "worker-4", name: "Juli Holtshausen",   role: "Finance & HR Manager",           departmentId: "div-7" },
   { id: "worker-5", name: "Sheryl-Lyn Lee",     role: "Existing Clients Sales & Admin", departmentId: "div-5" },
-  { id: "worker-6", name: "Sales 2",             role: "Sales Rep",                      departmentId: "div-5" },
+  { id: "worker-6", name: "sales2",              role: "Sales Rep",                      departmentId: "div-5" },
 ];
 
 interface LoginFormProps {
