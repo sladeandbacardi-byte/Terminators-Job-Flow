@@ -277,7 +277,9 @@ export default function Inventory() {
                                 <span>Min: {item.minStockLevel}</span>
                                 <span>Reorder pt: {item.reorderPoint}</span>
                                 <span>Max: {item.maxStockLevel}</span>
-                                {item.unitPrice && <span>Price: {formatCurrency(Number(item.unitPrice))}</span>}
+                                {(item as any).costPrice && <span className="text-gray-500">Cost: <strong className="text-gray-700">{formatCurrency(Number((item as any).costPrice))}</strong></span>}
+                                {(item as any).sellingPrice && <span className="text-green-700">Selling: <strong>{formatCurrency(Number((item as any).sellingPrice))}</strong></span>}
+                                {!(item as any).costPrice && !(item as any).sellingPrice && item.unitPrice && <span>Price: {formatCurrency(Number(item.unitPrice))}</span>}
                                 <span className="hidden sm:inline">{getDeptName(item.departmentId ?? null)}</span>
                               </div>
                               <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden w-full max-w-xs">
