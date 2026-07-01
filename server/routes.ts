@@ -4329,6 +4329,55 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         });
       }
 
+      // ── 7. Unified Contract + Line Items ──────────────────────────────────
+      {
+        const contract = await (storage as any).createUnifiedContract({
+          clientId: testClient.id,
+          department: "Sanitary Bins",
+          frequency: "Monthly",
+          activeStatus: true,
+          invoiceRule: "Invoice monthly contract",
+        });
+        toDelete.push({ type: "unifiedContract", id: contract.id });
+
+        const lineItem = await (storage as any).createContractLineItem({
+          contractId: contract.id,
+          clientId: testClient.id,
+          lineType: "Service",
+          itemServiceName: "Sanitary Bin Service / Exchange",
+          quantity: "1",
+          unitPrice: "50",
+          totalPrice: "50",
+          refillRule: "Not Applicable",
+          stockTrackingRequired: false,
+          notes: "SYSCHECK test line",
+        });
+        toDelete.push({ type: "contractLineItem", id: lineItem.id });
+
+        const allContracts     = await (storage as any).getUnifiedContracts();
+        const clientContracts  = await (storage as any).getUnifiedContractsByClient(testClientId);
+        const savedLineItems   = await (storage as any).getContractLineItems(contract.id);
+
+        const inList           = allContracts.some((c: any) => c.id === contract.id);
+        const inClientProfile  = clientContracts.some((c: any) => c.id === contract.id);
+        const lineItemSaved    = savedLineItems.some((li: any) => li.id === lineItem.id);
+        const contractNumberOk = !!contract.contractNumber;
+
+        const screens: ScreenResult[] = [
+          inList          ? pass("Service › Contracts list")             : fail("Service › Contracts list"),
+          inClientProfile ? pass("Client Profile › Contracts tab")       : fail("Client Profile › Contracts tab"),
+          lineItemSaved   ? pass("Contract line item saved to PostgreSQL") : fail("Contract line item saved to PostgreSQL"),
+          contractNumberOk? pass(`Contract number generated (${contract.contractNumber})`) : fail("Contract number generated"),
+        ];
+        results.push({
+          recordType: "Unified Contract",
+          id: contract.id,
+          clientId: testClientId,
+          status: screens.every(s => s.found) ? "passed" : "failed",
+          screens,
+        });
+      }
+
     } catch (err: any) {
       results.push({
         recordType: "TEST ERROR",
@@ -4342,12 +4391,14 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       // ── Cleanup ─────────────────────────────────────────────────────────
       for (const item of toDelete.reverse()) {
         try {
-          if (item.type === "invoice") await storage.deleteInvoice(item.id);
-          else if (item.type === "job") await storage.deleteJob(item.id);
+          if (item.type === "invoice")          await storage.deleteInvoice(item.id);
+          else if (item.type === "job")          await storage.deleteJob(item.id);
           else if (item.type === "serviceContract") await storage.deleteServiceContract(item.id);
-          else if (item.type === "rentalContract") await storage.deleteRentalContract(item.id);
-          else if (item.type === "quote") await storage.deleteQuoteSubmission(item.id);
-          else if (item.type === "client") await storage.deleteClient(item.id);
+          else if (item.type === "rentalContract")  await storage.deleteRentalContract(item.id);
+          else if (item.type === "quote")        await storage.deleteQuoteSubmission(item.id);
+          else if (item.type === "contractLineItem") await (storage as any).deleteContractLineItem(item.id);
+          else if (item.type === "unifiedContract")  await (storage as any).deleteUnifiedContract(item.id);
+          else if (item.type === "client")       await storage.deleteClient(item.id);
         } catch (_) { /* best-effort cleanup */ }
       }
     }
@@ -4491,7 +4542,52 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       else checks.push(warn("No Orphan Rental Contracts", `${orphanRC.length} rental contract(s) reference a missing client`));
     } catch (e: any) { checks.push(fail("No Orphan Rental Contracts", "Could not check", e.message)); }
 
-    // 9. No missing required columns (spot-check critical columns added during migration)
+    // 9a. Unified contract tables queryable
+    let unifiedContractsAll: any[] = [], contractLineItemsAll: any[] = [];
+    try {
+      [unifiedContractsAll, contractLineItemsAll] = await Promise.all([
+        (storage as any).getUnifiedContracts(),
+        (storage as any).getAllContractLineItems(),
+      ]);
+      checks.push(pass("Unified Contracts Tables Queryable", `unified_contracts: ${unifiedContractsAll.length} rows  |  contract_line_items: ${contractLineItemsAll.length} rows`));
+    } catch (e: any) {
+      checks.push(fail("Unified Contracts Tables Queryable", "Could not query unified contract tables", e.message));
+    }
+
+    // 9b. Contracts missing clientId
+    try {
+      const validClientIds = new Set(clients.map((c: any) => c.id));
+      const missingClient   = unifiedContractsAll.filter((c: any) => !c.clientId);
+      const orphanContracts = unifiedContractsAll.filter((c: any) => c.clientId && !validClientIds.has(c.clientId));
+      if (missingClient.length === 0 && orphanContracts.length === 0) {
+        checks.push(pass("No Orphan Contracts", `All ${unifiedContractsAll.length} contracts have valid clientId references`));
+      } else {
+        const msgs: string[] = [];
+        if (missingClient.length)   msgs.push(`${missingClient.length} contract(s) missing clientId`);
+        if (orphanContracts.length) msgs.push(`${orphanContracts.length} contract(s) reference a deleted client`);
+        checks.push(orphanContracts.length ? warn("No Orphan Contracts", msgs.join("; ")) : fail("No Orphan Contracts", msgs.join("; ")));
+      }
+    } catch (e: any) { checks.push(fail("No Orphan Contracts", "Could not check", e.message)); }
+
+    // 9c. Contract line items integrity
+    try {
+      const contractIds   = new Set(unifiedContractsAll.map((c: any) => c.id));
+      const validClientIds = new Set(clients.map((c: any) => c.id));
+      const missingContractId = contractLineItemsAll.filter((li: any) => !li.contractId);
+      const missingClientId   = contractLineItemsAll.filter((li: any) => !li.clientId);
+      const orphanLines       = contractLineItemsAll.filter((li: any) => li.contractId && !contractIds.has(li.contractId));
+      if (missingContractId.length === 0 && missingClientId.length === 0 && orphanLines.length === 0) {
+        checks.push(pass("Contract Line Items Integrity", `All ${contractLineItemsAll.length} line items have valid contractId and clientId`));
+      } else {
+        const msgs: string[] = [];
+        if (missingContractId.length) msgs.push(`${missingContractId.length} line item(s) missing contractId`);
+        if (missingClientId.length)   msgs.push(`${missingClientId.length} line item(s) missing clientId`);
+        if (orphanLines.length)       msgs.push(`${orphanLines.length} orphan line item(s) (contractId not found)`);
+        checks.push(missingContractId.length ? fail("Contract Line Items Integrity", msgs.join("; ")) : warn("Contract Line Items Integrity", msgs.join("; ")));
+      }
+    } catch (e: any) { checks.push(fail("Contract Line Items Integrity", "Could not check", e.message)); }
+
+    // 10. No missing required columns (spot-check critical columns added during migration)
     try {
       const criticalChecks: { table: string; column: string }[] = [
         { table: "jobs",              column: "job_number" },
@@ -4504,6 +4600,11 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         { table: "quote_submissions", column: "stage" },
         { table: "rental_contracts",  column: "contract_number" },
         { table: "rental_contracts",  column: "unit_price" },
+        { table: "unified_contracts",   column: "contract_number" },
+        { table: "unified_contracts",   column: "client_id" },
+        { table: "unified_contracts",   column: "department" },
+        { table: "contract_line_items", column: "contract_id" },
+        { table: "contract_line_items", column: "item_service_name" },
       ];
       const colResult = await db.execute(sql`
         SELECT table_name, column_name FROM information_schema.columns

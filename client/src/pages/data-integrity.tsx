@@ -332,8 +332,8 @@ function HealthCheckTab() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
-            Runs 10 checks against the PostgreSQL database: connection, table queries, record counts,
-            orphan detection, required columns, and schema integrity.
+            Runs 12 checks against the PostgreSQL database: connection, table queries, record counts,
+            orphan detection (jobs, quotes, invoices, contracts, line items), required columns, and schema integrity.
           </p>
         </div>
         <Button
