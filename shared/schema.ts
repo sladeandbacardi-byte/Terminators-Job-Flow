@@ -1742,7 +1742,16 @@ export const contractLineItems = pgTable("contract_line_items", {
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
-  refillRule: text("refill_rule").default("Not Applicable"), // Including Refills | Excluding Refills | Refill Only | On Demand Refills | Not Applicable
+  refillRule: text("refill_rule").default("Not Applicable"),
+  // ── Refill arrangement (Washroom / Hygiene) ──────────────────────────────
+  refillArrangement: text("refill_arrangement").default("Not Applicable"),
+  refillIncludedInPrice: boolean("refill_included_in_price").default(false),
+  refillBillableSeparately: boolean("refill_billable_separately").default(false),
+  clientSuppliesOwnRefills: boolean("client_supplies_own_refills").default(false),
+  linkedRefillStockItemId: varchar("linked_refill_stock_item_id"),
+  linkedRefillItemName: text("linked_refill_item_name"),
+  separateRefillPrice: decimal("separate_refill_price", { precision: 10, scale: 2 }),
+  // ─────────────────────────────────────────────────────────────────────────
   stockTrackingRequired: boolean("stock_tracking_required").default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),

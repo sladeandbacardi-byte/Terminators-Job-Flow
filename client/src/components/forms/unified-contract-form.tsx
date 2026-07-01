@@ -55,6 +55,29 @@ const REFILL_RULES = [
   "On Demand Refills", "Not Applicable",
 ] as const;
 
+const REFILL_ARRANGEMENTS = [
+  "Not Applicable",
+  "Refills Included in Rental",
+  "Refills Charged Separately",
+  "Client Supplies Own Refills",
+  "On Demand Refills",
+  "Refill Only",
+] as const;
+
+const WASHROOM_HYGIENE_DEPTS = new Set(["Washroom", "Hygiene"]);
+
+function showRefillSection(dept: string, lineType: string): boolean {
+  return WASHROOM_HYGIENE_DEPTS.has(dept) && lineType !== "Service";
+}
+
+function arrangementToBooleans(a: string) {
+  return {
+    refillIncludedInPrice:    a === "Refills Included in Rental",
+    refillBillableSeparately: ["Refills Charged Separately", "On Demand Refills", "Refill Only"].includes(a),
+    clientSuppliesOwnRefills: a === "Client Supplies Own Refills",
+  };
+}
+
 const INVOICE_RULES = [
   "Invoice per completed job", "Invoice monthly contract",
   "Invoice on demand", "Do not invoice automatically",
@@ -117,6 +140,13 @@ type SimpleInclude = {
   refillRule: string;
   stockTrackingRequired: boolean;
   notes: string;
+  refillArrangement: string;
+  refillIncludedInPrice: boolean;
+  refillBillableSeparately: boolean;
+  clientSuppliesOwnRefills: boolean;
+  linkedRefillStockItemId: string;
+  linkedRefillItemName: string;
+  separateRefillPrice: string;
 };
 
 type LineItem = {
@@ -131,6 +161,13 @@ type LineItem = {
   refillRule: string;
   stockTrackingRequired: boolean;
   notes: string;
+  refillArrangement: string;
+  refillIncludedInPrice: boolean;
+  refillBillableSeparately: boolean;
+  clientSuppliesOwnRefills: boolean;
+  linkedRefillStockItemId: string;
+  linkedRefillItemName: string;
+  separateRefillPrice: string;
 };
 
 type FormData = {
@@ -242,6 +279,13 @@ const EMPTY_LINE = (): LineItem => ({
   refillRule: "Not Applicable",
   stockTrackingRequired: false,
   notes: "",
+  refillArrangement: "Not Applicable",
+  refillIncludedInPrice: false,
+  refillBillableSeparately: false,
+  clientSuppliesOwnRefills: false,
+  linkedRefillStockItemId: "",
+  linkedRefillItemName: "",
+  separateRefillPrice: "",
 });
 
 const EMPTY_FORM: FormData = {
@@ -427,6 +471,13 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       refillRule: li.refillRule || "Not Applicable",
       stockTrackingRequired: li.stockTrackingRequired ?? false,
       notes: li.notes || "",
+      refillArrangement: li.refillArrangement || "Not Applicable",
+      refillIncludedInPrice: li.refillIncludedInPrice ?? false,
+      refillBillableSeparately: li.refillBillableSeparately ?? false,
+      clientSuppliesOwnRefills: li.clientSuppliesOwnRefills ?? false,
+      linkedRefillStockItemId: li.linkedRefillStockItemId || "",
+      linkedRefillItemName: li.linkedRefillItemName || "",
+      separateRefillPrice: String(li.separateRefillPrice ?? ""),
     })));
     setAdvancedMode(false);
   }, [existingLines.length]);
@@ -491,6 +542,13 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
       refillRule: "Not Applicable",
       stockTrackingRequired: cat.stockTrackingDefault,
       notes: "",
+      refillArrangement: "Not Applicable",
+      refillIncludedInPrice: false,
+      refillBillableSeparately: false,
+      clientSuppliesOwnRefills: false,
+      linkedRefillStockItemId: "",
+      linkedRefillItemName: "",
+      separateRefillPrice: "",
     }]);
     setSearchQuery("");
     setSearchOpen(false);
@@ -500,7 +558,25 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
     setSimpleItems(items => items.filter(i => i._key !== key));
 
   const updateSimpleItem = (key: string, field: keyof SimpleInclude, val: any) =>
-    setSimpleItems(items => items.map(i => i._key === key ? { ...i, [field]: val } : i));
+    setSimpleItems(items => items.map(i => {
+      if (i._key !== key) return i;
+      const updated: SimpleInclude = { ...i, [field]: val };
+      if (field === "refillArrangement") {
+        Object.assign(updated, arrangementToBooleans(val));
+        if (val === "Client Supplies Own Refills") updated.stockTrackingRequired = false;
+        else if (val !== "Not Applicable")         updated.stockTrackingRequired = true;
+        if (!["Refills Included in Rental", "Refills Charged Separately", "On Demand Refills"].includes(val)) {
+          updated.linkedRefillStockItemId = "";
+          updated.linkedRefillItemName    = "";
+        }
+      }
+      return updated;
+    }));
+
+  const setLinkedRefillItem = (key: string, id: string, name: string) =>
+    setSimpleItems(items => items.map(i =>
+      i._key === key ? { ...i, linkedRefillStockItemId: id, linkedRefillItemName: name } : i
+    ));
 
   // ── Mode switching ─────────────────────────────────────────────────────────
   const goToAdvanced = () => {
@@ -520,6 +596,13 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
             refillRule: i.refillRule,
             stockTrackingRequired: i.stockTrackingRequired,
             notes: i.notes,
+            refillArrangement: i.refillArrangement,
+            refillIncludedInPrice: i.refillIncludedInPrice,
+            refillBillableSeparately: i.refillBillableSeparately,
+            clientSuppliesOwnRefills: i.clientSuppliesOwnRefills,
+            linkedRefillStockItemId: i.linkedRefillStockItemId,
+            linkedRefillItemName: i.linkedRefillItemName,
+            separateRefillPrice: i.separateRefillPrice,
           };
         })
       : [EMPTY_LINE()]
@@ -541,6 +624,13 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
         refillRule: li.refillRule,
         stockTrackingRequired: li.stockTrackingRequired,
         notes: li.notes,
+        refillArrangement: li.refillArrangement,
+        refillIncludedInPrice: li.refillIncludedInPrice,
+        refillBillableSeparately: li.refillBillableSeparately,
+        clientSuppliesOwnRefills: li.clientSuppliesOwnRefills,
+        linkedRefillStockItemId: li.linkedRefillStockItemId,
+        linkedRefillItemName: li.linkedRefillItemName,
+        separateRefillPrice: li.separateRefillPrice,
       }))
     );
     setAdvancedMode(false);
@@ -580,6 +670,13 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
         refillRule: i.refillRule,
         stockTrackingRequired: i.stockTrackingRequired,
         notes: i.notes,
+        refillArrangement: i.refillArrangement,
+        refillIncludedInPrice: i.refillIncludedInPrice,
+        refillBillableSeparately: i.refillBillableSeparately,
+        clientSuppliesOwnRefills: i.clientSuppliesOwnRefills,
+        linkedRefillStockItemId: i.linkedRefillStockItemId || null,
+        linkedRefillItemName: i.linkedRefillItemName || null,
+        separateRefillPrice: i.separateRefillPrice || null,
       };
     });
   };
@@ -842,6 +939,89 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                       <Input className="h-7 text-xs mt-2" value={item.notes}
                         onChange={e => updateSimpleItem(item._key, "notes", e.target.value)}
                         placeholder="Notes for this item…" />
+
+                      {/* ── Refill Arrangement (Washroom / Hygiene only, non-service items) ── */}
+                      {showRefillSection(form.department, item.lineType) && (
+                        <div className="mt-2 pt-2 border-t border-blue-100 space-y-2 bg-blue-50/40 rounded p-2">
+                          <p className="text-xs font-semibold text-blue-700 mb-1">Refill Arrangement</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Field label="Arrangement">
+                              <Select
+                                value={item.refillArrangement || "Not Applicable"}
+                                onValueChange={v => updateSimpleItem(item._key, "refillArrangement", v)}
+                              >
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {REFILL_ARRANGEMENTS.map(r => (
+                                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </Field>
+
+                            {/* Refill Price — shown for billable arrangements */}
+                            {(item.refillArrangement === "Refills Charged Separately" ||
+                              item.refillArrangement === "On Demand Refills" ||
+                              item.refillArrangement === "Refill Only") && (
+                              <Field label="Refill Price (R)">
+                                <Input
+                                  className="h-8 text-xs" type="number" min="0" step="0.01"
+                                  value={item.separateRefillPrice} placeholder="0.00"
+                                  onChange={e => updateSimpleItem(item._key, "separateRefillPrice", e.target.value)}
+                                />
+                              </Field>
+                            )}
+                          </div>
+
+                          {/* Linked Refill Item — shown when we supply the refill */}
+                          {(item.refillArrangement === "Refills Included in Rental" ||
+                            item.refillArrangement === "Refills Charged Separately" ||
+                            item.refillArrangement === "On Demand Refills") && (
+                            <Field label="Linked Refill Item">
+                              <Select
+                                value={item.linkedRefillStockItemId || "__none__"}
+                                onValueChange={v => {
+                                  if (v === "__none__") { setLinkedRefillItem(item._key, "", ""); return; }
+                                  const inv = (inventoryItems as any[]).find(i => i.id === v);
+                                  setLinkedRefillItem(item._key, inv?.id ?? "", inv?.name ?? v);
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select refill item from inventory…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">— None —</SelectItem>
+                                  {(inventoryItems as any[])
+                                    .filter(i => i.activeStatus !== false)
+                                    .sort((a: any, b: any) => {
+                                      const aR = (a.category || "").toLowerCase().includes("refill") || (a.category || "").toLowerCase().includes("consumable");
+                                      const bR = (b.category || "").toLowerCase().includes("refill") || (b.category || "").toLowerCase().includes("consumable");
+                                      if (aR && !bR) return -1;
+                                      if (!aR && bR) return  1;
+                                      return a.name.localeCompare(b.name);
+                                    })
+                                    .map((i: any) => (
+                                      <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                                    ))
+                                  }
+                                </SelectContent>
+                              </Select>
+                            </Field>
+                          )}
+
+                          {/* Contextual notice */}
+                          {item.refillArrangement === "Client Supplies Own Refills" && (
+                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+                              Client supplies own refills — no stock deduction or billing required.
+                            </p>
+                          )}
+                          {item.refillArrangement === "Refills Included in Rental" && (
+                            <p className="text-xs text-green-700 bg-green-50 border border-green-100 rounded px-2 py-1">
+                              Refills included in monthly rental — stock will be tracked when jobs are completed.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

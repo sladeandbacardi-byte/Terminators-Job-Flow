@@ -5167,11 +5167,16 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   app.get("/api/unified-contracts", async (req, res) => {
     try {
       const { clientId } = req.query;
-      if (clientId) {
-        res.json(await (storage as any).getUnifiedContractsByClient(String(clientId)));
-      } else {
-        res.json(await (storage as any).getUnifiedContracts());
-      }
+      const contracts = clientId
+        ? await (storage as any).getUnifiedContractsByClient(String(clientId))
+        : await (storage as any).getUnifiedContracts();
+      const withLineItems = await Promise.all(
+        contracts.map(async (c: any) => ({
+          ...c,
+          lineItems: await (storage as any).getContractLineItems(c.id),
+        }))
+      );
+      res.json(withLineItems);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

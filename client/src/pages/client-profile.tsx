@@ -656,6 +656,56 @@ export default function ClientProfilePage() {
                                   {c.nextIncreaseDate && <InfoPair label="Next Increase" value={c.nextIncreaseDate} />}
                                 </div>
                                 {c.notes && <p className="text-xs text-muted-foreground border-t pt-1 mt-1">{c.notes}</p>}
+                                {/* ── Contract Includes ── */}
+                                {Array.isArray(c.lineItems) && c.lineItems.length > 0 && (
+                                  <div className="border-t border-gray-100 pt-2 mt-1.5">
+                                    <p className="text-xs font-medium text-gray-500 mb-1">Contract Includes:</p>
+                                    <div className="space-y-1">
+                                      {c.lineItems.map((li: any) => {
+                                        const refillLabel = (() => {
+                                          const a = li.refillArrangement;
+                                          if (!a || a === "Not Applicable") return null;
+                                          const m: Record<string, string> = {
+                                            "Refills Included in Rental":  "Refills included",
+                                            "Refills Charged Separately":  "Billed separately",
+                                            "Client Supplies Own Refills": "Client supplies",
+                                            "On Demand Refills":           "On demand",
+                                            "Refill Only":                 "Refill only",
+                                          };
+                                          return m[a] ?? a;
+                                        })();
+                                        return (
+                                          <div key={li.id} className="flex items-start gap-1.5 text-xs">
+                                            <span className="text-gray-300 mt-0.5">•</span>
+                                            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 flex-1">
+                                              <span className="text-gray-800 font-medium">{li.itemServiceName}</span>
+                                              <span className="text-gray-500">× {Number(li.quantity)}</span>
+                                              {li.unitPrice && Number(li.unitPrice) > 0 && (
+                                                <span className="text-gray-400">@ R{Number(li.unitPrice).toFixed(2)}/unit</span>
+                                              )}
+                                              <span className={`px-1 py-0.5 rounded text-xs font-medium ${
+                                                li.stockItemId ? "bg-blue-50 text-blue-600" : "bg-gray-50 text-gray-500"
+                                              }`}>
+                                                {li.stockItemId ? "Inventory" : "Service"}
+                                              </span>
+                                              {refillLabel && (
+                                                <span className="px-1 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-600">
+                                                  {refillLabel}
+                                                </span>
+                                              )}
+                                              {li.linkedRefillItemName && li.refillArrangement !== "Client Supplies Own Refills" && (
+                                                <span className="text-gray-400 italic">↳ {li.linkedRefillItemName}</span>
+                                              )}
+                                              {li.separateRefillPrice && Number(li.separateRefillPrice) > 0 && (
+                                                <span className="text-gray-400">Refill: R{Number(li.separateRefillPrice).toFixed(2)}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex gap-1.5 shrink-0">
                                 <Button variant="outline" size="sm" className="text-xs"

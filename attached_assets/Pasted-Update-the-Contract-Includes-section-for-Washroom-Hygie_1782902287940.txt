@@ -1,0 +1,250 @@
+Update the Contract Includes section for Washroom/Hygiene contracts.
+
+The current Contract Includes screen allows inventory items to be selected, but it does not allow the user to choose whether refills are included in the rental price, charged separately, supplied on demand, or supplied by the client.
+
+This is required.
+
+BUSINESS RULE
+
+For Washroom/Hygiene contracts, a dispenser/equipment item may have a linked refill arrangement.
+
+Example:
+A client rents a Paper Towel Dispenser for R200 per month including refills.
+
+Another client rents the same dispenser for R120 per month but pays separately for refills.
+
+Another client rents the dispenser but buys refills from another supplier.
+
+The contract form must support these options.
+
+REFILL RULE OPTIONS
+
+Add a field called:
+
+Refill Arrangement
+
+Options:
+
+- Refills Included in Rental
+- Refills Charged Separately
+- Client Supplies Own Refills
+- On Demand Refills
+- Refill Only
+- Not Applicable
+
+WHERE TO SHOW THIS
+
+Only show Refill Arrangement for Washroom/Hygiene inventory items that are dispensers, refills, hygiene consumables, or rental equipment.
+
+Examples:
+- Hand Sanitizer Dispenser - Automatic
+- Hand Sanitizer Refill - 1L
+- Paper Towel Dispenser - Wall Mount
+- Paper Roll Refill - Premium
+- Soap Dispenser
+- Soap Refill
+- Aerosol A/F Unit
+- Aerosol Refill
+- Toilet Roll Dispenser
+- Toilet Roll Refill
+- Urinal Mat
+
+UI CHANGE
+
+For each contract included item, show:
+
+- Item name
+- Quantity
+- Monthly Rental Price or Unit Price
+- Total
+- Refill Arrangement
+- Linked Refill Item
+- Refill Price if charged separately
+- Notes
+
+If the selected item is a dispenser/equipment item, show:
+
+Refill Arrangement:
+[ dropdown ]
+
+Linked Refill Item:
+[ searchable inventory dropdown ]
+
+If the selected item is a refill item only, show:
+
+Refill Arrangement:
+[ Refill Only / Refills Charged Separately / On Demand ]
+
+FIELD BEHAVIOUR
+
+If Refill Arrangement = Refills Included in Rental:
+
+Meaning:
+The refill is included in the monthly rental price.
+
+Show:
+- Linked Refill Item
+
+Hide:
+- Refill Price
+
+Set:
+- refillIncludedInPrice = true
+- refillBillableSeparately = false
+- clientSuppliesOwnRefills = false
+- stockTrackingRequired = true if linked refill item exists
+
+Job completion:
+- technician records refill stock used
+- stock reduces
+- refill is not billed separately
+
+If Refill Arrangement = Refills Charged Separately:
+
+Meaning:
+The dispenser is rented monthly, but refills are billed separately when supplied.
+
+Show:
+- Linked Refill Item
+- Refill Price
+
+Set:
+- refillIncludedInPrice = false
+- refillBillableSeparately = true
+- clientSuppliesOwnRefills = false
+- stockTrackingRequired = true
+
+Job completion:
+- technician records refill stock used
+- stock reduces
+- refill usage becomes billable / ready to invoice
+
+If Refill Arrangement = Client Supplies Own Refills:
+
+Meaning:
+The client rents the dispenser from us but buys refills elsewhere.
+
+Hide:
+- Linked Refill Item unless optional
+- Refill Price
+
+Set:
+- refillIncludedInPrice = false
+- refillBillableSeparately = false
+- clientSuppliesOwnRefills = true
+- stockTrackingRequired = false for refill
+
+Job completion:
+- do not deduct Terminators refill stock
+- do not create refill billing
+- show note: Client supplies own refills
+
+If Refill Arrangement = On Demand Refills:
+
+Meaning:
+We only supply refills when the client requests them.
+
+Show:
+- Linked Refill Item
+- Refill Price
+
+Set:
+- refillIncludedInPrice = false
+- refillBillableSeparately = true when supplied
+- clientSuppliesOwnRefills = false
+- stockTrackingRequired = true if we supply the refill
+
+If Refill Arrangement = Refill Only:
+
+Meaning:
+This line is for refill supply only, not dispenser rental.
+
+Show:
+- Refill Price
+- Stock Tracking Required
+
+If Refill Arrangement = Not Applicable:
+
+Meaning:
+No refill logic applies.
+
+DATA MODEL
+
+Update contract line items to include:
+
+- refillArrangement
+- refillIncludedInPrice
+- refillBillableSeparately
+- clientSuppliesOwnRefills
+- linkedRefillStockItemId
+- linkedRefillItemName
+- separateRefillPrice
+- stockTrackingRequired
+
+Make sure these fields are saved to PostgreSQL.
+
+Update:
+- Drizzle schema
+- PostgreSQL migration
+- API insert/update/select
+- contract edit form
+- client profile contract display
+- backup export
+- data integrity checks
+
+CONTRACT SUMMARY
+
+Client Profile > Contracts must show refill arrangement clearly.
+
+Examples:
+
+Hand Sanitizer Dispenser - Automatic x 20
+R199.99/month
+Refills Included: Hand Sanitizer Refill - 1L
+
+Paper Towel Dispenser - Wall Mount x 1
+R120/month
+Refills Charged Separately: Paper Roll Refill - Premium
+
+Paper Towel Dispenser - Wall Mount x 1
+R100/month
+Client Supplies Own Refills
+
+TEST
+
+Run this test:
+
+1. Open New Contract.
+2. Select Department: Washroom.
+3. Add Hand Sanitizer Dispenser - Automatic.
+4. Confirm Refill Arrangement dropdown appears.
+5. Select Refills Included in Rental.
+6. Select linked refill item: Hand Sanitizer Refill - 1L.
+7. Confirm Refill Price is hidden.
+8. Save contract.
+9. Confirm contract summary says refills included.
+
+Then test:
+
+1. Add Paper Towel Dispenser - Wall Mount.
+2. Select Refills Charged Separately.
+3. Select linked refill item: Paper Roll Refill - Premium.
+4. Enter Refill Price.
+5. Save.
+6. Confirm contract summary says refill charged separately.
+
+Then test:
+
+1. Add Paper Towel Dispenser - Wall Mount.
+2. Select Client Supplies Own Refills.
+3. Confirm linked refill and refill price are not required.
+4. Save.
+5. Confirm contract summary says client supplies own refills.
+
+IMPORTANT
+
+The user must be able to choose the refill arrangement directly on the Contract Includes section.
+
+Do not hide this only under Advanced settings.
+
+This is a normal washroom contract requirement.
