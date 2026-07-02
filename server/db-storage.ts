@@ -235,6 +235,25 @@ export class DbStorage implements IStorage {
     } else {
       console.log("[DbStorage] Database already seeded.");
     }
+    await this.runDataMigrations();
+  }
+
+  private async runDataMigrations(): Promise<void> {
+    // Fix worker-6 name if it was seeded with the old display name
+    const [w] = await db.select({ id: workers.id, name: workers.name })
+      .from(workers).where(eq(workers.id, "worker-6")).limit(1);
+    if (w && w.name !== "Sales 2") {
+      await db.update(workers).set({ name: "Sales 2" }).where(eq(workers.id, "worker-6"));
+      console.log(`[DbStorage] Migrated worker-6 name: "${w.name}" → "Sales 2"`);
+    }
+
+    // Fix the associated vehicle name
+    const [v] = await db.select({ id: vehicles.id, name: vehicles.name })
+      .from(vehicles).where(eq(vehicles.id, "vehicle-5")).limit(1);
+    if (v && v.name !== "Suzuki Celerio (Sales 2)") {
+      await db.update(vehicles).set({ name: "Suzuki Celerio (Sales 2)" }).where(eq(vehicles.id, "vehicle-5"));
+      console.log(`[DbStorage] Migrated vehicle-5 name: "${v.name}" → "Suzuki Celerio (Sales 2)"`);
+    }
   }
 
   private async seedDatabase(): Promise<void> {
