@@ -3,3 +3,5 @@
 - [Sidebar route naming](sidebar-route-naming.md) — `/contracts` belongs to Sales (Rental Contracts); the Service department's recurring jobs live at `/service-contracts`. Don't merge.
 - [Stock management storage pattern](stock-storage-pattern.md) — new stock tables added via db-storage.ts cast `storage as any` in routes since IStorage interface not extended; createStockMovement auto-updates stockBalances; seedDefaultStockLocations guards on existing count.
 - [Inventory type migration](inventory-type-migration.md) — old type values product/rental_equipment replaced by 7 new display values; runDataMigrations auto-patches on startup.
+- [npm overrides nested esbuild](npm-overrides-nested-esbuild.md) — scoped overrides don't retroactively fix already-resolved lockfile branches; force-reinstall the parent to make npm re-resolve and pick up the override.
+- [xlsx SheetJS registry limitation](xlsx-sheetjs-registry-limitation.md) — npm's xlsx is permanently stale; audit scanners always flag it even after installing SheetJS's own patched CDN build, since "fixed" is null in their data.
