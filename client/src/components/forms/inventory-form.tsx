@@ -122,12 +122,8 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
       toast({ title: "Item created", description: "Stock item saved successfully." });
       onSuccess();
     },
-    onError: async (err: any) => {
-      let msg = "Failed to create inventory item";
-      try {
-        const body = await err?.response?.json?.();
-        if (body?.error) msg = body.error;
-      } catch {}
+    onError: (err: any) => {
+      const msg = err?.message || "Failed to create inventory item";
       toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
@@ -139,12 +135,8 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
       toast({ title: "Item updated", description: "Stock item saved successfully." });
       onSuccess();
     },
-    onError: async (err: any) => {
-      let msg = "Failed to update inventory item";
-      try {
-        const body = await err?.response?.json?.();
-        if (body?.error) msg = body.error;
-      } catch {}
+    onError: (err: any) => {
+      const msg = err?.message || "Failed to update inventory item";
       toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });

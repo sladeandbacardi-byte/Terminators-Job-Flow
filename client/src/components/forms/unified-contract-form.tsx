@@ -82,50 +82,21 @@ const INVOICE_RULES = [
 ] as const;
 
 // Predefined service items (not physical inventory — no stockItemId)
-const PREDEFINED_SERVICES: Array<{
-  name: string; depts: string[]; lineType: string; category: string;
-}> = [
-  // Sanitary Bins
-  { name: "Sanitary Bin Service / Exchange",    depts: ["Sanitary Bins"],           lineType: "Service",             category: "Sanitary Bins" },
-  { name: "Sanitary Bin Cleaning",              depts: ["Sanitary Bins"],           lineType: "Service",             category: "Sanitary Bins" },
-  { name: "Sanitary Bin Placement",             depts: ["Sanitary Bins"],           lineType: "Service",             category: "Sanitary Bins" },
-  { name: "Sanitary Bin Replacement if needed", depts: ["Sanitary Bins"],           lineType: "Service",             category: "Sanitary Bins" },
-  // Washroom / Hygiene
-  { name: "Washroom Service",                   depts: ["Washroom", "Hygiene"],     lineType: "Service",             category: "Washroom" },
-  { name: "On-demand Refills",                  depts: ["Washroom", "Hygiene"],     lineType: "Refill / Consumable", category: "Washroom" },
-  // Pest Control
-  { name: "Pest Control Service",               depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "Rodent Service",                     depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "Cockroach Service",                  depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "Inspection",                         depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "Treatment",                          depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "Monitoring",                         depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "Baiting",                            depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  { name: "COC Inspection",                     depts: ["Pest Control"],            lineType: "Service",             category: "Pest Control" },
-  // Dustmats
-  { name: "Dustmat Rental",                     depts: ["Dustmats"],                lineType: "Rental Equipment",    category: "Dustmats" },
-  { name: "Dustmat Replacement",                depts: ["Dustmats"],                lineType: "Service",             category: "Dustmats" },
-  { name: "Dustmat Cleaning",                   depts: ["Dustmats"],                lineType: "Service",             category: "Dustmats" },
-  // Deep Cleaning
-  { name: "Deep Cleaning Service",              depts: ["Deep Cleaning"],           lineType: "Service",             category: "Deep Cleaning" },
-  { name: "Recurring Deep Clean",               depts: ["Deep Cleaning"],           lineType: "Service",             category: "Deep Cleaning" },
-  { name: "Once-off Deep Clean",                depts: ["Deep Cleaning"],           lineType: "Service",             category: "Deep Cleaning" },
-  { name: "Hygiene Deep Clean",                 depts: ["Deep Cleaning"],           lineType: "Service",             category: "Deep Cleaning" },
-];
+// Inventory is the master list — items are sourced exclusively from /api/inventory.
+// To add a new service or product to contracts, add it to Stock Management first.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type CatalogItem = {
   stockItemId: string;
   name: string;
+  type: string;           // inventory item type (Consumable, Equipment/Rental Item, etc.)
   lineType: string;
   serviceCategory: string;
   stockTrackingDefault: boolean;
   sellingPrice: string;   // raw inventory sellingPrice (for standard price)
   unitPrice: string;      // same as sellingPrice; kept for legacy compat
   divId: string;
-  depts: string[];
-  source: "inventory" | "service";
 };
 
 type SimpleInclude = {
@@ -235,46 +206,26 @@ function inventoryItemToLineType(item: InventoryItem): string {
 function buildCatalog(inventoryItems: InventoryItem[], selectedDept: string): CatalogItem[] {
   const selectedDivId = DEPT_TO_DIV_ID[selectedDept] ?? "";
 
-  const invItems: CatalogItem[] = inventoryItems
-    .filter(i => i.activeStatus !== false && (i as any).name !== "test")
+  const items: CatalogItem[] = inventoryItems
+    .filter(i => i.activeStatus !== false)
     .map(i => ({
       stockItemId: i.id,
       name: i.name,
+      type: i.type || "Consumable",
       lineType: inventoryItemToLineType(i),
       serviceCategory: i.category || "",
       stockTrackingDefault: true,
       sellingPrice: String((i as any).sellingPrice || ""),
       unitPrice: String((i as any).sellingPrice || i.unitPrice || ""),
       divId: (i as any).departmentId || "",
-      depts: [],
-      source: "inventory" as const,
     }));
 
-  const svcItems: CatalogItem[] = PREDEFINED_SERVICES.map(s => ({
-    stockItemId: "",
-    name: s.name,
-    lineType: s.lineType,
-    serviceCategory: s.category,
-    stockTrackingDefault: false,
-    sellingPrice: "",
-    unitPrice: "",
-    divId: "",
-    depts: s.depts,
-    source: "service" as const,
-  }));
-
-  const all = [...invItems, ...svcItems];
-
-  return all.sort((a, b) => {
-    const aMatch = a.source === "inventory"
-      ? a.divId === selectedDivId
-      : a.depts.includes(selectedDept);
-    const bMatch = b.source === "inventory"
-      ? b.divId === selectedDivId
-      : b.depts.includes(selectedDept);
+  // Sort: current department's items first, then others alphabetically
+  return items.sort((a, b) => {
+    const aMatch = a.divId === selectedDivId;
+    const bMatch = b.divId === selectedDivId;
     if (aMatch && !bMatch) return -1;
     if (!aMatch && bMatch) return 1;
-    if (a.source !== b.source) return a.source === "inventory" ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
 }
@@ -395,9 +346,8 @@ function RefillItemSelector({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const invItems = catalog.filter(i => i.source === "inventory");
   const q = query.trim().toLowerCase();
-  const filtered = q ? invItems.filter(i => i.name.toLowerCase().includes(q)) : invItems;
+  const filtered = q ? catalog.filter(i => i.name.toLowerCase().includes(q)) : catalog;
   const displayValue = value ? name : "";
 
   return (
@@ -1077,22 +1027,15 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
                   )}
                   {filteredCatalog.map(item => (
                     <button
-                      key={item.source === "inventory" ? item.stockItemId : `svc-${item.name}`}
+                      key={item.stockItemId}
                       type="button"
                       className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-blue-50 transition-colors text-sm border-b border-gray-50 last:border-0"
                       onMouseDown={e => { e.preventDefault(); addSimpleItem(item); }}
                     >
-                      {item.source === "inventory"
-                        ? <Box className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                        : <Wrench className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                      }
+                      <Box className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                       <span className="flex-1 text-gray-800">{item.name}</span>
-                      <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                        item.source === "inventory"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}>
-                        {item.source === "inventory" ? "Inventory" : "Service"}
+                      <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+                        {item.type}
                       </span>
                     </button>
                   ))}
@@ -1101,7 +1044,7 @@ export default function UnifiedContractForm({ contract, defaultClientId, onSucce
 
               {searchOpen && searchQuery.trim() && filteredCatalog.length === 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-3 text-sm text-gray-400">
-                  No items found for "{searchQuery}" — switch to Advanced to add a custom item.
+                  No stock items match "{searchQuery}". Add it to <strong>Stock Management</strong> first, or switch to Advanced mode for a one-off entry.
                 </div>
               )}
             </div>
