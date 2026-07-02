@@ -802,6 +802,12 @@ export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).
     "website","existing_client","walk_in","email","other",
   ], { required_error: "Origination is required" }),
   originationOther: z.string().optional().nullable(),
+  // email and phone are NOT NULL in DB but are optional when staff create a lead internally
+  email: z.string().optional().default(""),
+  phone: z.string().optional().default(""),
+  // companyName and contactPerson: make the Zod message friendly
+  companyName: z.string().min(1, "Company / client name is required"),
+  contactPerson: z.string().optional().default(""),
 });
 
 export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;

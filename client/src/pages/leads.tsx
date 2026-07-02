@@ -153,7 +153,28 @@ export default function Leads() {
       setShowNewLead(false);
       toast({ title: "Lead created", description: "New lead added to the pipeline." });
     },
-    onError: () => toast({ title: "Error", description: "Failed to create lead.", variant: "destructive" }),
+    onError: (error: any) => {
+      let description = "Failed to create lead.";
+      try {
+        const raw = String(error?.message ?? "");
+        // apiRequest throws "STATUS: <details>" — strip the status prefix
+        const body = raw.replace(/^\d+:\s*/, "");
+        // Try to parse Zod-style errors
+        const parsed = JSON.parse(body);
+        if (Array.isArray(parsed) && parsed[0]?.message) {
+          const field = parsed[0].path?.join(".") || "field";
+          description = `${parsed[0].message} (${field})`;
+        } else if (parsed?.details) {
+          description = parsed.details;
+        } else if (parsed?.error) {
+          description = parsed.error;
+        }
+      } catch {
+        if (error?.message) description = error.message;
+      }
+      console.error("[createLead] error:", error?.message);
+      toast({ title: "Error creating lead", description, variant: "destructive" });
+    },
   });
 
   const advanceLead = useMutation({

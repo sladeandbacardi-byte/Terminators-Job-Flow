@@ -2030,11 +2030,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Quote Submission Routes (public-facing)
   app.post("/api/quote-submissions", async (req, res) => {
     try {
-      const submissionData = insertQuoteSubmissionSchema.parse({ ...req.body, origination: req.body?.origination ?? "website" });
+      const submissionData = insertQuoteSubmissionSchema.parse({
+        email: "",
+        phone: "",
+        contactPerson: "",
+        ...req.body,
+        origination: req.body?.origination ?? "other",
+      });
       const submission = await storage.createQuoteSubmission(submissionData);
       res.status(201).json(submission);
     } catch (error: any) {
-      res.status(400).json({ error: "Failed to create lead", details: error.message });
+      console.error("[POST /api/quote-submissions] validation error:", error.message);
+      // Parse Zod errors into a human-readable message
+      let details = error.message;
+      try {
+        const zodErrors = JSON.parse(error.message);
+        if (Array.isArray(zodErrors)) {
+          details = zodErrors.map((e: any) => `${e.path?.join(".") || "field"}: ${e.message}`).join("; ");
+        }
+      } catch {}
+      res.status(400).json({ error: "Failed to create lead", details });
     }
   });
 
