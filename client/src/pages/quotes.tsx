@@ -309,31 +309,9 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
-          <div className="flex items-center justify-between gap-4">
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <FileText className="h-5 w-5 text-primary" /> New Quote
-            </DialogTitle>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Issuing Entity <span className="text-red-500">*</span></span>
-              <Select
-                value={legalEntityId}
-                onValueChange={id => {
-                  setLegalEntityId(id);
-                  const e = legalEntities.find(x => x.id === id);
-                  setLegalEntityName(e?.name ?? "");
-                }}
-              >
-                <SelectTrigger className={`w-52 h-8 text-sm ${!legalEntityId ? "border-red-300" : ""}`}>
-                  <SelectValue placeholder="Select entity…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {legalEntities.filter(e => e.isActive).map(e => (
-                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <FileText className="h-5 w-5 text-primary" /> New Quote
+          </DialogTitle>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -345,6 +323,30 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
 
           {/* ── TAB 1: Client ──────────────────────────────────────────── */}
           <TabsContent value="client" className="flex-1 overflow-y-auto px-6 pb-6 mt-2">
+
+            {/* Issuing Entity — must be inside scrollable content, not DialogHeader, to avoid Radix portal z-index conflict */}
+            <div className={`flex items-center gap-3 rounded-md border p-3 mb-4 ${!legalEntityId ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
+              <Building2 className="h-4 w-4 text-gray-500 shrink-0" />
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Issuing Entity <span className="text-red-500">*</span></span>
+              <Select
+                value={legalEntityId}
+                onValueChange={id => {
+                  setLegalEntityId(id);
+                  const e = legalEntities.find(x => x.id === id);
+                  setLegalEntityName(e?.name ?? "");
+                }}
+              >
+                <SelectTrigger className="flex-1 bg-white">
+                  <SelectValue placeholder="Select the company issuing this quote…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {legalEntities.filter(e => e.isActive).map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="rounded-md border bg-muted/40 p-3 mb-5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Auto-fill from existing client</p>
               <Select onValueChange={id => { if (id !== "__none__") fillFromClient(id); }}>
