@@ -1,0 +1,136 @@
+Fix the "Failed to create lead" error in JobFlow.
+
+A sales rep is trying to save a new lead and the frontend only shows a red toast saying:
+"Error - Failed to create lead."
+
+This is not enough information.
+
+Please debug and fix the lead creation flow.
+
+Required checks:
+
+1. Check browser console errors when saving a lead.
+2. Check server logs for the POST request that creates the lead.
+3. Identify the actual failing API route.
+4. Confirm whether the failing route is:
+- lead creation
+- quote submission creation
+- quote line item creation
+- pricing item selection
+- client creation
+- another linked table
+
+5. Check that all fields sent by the frontend match the backend schema.
+
+Pay special attention to recently added sales fields:
+- after_hours_required
+- existing_competitor_contract
+- competitor_name
+- cancellation_notice
+- notice_period
+- earliest_start_date
+- expected_service_frequency
+- client_flags
+- origination
+- lead_source
+- quote_status
+- quote_items
+- selected pricing items
+
+6. Check database migrations.
+
+Confirm all required columns exist in the real database, not only in shared/schema.ts.
+
+Check tables:
+- leads
+- quote_submissions
+- pricing_library
+- clients
+- follow_ups
+- sales_appointments
+
+7. Make sure optional fields are actually optional.
+
+These fields should not block lead creation if blank:
+- competitor name
+- cancellation notice
+- notice period
+- earliest start date
+- expected service frequency
+- client flags
+- after-hours required
+- quote items
+- pricing items
+- notes
+
+8. Fix data type handling.
+
+Before sending to the API:
+- Convert blank number fields to null, not empty string
+- Convert price fields to numbers
+- Convert quantity fields to numbers
+- Convert dates to valid ISO date strings or null
+- Convert empty dropdowns to null
+- Ensure client flags are saved as an array or valid JSON, depending on the schema
+
+9. Improve frontend error handling.
+
+Instead of always showing:
+"Failed to create lead"
+
+Show the actual error returned by the server.
+
+Example:
+"Failed to create lead: Company name is required"
+or
+"Failed to create lead: column expected_service_frequency does not exist"
+or
+"Failed to create lead: invalid input syntax for type numeric"
+
+10. Improve backend error handling.
+
+For the create lead API route:
+- Log the full error on the server
+- Return a clear JSON error response
+- Do not hide the actual database/schema validation error
+
+Example response:
+{
+  "success": false,
+  "message": "Failed to create lead",
+  "details": "expected_service_frequency column does not exist"
+}
+
+11. Add validation before submitting.
+
+Required lead fields should be:
+- Client/company name
+- Contact person or contact number
+- Origination
+- Department/service required
+- Assigned sales rep
+
+All other fields should be optional unless specifically needed.
+
+12. Prevent partial save issues.
+
+If the form creates a lead and quote items together:
+- First create the lead
+- Then create quote/line items only if provided
+- If quote items fail, do not show "Failed to create lead" if the lead was actually created
+- Show the correct error:
+"Lead created, but quote items failed to save."
+
+13. Add a development debug panel or console log temporarily.
+
+Before submitting, log:
+- Payload being sent
+- API route
+- Response status
+- Response body
+
+Remove or hide this once fixed.
+
+Goal:
+The sales rep must be able to save a lead without the form failing because optional quote/pricing/contract fields are blank.
+The error message must show the real cause instead of only saying "Failed to create lead."
