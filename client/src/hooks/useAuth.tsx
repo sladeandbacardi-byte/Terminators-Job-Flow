@@ -45,6 +45,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setToken(storedToken);
         setUser(userData);
         setIsDemoMode(demoFlag);
+        setIsLoading(false);
+        return;
       } catch (error) {
         console.error('Error parsing stored user data:', error);
         localStorage.removeItem('auth_token');

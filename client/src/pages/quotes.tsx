@@ -401,6 +401,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
                     <button
                       key={e.id}
                       type="button"
+                      data-testid={`entity-pill-${e.id}`}
                       onClick={() => { setLegalEntityId(e.id); setLegalEntityName(e.name); }}
                       className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
                         legalEntityId === e.id
