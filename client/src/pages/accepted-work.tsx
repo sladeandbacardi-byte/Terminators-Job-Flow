@@ -162,6 +162,11 @@ function WorkflowCard({
               <Badge className={`text-xs ${statusCfg?.color || "bg-gray-100 text-gray-700"}`}>
                 {STATUS_LABELS[w.workflowStatus] || w.workflowStatus}
               </Badge>
+              {(w as any).legalEntityName && (
+                <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                  {(w as any).legalEntityName}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
               {w.contactPerson && (
@@ -464,6 +469,8 @@ function CreateWorkflowDialog({
         cancellationNoticeRequired: q.cancellationNoticeRequired,
         noticePeriod: q.noticePeriod,
         departmentId: q.departmentId,
+        legalEntityId: (q as any).legalEntityId ?? null,
+        legalEntityName: (q as any).legalEntityName ?? null,
         workflowStatus: "pending_registration",
       });
     },

@@ -183,7 +183,12 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
   const [legalEntityId,   setLegalEntityId]   = useState("");
   const [legalEntityName, setLegalEntityName] = useState("");
 
-  const { data: legalEntities = [] } = useQuery<import("@shared/schema").LegalEntity[]>({
+  const {
+    data: legalEntities = [],
+    isLoading: legalEntitiesLoading,
+    isError: legalEntitiesError,
+    refetch: refetchLegalEntities,
+  } = useQuery<import("@shared/schema").LegalEntity[]>({
     queryKey: ["/api/legal-entities"],
   });
 
@@ -331,9 +336,31 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
                 <span className="text-sm font-medium text-gray-700">Issuing Entity <span className="text-red-500">*</span></span>
                 {!legalEntityId && <span className="text-xs text-red-500">— please select one</span>}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {legalEntities.filter(e => e.isActive).length === 0 ? (
+              <div className="flex flex-wrap gap-2 items-center">
+                {legalEntitiesLoading ? (
                   <span className="text-xs text-muted-foreground italic">Loading entities…</span>
+                ) : legalEntitiesError ? (
+                  <>
+                    <span className="text-xs text-red-600">Could not load issuing entities. Please refresh or contact admin.</span>
+                    <button
+                      type="button"
+                      onClick={() => refetchLegalEntities()}
+                      className="text-xs font-medium text-primary underline hover:no-underline"
+                    >
+                      Reload entities
+                    </button>
+                  </>
+                ) : legalEntities.filter(e => e.isActive).length === 0 ? (
+                  <>
+                    <span className="text-xs text-muted-foreground italic">No active issuing entities found. Please contact admin.</span>
+                    <button
+                      type="button"
+                      onClick={() => refetchLegalEntities()}
+                      className="text-xs font-medium text-primary underline hover:no-underline"
+                    >
+                      Reload entities
+                    </button>
+                  </>
                 ) : (
                   legalEntities.filter(e => e.isActive).map(e => (
                     <button

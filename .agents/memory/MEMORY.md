@@ -1,6 +1,7 @@
 - [Recurrence expander anchors](recurrence-anchors.md) — stepped monthly cadence must anchor on a fixed date (contract startDate or epoch fallback), never on the query window, or occurrences shift each month viewed.
 - [Calendar virtual events](calendar-virtual-events.md) — non-persisted events (id prefix `occ-`) must be filtered out of job click/edit/drag handlers; merging them as `type:'job'` breaks PATCH `/api/jobs/:id` and silent no-op clicks.
 - [Sidebar route naming](sidebar-route-naming.md) — `/contracts` belongs to Sales (Rental Contracts); the Service department's recurring jobs live at `/service-contracts`. Don't merge.
+- [Legal entity propagation](legal-entity-propagation.md) — issuing entity is chosen once on the quote; copy it forward (workflow, invoice) rather than re-picking; entity picker needs loading/error/empty states with retry.
 - [Stock management storage pattern](stock-storage-pattern.md) — new stock tables added via db-storage.ts cast `storage as any` in routes since IStorage interface not extended; createStockMovement auto-updates stockBalances; seedDefaultStockLocations guards on existing count.
 - [Inventory type migration](inventory-type-migration.md) — old type values product/rental_equipment replaced by 7 new display values; runDataMigrations auto-patches on startup.
 - [npm overrides nested esbuild](npm-overrides-nested-esbuild.md) — scoped overrides don't retroactively fix already-resolved lockfile branches; force-reinstall the parent to make npm re-resolve and pick up the override.

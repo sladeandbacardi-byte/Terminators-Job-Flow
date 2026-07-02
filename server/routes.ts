@@ -974,6 +974,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const job = await storage.getJob(req.params.id);
       if (!job) return res.status(404).json({ error: "Job not found" });
 
+      let legalEntityId: string | null = null;
+      let legalEntityName: string | null = null;
+      const linkedQuoteId = (job as any).linkedQuoteId;
+      if (linkedQuoteId) {
+        try {
+          const linkedQuote = await storage.getQuoteSubmission(linkedQuoteId);
+          legalEntityId = (linkedQuote as any)?.legalEntityId ?? null;
+          legalEntityName = (linkedQuote as any)?.legalEntityName ?? null;
+        } catch { /* non-fatal — invoice can still be created without entity info */ }
+      }
+
       const priceNum = Number((job as any).price ?? 0);
       const subtotal = Number.isFinite(priceNum) ? priceNum : 0;
       const taxRate = 0.15; // 15% VAT
@@ -996,6 +1007,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         terms: "Payment due within 30 days.",
         linkedJobId: job.id,
         linkedQuoteId: (job as any).linkedQuoteId ?? null,
+        legalEntityId,
+        legalEntityName,
       } as any);
 
       // Seed a single line item from the job

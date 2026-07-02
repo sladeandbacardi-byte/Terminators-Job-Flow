@@ -127,7 +127,12 @@ export default function DocumentForm({
   const Icon = cfg.icon;
   const [linkedClientId, setLinkedClientId] = useState("");
 
-  const { data: legalEntities = [] } = useQuery<LegalEntity[]>({
+  const {
+    data: legalEntities = [],
+    isLoading: legalEntitiesLoading,
+    isError: legalEntitiesError,
+    refetch: refetchLegalEntities,
+  } = useQuery<LegalEntity[]>({
     queryKey: ["/api/legal-entities"],
   });
 
@@ -297,8 +302,14 @@ export default function DocumentForm({
                     value={field.value ?? ""}
                   >
                     <FormControl>
-                      <SelectTrigger className={!field.value ? "border-orange-300" : ""}>
-                        <SelectValue placeholder="Select which legal entity is issuing this document…" />
+                      <SelectTrigger className={!field.value ? "border-orange-300" : ""} disabled={legalEntitiesLoading || legalEntitiesError}>
+                        <SelectValue placeholder={
+                          legalEntitiesLoading
+                            ? "Loading entities…"
+                            : legalEntitiesError
+                            ? "Could not load issuing entities"
+                            : "Select which legal entity is issuing this document…"
+                        } />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -310,6 +321,30 @@ export default function DocumentForm({
                       ))}
                     </SelectContent>
                   </Select>
+                  {legalEntitiesError && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-red-600">Could not load issuing entities. Please refresh or contact admin.</span>
+                      <button
+                        type="button"
+                        onClick={() => refetchLegalEntities()}
+                        className="text-xs font-medium text-primary underline hover:no-underline"
+                      >
+                        Reload entities
+                      </button>
+                    </div>
+                  )}
+                  {!legalEntitiesLoading && !legalEntitiesError && legalEntities.filter(e => e.isActive).length === 0 && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-muted-foreground italic">No active issuing entities found. Please contact admin.</span>
+                      <button
+                        type="button"
+                        onClick={() => refetchLegalEntities()}
+                        className="text-xs font-medium text-primary underline hover:no-underline"
+                      >
+                        Reload entities
+                      </button>
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

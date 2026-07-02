@@ -1,0 +1,78 @@
+Fix the New Quote form Issuing Entity dropdown.
+
+Current problem:
+On the New Quote modal, the required "Issuing Entity" field shows:
+"Loading entities..."
+The user cannot select an entity, so they cannot create a quote.
+
+Expected behaviour:
+The Issuing Entity dropdown must load and allow the user to select one of the company legal entities.
+
+Required legal entities:
+1. Terminators CC
+2. Terminators Pty Ltd
+
+Tasks:
+
+1. Check the frontend New Quote modal.
+Find the Issuing Entity field.
+Confirm which API endpoint it uses to load entities.
+
+2. Check the backend route for loading issuing entities.
+Confirm the route exists and returns data.
+
+3. Check the database.
+Confirm there is an issuing_entities table or equivalent table.
+If it does not exist, create it.
+
+4. Seed the required entities into the database:
+- Terminators CC
+- Terminators Pty Ltd
+
+Each entity should have:
+- id
+- entity_name
+- legal_name
+- registration_number, optional
+- vat_number, optional
+- address, optional
+- phone, optional
+- email, optional
+- bank_details, optional
+- is_active
+- created_at
+- updated_at
+
+5. The Issuing Entity dropdown must only show active entities.
+
+6. If the API fails, do not leave the dropdown stuck on "Loading entities..."
+Show a clear error message:
+"Could not load issuing entities. Please refresh or contact admin."
+
+7. Add a fallback reload button next to the entity field:
+"Reload entities"
+
+8. Add validation:
+The quote cannot be saved unless an issuing entity is selected.
+
+9. When saving a quote, store:
+- issuing_entity_id
+- issuing_entity_name
+
+10. The selected issuing entity must appear on:
+- Quote detail view
+- Quote PDF/export
+- Accepted Work page
+- Invoice handover
+- Reports if relevant
+
+11. Test with both legal entities:
+- Create quote using Terminators CC
+- Create quote using Terminators Pty Ltd
+
+12. Also test what happens if the entity API fails.
+The user must see a useful error instead of the field staying stuck on "Loading entities..."
+
+Goal:
+The sales rep must be able to select the legal entity before creating a quote.
+The quote must clearly belong to the selected legal entity.

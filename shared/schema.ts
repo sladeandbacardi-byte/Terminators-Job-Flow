@@ -1401,6 +1401,8 @@ export const acceptedWorkflows = pgTable("accepted_workflows", {
   cancellationNoticeRequired:  text("cancellation_notice_required"),
   noticePeriod:                text("notice_period"),
   departmentId:                varchar("department_id"),
+  legalEntityId:               varchar("legal_entity_id"),
+  legalEntityName:             text("legal_entity_name"),
   // ── Client Registration ──────────────────────────────────────────────────
   regFormSent:                 boolean("reg_form_sent").notNull().default(false),
   regFormSentAt:               timestamp("reg_form_sent_at"),
