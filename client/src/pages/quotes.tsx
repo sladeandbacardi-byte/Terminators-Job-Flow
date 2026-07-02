@@ -307,7 +307,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0" onInteractOutside={e => e.preventDefault()}>
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <FileText className="h-5 w-5 text-primary" /> New Quote
@@ -324,27 +324,24 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
           {/* ── TAB 1: Client ──────────────────────────────────────────── */}
           <TabsContent value="client" className="flex-1 overflow-y-auto px-6 pb-6 mt-2">
 
-            {/* Issuing Entity — must be inside scrollable content, not DialogHeader, to avoid Radix portal z-index conflict */}
+            {/* Issuing Entity — native <select> avoids all Radix portal/z-index issues inside Dialog */}
             <div className={`flex items-center gap-3 rounded-md border p-3 mb-4 ${!legalEntityId ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
               <Building2 className="h-4 w-4 text-gray-500 shrink-0" />
               <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Issuing Entity <span className="text-red-500">*</span></span>
-              <Select
+              <select
+                className="flex-1 h-10 rounded-md border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 value={legalEntityId}
-                onValueChange={id => {
-                  setLegalEntityId(id);
-                  const e = legalEntities.find(x => x.id === id);
-                  setLegalEntityName(e?.name ?? "");
+                onChange={e => {
+                  setLegalEntityId(e.target.value);
+                  const ent = legalEntities.find(x => x.id === e.target.value);
+                  setLegalEntityName(ent?.name ?? "");
                 }}
               >
-                <SelectTrigger className="flex-1 bg-white">
-                  <SelectValue placeholder="Select the company issuing this quote…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {legalEntities.filter(e => e.isActive).map(e => (
-                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">Select the company issuing this quote…</option>
+                {legalEntities.filter(e => e.isActive).map(e => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="rounded-md border bg-muted/40 p-3 mb-5">
