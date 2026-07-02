@@ -324,24 +324,34 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
           {/* ── TAB 1: Client ──────────────────────────────────────────── */}
           <TabsContent value="client" className="flex-1 overflow-y-auto px-6 pb-6 mt-2">
 
-            {/* Issuing Entity — native <select> avoids all Radix portal/z-index issues inside Dialog */}
-            <div className={`flex items-center gap-3 rounded-md border p-3 mb-4 ${!legalEntityId ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
-              <Building2 className="h-4 w-4 text-gray-500 shrink-0" />
-              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Issuing Entity <span className="text-red-500">*</span></span>
-              <select
-                className="flex-1 h-10 rounded-md border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                value={legalEntityId}
-                onChange={e => {
-                  setLegalEntityId(e.target.value);
-                  const ent = legalEntities.find(x => x.id === e.target.value);
-                  setLegalEntityName(ent?.name ?? "");
-                }}
-              >
-                <option value="">Select the company issuing this quote…</option>
-                {legalEntities.filter(e => e.isActive).map(e => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
-                ))}
-              </select>
+            {/* Issuing Entity — pill buttons, no dropdown/portal, always works inside Dialog */}
+            <div className={`rounded-md border p-3 mb-4 ${!legalEntityId ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Issuing Entity <span className="text-red-500">*</span></span>
+                {!legalEntityId && <span className="text-xs text-red-500">— please select one</span>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {legalEntities.filter(e => e.isActive).length === 0 ? (
+                  <span className="text-xs text-muted-foreground italic">Loading entities…</span>
+                ) : (
+                  legalEntities.filter(e => e.isActive).map(e => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => { setLegalEntityId(e.id); setLegalEntityName(e.name); }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                        legalEntityId === e.id
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {e.name}
+                      {e.isDefault && <span className="ml-1 text-xs opacity-70">(default)</span>}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
 
             <div className="rounded-md border bg-muted/40 p-3 mb-5">
