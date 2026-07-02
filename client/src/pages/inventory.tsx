@@ -222,8 +222,13 @@ export default function Inventory() {
                 </div>
                 <select className="border rounded-md px-3 py-2 text-sm" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
                   <option value="all">All Types</option>
-                  <option value="product">Product</option>
-                  <option value="rental_equipment">Rental Equipment</option>
+                  <option value="Consumable">Consumable</option>
+                  <option value="Equipment / Rental Item">Equipment / Rental Item</option>
+                  <option value="Chemical">Chemical</option>
+                  <option value="Tool">Tool</option>
+                  <option value="PPE">PPE</option>
+                  <option value="Service Item">Service Item</option>
+                  <option value="Other">Other</option>
                 </select>
                 <select className="border rounded-md px-3 py-2 text-sm" value={alertsFilter} onChange={e => setAlertsFilter(e.target.value)}>
                   <option value="all">All Levels</option>
@@ -268,7 +273,7 @@ export default function Inventory() {
                                 <span className="font-semibold">{item.name}</span>
                                 <Badge variant="outline" className="text-xs">{item.sku}</Badge>
                                 {(item as any).category && <Badge className="text-xs bg-gray-100 text-gray-700">{(item as any).category}</Badge>}
-                                {item.type === "rental_equipment" && <Badge className="text-xs bg-blue-100 text-blue-800">Rental</Badge>}
+                                {item.type && <Badge className="text-xs bg-blue-50 text-blue-700 border border-blue-200">{item.type}</Badge>}
                                 {isCritical && <Badge className="text-xs bg-red-100 text-red-800"><AlertTriangle className="h-3 w-3 mr-0.5" />Critical</Badge>}
                                 {isLow && !isCritical && <Badge className="text-xs bg-orange-100 text-orange-800">Low Stock</Badge>}
                               </div>

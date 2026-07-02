@@ -79,8 +79,8 @@ export const clients = pgTable("clients", {
 export const inventoryItems = pgTable("inventory_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  type: text("type").notNull(), // 'product' or 'rental_equipment'
-  sku: text("sku").notNull().unique(),
+  type: text("type").notNull().default("Consumable"),
+  sku: text("sku").unique(), // optional — auto-generated if not supplied
   quantity: integer("quantity").notNull().default(0),
   minStockLevel: integer("min_stock_level").notNull().default(10),
   maxStockLevel: integer("max_stock_level").notNull().default(100),
@@ -88,14 +88,15 @@ export const inventoryItems = pgTable("inventory_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   description: text("description"),
   departmentId: varchar("department_id"),
-  location: text("location"), // Storage location/warehouse
-  supplier: text("supplier"), // Supplier information
+  location: text("location"),
+  supplier: text("supplier"),
   lastRestocked: timestamp("last_restocked"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at"),
   // Enhanced stock management fields
   itemCode: text("item_code"),
-  category: text("category"), // Pest Control Chemical, Washroom Refill, etc.
-  unitOfMeasure: text("unit_of_measure").default("units"), // units, litres, kg, boxes, etc.
+  category: text("category"),
+  unitOfMeasure: text("unit_of_measure").default("units"),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
   preferredSupplierId: varchar("preferred_supplier_id"),

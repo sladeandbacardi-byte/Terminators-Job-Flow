@@ -1,0 +1,403 @@
+URGENT BUG FIX: Inventory items cannot be created and contract form cannot select items
+
+The Stock Management > Add Item form is failing with:
+
+"Failed to create inventory item"
+
+Because inventory items are not saving, the Contract Includes section also cannot properly select stock/inventory items for contracts.
+
+Fix this end to end.
+
+DO NOT only change the UI.
+Check:
+- frontend form fields
+- API request payload
+- backend validation
+- permissions
+- Drizzle schema
+- PostgreSQL columns
+- insert logic
+- error handling
+- refetch after save
+
+PART 1: FIX INVENTORY ITEM CREATION
+
+Current issue:
+When adding a stock item, the form shows:
+- Item Name
+- SKU
+- Type
+- Department
+- Quantity
+- Cost Price
+- Selling Price
+- Minimum Stock Level
+- Reorder Point
+- Maximum Stock Level
+- Storage Location
+- Supplier
+- Description
+
+But clicking Add Item fails.
+
+Please inspect the API/server logs and fix the actual reason.
+
+Check for:
+- missing PostgreSQL columns
+- field name mismatch between frontend and backend
+- enum mismatch
+- required field missing
+- invalid department value
+- invalid type value
+- permission failure
+- numeric fields being sent as strings
+- schema expecting category but frontend sending type
+- schema expecting quantityOnHand but frontend sending quantity
+- schema expecting sellingPrice but frontend sending price
+
+The Add Item form must save successfully to PostgreSQL.
+
+If save fails:
+- do not close the modal
+- do not clear entered data
+- show the real error message
+- reset the Add Item button from Saving back to Add Item
+
+If save succeeds:
+- show success toast
+- close modal
+- refresh item list
+- show new item immediately
+- item must persist after page refresh
+
+PART 2: UPDATE STOCK ITEM DATA MODEL
+
+Stock item fields must include:
+
+- stockItemId
+- itemName
+- sku
+- itemType
+- department
+- category
+- quantityOnHand
+- unitOfMeasure
+- costPrice
+- sellingPrice
+- minimumStockLevel
+- reorderPoint
+- maximumStockLevel
+- storageLocation
+- supplier
+- description
+- activeStatus
+- createdAt
+- updatedAt
+
+Make sure these fields exist in:
+1. Drizzle schema
+2. PostgreSQL table
+3. API insert/select/update
+4. frontend form
+5. backup export
+6. Data Integrity checks
+
+PART 3: SIMPLIFY ITEM TYPE
+
+The current Type dropdown only shows:
+- Product
+- Rental Equipment
+
+That is not enough.
+
+Use this Type dropdown:
+
+- Consumable
+- Equipment / Rental Item
+- Chemical
+- Tool
+- PPE
+- Service Item
+- Other
+
+Examples:
+Hand Sanitizer Refill = Consumable
+Hand Sanitizer Dispenser = Equipment / Rental Item
+Rodent Bait = Consumable
+Rodent Bait Station = Equipment / Rental Item
+Sani Powder = Consumable
+Deep Cleaning Chemical = Chemical
+Gloves = PPE
+
+PART 4: DEPARTMENT-BASED CATEGORIES
+
+Categories must be according to department.
+
+Department options:
+
+- Pest Control
+- Washroom
+- Sanitary Bins
+- Deep Cleaning
+- Dustmats
+- Hygiene
+- Other
+
+When the user selects Department, show relevant Category options.
+
+If Department = Pest Control:
+Category options:
+- Rodent Control
+- Crawling Insects
+- Flying Insects
+- Bait Stations
+- Baits
+- Chemicals
+- Monitoring Equipment
+- PPE
+- Tools
+- Other Pest Control
+
+If Department = Washroom:
+Category options:
+- Dispensers
+- Refills
+- Aerosol Units
+- Soap
+- Paper Products
+- Toilet Products
+- Urinal Products
+- Hand Sanitizer
+- Consumables
+- Other Washroom
+
+If Department = Sanitary Bins:
+Category options:
+- Sanitary Bins
+- Sani Powder
+- Plastic Liners / Packets
+- Deodorisers
+- Consumables
+- Replacement Bins
+- Other Sanitary Bins
+
+If Department = Deep Cleaning:
+Category options:
+- Cleaning Chemicals
+- Equipment
+- Consumables
+- PPE
+- Tools
+- Other Deep Cleaning
+
+If Department = Dustmats:
+Category options:
+- Dustmats
+- Replacement Mats
+- Cleaning
+- Other Dustmats
+
+If Department = Hygiene:
+Category options:
+- Hygiene Equipment
+- Hygiene Refills
+- Consumables
+- Other Hygiene
+
+PART 5: CONTRACT FORM MUST SELECT INVENTORY ITEMS
+
+Once stock item creation works, update the Contract Includes section.
+
+The Contract Includes item picker must search and select from Stock Management / Inventory.
+
+Example:
+If Stock Management has:
+- Hand Sanitizer Dispenser - Automatic
+- Hand Sanitizer Refill - 1L
+
+Then when creating a contract and searching "hand", the dropdown must show both items.
+
+The contract form must not rely only on hard-coded item names.
+
+Inventory is the master list for physical items.
+
+Services can still come from a predefined service list.
+
+PART 6: CONTRACT ITEM PICKER BEHAVIOUR
+
+In Contract Includes, add/search item field:
+
+Search inventory or service item
+
+When user searches, show:
+- matching stock/inventory items
+- matching service items
+
+For each result, show:
+- item name
+- department
+- category
+- type
+- selling price
+- stock badge if inventory item
+
+When selected from inventory, prefill:
+- stockItemId
+- itemName
+- department
+- category
+- itemType
+- sellingPrice
+- unit price
+- stockTrackingRequired = true for consumables/equipment/chemicals
+
+If selected item has sellingPrice:
+- unit price must pre-populate with sellingPrice
+
+If no sellingPrice:
+- show price as 0.00 and allow user to enter it
+
+PART 7: CONSUMABLE / EQUIPMENT RULES IN CONTRACT
+
+For contract lines, allow:
+
+- Equipment / Unit Item
+- Linked Consumable Item
+- Consumable Arrangement
+- Quantity
+- Unit Price
+- Discount %
+- Final Unit Price
+- Total
+- Notes
+
+Consumable Arrangement options:
+
+- Consumables Included
+- Consumables Charged Separately
+- Client Supplies Own Consumables
+- On Demand Consumables
+- Consumable Only
+- Not Applicable
+
+Examples:
+
+Washroom:
+Hand Sanitizer Dispenser - Automatic
+Linked consumable: Hand Sanitizer Refill - 1L
+
+Pest Control:
+Rodent Bait Station
+Linked consumable: Rodent Bait
+
+Sanitary Bins:
+Sanitary Bin
+Linked consumable: Sani Powder or Plastic Liner / Packet
+
+PART 8: PERMISSIONS
+
+Service managers must be able to create inventory items.
+
+Allow these roles:
+- admin
+- manager
+- service_manager
+- service_admin
+- hygiene_services_manager
+- operations_manager
+
+If a role is not allowed to add stock items, hide the Add Item button.
+Do not show a button that fails.
+
+Mariette Koekemoer / Hygiene Services Manager must be able to add stock items if that is intended.
+
+PART 9: DATA INTEGRITY
+
+Update Admin > Data Integrity checks:
+
+- stock_items table exists
+- stock items missing itemName
+- stock items missing department
+- stock items missing type/category
+- stock items with invalid selling price
+- stock items with invalid quantity
+- contract line item linked to missing stockItemId
+- contract item picker can fetch inventory items
+- inventory item can be created and found after refresh
+
+PART 10: TEST REQUIRED
+
+Run this exact test:
+
+TEST A: Add inventory item
+1. Log in as Mariette Koekemoer.
+2. Go to Service > Stock Management.
+3. Click Add Item.
+4. Add:
+   Item Name: Hand Sanitizer Dispenser - Automatic
+   Type: Equipment / Rental Item
+   Department: Washroom
+   Category: Hand Sanitizer
+   Quantity: 10
+   Cost Price: 100
+   Selling Price: 199.99
+   Minimum Stock Level: 5
+   Reorder Point: 10
+   Maximum Stock Level: 50
+5. Click Add Item.
+6. Confirm no error.
+7. Confirm success toast.
+8. Confirm item appears in Stock Management.
+9. Refresh page.
+10. Confirm item is still there.
+
+TEST B: Add refill item
+1. Add:
+   Item Name: Hand Sanitizer Refill - 1L
+   Type: Consumable
+   Department: Washroom
+   Category: Hand Sanitizer
+   Quantity: 20
+   Cost Price: 20
+   Selling Price: 35
+2. Save.
+3. Confirm item appears and persists after refresh.
+
+TEST C: Select inventory item in contract
+1. Go to Service > Contracts.
+2. Click New Contract.
+3. Select a client.
+4. Select Department: Washroom.
+5. In Contract Includes, search "hand".
+6. Confirm dropdown shows:
+   - Hand Sanitizer Dispenser - Automatic
+   - Hand Sanitizer Refill - 1L
+7. Select Hand Sanitizer Dispenser - Automatic.
+8. Confirm selling price pre-populates.
+9. Link consumable:
+   Hand Sanitizer Refill - 1L
+10. Choose Consumable Arrangement:
+   Consumables Included
+11. Save contract.
+12. Confirm contract saves.
+13. Confirm contract appears under Client Profile > Contracts.
+14. Refresh page and confirm it persists.
+
+TEST D: Pest Control category
+1. Add inventory item:
+   Rodent Bait Station
+   Type: Equipment / Rental Item
+   Department: Pest Control
+   Category: Bait Stations
+2. Add inventory item:
+   Rodent Bait
+   Type: Consumable
+   Department: Pest Control
+   Category: Baits
+3. Confirm both can be selected in a Pest Control contract.
+
+IMPORTANT
+
+Fix Stock Management item creation first.
+
+If stock items cannot be created and saved to PostgreSQL, the Contract Includes inventory picker cannot work properly.

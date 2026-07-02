@@ -483,21 +483,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/inventory", async (req, res) => {
     try {
-      const item = insertInventoryItemSchema.parse(req.body);
+      const body = { ...req.body };
+      // Sanitise departmentId — "__none__" means "no department"
+      if (body.departmentId === "__none__" || body.departmentId === "") body.departmentId = null;
+      // Auto-generate SKU when caller leaves it blank
+      if (!body.sku || body.sku.trim() === "") {
+        const prefix = (body.name ?? "ITEM").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "ITEM";
+        body.sku = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+      }
+      const item = insertInventoryItemSchema.parse(body);
       const created = await storage.createInventoryItem(item);
       res.status(201).json(created);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid inventory item data" });
+    } catch (error: any) {
+      console.error("[POST /api/inventory] error:", error?.message ?? error);
+      const msg = error?.errors
+        ? error.errors.map((e: any) => `${e.path.join(".")}: ${e.message}`).join("; ")
+        : error?.message ?? "Unknown error";
+      res.status(400).json({ error: msg });
     }
   });
 
   app.put("/api/inventory/:id", async (req, res) => {
     try {
-      const updateData = insertInventoryItemSchema.partial().parse(req.body);
+      const body = { ...req.body };
+      if (body.departmentId === "__none__" || body.departmentId === "") body.departmentId = null;
+      const updateData = insertInventoryItemSchema.partial().parse(body);
       const updated = await storage.updateInventoryItem(req.params.id, updateData);
       res.json(updated);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid inventory item data" });
+    } catch (error: any) {
+      console.error("[PUT /api/inventory] error:", error?.message ?? error);
+      res.status(400).json({ error: error?.message ?? "Invalid inventory item data" });
     }
   });
 
@@ -4680,6 +4695,52 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         ));
       }
     } catch (e: any) { checks.push(fail("Schema Integrity", "Could not query information_schema tables", e.message)); }
+
+    // 11. Inventory / Stock Management checks
+    try {
+      const allInv = await storage.getInventoryItems();
+      // 11a. inventory_items table has data
+      if (allInv.length > 0) {
+        checks.push(pass("Inventory Items Exist", `${allInv.length} stock item(s) in inventory_items table`));
+      } else {
+        checks.push(warn("Inventory Items Exist", "No stock items found in inventory_items table"));
+      }
+      // 11b. No items missing name
+      const missingName = allInv.filter(i => !i.name || !i.name.trim());
+      if (missingName.length === 0) {
+        checks.push(pass("Inventory Names", `All ${allInv.length} items have a name`));
+      } else {
+        checks.push(fail("Inventory Names", `${missingName.length} item(s) missing itemName`));
+      }
+      // 11c. No items missing type
+      const missingType = allInv.filter(i => !i.type);
+      if (missingType.length === 0) {
+        checks.push(pass("Inventory Types", `All items have a type value`));
+      } else {
+        checks.push(warn("Inventory Types", `${missingType.length} item(s) missing type`));
+      }
+      // 11d. Items with legacy type values (old snake_case — should be zero after migration)
+      const legacyTypes = allInv.filter(i => i.type === "product" || i.type === "rental_equipment");
+      if (legacyTypes.length === 0) {
+        checks.push(pass("Inventory Type Values", "No legacy type values (product/rental_equipment) found"));
+      } else {
+        checks.push(warn("Inventory Type Values", `${legacyTypes.length} item(s) still use legacy type values — startup migration will fix on next restart`));
+      }
+      // 11e. Items with invalid selling price (negative)
+      const badPrice = allInv.filter(i => i.sellingPrice !== null && i.sellingPrice !== undefined && Number(i.sellingPrice) < 0);
+      if (badPrice.length === 0) {
+        checks.push(pass("Inventory Prices", "No items with negative selling price"));
+      } else {
+        checks.push(warn("Inventory Prices", `${badPrice.length} item(s) have negative selling price`));
+      }
+      // 11f. Items with invalid quantity (negative)
+      const badQty = allInv.filter(i => i.quantity < 0);
+      if (badQty.length === 0) {
+        checks.push(pass("Inventory Quantities", "No items with negative quantity"));
+      } else {
+        checks.push(warn("Inventory Quantities", `${badQty.length} item(s) have negative quantity`));
+      }
+    } catch (e: any) { checks.push(fail("Inventory Health", "Could not query inventory_items", e.message)); }
 
     const overall = checks.every(c => c.status === "passed") ? "passed"
       : checks.some(c => c.status === "failed") ? "failed"

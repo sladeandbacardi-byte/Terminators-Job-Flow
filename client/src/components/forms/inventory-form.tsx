@@ -12,11 +12,65 @@ import { insertInventoryItemSchema } from "@shared/schema";
 import type { InventoryItem, Department } from "@shared/schema";
 import { z } from "zod";
 
+// ── Item type options ─────────────────────────────────────────────────────────
+const ITEM_TYPES = [
+  "Consumable",
+  "Equipment / Rental Item",
+  "Chemical",
+  "Tool",
+  "PPE",
+  "Service Item",
+  "Other",
+] as const;
+
+// ── Department → categories mapping ──────────────────────────────────────────
+const DEPT_CATEGORIES: Record<string, string[]> = {
+  "Pest Control": [
+    "Rodent Control", "Crawling Insects", "Flying Insects", "Bait Stations",
+    "Baits", "Chemicals", "Monitoring Equipment", "PPE", "Tools", "Other Pest Control",
+  ],
+  "Washroom": [
+    "Dispensers", "Refills", "Aerosol Units", "Soap", "Paper Products",
+    "Toilet Products", "Urinal Products", "Hand Sanitizer", "Consumables", "Other Washroom",
+  ],
+  "Sanitary Bins": [
+    "Sanitary Bins", "Sani Powder", "Plastic Liners / Packets", "Deodorisers",
+    "Consumables", "Replacement Bins", "Other Sanitary Bins",
+  ],
+  "Deep Cleaning": [
+    "Cleaning Chemicals", "Equipment", "Consumables", "PPE", "Tools", "Other Deep Cleaning",
+  ],
+  "Dustmats": [
+    "Dustmats", "Replacement Mats", "Cleaning", "Other Dustmats",
+  ],
+  "Hygiene": [
+    "Hygiene Equipment", "Hygiene Refills", "Consumables", "Other Hygiene",
+  ],
+};
+
+const GENERAL_CATEGORIES = [
+  "General", "Consumables", "Equipment", "Tools", "PPE", "Chemicals", "Other",
+];
+
+function getCategoriesForDept(deptName: string | undefined): string[] {
+  if (!deptName) return GENERAL_CATEGORIES;
+  const match = Object.keys(DEPT_CATEGORIES).find(
+    k => deptName.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(deptName.toLowerCase())
+  );
+  return match ? DEPT_CATEGORIES[match] : GENERAL_CATEGORIES;
+}
+
+// ── Form schema ───────────────────────────────────────────────────────────────
 const inventoryFormSchema = insertInventoryItemSchema.extend({
-  unitPrice: z.string().optional().transform((val) => val && val !== "" ? val : undefined),
-  costPrice: z.string().optional().transform((val) => val && val !== "" ? val : undefined),
-  sellingPrice: z.string().optional().transform((val) => val && val !== "" ? val : undefined),
+  name: z.string().min(1, "Item name is required"),
+  type: z.string().min(1, "Type is required"),
+  sku: z.string().optional(),
+  costPrice: z.string().optional().transform(v => v && v !== "" ? v : undefined),
+  sellingPrice: z.string().optional().transform(v => v && v !== "" ? v : undefined),
+  unitPrice: z.string().optional().transform(v => v && v !== "" ? v : undefined),
   quantity: z.number().min(0, "Quantity must be 0 or greater"),
+  category: z.string().optional(),
+  departmentId: z.string().optional(),
 });
 
 type InventoryFormData = z.infer<typeof inventoryFormSchema>;
@@ -32,70 +86,75 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
   const queryClient = useQueryClient();
 
   const { data: departments = [] } = useQuery<Department[]>({
-    queryKey: ['/api/departments'],
+    queryKey: ["/api/departments"],
   });
 
   const form = useForm<InventoryFormData>({
     resolver: zodResolver(inventoryFormSchema),
     defaultValues: {
-      name: item?.name || "",
-      type: item?.type || "product",
-      sku: item?.sku || "",
-      quantity: item?.quantity || 0,
-      minStockLevel: item?.minStockLevel || 10,
-      maxStockLevel: item?.maxStockLevel || 100,
-      reorderPoint: item?.reorderPoint || 20,
-      unitPrice: item?.unitPrice || "",
-      costPrice: item?.costPrice || "",
-      sellingPrice: item?.sellingPrice || "",
-      description: item?.description || "",
-      departmentId: item?.departmentId || undefined,
-      location: item?.location || "",
-      supplier: item?.supplier || "",
+      name:          item?.name          ?? "",
+      type:          item?.type          ?? "Consumable",
+      sku:           item?.sku           ?? "",
+      quantity:      item?.quantity      ?? 0,
+      minStockLevel: item?.minStockLevel ?? 5,
+      maxStockLevel: item?.maxStockLevel ?? 100,
+      reorderPoint:  item?.reorderPoint  ?? 10,
+      costPrice:     item?.costPrice     ?? "",
+      sellingPrice:  item?.sellingPrice  ?? "",
+      unitPrice:     item?.unitPrice     ?? "",
+      description:   item?.description  ?? "",
+      departmentId:  item?.departmentId  ?? "",
+      category:      item?.category      ?? "",
+      location:      item?.location      ?? "",
+      supplier:      item?.supplier      ?? "",
     },
   });
 
+  // watch departmentId to drive dynamic category list
+  const watchedDeptId = form.watch("departmentId");
+  const selectedDept = departments.find(d => d.id === watchedDeptId);
+  const categoryOptions = getCategoriesForDept(selectedDept?.name);
+
   const createMutation = useMutation({
-    mutationFn: (data: InventoryFormData) => apiRequest('POST', '/api/inventory', data),
+    mutationFn: (data: InventoryFormData) => apiRequest("POST", "/api/inventory", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
-      toast({
-        title: "Success",
-        description: "Inventory item created successfully",
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({ title: "Item created", description: "Stock item saved successfully." });
       onSuccess();
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create inventory item",
-        variant: "destructive",
-      });
+    onError: async (err: any) => {
+      let msg = "Failed to create inventory item";
+      try {
+        const body = await err?.response?.json?.();
+        if (body?.error) msg = body.error;
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: InventoryFormData) => apiRequest('PUT', `/api/inventory/${item!.id}`, data),
+    mutationFn: (data: InventoryFormData) => apiRequest("PUT", `/api/inventory/${item!.id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
-      toast({
-        title: "Success",
-        description: "Inventory item updated successfully",
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({ title: "Item updated", description: "Stock item saved successfully." });
       onSuccess();
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update inventory item",
-        variant: "destructive",
-      });
+    onError: async (err: any) => {
+      let msg = "Failed to update inventory item";
+      try {
+        const body = await err?.response?.json?.();
+        if (body?.error) msg = body.error;
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
   const onSubmit = (data: InventoryFormData) => {
-    // Keep unitPrice in sync with sellingPrice for backward compatibility
-    const payload = { ...data, unitPrice: data.sellingPrice || data.unitPrice };
+    const payload = {
+      ...data,
+      departmentId: data.departmentId === "__none__" || !data.departmentId ? undefined : data.departmentId,
+      unitPrice: data.sellingPrice || data.unitPrice,
+    };
     if (item) {
       updateMutation.mutate(payload);
     } else {
@@ -103,314 +162,205 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
     }
   };
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" data-testid="inventory-form">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">
-            {item ? "Edit Inventory Item" : "Add New Inventory Item"}
-          </h2>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+        <h2 className="text-lg font-semibold">
+          {item ? "Edit Stock Item" : "Add New Stock Item"}
+        </h2>
 
+        {/* ── Row 1: Name + SKU ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="name" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Item Name <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="e.g. Hand Sanitizer Dispenser - Automatic" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField control={form.control} name="sku" render={({ field }) => (
+            <FormItem>
+              <FormLabel>SKU <span className="text-xs font-normal text-gray-400">(optional — auto-generated)</span></FormLabel>
+              <FormControl><Input placeholder="e.g. HSD-AUTO-001" {...field} value={field.value ?? ""} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
+
+        {/* ── Row 2: Type + Department ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="type" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Type <span className="text-red-500">*</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {ITEM_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField control={form.control} name="departmentId" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Department</FormLabel>
+              <Select
+                onValueChange={v => {
+                  field.onChange(v === "__none__" ? "" : v);
+                  form.setValue("category", ""); // reset category when dept changes
+                }}
+                value={field.value || "__none__"}
+              >
+                <FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="__none__">All Departments / General</SelectItem>
+                  {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
+
+        {/* ── Row 3: Category ── */}
+        <FormField control={form.control} name="category" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Category</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value || ""}>
+              <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
+              <SelectContent>
+                <SelectItem value="">No category</SelectItem>
+                {categoryOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* ── Row 4: Quantity ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField control={form.control} name="quantity" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Quantity on Hand</FormLabel>
+              <FormControl>
+                <Input type="number" min={0} placeholder="0"
+                  {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField control={form.control} name="location" render={({ field }) => (
+            <FormItem className="md:col-span-2">
+              <FormLabel>Storage Location</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g. Main Warehouse - Shelf A3" {...field} value={field.value ?? ""} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
+
+        {/* ── Pricing ── */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Pricing (ZAR)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter item name" {...field} data-testid="input-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="sku"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SKU</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter SKU code" {...field} data-testid="input-sku" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-type">
-                        <SelectValue placeholder="Select item type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="product">Product</SelectItem>
-                      <SelectItem value="rental_equipment">Rental Equipment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="departmentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Department</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-department">
-                        <SelectValue placeholder="Select department (optional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="__none__">General (No specific department)</SelectItem>
-                      {departments.map((department) => (
-                        <SelectItem key={department.id} value={department.id}>
-                          {department.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantity</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="0" 
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                      data-testid="input-quantity"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-          </div>
-
-          {/* Pricing Section */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Pricing (ZAR)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="costPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-600">Cost Price <span className="text-xs font-normal text-gray-400">(what you pay)</span></FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-cost-price"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="sellingPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-green-700 font-semibold">Selling Price <span className="text-xs font-normal text-gray-400">(charged to client)</span></FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        className="border-green-300 focus:border-green-500"
-                        {...field}
-                        data-testid="input-selling-price"
-                      />
-                    </FormControl>
-                    <p className="text-xs text-green-600 mt-0.5">Auto-fills in contracts</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-
-          {/* Stock Level Management */}
-          <div className="space-y-4">
-            <h3 className="text-md font-semibold text-gray-900 border-b pb-2">Stock Level Management</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="minStockLevel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Minimum Stock Level</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="10" 
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 10)}
-                        data-testid="input-min-stock"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="reorderPoint"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Reorder Point</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="20" 
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 20)}
-                        data-testid="input-reorder-point"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="maxStockLevel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Maximum Stock Level</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="100" 
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 100)}
-                        data-testid="input-max-stock"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-
-          {/* Location and Supplier Information */}
-          <div className="space-y-4">
-            <h3 className="text-md font-semibold text-gray-900 border-b pb-2">Storage & Supplier Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Storage Location</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="e.g., Main Warehouse - Shelf A3" 
-                        {...field} 
-                        value={field.value ?? ""}
-                        data-testid="input-location"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="supplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="e.g., HygieneTech Solutions" 
-                        {...field} 
-                        value={field.value ?? ""}
-                        data-testid="input-supplier"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
+            <FormField control={form.control} name="costPrice" render={({ field }) => (
               <FormItem>
-                <FormLabel>Description</FormLabel>
+                <FormLabel className="text-gray-600">
+                  Cost Price <span className="text-xs font-normal text-gray-400">(what you pay)</span>
+                </FormLabel>
                 <FormControl>
-                  <Textarea 
-                    placeholder="Enter item description" 
-                    className="min-h-[100px]" 
-                    {...field} 
-                    value={field.value ?? ""}
-                    data-testid="input-description"
-                  />
+                  <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} value={field.value ?? ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
+            )} />
+
+            <FormField control={form.control} name="sellingPrice" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-green-700 font-semibold">
+                  Selling Price <span className="text-xs font-normal text-gray-400">(charged to client)</span>
+                </FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.01" min="0" placeholder="0.00"
+                    className="border-green-300 focus:border-green-500"
+                    {...field} value={field.value ?? ""} />
+                </FormControl>
+                <p className="text-xs text-green-600 mt-0.5">Auto-fills in contracts</p>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
         </div>
 
-        <div className="flex justify-end space-x-4">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={onCancel}
-            data-testid="button-cancel"
-          >
-            Cancel
-          </Button>
-          <Button 
-            type="submit" 
-            disabled={createMutation.isPending || updateMutation.isPending}
-            data-testid="button-submit"
-          >
-            {createMutation.isPending || updateMutation.isPending ? "Saving..." : (item ? "Update Item" : "Add Item")}
+        {/* ── Stock levels ── */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Stock Levels</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <FormField control={form.control} name="minStockLevel" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Minimum</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} placeholder="5"
+                    {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="reorderPoint" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Reorder At</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} placeholder="10"
+                    {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="maxStockLevel" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Maximum</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} placeholder="100"
+                    {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+        </div>
+
+        {/* ── Supplier + Description ── */}
+        <FormField control={form.control} name="supplier" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Supplier</FormLabel>
+            <FormControl>
+              <Input placeholder="e.g. HygieneTech Solutions" {...field} value={field.value ?? ""} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="description" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Description</FormLabel>
+            <FormControl>
+              <Textarea placeholder="Optional description…" className="min-h-[80px]"
+                {...field} value={field.value ?? ""} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Saving…" : item ? "Update Item" : "Add Item"}
           </Button>
         </div>
       </form>

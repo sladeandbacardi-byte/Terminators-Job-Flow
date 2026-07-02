@@ -223,9 +223,12 @@ type Props = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function inventoryItemToLineType(item: InventoryItem): string {
+  const t = (item.type || "").toLowerCase();
   const cat = (item.category || "").toLowerCase();
-  if (item.type === "rental_equipment") return "Rental Equipment";
-  if (cat.includes("refill") || cat.includes("consumable")) return "Refill / Consumable";
+  if (t.includes("equipment") || t.includes("rental") || t === "rental_equipment") return "Rental Equipment";
+  if (t === "consumable" || cat.includes("refill") || cat.includes("consumable")) return "Refill / Consumable";
+  if (t === "chemical") return "Refill / Consumable";
+  if (t === "ppe" || t === "tool") return "Inventory Item";
   return "Inventory Item";
 }
 
