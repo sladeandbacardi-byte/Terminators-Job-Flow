@@ -1,0 +1,111 @@
+FIX REPLIT PUBLISHING / INVALID RUN COMMAND
+
+Replit is showing:
+
+Publishing not available
+Open the Publishing pane to resolve
+
+It also shows:
+Invalid run command
+
+Please fix the Replit publishing configuration.
+
+The app already works locally/in preview, but Replit Publishing needs correct build and start commands.
+
+Check and fix:
+
+1. Run command
+   Make sure the app has a valid run/start command.
+
+2. package.json scripts
+   Confirm package.json has correct scripts for:
+
+dev
+build
+start
+
+Expected example:
+
+"scripts": {
+"dev": "tsx server/index.ts",
+"build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+"start": "NODE_ENV=production node dist/index.js"
+}
+
+Adjust if the project uses a different structure.
+
+3. Publishing settings
+   Open the Publishing pane and set:
+
+Build command:
+npm run build
+
+Start command:
+npm run start
+
+4. Port
+   Make sure the server listens on process.env.PORT.
+
+Example:
+
+const port = process.env.PORT || 5000;
+server.listen(port, "0.0.0.0", () => {
+console.log(`Server listening on port ${port}`);
+});
+
+5. Production secrets
+   Make sure production publishing secrets are configured.
+
+Required secrets may include:
+
+DATABASE_URL
+BREVO_API_KEY
+BACKUP_EMAIL_TO
+BACKUP_EMAIL_FROM
+EMAIL_PROVIDER
+NODE_ENV
+
+Do not print secret values in logs.
+
+6. Database
+   DATABASE_URL must be a normal Postgres URL:
+
+postgresql://...
+or
+postgres://...
+
+It must not be:
+wss://...
+
+7. Do not run database migration commands during normal startup.
+
+Do not run:
+npx drizzle-kit push
+npm run db:push
+execSync
+spawnSync
+
+inside server/index.ts.
+
+Database schema updates should be manual/separate, not part of production server startup.
+
+8. Add clear startup logs:
+
+Job Flow server starting
+Database URL protocol: postgresql
+Database URL validation: passed
+Server listening on port: [PORT]
+
+Do not print the full DATABASE_URL.
+
+9. If Replit Publishing still fails, open the Publishing logs and report:
+
+* Build error
+* Start command error
+* Missing secret
+* Port error
+* Database connection error
+
+10. If Railway is the intended production host, then Replit Publishing does not need to be used. In that case, keep Replit for development and GitHub sync, and keep Railway as production.
+
+END
