@@ -45,9 +45,9 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
       minStockLevel: item?.minStockLevel || 10,
       maxStockLevel: item?.maxStockLevel || 100,
       reorderPoint: item?.reorderPoint || 20,
-      unitPrice: item?.unitPrice || undefined,
-      costPrice: (item as any)?.costPrice || undefined,
-      sellingPrice: (item as any)?.sellingPrice || undefined,
+      unitPrice: item?.unitPrice || "",
+      costPrice: item?.costPrice || "",
+      sellingPrice: item?.sellingPrice || "",
       description: item?.description || "",
       departmentId: item?.departmentId || undefined,
       location: item?.location || "",
@@ -94,10 +94,12 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
   });
 
   const onSubmit = (data: InventoryFormData) => {
+    // Keep unitPrice in sync with sellingPrice for backward compatibility
+    const payload = { ...data, unitPrice: data.sellingPrice || data.unitPrice };
     if (item) {
-      updateMutation.mutate(data);
+      updateMutation.mutate(payload);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(payload);
     }
   };
 
@@ -215,7 +217,7 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
           {/* Pricing Section */}
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Pricing (ZAR)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="costPrice"
@@ -254,26 +256,6 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
                       />
                     </FormControl>
                     <p className="text-xs text-green-600 mt-0.5">Auto-fills in contracts</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="unitPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-500">Unit Price <span className="text-xs font-normal text-gray-400">(legacy / internal)</span></FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-unit-price"
-                      />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
