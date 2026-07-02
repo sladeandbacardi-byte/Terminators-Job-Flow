@@ -18,6 +18,21 @@ import { documentFormSchema, type DocumentFormValues, type DocType } from "./doc
 
 // ── service catalogue ─────────────────────────────────────────────────────────
 
+// Temporary safety-net so quote/invoice creation is never blocked if
+// /api/legal-entities fails or returns nothing.
+const FALLBACK_LEGAL_ENTITIES: LegalEntity[] = [
+  { id: "terminators_cc", name: "Terminators CC", tradingName: null, registrationNumber: null,
+    vatNumber: null, physicalAddress: null, postalAddress: null, phone: null, email: null,
+    bankName: null, bankAccount: null, bankBranch: null, bankAccountType: null,
+    defaultPaymentTerms: null, invoiceFooter: null, quoteFooter: null,
+    isActive: true, isDefault: true, createdAt: new Date(), updatedAt: new Date() } as any,
+  { id: "terminators_pty", name: "Terminators Pty Ltd", tradingName: null, registrationNumber: null,
+    vatNumber: null, physicalAddress: null, postalAddress: null, phone: null, email: null,
+    bankName: null, bankAccount: null, bankBranch: null, bankAccountType: null,
+    defaultPaymentTerms: null, invoiceFooter: null, quoteFooter: null,
+    isActive: true, isDefault: false, createdAt: new Date(), updatedAt: new Date() } as any,
+];
+
 const SERVICE_CATALOGUE = [
   { group: "Pest Control", items: [
     "General Pest Control Treatment",
@@ -131,10 +146,28 @@ export default function DocumentForm({
     data: legalEntities = [],
     isLoading: legalEntitiesLoading,
     isError: legalEntitiesError,
+    error: legalEntitiesFetchError,
     refetch: refetchLegalEntities,
   } = useQuery<LegalEntity[]>({
     queryKey: ["/api/legal-entities"],
   });
+
+  // TEMP DEBUG — remove once entity loading is confirmed fixed in production
+  useEffect(() => {
+    console.log("[IssuingEntity] Fetching /api/legal-entities…", { loading: legalEntitiesLoading });
+  }, [legalEntitiesLoading]);
+  useEffect(() => {
+    if (legalEntitiesError) console.log("[IssuingEntity] API error:", legalEntitiesFetchError);
+    else if (!legalEntitiesLoading) console.log("[IssuingEntity] API response:", legalEntities);
+  }, [legalEntities, legalEntitiesError, legalEntitiesLoading]);
+
+  // Real active entities from the API, or the hardcoded fallback if the API
+  // failed or returned no active entities — the picker must never be a dead end.
+  const usingFallbackEntities = !legalEntitiesLoading &&
+    (legalEntitiesError || legalEntities.filter(e => e.isActive).length === 0);
+  const availableEntities: LegalEntity[] = usingFallbackEntities
+    ? FALLBACK_LEGAL_ENTITIES
+    : legalEntities.filter(e => e.isActive);
 
   const dueDefault = new Date();
   dueDefault.setDate(dueDefault.getDate() + 30);
@@ -171,6 +204,19 @@ export default function DocumentForm({
   });
 
   const watchedOrigination = form.watch("origination");
+
+  // Auto-select default entity (real or fallback) once available, unless
+  // editing an existing document that already has one (via defaultValues).
+  useEffect(() => {
+    if (availableEntities.length > 0 && !form.getValues("legalEntityId")) {
+      const def = availableEntities.find(e => e.isDefault && e.isActive) ?? availableEntities.find(e => e.isActive);
+      if (def) {
+        form.setValue("legalEntityId", def.id);
+        form.setValue("legalEntityName", def.name);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableEntities]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lineItems" });
 
@@ -296,24 +342,23 @@ export default function DocumentForm({
                   <Select
                     onValueChange={id => {
                       field.onChange(id);
-                      const entity = legalEntities.find(e => e.id === id);
+                      const entity = availableEntities.find(e => e.id === id);
                       form.setValue("legalEntityName", entity?.name ?? "");
+                      console.log("[IssuingEntity] Selected entity:", { id, name: entity?.name, usingFallbackEntities });
                     }}
                     value={field.value ?? ""}
                   >
                     <FormControl>
-                      <SelectTrigger className={!field.value ? "border-orange-300" : ""} disabled={legalEntitiesLoading || legalEntitiesError}>
+                      <SelectTrigger className={!field.value ? "border-orange-300" : ""} disabled={legalEntitiesLoading}>
                         <SelectValue placeholder={
                           legalEntitiesLoading
                             ? "Loading entities…"
-                            : legalEntitiesError
-                            ? "Could not load issuing entities"
                             : "Select which legal entity is issuing this document…"
                         } />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {legalEntities.filter(e => e.isActive).map(e => (
+                      {availableEntities.map(e => (
                         <SelectItem key={e.id} value={e.id}>
                           <span className="font-medium">{e.name}</span>
                           {e.tradingName && <span className="text-muted-foreground ml-1 text-xs">t/a {e.tradingName}</span>}
@@ -321,27 +366,19 @@ export default function DocumentForm({
                       ))}
                     </SelectContent>
                   </Select>
-                  {legalEntitiesError && (
+                  {!legalEntitiesLoading && usingFallbackEntities && (
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-red-600">Could not load issuing entities. Please refresh or contact admin.</span>
+                      <span className="text-xs text-orange-600">
+                        {legalEntitiesError
+                          ? "Could not load issuing entities from the server — using default list."
+                          : "No active issuing entities returned by the server — using default list."}
+                      </span>
                       <button
                         type="button"
                         onClick={() => refetchLegalEntities()}
                         className="text-xs font-medium text-primary underline hover:no-underline"
                       >
-                        Reload entities
-                      </button>
-                    </div>
-                  )}
-                  {!legalEntitiesLoading && !legalEntitiesError && legalEntities.filter(e => e.isActive).length === 0 && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-muted-foreground italic">No active issuing entities found. Please contact admin.</span>
-                      <button
-                        type="button"
-                        onClick={() => refetchLegalEntities()}
-                        className="text-xs font-medium text-primary underline hover:no-underline"
-                      >
-                        Reload entities
+                        Retry
                       </button>
                     </div>
                   )}

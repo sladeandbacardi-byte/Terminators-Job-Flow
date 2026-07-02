@@ -1,0 +1,142 @@
+URGENT FIX: New Quote form still cannot select Issuing Entity.
+
+The Issuing Entity field still shows "Loading entities..." or cannot be opened/selected.
+This is blocking quote creation.
+
+Do not only seed the database. Debug the full frontend + backend flow.
+
+Check these exact things:
+
+1. Frontend query
+Find the New Quote modal/component and locate the Issuing Entity dropdown.
+
+Check:
+- What query key is used?
+- What API endpoint is called?
+- Is the query enabled?
+- Is it waiting for another value before running?
+- Is isLoading staying true forever?
+- Is the dropdown disabled while loading?
+- Is the dropdown value controlled incorrectly?
+- Is the onChange handler setting the selected entity id correctly?
+
+2. API endpoint
+Open the browser Network tab and check the request for issuing entities.
+
+Confirm:
+- Is the request being made?
+- What URL is being called?
+- Is it returning 200?
+- Is it returning an array?
+- Is it returning data in the shape the frontend expects?
+
+Expected response shape should be one of these, but frontend and backend must match:
+
+Option A:
+[
+  { "id": 1, "name": "Terminators CC" },
+  { "id": 2, "name": "Terminators Pty Ltd" }
+]
+
+OR Option B:
+{
+  "entities": [
+    { "id": 1, "name": "Terminators CC" },
+    { "id": 2, "name": "Terminators Pty Ltd" }
+  ]
+}
+
+Do not let the frontend expect one shape while the backend returns another.
+
+3. Backend route
+Create or fix the route:
+
+GET /api/issuing-entities
+
+It must return active entities.
+
+Example return:
+[
+  {
+    "id": 1,
+    "name": "Terminators CC",
+    "legalName": "Terminators CC",
+    "isActive": true
+  },
+  {
+    "id": 2,
+    "name": "Terminators Pty Ltd",
+    "legalName": "Terminators Pty Ltd",
+    "isActive": true
+  }
+]
+
+4. Database
+Confirm the actual production/development database has the table and rows.
+
+Table:
+issuing_entities
+
+Required rows:
+- Terminators CC
+- Terminators Pty Ltd
+
+If the table does not exist, create it.
+If the rows do not exist, seed them.
+
+5. Do not allow endless loading
+If entities fail to load, stop the loading state and show:
+"Could not load issuing entities."
+
+Add a fallback button:
+"Retry"
+
+6. Temporary hardcoded fallback
+Until the API is confirmed working, add a safe fallback list in the frontend:
+
+[
+  { id: "terminators_cc", name: "Terminators CC" },
+  { id: "terminators_pty", name: "Terminators Pty Ltd" }
+]
+
+If the API fails or returns empty, the dropdown must still allow the user to select:
+- Terminators CC
+- Terminators Pty Ltd
+
+This is important because quote creation must not be blocked by an entity lookup failure.
+
+7. Fix the dropdown disabled state
+The Issuing Entity dropdown must only be disabled while actively loading.
+If loading fails or returns empty, it must either show the fallback entities or show a retry message.
+It must never stay permanently disabled.
+
+8. Fix selected value handling
+When the user selects an entity, store:
+- issuingEntityId
+- issuingEntityName
+
+Make sure the value is not being reset when moving between quote tabs:
+1. Client Details
+2. Quote Items
+3. Notes & Summary
+
+9. Add console/debug logging temporarily
+Log:
+- "Fetching issuing entities..."
+- API response
+- Normalized entity list
+- Selected entity
+
+Remove these logs after confirming the fix.
+
+10. Test
+Test the New Quote form as Sheryl-Lyn Lee and Chané du Toit.
+
+Confirm:
+- Entity dropdown opens
+- Terminators CC can be selected
+- Terminators Pty Ltd can be selected
+- Selection remains when moving to Quote Items
+- Quote can be saved
+- Quote detail shows selected entity
+- Quote PDF/export shows selected entity

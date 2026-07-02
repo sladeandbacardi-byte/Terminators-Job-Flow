@@ -167,6 +167,21 @@ const emptyItem = (): QuoteLineItem => ({
 const fmtZAR = (n: number) =>
   `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// Temporary safety-net so quote creation is never blocked if /api/legal-entities
+// fails or returns nothing — used only when the real query errors or is empty.
+const FALLBACK_LEGAL_ENTITIES: import("@shared/schema").LegalEntity[] = [
+  { id: "terminators_cc", name: "Terminators CC", tradingName: null, registrationNumber: null,
+    vatNumber: null, physicalAddress: null, postalAddress: null, phone: null, email: null,
+    bankName: null, bankAccount: null, bankBranch: null, bankAccountType: null,
+    defaultPaymentTerms: null, invoiceFooter: null, quoteFooter: null,
+    isActive: true, isDefault: true, createdAt: new Date(), updatedAt: new Date() } as any,
+  { id: "terminators_pty", name: "Terminators Pty Ltd", tradingName: null, registrationNumber: null,
+    vatNumber: null, physicalAddress: null, postalAddress: null, phone: null, email: null,
+    bankName: null, bankAccount: null, bankBranch: null, bankAccountType: null,
+    defaultPaymentTerms: null, invoiceFooter: null, quoteFooter: null,
+    isActive: true, isDefault: false, createdAt: new Date(), updatedAt: new Date() } as any,
+];
+
 // ── NewQuoteDialog ────────────────────────────────────────────────────────────
 
 interface NewQuoteDialogProps {
@@ -187,18 +202,41 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
     data: legalEntities = [],
     isLoading: legalEntitiesLoading,
     isError: legalEntitiesError,
+    error: legalEntitiesFetchError,
     refetch: refetchLegalEntities,
   } = useQuery<import("@shared/schema").LegalEntity[]>({
     queryKey: ["/api/legal-entities"],
   });
 
-  // Auto-select default entity when list loads
+  // TEMP DEBUG — remove once entity loading is confirmed fixed in production
   useEffect(() => {
-    if (legalEntities.length > 0 && !legalEntityId) {
-      const def = legalEntities.find(e => e.isDefault && e.isActive) ?? legalEntities.find(e => e.isActive);
+    console.log("[IssuingEntity] Fetching /api/legal-entities…", { loading: legalEntitiesLoading });
+  }, [legalEntitiesLoading]);
+  useEffect(() => {
+    if (legalEntitiesError) console.log("[IssuingEntity] API error:", legalEntitiesFetchError);
+    else if (!legalEntitiesLoading) console.log("[IssuingEntity] API response:", legalEntities);
+  }, [legalEntities, legalEntitiesError, legalEntitiesLoading]);
+
+  // Real active entities from the API, or the hardcoded fallback if the API
+  // failed or returned no active entities — the picker must never be a dead end.
+  const usingFallbackEntities = !legalEntitiesLoading &&
+    (legalEntitiesError || legalEntities.filter(e => e.isActive).length === 0);
+  const availableEntities = usingFallbackEntities
+    ? FALLBACK_LEGAL_ENTITIES
+    : legalEntities.filter(e => e.isActive);
+
+  // Auto-select default entity when list (real or fallback) loads
+  useEffect(() => {
+    if (availableEntities.length > 0 && !legalEntityId) {
+      const def = availableEntities.find(e => e.isDefault && e.isActive) ?? availableEntities.find(e => e.isActive);
       if (def) { setLegalEntityId(def.id); setLegalEntityName(def.name); }
     }
-  }, [legalEntities]);
+  }, [availableEntities]);
+
+  // TEMP DEBUG — remove once entity loading is confirmed fixed in production
+  useEffect(() => {
+    if (legalEntityId) console.log("[IssuingEntity] Selected entity:", { legalEntityId, legalEntityName, usingFallbackEntities });
+  }, [legalEntityId, legalEntityName]);
 
   // Client fields
   const [companyName,     setCompanyName]     = useState("");
@@ -336,33 +374,30 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
                 <span className="text-sm font-medium text-gray-700">Issuing Entity <span className="text-red-500">*</span></span>
                 {!legalEntityId && <span className="text-xs text-red-500">— please select one</span>}
               </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                {legalEntitiesLoading ? (
+              {legalEntitiesLoading && (
+                <div className="flex flex-wrap gap-2 items-center">
                   <span className="text-xs text-muted-foreground italic">Loading entities…</span>
-                ) : legalEntitiesError ? (
-                  <>
-                    <span className="text-xs text-red-600">Could not load issuing entities. Please refresh or contact admin.</span>
-                    <button
-                      type="button"
-                      onClick={() => refetchLegalEntities()}
-                      className="text-xs font-medium text-primary underline hover:no-underline"
-                    >
-                      Reload entities
-                    </button>
-                  </>
-                ) : legalEntities.filter(e => e.isActive).length === 0 ? (
-                  <>
-                    <span className="text-xs text-muted-foreground italic">No active issuing entities found. Please contact admin.</span>
-                    <button
-                      type="button"
-                      onClick={() => refetchLegalEntities()}
-                      className="text-xs font-medium text-primary underline hover:no-underline"
-                    >
-                      Reload entities
-                    </button>
-                  </>
-                ) : (
-                  legalEntities.filter(e => e.isActive).map(e => (
+                </div>
+              )}
+              {!legalEntitiesLoading && usingFallbackEntities && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-orange-600">
+                    {legalEntitiesError
+                      ? "Could not load issuing entities from the server — using default list."
+                      : "No active issuing entities returned by the server — using default list."}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => refetchLegalEntities()}
+                    className="text-xs font-medium text-primary underline hover:no-underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!legalEntitiesLoading && (
+                <div className="flex flex-wrap gap-2">
+                  {availableEntities.map(e => (
                     <button
                       key={e.id}
                       type="button"
@@ -376,9 +411,9 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
                       {e.name}
                       {e.isDefault && <span className="ml-1 text-xs opacity-70">(default)</span>}
                     </button>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="rounded-md border bg-muted/40 p-3 mb-5">
