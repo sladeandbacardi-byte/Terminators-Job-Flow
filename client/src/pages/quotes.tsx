@@ -175,7 +175,7 @@ const FALLBACK_LEGAL_ENTITIES: import("@shared/schema").LegalEntity[] = [
     bankName: null, bankAccount: null, bankBranch: null, bankAccountType: null,
     defaultPaymentTerms: null, invoiceFooter: null, quoteFooter: null,
     isActive: true, isDefault: true, createdAt: new Date(), updatedAt: new Date() } as any,
-  { id: "terminators_pty", name: "Terminators Pty Ltd", tradingName: null, registrationNumber: null,
+  { id: "terminators_pty_ltd", name: "Terminators Pty Ltd", tradingName: null, registrationNumber: null,
     vatNumber: null, physicalAddress: null, postalAddress: null, phone: null, email: null,
     bankName: null, bankAccount: null, bankBranch: null, bankAccountType: null,
     defaultPaymentTerms: null, invoiceFooter: null, quoteFooter: null,
