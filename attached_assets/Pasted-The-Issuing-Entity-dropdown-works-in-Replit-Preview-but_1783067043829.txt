@@ -1,0 +1,99 @@
+The Issuing Entity dropdown works in Replit Preview, but it does NOT work on the deployed Railway link.
+
+In Railway, the New Quote form still shows:
+"Loading entities..."
+
+This means the issue is likely one of the following:
+- Railway is running an old build
+- Railway did not redeploy the latest code
+- Railway build cache is serving an old frontend bundle
+- Railway is connected to a different database
+- Railway database does not have issuing_entities seeded
+- Railway environment variables are different from Replit
+- The Railway API route for issuing entities is failing
+- The frontend is calling the wrong API URL in production
+
+Please debug the Railway production deployment specifically.
+
+Required checks:
+
+1. Confirm Railway has deployed the latest commit/code.
+Force a fresh Railway redeploy.
+
+2. Clear/rebuild the frontend bundle.
+Make sure Railway is not serving an old cached build.
+
+3. Check Railway logs when opening the New Quote form.
+Look for the request to load issuing entities.
+
+4. In Railway production, test this API route directly:
+
+GET /api/issuing-entities
+
+Expected response:
+[
+  { "id": "terminators_cc", "name": "Terminators CC" },
+  { "id": "terminators_pty_ltd", "name": "Terminators Pty Ltd" }
+]
+
+If the route fails, fix the backend route in production.
+
+5. Check Railway environment variables.
+Confirm Railway has the correct:
+- DATABASE_URL
+- NODE_ENV
+- PORT
+- any API base URL variables
+- any frontend VITE_API_URL or equivalent variable
+
+6. Confirm the frontend in production is calling the correct API path.
+
+The frontend should call a relative path:
+"/api/issuing-entities"
+
+Do not hardcode localhost.
+Do not hardcode the Replit preview URL.
+Do not call a development-only API URL.
+
+7. Check Railway production database.
+Confirm the issuing entities exist in the Railway database, not just the Replit database.
+
+Required rows:
+- Terminators CC
+- Terminators Pty Ltd
+
+8. If production database does not have these rows, seed them in Railway.
+
+9. Add a production-safe frontend fallback.
+Even if the production API fails, the dropdown must still show:
+
+const fallbackIssuingEntities = [
+  { id: "terminators_cc", name: "Terminators CC" },
+  { id: "terminators_pty_ltd", name: "Terminators Pty Ltd" },
+];
+
+The Issuing Entity dropdown must never stay stuck on "Loading entities..." in production.
+
+10. Make sure the dropdown uses this logic:
+
+- If API returns entities, use API entities.
+- If API fails, use fallback entities.
+- If API returns empty, use fallback entities.
+- Never leave the field permanently disabled.
+
+11. Test on the actual Railway URL, not Replit Preview.
+
+Test steps:
+- Open Railway deployed app
+- Go to Quotes
+- Click New Quote
+- Confirm Issuing Entity shows Terminators CC by default
+- Confirm dropdown opens
+- Select Terminators Pty Ltd
+- Move to Quote Items
+- Move back to Client Details
+- Confirm selected entity is retained
+- Save quote
+- Confirm quote displays selected entity
+
+Do not mark this fixed unless it works on the Railway production link.
