@@ -33,6 +33,10 @@ import { createSageService } from "./sage-integration";
 import { AuthService, requireAuth, logActivity, type AuthenticatedRequest } from "./auth-service";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -4760,6 +4764,30 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       : "warning";
 
     res.json({ overall, checkedAt: new Date().toISOString(), checks });
+  });
+
+  // ── TEMPORARY: One-time production schema sync ──────────────────────────
+  // Runs `drizzle-kit push` (the same command as `npm run db:push`) against
+  // whatever DATABASE_URL this server is currently running with. This is a
+  // manual, admin-triggered, one-time utility to bring a production database
+  // schema in sync with shared/schema.ts. It does NOT run automatically on
+  // startup. Remove this route once the schema has been confirmed in sync.
+  app.post("/api/admin/run-db-push", requireAuth, requireAdmin, logActivity("admin_db_push", "database"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { stdout, stderr } = await execAsync("npx drizzle-kit push --force", {
+        cwd: process.cwd(),
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: process.env,
+      });
+      res.json({ success: true, output: [stdout, stderr].filter(Boolean).join("\n") });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        error: err.message,
+        output: [err.stdout, err.stderr].filter(Boolean).join("\n"),
+      });
+    }
   });
 
   // ── Treatment Reports ─────────────────────────────────────────────────────

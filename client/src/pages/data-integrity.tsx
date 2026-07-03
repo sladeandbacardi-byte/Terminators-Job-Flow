@@ -288,6 +288,104 @@ function DatabaseStatusSection() {
   );
 }
 
+// ── TEMPORARY: One-time Database Update (schema sync) ───────────────────────────
+// Admin-only, manual, one-time trigger for `npm run db:push`. This does NOT run
+// automatically — it only runs when this button is clicked. Remove this section
+// (and the matching server route) once the production schema is confirmed in sync.
+function DbPushSection() {
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; output?: string; error?: string } | null>(null);
+
+  async function runDbPush() {
+    setConfirmOpen(false);
+    setRunning(true);
+    setResult(null);
+    try {
+      const resp = await apiRequest("POST", "/api/admin/run-db-push");
+      const json = await resp.json();
+      setResult(json);
+      if (json.success) {
+        toast({ title: "Database update complete", description: "The database schema has been updated to match the app." });
+      } else {
+        toast({ title: "Database update failed", description: json.error ?? "Unknown error", variant: "destructive" });
+      }
+    } catch (err: any) {
+      const message = err?.message ?? "Unknown error";
+      setResult({ success: false, error: message });
+      toast({ title: "Database update failed", description: message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <Card className="border-amber-300 bg-amber-50">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600" />
+          <div>
+            <CardTitle className="text-base text-amber-900">Run Database Update</CardTitle>
+            <CardDescription className="text-amber-800 text-xs">
+              Temporary tool: updates this server's database structure to match the app (adds any missing
+              tables/columns). Only run this if you were told a database update is needed. Safe to run more
+              than once — it only adds what's missing, it does not delete existing data.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Button
+          variant="outline"
+          className="border-amber-400 text-amber-900 hover:bg-amber-100"
+          onClick={() => setConfirmOpen(true)}
+          disabled={running}
+        >
+          {running ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Database className="h-4 w-4 mr-1.5" />}
+          {running ? "Running database update…" : "Run Database Update"}
+        </Button>
+
+        {result && (
+          <div className={`rounded-lg border p-3 text-sm ${result.success ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`}>
+            <p className="font-medium flex items-center gap-1.5">
+              {result.success ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {result.success ? "Update finished successfully" : "Update failed"}
+            </p>
+            {result.error && <p className="mt-1 text-xs">{result.error}</p>}
+            {result.output && (
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-white/60 p-2 text-xs">
+                {result.output}
+              </pre>
+            )}
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Run database update?
+            </DialogTitle>
+            <DialogDescription>
+              This will update this database's structure to match the current app (adding any missing tables
+              or columns). It will not delete any existing data. This may take up to a minute.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={runDbPush}>
+              Yes, run it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 // ── Health Check Tab ────────────────────────────────────────────────────────────
 function HealthCheckTab() {
   const { toast } = useToast();
@@ -1236,6 +1334,9 @@ export default function DataIntegrity() {
 
             {/* Database Status — always visible at the top */}
             <DatabaseStatusSection />
+
+            {/* TEMPORARY — remove once production schema is confirmed in sync */}
+            <DbPushSection />
 
             <Tabs defaultValue="health-check" className="space-y-4">
               <TabsList className="flex-wrap h-auto gap-1">
