@@ -16,6 +16,10 @@ params, then remove it immediately after capturing proof:
 - Auto-click: add a `data-testid` to the target element and, after it renders, call
   `element.click()` on the real DOM node (not just calling the state setter directly) —
   this exercises the actual onClick wiring, not just the underlying logic.
+- Radix UI primitives (Tabs, Select, etc.) often don't respond to a plain synthetic
+  `.click()` — dispatch a full pointer sequence instead: `pointerdown`, `mousedown`,
+  `pointerup`, `mouseup`, then `click`. Radix `Select` sometimes works with plain
+  `.click()` alone, but Radix `Tabs` triggers reliably need the full sequence.
 - Capture proof via the screenshot tool (visual state) plus `refresh_all_logs` /
   browser console output (via `console.log` in the harness) for a textual trail.
 

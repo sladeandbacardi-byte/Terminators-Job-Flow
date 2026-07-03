@@ -217,13 +217,13 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
     else if (!legalEntitiesLoading) console.log("[IssuingEntity] API response:", legalEntities);
   }, [legalEntities, legalEntitiesError, legalEntitiesLoading]);
 
-  // Real active entities from the API, or the hardcoded fallback if the API
-  // failed or returned no active entities — the picker must never be a dead end.
-  const usingFallbackEntities = !legalEntitiesLoading &&
-    (legalEntitiesError || legalEntities.filter(e => e.isActive).length === 0);
-  const availableEntities = usingFallbackEntities
-    ? FALLBACK_LEGAL_ENTITIES
-    : legalEntities.filter(e => e.isActive);
+  // The dropdown is populated immediately from the hardcoded fallback list and
+  // is upgraded in place once the real active entities arrive — it is NEVER
+  // gated on the API call being in flight, so it can never get stuck showing
+  // a loading state or be left unusable if the request is slow or fails.
+  const realActiveEntities = legalEntities.filter(e => e.isActive);
+  const availableEntities = realActiveEntities.length > 0 ? realActiveEntities : FALLBACK_LEGAL_ENTITIES;
+  const usingFallbackEntities = availableEntities === FALLBACK_LEGAL_ENTITIES;
 
   // Auto-select default entity when list (real or fallback) loads
   useEffect(() => {
@@ -359,32 +359,52 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
 
         <Tabs value={tab} onValueChange={setTab} className="flex-1 overflow-hidden flex flex-col min-h-0">
           <TabsList className="mx-6 mt-3 mb-1 w-auto self-start shrink-0">
-            <TabsTrigger value="client">1. Client Details</TabsTrigger>
-            <TabsTrigger value="items">2. Quote Items</TabsTrigger>
-            <TabsTrigger value="summary">3. Notes &amp; Summary</TabsTrigger>
+            <TabsTrigger value="client" data-testid="tab-client">1. Client Details</TabsTrigger>
+            <TabsTrigger value="items" data-testid="tab-items">2. Quote Items</TabsTrigger>
+            <TabsTrigger value="summary" data-testid="tab-summary">3. Notes &amp; Summary</TabsTrigger>
           </TabsList>
 
           {/* ── TAB 1: Client ──────────────────────────────────────────── */}
           <TabsContent value="client" className="flex-1 overflow-y-auto px-6 pb-6 mt-2">
 
-            {/* Issuing Entity — pill buttons, no dropdown/portal, always works inside Dialog */}
+            {/* Issuing Entity — always a live, working dropdown. It is populated
+                from the hardcoded fallback list immediately, upgraded to the
+                real API list once it arrives, and is never disabled. */}
             <div className={`rounded-md border p-3 mb-4 ${!legalEntityId ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <Building2 className="h-4 w-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">Issuing Entity <span className="text-red-500">*</span></span>
                 {!legalEntityId && <span className="text-xs text-red-500">— please select one</span>}
               </div>
-              {legalEntitiesLoading && (
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs text-muted-foreground italic">Loading entities…</span>
-                </div>
-              )}
-              {!legalEntitiesLoading && usingFallbackEntities && (
-                <div className="flex items-center gap-2 mb-2">
+              <Select
+                value={legalEntityId}
+                onValueChange={id => {
+                  const entity = availableEntities.find(e => e.id === id);
+                  setLegalEntityId(id);
+                  setLegalEntityName(entity?.name ?? "");
+                  console.log("[IssuingEntity] Selected entity:", { id, name: entity?.name, usingFallbackEntities });
+                }}
+              >
+                <SelectTrigger className="bg-white" data-testid="select-issuing-entity">
+                  <SelectValue placeholder="Select issuing entity…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEntities.map(e => (
+                    <SelectItem key={e.id} value={e.id} data-testid={`entity-option-${e.id}`}>
+                      {e.name}
+                      {e.isDefault && <span className="ml-1 text-xs opacity-70">(default)</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {usingFallbackEntities && (
+                <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-orange-600">
                     {legalEntitiesError
                       ? "Could not load issuing entities from the server — using default list."
-                      : "No active issuing entities returned by the server — using default list."}
+                      : legalEntitiesLoading
+                        ? "Loading full entity details in the background — default list shown for now."
+                        : "No active issuing entities returned by the server — using default list."}
                   </span>
                   <button
                     type="button"
@@ -393,26 +413,6 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
                   >
                     Retry
                   </button>
-                </div>
-              )}
-              {!legalEntitiesLoading && (
-                <div className="flex flex-wrap gap-2">
-                  {availableEntities.map(e => (
-                    <button
-                      key={e.id}
-                      type="button"
-                      data-testid={`entity-pill-${e.id}`}
-                      onClick={() => { setLegalEntityId(e.id); setLegalEntityName(e.name); }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                        legalEntityId === e.id
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-white text-gray-700 border-gray-300 hover:border-primary hover:text-primary"
-                      }`}
-                    >
-                      {e.name}
-                      {e.isDefault && <span className="ml-1 text-xs opacity-70">(default)</span>}
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
@@ -643,7 +643,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setTab("items")}>← Back</Button>
-              <Button onClick={handleSubmit} disabled={mutation.isPending} className="gap-2">
+              <Button onClick={handleSubmit} disabled={mutation.isPending} className="gap-2" data-testid="button-save-quote">
                 <FileText className="h-4 w-4" />
                 {mutation.isPending ? "Creating…" : "Create Quote"}
               </Button>

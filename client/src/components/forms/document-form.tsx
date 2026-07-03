@@ -161,13 +161,13 @@ export default function DocumentForm({
     else if (!legalEntitiesLoading) console.log("[IssuingEntity] API response:", legalEntities);
   }, [legalEntities, legalEntitiesError, legalEntitiesLoading]);
 
-  // Real active entities from the API, or the hardcoded fallback if the API
-  // failed or returned no active entities — the picker must never be a dead end.
-  const usingFallbackEntities = !legalEntitiesLoading &&
-    (legalEntitiesError || legalEntities.filter(e => e.isActive).length === 0);
-  const availableEntities: LegalEntity[] = usingFallbackEntities
-    ? FALLBACK_LEGAL_ENTITIES
-    : legalEntities.filter(e => e.isActive);
+  // The dropdown is populated immediately from the hardcoded fallback list and
+  // is upgraded in place once the real active entities arrive — it is NEVER
+  // gated on the API call being in flight, so it can never get stuck showing
+  // a loading state or be left unusable if the request is slow or fails.
+  const realActiveEntities = legalEntities.filter(e => e.isActive);
+  const availableEntities: LegalEntity[] = realActiveEntities.length > 0 ? realActiveEntities : FALLBACK_LEGAL_ENTITIES;
+  const usingFallbackEntities = availableEntities === FALLBACK_LEGAL_ENTITIES;
 
   const dueDefault = new Date();
   dueDefault.setDate(dueDefault.getDate() + 30);
@@ -349,29 +349,27 @@ export default function DocumentForm({
                     value={field.value ?? ""}
                   >
                     <FormControl>
-                      <SelectTrigger className={!field.value ? "border-orange-300" : ""} disabled={legalEntitiesLoading}>
-                        <SelectValue placeholder={
-                          legalEntitiesLoading
-                            ? "Loading entities…"
-                            : "Select which legal entity is issuing this document…"
-                        } />
+                      <SelectTrigger className={!field.value ? "border-orange-300" : ""} data-testid="select-issuing-entity">
+                        <SelectValue placeholder="Select which legal entity is issuing this document…" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {availableEntities.map(e => (
-                        <SelectItem key={e.id} value={e.id}>
+                        <SelectItem key={e.id} value={e.id} data-testid={`entity-option-${e.id}`}>
                           <span className="font-medium">{e.name}</span>
                           {e.tradingName && <span className="text-muted-foreground ml-1 text-xs">t/a {e.tradingName}</span>}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {!legalEntitiesLoading && usingFallbackEntities && (
+                  {usingFallbackEntities && (
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs text-orange-600">
                         {legalEntitiesError
                           ? "Could not load issuing entities from the server — using default list."
-                          : "No active issuing entities returned by the server — using default list."}
+                          : legalEntitiesLoading
+                            ? "Loading full entity details in the background — default list shown for now."
+                            : "No active issuing entities returned by the server — using default list."}
                       </span>
                       <button
                         type="button"

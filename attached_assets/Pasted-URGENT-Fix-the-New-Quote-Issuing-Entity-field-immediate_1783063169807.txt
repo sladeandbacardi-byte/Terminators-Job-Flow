@@ -1,0 +1,67 @@
+URGENT: Fix the New Quote Issuing Entity field immediately.
+
+The New Quote form is still stuck on:
+"Loading entities..."
+
+The user cannot select an issuing entity and cannot create a quote.
+
+Stop relying only on the API to load issuing entities.
+
+For now, hardcode the issuing entity dropdown directly in the New Quote form with these two options:
+
+1. Terminators CC
+2. Terminators Pty Ltd
+
+The Issuing Entity field must be a normal working dropdown/select field.
+
+Requirements:
+
+1. Remove the endless "Loading entities..." state from the Issuing Entity field.
+
+2. Replace it with a working select/dropdown containing:
+- Terminators CC
+- Terminators Pty Ltd
+
+3. Set default value to:
+- Terminators CC
+
+4. The user must be able to change the value to:
+- Terminators Pty Ltd
+
+5. Store the selected value when creating the quote:
+- issuingEntityName
+- issuingEntityId if needed
+
+Use these frontend fallback values:
+
+const issuingEntities = [
+  { id: "terminators_cc", name: "Terminators CC" },
+  { id: "terminators_pty_ltd", name: "Terminators Pty Ltd" }
+];
+
+6. Do not disable the dropdown.
+
+7. Do not show "Loading entities..." unless the API is actually loading and the fallback list is not available.
+
+8. Even if the API fails, the dropdown must still work using the hardcoded fallback list.
+
+9. Make sure the selected entity remains selected when moving between:
+- Client Details
+- Quote Items
+- Notes & Summary
+
+10. Make sure quote creation does not fail because of missing issuing entity.
+
+11. The quote detail page, quote list, accepted work page and quote PDF/export must show the selected issuing entity.
+
+12. Test in the actual browser UI:
+- Open New Quote
+- Confirm Terminators CC is visible by default
+- Select Terminators Pty Ltd
+- Move to Quote Items
+- Move back to Client Details
+- Confirm selected entity is still visible
+- Save the quote
+- Confirm the saved quote displays the selected entity
+
+Do not mark this complete until the dropdown can actually be clicked and changed in the browser.
