@@ -5,9 +5,53 @@ import { db } from './db';
 import { adminUsers, userSessions, activityLogs } from '@shared/schema';
 import { eq, and, gt } from 'drizzle-orm';
 import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/schema';
+import { getDashboardRole } from '@shared/dashboardRole';
+import { storage } from './storage';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'terminators_default_secret_key_2024';
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Tokens issued by the app's real sign-in flow (the "choose your profile"
+// screen at POST /api/auth/login) look like `token_<workerId>_<issuedAtMs>`.
+// They are NOT JWTs and have no row in `user_sessions`, so they must be
+// validated separately from the (currently unused in the UI) admin
+// username/password login handled by AuthService.authenticateUser below.
+const WORKER_TOKEN_RE = /^token_(.+)_(\d{10,})$/;
+const WORKER_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours, mirrors SESSION_DURATION
+
+async function resolveWorkerToken(token: string): Promise<AdminUser | null> {
+  const match = token.match(WORKER_TOKEN_RE);
+  if (!match) return null;
+
+  const [, workerId, issuedAtStr] = match;
+  const issuedAt = Number(issuedAtStr);
+  if (!issuedAt || Date.now() - issuedAt > WORKER_TOKEN_MAX_AGE) return null;
+
+  try {
+    const worker = await storage.getWorker(workerId);
+    if (!worker || worker.isActive === false) return null;
+
+    const effectiveRole = getDashboardRole({ departmentId: worker.departmentId, role: worker.role });
+    const [firstName, ...rest] = (worker.name || '').split(' ');
+
+    return {
+      id: worker.id,
+      username: worker.name,
+      email: worker.email || '',
+      passwordHash: '',
+      firstName: firstName || worker.name,
+      lastName: rest.join(' '),
+      role: effectiveRole,
+      isActive: true,
+      lastLoginAt: null,
+      createdAt: worker.createdAt ?? new Date(),
+      updatedAt: new Date(),
+    } as AdminUser;
+  } catch (error) {
+    console.error('Worker token resolution error:', error);
+    return null;
+  }
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: AdminUser;
@@ -186,6 +230,14 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
 
     if (!token) {
       return res.status(401).json({ message: 'Authentication token required' });
+    }
+
+    // Tokens from the app's real login screen (worker profile picker) use a
+    // different format than the JWT-based admin session — check that first.
+    const workerUser = await resolveWorkerToken(token);
+    if (workerUser) {
+      req.user = workerUser;
+      return next();
     }
 
     const user = await AuthService.validateSession(token);

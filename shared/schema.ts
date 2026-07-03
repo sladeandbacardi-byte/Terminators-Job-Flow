@@ -611,7 +611,10 @@ export const adminUsers = pgTable("admin_users", {
 // Activity logs for tracking admin user actions
 export const activityLogs = pgTable("activity_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => adminUsers.id),
+  // No FK reference: this app has two parallel user types (admin_users and
+  // workers), and this column records the id of whichever one performed the
+  // action, so it can't be constrained to a single table.
+  userId: varchar("user_id").notNull(),
   action: varchar("action").notNull(), // login, logout, create_invoice, update_client, etc.
   resource: varchar("resource"), // invoices, clients, workers, etc.
   resourceId: varchar("resource_id"), // specific record ID
