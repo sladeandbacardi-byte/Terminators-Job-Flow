@@ -1,0 +1,111 @@
+FIX RAILWAY BUILD PROPERLY BEFORE RECREATING RAILWAY
+
+Railway is still failing to build.
+
+Current Railway error:
+
+npm install --include=dev && npm run build
+
+npm error Exit handler never called!
+
+Then during build:
+
+sh: 1: vite: not found
+
+This means the install/build setup is still broken. Please fix the repository so Railway can build cleanly from a fresh clone.
+
+Do not rely on deleting and recreating Railway until the repo itself builds properly.
+
+Please do the following:
+
+1. Confirm Vite is installed
+
+Make sure these are in package.json devDependencies:
+
+vite
+typescript
+tsx
+esbuild
+drizzle-kit
+
+2. Confirm build scripts
+
+package.json must include:
+
+"scripts": {
+"dev": "tsx server/index.ts",
+"build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+"start": "NODE_ENV=production node dist/index.js",
+"db:push": "drizzle-kit push"
+}
+
+Adjust paths only if the app structure is different.
+
+3. Fix npm install problem
+
+Railway says npm may be running out of memory during install.
+
+Create or update .npmrc in the project root:
+
+maxsockets=3
+production=false
+legacy-peer-deps=true
+
+If still failing, change maxsockets to:
+
+maxsockets=1
+
+4. Regenerate package-lock.json cleanly
+
+Please clean the dependency lock file.
+
+Steps:
+
+* Delete node_modules
+* Delete package-lock.json
+* Run npm install
+* Confirm npm run build works locally/Replit
+* Commit the new package-lock.json
+
+5. Make sure devDependencies are available during Railway build
+
+Railway build command should be:
+
+npm install --include=dev --legacy-peer-deps && npm run build
+
+Start command should be:
+
+npm run start
+
+6. Do not use npm ci for now
+
+Railway’s npm ci is failing with:
+Exit handler never called
+
+Use npm install for now.
+
+7. Do not run database commands during build
+
+Do not run:
+npm run db:push
+npx drizzle-kit push
+drizzle-kit push
+
+during build or normal startup.
+
+8. Database setup must be manual after successful deploy:
+
+npm run db:push
+
+9. Confirm app listens on Railway port
+
+Server must use:
+
+const port = process.env.PORT || 5000;
+server.listen(port, "0.0.0.0", ...)
+
+10. After fixing, push all changes to GitHub.
+
+11. Only after GitHub builds cleanly should we redeploy Railway.
+
+END
