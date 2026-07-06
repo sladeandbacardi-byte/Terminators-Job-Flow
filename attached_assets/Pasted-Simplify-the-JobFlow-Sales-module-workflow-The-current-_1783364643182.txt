@@ -1,0 +1,175 @@
+Simplify the JobFlow Sales module workflow.
+
+The current Sales module is too complicated. Leads are disappearing when the user clicks "Site Done", likely because the lead status changes to a stage that is not visible on the current board.
+
+Redesign the Sales workflow to be simple:
+
+Lead → Quote → Job → Invoice
+
+IMPORTANT:
+Appointments, site visits, site assessments, notes and follow-ups must be activities inside the lead or quote.
+They must not be separate main pipeline stages that make the lead disappear.
+
+SALES MENU:
+Keep the Sales menu simple:
+- Leads
+- Quotes
+- Accepted Work
+- Diary
+- Clients
+- Follow-ups
+- Reports
+- Email Center
+
+LEAD PIPELINE:
+Replace the current complicated lead stages with these simple statuses only:
+
+1. New
+2. Contacted
+3. Appointment Booked
+4. Quote Required
+5. Quoted
+6. Lost
+7. Converted
+
+Do not use hidden statuses such as:
+- Site Assessment Done
+- Contract Pending
+- Client Registration Pending
+- Installation Scheduled
+- Invoiced
+- After-sales Follow-up Due
+
+Those items must be handled inside the relevant lead, quote, accepted work, job or invoice record, not as lead board stages.
+
+LEAD ACTIONS:
+Each lead card must have these actions:
+- Mark Contacted
+- Book Appointment
+- Mark Site Visit Done
+- Create Quote
+- Mark Lost
+- Convert to Client
+
+When the user clicks "Mark Site Visit Done":
+- Do not move the lead to a hidden board stage.
+- Keep the lead visible.
+- Set a field called siteVisitDone = true.
+- Add a timeline activity: "Site visit completed".
+- Change the visible lead status to "Quote Required".
+- Show the lead in the "Quote Required" column.
+
+When the user clicks "Book Appointment":
+- Create a diary appointment.
+- Keep the lead visible.
+- Set the visible lead status to "Appointment Booked".
+- Add a timeline activity: "Appointment booked".
+
+When the user clicks "Create Quote":
+- Create a quote linked to the lead.
+- Set the lead status to "Quoted".
+- Keep the quote visible on the Quotes page.
+- Keep the lead visible or show it as linked to quote.
+- Do not delete or hide the lead.
+
+When a quote is accepted:
+- Set quote status to "Accepted".
+- Set the linked lead status to "Converted".
+- Create an Accepted Work item.
+- Accepted Work will then handle contract, registration, scheduling and invoice handover.
+
+QUOTES:
+Quotes must have simple statuses:
+- Draft
+- Sent
+- Follow-up Due
+- Accepted
+- Lost
+- Converted to Job
+
+When a quote is accepted:
+- Show button: Convert to Job
+- Create a job/service task
+- Link the job to the quote
+- Link the quote to the client
+- Move the quote to Accepted Work
+
+ACCEPTED WORK:
+Accepted Work must handle the things that happen after the quote is accepted:
+- Client registration needed
+- Contract needed
+- Contract sent
+- Contract signed
+- Job/service needs scheduling
+- Job scheduled
+- Job completed
+- Ready to invoice
+- Invoiced
+
+Do not show these as lead stages.
+
+DIARY:
+Diary must show appointments and site visits.
+Diary appointments must link back to the lead or quote.
+Completing a diary appointment must not hide the lead.
+Completing a site visit should update the lead to "Quote Required".
+
+FOLLOW-UPS:
+Follow-ups must be tasks linked to leads or quotes.
+They must not be pipeline stages that remove the lead from view.
+
+CLIENTS:
+Clients must be created or updated when:
+- A lead is converted
+- A quote is accepted
+- A job is created
+
+REPORTS:
+Reports can show:
+- Leads created
+- Quotes sent
+- Quotes accepted
+- Quotes lost
+- Jobs created
+- Invoices created
+- Sales by rep
+- Commission report
+
+BUG FIX:
+Find all places where lead status is set.
+
+Make sure every possible lead status maps to a visible board column.
+
+If there are existing old statuses in the database, map them as follows:
+- site_assessment_done → Quote Required
+- assessment_done → Quote Required
+- site_done → Quote Required
+- follow_up_due → Quoted
+- contract_pending → Converted
+- client_registration_pending → Converted
+- installation_scheduled → Converted
+- invoiced → Converted
+- after_sales_follow_up_due → Converted
+
+No lead should disappear from the Leads page because of an unmapped status.
+
+Add a fallback column called "Other / Needs Review" temporarily.
+If a lead has an unknown status, show it in this column instead of hiding it.
+
+TESTING:
+Test the exact flow:
+1. Create new lead.
+2. Mark Contacted.
+3. Book Appointment.
+4. Mark Site Visit Done.
+5. Confirm lead remains visible under Quote Required.
+6. Create Quote.
+7. Confirm quote appears under Quotes.
+8. Mark Quote Accepted.
+9. Confirm lead becomes Converted.
+10. Confirm Accepted Work item is created.
+11. Convert Accepted Work to Job.
+12. Complete Job.
+13. Mark Ready to Invoice.
+
+Do not mark this fixed until the lead remains visible after clicking Site Visit Done.

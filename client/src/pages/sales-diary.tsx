@@ -97,7 +97,7 @@ export default function SalesDiary() {
       siteAddress: params.get("siteAddress") || "",
       leadId: params.get("leadId") || undefined,
       appointmentType: (params.get("appointmentType") as any) || "new_lead_meeting",
-      title: `${params.get("appointmentType") === "quote_followup" ? "Quote Follow-up" : "New Lead Meeting"} – ${clientName}`,
+      title: `${TYPE_LABELS[params.get("appointmentType") || "new_lead_meeting"] || "New Lead Meeting"} – ${clientName}`,
     });
     setEditAppt(null);
     setShowForm(true);
@@ -644,6 +644,11 @@ export default function SalesDiary() {
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>Mark as Completed — {completeAppt.clientName}</DialogTitle></DialogHeader>
             <div className="space-y-3 py-1">
+              {completeAppt.appointmentType === "site_visit" && (
+                <p className="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded px-2 py-1.5">
+                  Completing this site visit will move the lead to "Quote Required" on the Leads board.
+                </p>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">What happened?</Label>
                 <Textarea value={completionData.completionNote} onChange={e => setCompletionData(d => ({ ...d, completionNote: e.target.value }))} rows={3} placeholder="Brief summary of the appointment…" />

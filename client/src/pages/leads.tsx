@@ -15,13 +15,17 @@ import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase,
   XCircle, ArrowRight, Calendar, User, Building2, AlertCircle,
   Send, Search, X, Megaphone, Download, BookOpen, Flag,
+  PhoneCall, CalendarClock, ClipboardCheck, FileText, UserCheck,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { QuoteSubmission, Worker, Department } from "@shared/schema";
-import { ORIGINATION_OPTIONS, ORIGINATION_LABELS, LEAD_STAGES, LEAD_STAGE_LABELS } from "@shared/schema";
-import type { LeadStage } from "@shared/schema";
+import {
+  ORIGINATION_OPTIONS, ORIGINATION_LABELS,
+  LEAD_STATUSES, LEAD_STATUS_LABELS, NEEDS_REVIEW_STATUS, normalizeLeadStatus,
+} from "@shared/schema";
+import type { LeadStatus } from "@shared/schema";
 import { exportLeads } from "@/lib/data-export";
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -40,21 +44,30 @@ const PRIORITY_OPTIONS = [
   { value: "high",   label: "High",   cls: "bg-red-100 text-red-700" },
 ];
 
-// Active pipeline stages shown in the kanban (pre-quoting)
-const ACTIVE_PIPELINE_STAGES: LeadStage[] = ["new","contacted","appointment_scheduled","quote_needed"];
-
-// All stages considered active (including post-site-assessment)
-const ALL_ACTIVE_STAGES = [
-  "new","contacted","appointment_scheduled","site_assessment_done",
-  "quote_needed","quote_sent","follow_up_due",
+// The 7 canonical board columns, in pipeline order.
+const PIPELINE: { status: LeadStatus; label: string; color: string; dotColor: string }[] = [
+  { status: "new",                label: "New",                color: "bg-blue-50 border-blue-200",     dotColor: "bg-blue-500"   },
+  { status: "contacted",          label: "Contacted",          color: "bg-indigo-50 border-indigo-200", dotColor: "bg-indigo-500" },
+  { status: "appointment_booked", label: "Appointment Booked", color: "bg-purple-50 border-purple-200", dotColor: "bg-purple-500" },
+  { status: "quote_required",     label: "Quote Required",     color: "bg-amber-50 border-amber-200",   dotColor: "bg-amber-500"  },
+  { status: "quoted",             label: "Quoted",              color: "bg-yellow-50 border-yellow-200", dotColor: "bg-yellow-500" },
+  { status: "lost",               label: "Lost",                color: "bg-red-50 border-red-200",       dotColor: "bg-red-500"    },
+  { status: "converted",          label: "Converted",           color: "bg-green-50 border-green-200",   dotColor: "bg-green-500"  },
 ];
+
+// Statuses still "in play" for staleness warnings — lost/converted are terminal.
+const STALE_STATUSES = new Set(["new","contacted","appointment_booked","quote_required","quoted"]);
 
 // Stale-lead thresholds: days without advancement triggers a warning
 const STALE_DAYS: Record<string, number> = { high: 2, medium: 5, low: 7 };
 
+function getLeadStatus(l: QuoteSubmission): LeadStatus | "needs_review" {
+  return normalizeLeadStatus(l.status, (l as any).stage);
+}
+
 function isStale(lead: QuoteSubmission): boolean {
-  const stage = (lead as any).stage || lead.status;
-  if (!ALL_ACTIVE_STAGES.includes(stage)) return false;
+  const status = getLeadStatus(lead);
+  if (!STALE_STATUSES.has(status)) return false;
   const days = Math.floor((Date.now() - new Date(lead.submittedAt ?? 0).getTime()) / 86400000);
   const threshold = STALE_DAYS[(lead as any).priority ?? "medium"] ?? 5;
   return days > threshold;
@@ -75,16 +88,6 @@ const CLIENT_FLAG_OPTIONS = [
   { value: "competitor_risk",   label: "Competitor Risk" },
   { value: "do_not_contact",    label: "Do Not Contact" },
 ];
-
-const PIPELINE: { status: LeadStage; label: string; color: string; dotColor: string }[] = [
-  { status: "new",                   label: "New Leads",       color: "bg-blue-50 border-blue-200",    dotColor: "bg-blue-500"   },
-  { status: "contacted",             label: "Contacted",       color: "bg-amber-50 border-amber-200",  dotColor: "bg-amber-500"  },
-  { status: "appointment_scheduled", label: "Appt. Scheduled", color: "bg-purple-50 border-purple-200", dotColor: "bg-purple-500" },
-  { status: "quote_needed",          label: "Quote Needed",    color: "bg-orange-50 border-orange-200", dotColor: "bg-orange-500" },
-];
-
-// ─── schema ──────────────────────────────────────────────────────────────────
-
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -122,6 +125,7 @@ export default function Leads() {
   const [serviceFilter, setServiceFilter] = useState("all");
   const [salespersonFilter, setSalespersonFilter] = useState("all");
   const [originationFilter, setOriginationFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
@@ -178,42 +182,14 @@ export default function Leads() {
   });
 
   const advanceLead = useMutation({
-    mutationFn: async ({ id, status, notes, lead }: { id: string; status: string; notes?: string; lead?: any }) => {
-      const res = await apiRequest("PATCH", `/api/quote-submissions/${id}`, { status, ...(notes ? { notes } : {}) });
-      // Auto-create accepted workflow when advancing to "accepted" stage
-      if (status === "accepted" && lead) {
-        try {
-          await apiRequest("POST", "/api/accepted-workflows", {
-            quoteId: id,
-            quoteNumber: lead.quoteNumber,
-            companyName: lead.companyName,
-            contactPerson: lead.contactPerson,
-            serviceType: lead.serviceType,
-            quoteAmount: lead.quoteAmount,
-            monthlyRecurring: lead.monthlyRecurring,
-            installationCost: lead.installationCost,
-            frequency: lead.frequency,
-            address: lead.address,
-            specialInstructions: lead.specialInstructions,
-            salesRepId: lead.assignedTo,
-            afterHoursRequired: lead.afterHoursRequired,
-            existingCompetitorContract: lead.existingCompetitorContract,
-            competitorName: lead.competitorName,
-            cancellationNoticeRequired: lead.cancellationNoticeRequired,
-            noticePeriod: lead.noticePeriod,
-            departmentId: lead.departmentId,
-            workflowStatus: "pending_registration",
-          });
-        } catch (_) {}
-      }
-      return res;
-    },
+    mutationFn: ({ id, status, notes }: { id: string; status: string; notes?: string }) =>
+      apiRequest("PATCH", `/api/quote-submissions/${id}`, { status, ...(notes ? { notes } : {}) }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accepted-workflows"] });
-      if (variables.status === "accepted") {
+      if (variables.status === "converted") {
         toast({
-          title: "Lead accepted! 🎉",
+          title: "Lead converted! 🎉",
           description: "Workflow created — go to Accepted Work to manage the next steps.",
         });
       } else {
@@ -221,6 +197,27 @@ export default function Leads() {
       }
     },
     onError: () => toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" }),
+  });
+
+  const markSiteVisitDone = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("PATCH", `/api/quote-submissions/${id}`, { siteVisitDone: true, status: "quote_required" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      toast({ title: "Site visit marked done", description: "Lead moved to Quote Required." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" }),
+  });
+
+  const convertToClient = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/quote-submissions/${id}/convert-to-client`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accepted-workflows"] });
+      toast({ title: "Converted to client! 🎉", description: "Client created and lead marked Converted." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to convert lead to client.", variant: "destructive" }),
   });
 
   const saveLeadEdits = useMutation({
@@ -235,7 +232,7 @@ export default function Leads() {
 
   const [editOrigination, setEditOrigination] = useState<string>("other");
   const [editOriginationOther, setEditOriginationOther] = useState<string>("");
-  const [editStage, setEditStage] = useState<string>("");
+  const [editStatus, setEditStatus] = useState<string>("");
   const [editPriority, setEditPriority] = useState<string>("");
   const [editLeadType, setEditLeadType] = useState<string>("");
   const [editTradingName, setEditTradingName] = useState<string>("");
@@ -271,41 +268,33 @@ export default function Leads() {
 
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
-  // Active pipeline stages shown in kanban; quoted/accepted/converted/declined handled in Quotes / Contracts pages
-  const getLeadStage = (l: QuoteSubmission) => (l as any).stage || l.status;
-
-  const [stageFilter, setStageFilter] = useState<string>("active");
-
   const filteredLeads = useMemo(() => {
     const q = search.toLowerCase().trim();
     return leads.filter(l => {
-      const ls = getLeadStage(l);
-      if (stageFilter === "active") {
-        if (!ACTIVE_PIPELINE_STAGES.includes(ls as LeadStage)) return false;
-      } else if (stageFilter !== "all") {
-        if (ls !== stageFilter) return false;
-      }
+      const status = getLeadStatus(l);
+      if (statusFilter !== "all" && status !== statusFilter) return false;
       if (q && !l.companyName.toLowerCase().includes(q) && !(l.contactPerson ?? "").toLowerCase().includes(q) && !((l as any).tradingName ?? "").toLowerCase().includes(q)) return false;
       if (serviceFilter !== "all" && l.serviceType !== serviceFilter) return false;
       if (salespersonFilter !== "all" && l.assignedTo !== salespersonFilter) return false;
       if (originationFilter !== "all" && (l.origination ?? "other") !== originationFilter) return false;
       return true;
     });
-  }, [leads, search, serviceFilter, salespersonFilter, originationFilter, stageFilter]);
+  }, [leads, search, serviceFilter, salespersonFilter, originationFilter, statusFilter]);
 
-  // For kanban: columns come from PIPELINE when filter is "active"; otherwise one "All" column
-  const pipelineColumns = stageFilter === "active"
-    ? PIPELINE
-    : LEAD_STAGES.filter(s => stageFilter === "all" || s.value === stageFilter)
-        .map(s => ({ status: s.value as LeadStage, label: s.label, color: "bg-gray-50 border-gray-200", dotColor: "bg-gray-400" }));
+  // Board columns: the 7 canonical statuses, plus a fallback "Needs Review"
+  // column whenever any lead has an unrecognised status — so nothing is ever
+  // silently hidden.
+  const hasNeedsReview = filteredLeads.some(l => getLeadStatus(l) === NEEDS_REVIEW_STATUS);
+  const pipelineColumns = useMemo(() => {
+    const base = statusFilter === "all" ? PIPELINE : PIPELINE.filter(c => c.status === statusFilter);
+    if (hasNeedsReview && (statusFilter === "all" || statusFilter === NEEDS_REVIEW_STATUS)) {
+      return [...base, { status: NEEDS_REVIEW_STATUS as any, label: "Other / Needs Review", color: "bg-gray-100 border-gray-300", dotColor: "bg-gray-500" }];
+    }
+    return base;
+  }, [statusFilter, hasNeedsReview]);
 
-  const totals = pipelineColumns.reduce((acc, col) => {
-    acc[col.status] = filteredLeads.filter(l => getLeadStage(l) === col.status).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all" || stageFilter !== "active";
-  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); setStageFilter("active"); };
+  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all" || statusFilter !== "all";
+  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); setStatusFilter("all"); };
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -340,12 +329,10 @@ export default function Leads() {
       {/* Pipeline flow indicator */}
       <div className="flex items-center gap-1 text-xs text-gray-500 overflow-x-auto pb-1">
         {[
-          { label: "New Lead", cls: "bg-blue-100 text-blue-700" },
-          { label: "Contacted", cls: "bg-amber-100 text-amber-700" },
-          { label: "Appt. Scheduled", cls: "bg-purple-100 text-purple-700" },
-          { label: "Quote Needed", cls: "bg-orange-100 text-orange-700" },
-          { label: "Quote Sent → Quotes Page", cls: "bg-teal-100 text-teal-700" },
-          { label: "Accepted → Contracts", cls: "bg-green-100 text-green-700" },
+          { label: "Lead", cls: "bg-blue-100 text-blue-700" },
+          { label: "Quote", cls: "bg-yellow-100 text-yellow-700" },
+          { label: "Job", cls: "bg-green-100 text-green-700" },
+          { label: "Invoice", cls: "bg-teal-100 text-teal-700" },
         ].map((step, i, arr) => (
           <span key={step.label} className="flex items-center gap-1 whitespace-nowrap">
             <span className={`px-2 py-0.5 rounded-full font-medium ${step.cls}`}>{step.label}</span>
@@ -412,17 +399,17 @@ export default function Leads() {
           </SelectContent>
         </Select>
 
-        {/* Stage */}
-        <Select value={stageFilter} onValueChange={setStageFilter}>
+        {/* Status */}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="h-8 text-sm w-48">
-            <SelectValue placeholder="Pipeline Stage" />
+            <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="active">Active Pipeline</SelectItem>
-            <SelectItem value="all">All Stages</SelectItem>
-            {LEAD_STAGES.map(s => (
+            <SelectItem value="all">All Statuses</SelectItem>
+            {LEAD_STATUSES.map(s => (
               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
             ))}
+            {hasNeedsReview && <SelectItem value={NEEDS_REVIEW_STATUS}>Other / Needs Review</SelectItem>}
           </SelectContent>
         </Select>
 
@@ -464,7 +451,7 @@ export default function Leads() {
       ) : (
         <div className={`grid gap-4 items-start ${pipelineColumns.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : pipelineColumns.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
           {pipelineColumns.map(col => {
-            const colLeads = filteredLeads.filter(l => getLeadStage(l) === col.status)
+            const colLeads = filteredLeads.filter(l => getLeadStatus(l) === col.status)
               .sort((a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime());
             return (
               <div key={col.status} className={`rounded-xl border ${col.color} p-3 min-h-[200px]`}>
@@ -472,6 +459,7 @@ export default function Leads() {
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${col.dotColor}`} />
                     <span className="text-sm font-semibold text-gray-700">{col.label}</span>
+                    {col.status === NEEDS_REVIEW_STATUS && <AlertCircle className="h-3.5 w-3.5 text-gray-500" />}
                   </div>
                   <Badge variant="outline" className="text-xs">{colLeads.length}</Badge>
                 </div>
@@ -481,14 +469,28 @@ export default function Leads() {
                       key={lead.id}
                       lead={lead}
                       workers={workers}
-                      onAdvance={(status) => advanceLead.mutate({ id: lead.id, status, lead })}
-                      onQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
+                      onMarkContacted={() => advanceLead.mutate({ id: lead.id, status: "contacted" })}
+                      onBookAppointment={() => {
+                        const p = new URLSearchParams({
+                          clientName: lead.companyName,
+                          contactPerson: lead.contactPerson,
+                          phone: lead.phone,
+                          siteAddress: lead.address || "",
+                          leadId: lead.id,
+                          appointmentType: "site_visit",
+                        });
+                        navigate(`/sales-diary?${p.toString()}`);
+                      }}
+                      onMarkSiteVisitDone={() => markSiteVisitDone.mutate(lead.id)}
+                      onCreateQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
+                      onMarkLost={() => advanceLead.mutate({ id: lead.id, status: "lost" })}
+                      onConvertToClient={() => convertToClient.mutate(lead.id)}
                       onNotes={() => {
                         setNotesLead(lead);
                         setNotesText(lead.notes ?? "");
                         setEditOrigination(lead.origination ?? "other");
                         setEditOriginationOther((lead as any).originationOther ?? "");
-                        setEditStage(getLeadStage(lead));
+                        setEditStatus(getLeadStatus(lead));
                         setEditPriority((lead as any).priority ?? "medium");
                         setEditLeadType((lead as any).leadType ?? "");
                         setEditTradingName((lead as any).tradingName ?? "");
@@ -501,18 +503,6 @@ export default function Leads() {
                         setEditEarliestStartDate((lead as any).earliestStartDate ?? "");
                         setEditExpectedServiceTime((lead as any).expectedServiceTime ?? "");
                         try { setEditClientFlags(JSON.parse((lead as any).clientFlags ?? "[]") ?? []); } catch { setEditClientFlags([]); }
-                      }}
-                      onDecline={() => advanceLead.mutate({ id: lead.id, status: "declined" })}
-                      onSchedule={() => {
-                        const p = new URLSearchParams({
-                          clientName: lead.companyName,
-                          contactPerson: lead.contactPerson,
-                          phone: lead.phone,
-                          siteAddress: lead.address || "",
-                          leadId: lead.id,
-                          appointmentType: "new_lead_meeting",
-                        });
-                        navigate(`/sales-diary?${p.toString()}`);
                       }}
                     />
                   ))}
@@ -541,11 +531,11 @@ export default function Leads() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Send Quote dialog ── */}
+      {/* ── Create Quote dialog ── */}
       {quoteLead && (
         <Dialog open={!!quoteLead} onOpenChange={() => { setQuoteLead(null); setQuotePreview(false); }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-            <DialogTitle className="sr-only">Send Quote</DialogTitle>
+            <DialogTitle className="sr-only">Create Quote</DialogTitle>
             <DocumentForm
               docType="quote"
               clientInfo={{
@@ -587,14 +577,14 @@ export default function Leads() {
                 <Input value={editTradingName} onChange={e => setEditTradingName(e.target.value)} placeholder="e.g. The Corner Café t/a ABC Holdings" className="h-9 text-sm" />
               </div>
 
-              {/* Stage + Priority row */}
+              {/* Status + Priority row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium block mb-1">Pipeline Stage</label>
-                  <Select value={editStage} onValueChange={setEditStage}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select stage" /></SelectTrigger>
+                  <label className="text-sm font-medium block mb-1">Status</label>
+                  <Select value={editStatus} onValueChange={setEditStatus}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
                     <SelectContent>
-                      {LEAD_STAGES.map(s => (
+                      {LEAD_STATUSES.map(s => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -764,7 +754,7 @@ export default function Leads() {
                     notes: notesText,
                     origination: editOrigination,
                     originationOther: editOrigination === "other" ? editOriginationOther.trim() : null,
-                    stage: editStage || undefined,
+                    status: editStatus || undefined,
                     priority: editPriority || undefined,
                     leadType: editLeadType || undefined,
                     tradingName: editTradingName || undefined,
@@ -799,40 +789,35 @@ export default function Leads() {
 function LeadCard({
   lead,
   workers,
-  onAdvance,
-  onQuote,
+  onMarkContacted,
+  onBookAppointment,
+  onMarkSiteVisitDone,
+  onCreateQuote,
+  onMarkLost,
+  onConvertToClient,
   onNotes,
-  onDecline,
-  onSchedule,
 }: {
   lead: QuoteSubmission;
   workers: Worker[];
-  onAdvance: (status: string) => void;
-  onQuote: () => void;
+  onMarkContacted: () => void;
+  onBookAppointment: () => void;
+  onMarkSiteVisitDone: () => void;
+  onCreateQuote: () => void;
+  onMarkLost: () => void;
+  onConvertToClient: () => void;
   onNotes: () => void;
-  onDecline: () => void;
-  onSchedule: () => void;
 }) {
   const fu = followUpLabel(lead.followUpDate);
   const assignedWorker = lead.assignedTo ? workers.find(w => w.id === lead.assignedTo) : null;
-  const stage = (lead as any).stage || lead.status;
+  const status = getLeadStatus(lead);
   const priority = (lead as any).priority as string | undefined;
   const leadType = (lead as any).leadType as string | undefined;
   const tradingName = (lead as any).tradingName as string | undefined;
+  const siteVisitDone = (lead as any).siteVisitDone as boolean | undefined;
 
   const priorityCls = priority === "high" ? "bg-red-100 text-red-700" : priority === "low" ? "bg-gray-100 text-gray-500" : "bg-blue-50 text-blue-600";
 
-  // Next-stage quick-advance map
-  const STAGE_NEXT: Record<string, { label: string; nextStage: string; cls?: string }> = {
-    new:                   { label: "→ Contacted",       nextStage: "contacted" },
-    contacted:             { label: "→ Set Appt.",        nextStage: "appointment_scheduled" },
-    appointment_scheduled: { label: "→ Site Done",        nextStage: "site_assessment_done" },
-    site_assessment_done:  { label: "→ Quote Needed",     nextStage: "quote_needed" },
-    quote_needed:          { label: "→ Send Quote",       nextStage: "quote_sent", cls: "border-purple-300 text-purple-700 hover:bg-purple-50" },
-    quote_sent:            { label: "→ Follow-up Due",    nextStage: "follow_up_due" },
-    follow_up_due:         { label: "→ Accepted",         nextStage: "accepted", cls: "border-green-300 text-green-700 hover:bg-green-50" },
-  };
-  const nextAction = STAGE_NEXT[stage];
+  const isTerminal = status === "lost" || status === "converted";
 
   const stale = isStale(lead);
   const clientFlagsList: string[] = (() => {
@@ -846,6 +831,13 @@ function LeadCard({
         <div className="flex items-center gap-1 text-[10px] font-semibold text-red-600 bg-red-50 rounded px-2 py-1 -mx-1 -mt-1">
           <AlertCircle className="h-3 w-3 flex-shrink-0" />
           Stale — no activity in {Math.floor((Date.now() - new Date(lead.submittedAt ?? 0).getTime()) / 86400000)}d
+        </div>
+      )}
+      {/* Needs-review warning */}
+      {status === NEEDS_REVIEW_STATUS && (
+        <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-700 bg-gray-100 rounded px-2 py-1 -mx-1 -mt-1">
+          <AlertCircle className="h-3 w-3 flex-shrink-0" />
+          Unrecognised status: "{lead.status}" — please review and re-assign
         </div>
       )}
       {/* Competitor warning */}
@@ -893,6 +885,11 @@ function LeadCard({
           {ORIGINATION_LABELS[lead.origination ?? "other"] ?? "Other"}
           {lead.origination === "other" && (lead as any).originationOther ? `: ${(lead as any).originationOther}` : ""}
         </Badge>
+        {siteVisitDone && (
+          <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 border border-purple-100">
+            <ClipboardCheck className="h-3 w-3 mr-1" />Site visit done
+          </Badge>
+        )}
       </div>
 
       {/* Contact info */}
@@ -926,33 +923,39 @@ function LeadCard({
       {/* Age */}
       <p className="text-xs text-gray-400 flex items-center gap-1"><Clock className="h-3 w-3" />{daysAgo(lead.submittedAt)}</p>
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
-        {/* Dynamic next-stage advance */}
-        {nextAction && stage !== "quote_needed" && (
-          <Button size="sm" variant="outline" className={`text-xs h-6 px-2 ${nextAction.cls ?? ""}`} onClick={() => onAdvance(nextAction.nextStage)}>
-            <ChevronRight className="h-3 w-3 mr-0.5" /> {nextAction.label}
+      {/* Actions — the 6 canonical lead actions (always available while the lead is active) */}
+      {!isTerminal && (
+        <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={onMarkContacted}>
+            <PhoneCall className="h-3 w-3 mr-0.5" /> Mark Contacted
           </Button>
-        )}
-        {/* Send Quote (special — opens quote form) */}
-        {(stage === "quote_needed" || stage === "contacted") && (
-          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-purple-300 text-purple-700 hover:bg-purple-50" onClick={onQuote}>
-            <Send className="h-3 w-3 mr-0.5" /> Send Quote
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-blue-300 text-blue-700 hover:bg-blue-50" onClick={onBookAppointment}>
+            <CalendarClock className="h-3 w-3 mr-0.5" /> Book Appointment
           </Button>
-        )}
-
-        <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50" onClick={onSchedule}>
-          <BookOpen className="h-3 w-3 mr-0.5" /> Schedule
-        </Button>
-
-        <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-gray-500" onClick={onNotes}>
-          Notes
-        </Button>
-
-        <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-red-500 hover:text-red-700" onClick={onDecline}>
-          <XCircle className="h-3 w-3" /> Lost
-        </Button>
-      </div>
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-purple-300 text-purple-700 hover:bg-purple-50" onClick={onMarkSiteVisitDone} disabled={!!siteVisitDone}>
+            <ClipboardCheck className="h-3 w-3 mr-0.5" /> {siteVisitDone ? "Site Visit Done" : "Mark Site Visit Done"}
+          </Button>
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={onCreateQuote}>
+            <FileText className="h-3 w-3 mr-0.5" /> Create Quote
+          </Button>
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-green-300 text-green-700 hover:bg-green-50" onClick={onConvertToClient}>
+            <UserCheck className="h-3 w-3 mr-0.5" /> Convert to Client
+          </Button>
+          <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-gray-500" onClick={onNotes}>
+            Notes
+          </Button>
+          <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-red-500 hover:text-red-700" onClick={onMarkLost}>
+            <XCircle className="h-3 w-3" /> Mark Lost
+          </Button>
+        </div>
+      )}
+      {isTerminal && (
+        <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
+          <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-gray-500" onClick={onNotes}>
+            Notes
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -123,15 +123,14 @@ const QUOTE_TYPES = [
   { value: "mixed",     label: "Mixed Quote" },
 ];
 
+// Canonical quote statuses — these are the SAME underlying `status` field
+// used by the lead pipeline (see LEAD_STATUSES in shared/schema.ts), so a
+// quote created directly here always lands on a visible lead board column.
 const QUOTE_STATUS_OPTIONS = [
-  { value: "draft",              label: "Draft" },
-  { value: "quoted",             label: "Quoted" },
-  { value: "sent",               label: "Sent" },
-  { value: "follow_up",          label: "Follow-up Required" },
-  { value: "accepted",           label: "Accepted" },
-  { value: "declined",           label: "Declined" },
-  { value: "converted",          label: "Converted to Job" },
-  { value: "converted_contract", label: "Converted to Contract" },
+  { value: "quote_required", label: "Quote Required" },
+  { value: "quoted",         label: "Quoted / Sent" },
+  { value: "lost",           label: "Lost" },
+  { value: "converted",      label: "Converted to Job" },
 ];
 
 const VAT_MODES = [
@@ -251,7 +250,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
 
   // Quote settings
   const [quoteType,     setQuoteType]     = useState("once_off");
-  const [status,        setStatus]        = useState("draft");
+  const [status,        setStatus]        = useState("quoted");
   const [vatMode,       setVatMode]       = useState("exclusive");
   const [description,   setDescription]   = useState("");
   const [internalNotes, setInternalNotes] = useState("");
@@ -265,7 +264,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
     setCompanyName(""); setContactPerson(""); setPhone(""); setEmail("");
     setSiteAddress(""); setBillingAddress(""); setPreferredContact("email");
     setVatNumber(""); setCompanyReg("");
-    setQuoteType("once_off"); setStatus("draft"); setVatMode("exclusive");
+    setQuoteType("once_off"); setStatus("quoted"); setVatMode("exclusive");
     setDescription(""); setInternalNotes("");
     setLineItems([emptyItem()]);
   };
@@ -660,9 +659,9 @@ type ConvertJobForm = z.infer<typeof convertToJobSchema>;
 // ── constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS = [
-  { value: "quoted",    label: "Quoted",   class: "bg-purple-100 text-purple-700" },
-  { value: "converted", label: "Accepted", class: "bg-green-100 text-green-700" },
-  { value: "declined",  label: "Declined", class: "bg-red-100 text-red-600" },
+  { value: "quoted",    label: "Quoted",           class: "bg-purple-100 text-purple-700" },
+  { value: "converted", label: "Converted to Job", class: "bg-green-100 text-green-700" },
+  { value: "lost",      label: "Lost",             class: "bg-red-100 text-red-600" },
 ];
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -836,7 +835,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
 
   // ── Handlers ──
   const handleStatusChange = (status: string) => {
-    if (status === "declined") {
+    if (status === "lost") {
       setDeclineReason("");
       setDeclineOpen(true);
     } else if (status === "converted") {
@@ -882,7 +881,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
 
   const handleDeclineConfirm = () => {
     if (!declineReason.trim()) return;
-    updateMutation.mutate({ status: "declined", notes: declineReason.trim() });
+    updateMutation.mutate({ status: "lost", notes: declineReason.trim() });
     setDeclineOpen(false);
   };
 
@@ -1096,11 +1095,11 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
     <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Reason for Declining</DialogTitle>
+          <DialogTitle>Reason for Losing this Quote</DialogTitle>
         </DialogHeader>
         <div className="py-2 space-y-2">
           <p className="text-sm text-muted-foreground">
-            Please enter why this quote was declined. This will be saved as a note.
+            Please enter why this quote was lost. This will be saved as a note.
           </p>
           <Textarea
             autoFocus
@@ -1111,7 +1110,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
             className="resize-none"
           />
           {declineReason.trim() === "" && (
-            <p className="text-xs text-red-500">A reason is required before declining.</p>
+            <p className="text-xs text-red-500">A reason is required before marking this quote lost.</p>
           )}
         </div>
         <DialogFooter>
@@ -1121,7 +1120,7 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
             disabled={!declineReason.trim() || updateMutation.isPending}
             onClick={handleDeclineConfirm}
           >
-            {updateMutation.isPending ? "Saving..." : "Confirm Decline"}
+            {updateMutation.isPending ? "Saving..." : "Mark Lost"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1620,7 +1619,7 @@ export default function QuotesPage() {
 
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
-  const QUOTE_STATUSES = ["quoted", "converted", "declined"];
+  const QUOTE_STATUSES = ["quoted", "converted", "lost"];
   const filtered = quotes.filter(q => {
     if (!QUOTE_STATUSES.includes(q.status)) return false;
     const matchStatus  = statusFilter  === "all" || q.status      === statusFilter;
@@ -1653,7 +1652,7 @@ export default function QuotesPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm text-muted-foreground">
-                  <strong>{filtered.length}</strong> shown · <strong>{countByStatus("quoted")}</strong> pending · <strong>{countByStatus("converted")}</strong> accepted
+                  <strong>{filtered.length}</strong> shown · <strong>{countByStatus("quoted")}</strong> pending · <strong>{countByStatus("converted")}</strong> converted
                 </div>
                 <Button onClick={() => setShowNewQuote(true)} className="gap-2">
                   <Plus className="h-4 w-4" /> New Quote

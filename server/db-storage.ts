@@ -10,7 +10,7 @@ import {
   users, departments, workers, clients, inventoryItems, rentalContracts, rentalContractItems,
   jobs, invoices, invoiceItems, jobInventoryItems, notifications,
   emailTemplates, emailLogs, suppliers, purchaseOrders, purchaseOrderItems,
-  calendarEvents, customReports, quoteSubmissions, pricingLibrary, salesFollowUps,
+  calendarEvents, customReports, quoteSubmissions, leadActivities, pricingLibrary, salesFollowUps,
   vehicles, vehicleAssignments, kmLogs, fuelFillups, vehicleInspections, vehicleIssues,
   serviceRecords, workshopJobs, teams, teamMembers, attendanceRecords, attendanceMemberRecords,
   serviceContracts, salesAppointments, expenses, serviceScheduleEntries, activityLogs,
@@ -61,6 +61,7 @@ import type {
   TreatmentReport, InsertTreatmentReport,
   CommunicationNote, InsertCommunicationNote,
   AcceptedWorkflow, InsertAcceptedWorkflow,
+  LeadActivity, InsertLeadActivity,
 } from "@shared/schema";
 
 import type {
@@ -1309,6 +1310,17 @@ export class DbStorage implements IStorage {
   async deleteQuoteSubmission(id: string): Promise<boolean> {
     const r = await db.delete(quoteSubmissions).where(eq(quoteSubmissions.id, id));
     return (r.rowCount ?? 0) > 0;
+  }
+
+  // ─── Lead Activities ─────────────────────────────────────────────────────
+
+  async getLeadActivities(leadId: string): Promise<LeadActivity[]> {
+    return db.select().from(leadActivities).where(eq(leadActivities.leadId, leadId)).orderBy(desc(leadActivities.createdAt));
+  }
+
+  async createLeadActivity(data: InsertLeadActivity): Promise<LeadActivity> {
+    const [row] = await db.insert(leadActivities).values({ id: randomUUID(), ...data, createdAt: new Date() }).returning();
+    return row;
   }
 
   // ─── Pricing Library ─────────────────────────────────────────────────────

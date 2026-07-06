@@ -735,6 +735,7 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   departmentId: varchar("department_id"),
   legalEntityId: varchar("legal_entity_id"),
   legalEntityName: text("legal_entity_name"),
+  siteVisitDone: boolean("site_visit_done").notNull().default(false),
 });
 
 // Marketing channel options for the Origination field on every lead
@@ -780,6 +781,66 @@ export const LEAD_STAGES = [
 export type LeadStage = typeof LEAD_STAGES[number]["value"];
 export const LEAD_STAGE_LABELS: Record<string, string> = Object.fromEntries(LEAD_STAGES.map(s => [s.value, s.label]));
 
+// ── Simplified lead pipeline (Lead -> Quote -> Job -> Invoice redesign) ─────
+// This is the ONLY set of statuses the Leads board renders as columns.
+// Everything that used to be a separate "hidden" pipeline stage (site visits,
+// contracts, registration, scheduling, invoicing, after-sales) now lives as
+// an activity/record on the lead, quote, Accepted Work item, job or invoice
+// instead of a board stage — so a lead can never disappear from the board.
+export const LEAD_STATUSES = [
+  { value: "new",                 label: "New",                color: "bg-blue-100 text-blue-700" },
+  { value: "contacted",           label: "Contacted",           color: "bg-indigo-100 text-indigo-700" },
+  { value: "appointment_booked",  label: "Appointment Booked",  color: "bg-purple-100 text-purple-700" },
+  { value: "quote_required",      label: "Quote Required",      color: "bg-amber-100 text-amber-700" },
+  { value: "quoted",              label: "Quoted",               color: "bg-yellow-100 text-yellow-700" },
+  { value: "lost",                label: "Lost",                color: "bg-red-100 text-red-700" },
+  { value: "converted",           label: "Converted",           color: "bg-green-100 text-green-700" },
+] as const;
+export type LeadStatus = typeof LEAD_STATUSES[number]["value"];
+export const LEAD_STATUS_LABELS: Record<string, string> = Object.fromEntries(LEAD_STATUSES.map(s => [s.value, s.label]));
+
+// Fallback bucket for any status value that doesn't map cleanly — a lead must
+// NEVER be hidden just because its status is unrecognised.
+export const NEEDS_REVIEW_STATUS = "needs_review" as const;
+
+// Maps every legacy/hidden LEAD_STAGES value (and any stray `stage` value) to
+// one of the 7 canonical LEAD_STATUSES above. Pure function — safe to call at
+// read time (normalizing old DB rows on the fly) or as a one-time migration.
+export function normalizeLeadStatus(status?: string | null, stage?: string | null): LeadStatus | "needs_review" {
+  const canonical = new Set(LEAD_STATUSES.map(s => s.value));
+  const raw = (status || "").trim();
+  if (canonical.has(raw as LeadStatus)) return raw as LeadStatus;
+
+  const LEGACY_MAP: Record<string, LeadStatus> = {
+    appointment_scheduled: "appointment_booked",
+    site_assessment_done: "quote_required",
+    assessment_done: "quote_required",
+    site_done: "quote_required",
+    quote_needed: "quote_required",
+    quote_sent: "quoted",
+    follow_up_due: "quoted",
+    declined: "lost",
+    accepted: "converted",
+    contract_pending: "converted",
+    client_registration_pending: "converted",
+    installation_scheduled: "converted",
+    invoiced: "converted",
+    after_sales_followup: "converted",
+    after_sales_follow_up_due: "converted",
+    complete: "converted",
+    converted_contract: "converted",
+    converted_job: "converted",
+  };
+  if (LEGACY_MAP[raw]) return LEGACY_MAP[raw];
+
+  // Fall back to the legacy `stage` column if `status` itself was unusable.
+  const rawStage = (stage || "").trim();
+  if (canonical.has(rawStage as LeadStatus)) return rawStage as LeadStatus;
+  if (LEGACY_MAP[rawStage]) return LEGACY_MAP[rawStage];
+
+  return NEEDS_REVIEW_STATUS;
+}
+
 export const QUOTE_STATUSES = [
   "Draft","Sent","Follow-up Due","Followed Up","Accepted","Declined",
   "Expired","Contract Pending","Converted to Contract","Converted to Job",
@@ -816,6 +877,25 @@ export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).
 
 export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;
 export type QuoteSubmission = typeof quoteSubmissions.$inferSelect;
+
+// ── Lead activity timeline ──────────────────────────────────────────────────
+// A simple append-only log of what happened on a lead (status changes,
+// appointments booked, site visits completed, quotes created, etc). Rendered
+// on the lead card as its history; never used to drive board visibility.
+export const leadActivities = pgTable("lead_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => quoteSubmissions.id),
+  type: text("type").notNull(),          // status_change, appointment_booked, site_visit_done, quote_created, note, etc.
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertLeadActivitySchema = createInsertSchema(leadActivities).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertLeadActivity = z.infer<typeof insertLeadActivitySchema>;
+export type LeadActivity = typeof leadActivities.$inferSelect;
 
 // ─── PRICING LIBRARY ────────────────────────────────────────────────────────
 

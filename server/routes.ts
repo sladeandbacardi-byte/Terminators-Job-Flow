@@ -26,6 +26,8 @@ import {
   insertTreatmentReportSchema,
   insertCommunicationNoteSchema,
   insertLegalEntitySchema,
+  normalizeLeadStatus,
+  LEAD_STATUS_LABELS,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -2167,8 +2169,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/quote-submissions/:id", async (req, res) => {
     try {
-      const updateData = insertQuoteSubmissionSchema.partial().parse(req.body);
+      const existing = await storage.getQuoteSubmission(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Quote submission not found" });
+
+      const body: Record<string, any> = { ...req.body };
+      if (typeof body.status === "string" && body.status.trim()) {
+        body.status = normalizeLeadStatus(body.status, body.stage ?? (existing as any).stage);
+      }
+
+      const updateData = insertQuoteSubmissionSchema.partial().parse(body);
       const updated = await storage.updateQuoteSubmission(req.params.id, updateData);
+
+      // "Mark Site Visit Done" — explicit activity text called out in spec,
+      // logged in addition to the generic status-change activity below.
+      if (updateData.siteVisitDone === true && !(existing as any).siteVisitDone) {
+        await storage.createLeadActivity({
+          leadId: updated.id,
+          type: "site_visit_done",
+          description: "Site visit completed",
+        });
+      }
+
+      // Log a lead activity + fire side-effects whenever status actually changes
+      if (updateData.status && updateData.status !== existing.status) {
+        const fromLabel = LEAD_STATUS_LABELS[existing.status] ?? existing.status;
+        const toLabel = LEAD_STATUS_LABELS[updateData.status] ?? updateData.status;
+        await storage.createLeadActivity({
+          leadId: updated.id,
+          type: "status_change",
+          description: `Status changed from ${fromLabel} to ${toLabel}`,
+        });
+
+        // Moving a lead to "converted" means the quote was accepted — create
+        // the accepted-workflow record server-side (idempotent) so job/contract
+        // creation can happen as a separate follow-up step.
+        if (updateData.status === "converted") {
+          const existingWorkflow = await storage.getAcceptedWorkflowByQuote(updated.id);
+          if (!existingWorkflow) {
+            await storage.createAcceptedWorkflow({
+              quoteId: updated.id,
+              quoteNumber: updated.quoteNumber ?? null,
+              companyName: updated.companyName,
+              contactPerson: updated.contactPerson ?? null,
+              serviceType: updated.serviceType ?? null,
+              quoteAmount: updated.quoteAmount ?? null,
+              monthlyRecurring: updated.monthlyRecurring ?? null,
+              installationCost: updated.installationCost ?? null,
+              frequency: updated.frequency ?? null,
+              address: updated.address ?? null,
+              specialInstructions: updated.specialInstructions ?? null,
+              salesRepId: updated.assignedTo ?? null,
+              afterHoursRequired: updated.afterHoursRequired ?? null,
+              existingCompetitorContract: updated.existingCompetitorContract ?? null,
+              competitorName: updated.competitorName ?? null,
+              cancellationNoticeRequired: updated.cancellationNoticeRequired ?? null,
+              noticePeriod: updated.noticePeriod ?? null,
+              departmentId: updated.departmentId ?? null,
+              workflowStatus: "pending_registration",
+            } as any);
+          }
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2178,12 +2240,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Activity timeline for a lead
+  app.get("/api/quote-submissions/:id/activities", async (req, res) => {
+    try {
+      const activities = await storage.getLeadActivities(req.params.id);
+      res.json(activities);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lead activities" });
+    }
+  });
+
+  // ── Convert a lead directly to a client (manual "Convert to Client" action) ──
+  app.post("/api/quote-submissions/:id/convert-to-client", async (req, res) => {
+    try {
+      const lead = await storage.getQuoteSubmission(req.params.id);
+      if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+      let clientId = lead.clientId;
+      if (!clientId) {
+        const client = await storage.createClient({
+          name: lead.companyName,
+          tradingName: (lead as any).tradingName ?? null,
+          email: lead.email || null,
+          phone: lead.phone || null,
+          address: lead.address ?? null,
+          contactPerson: lead.contactPerson ?? null,
+          departmentId: (lead as any).departmentId ?? null,
+          status: "active",
+        } as any);
+        clientId = client.id;
+      }
+
+      const updated = await storage.updateQuoteSubmission(lead.id, {
+        clientId,
+        status: "converted",
+      } as any);
+
+      if (lead.status !== "converted") {
+        await storage.createLeadActivity({
+          leadId: lead.id,
+          type: "converted_to_client",
+          description: "Lead converted to client",
+        });
+      }
+
+      res.json({ ...updated, clientId });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to convert lead to client", details: error?.message });
+    }
+  });
+
   // ── Convert quote to a job (atomic: create job + mark quote "converted") ──
   app.post("/api/quote-submissions/:id/convert-to-job", async (req, res) => {
     try {
       const quote = await storage.getQuoteSubmission(req.params.id);
       if (!quote) return res.status(404).json({ error: "Quote not found" });
-      if (quote.status === "converted") return res.status(409).json({ error: "Quote is already converted" });
+      const existingJobs = await storage.getJobs();
+      if (existingJobs.some(j => (j as any).linkedQuoteId === quote.id)) {
+        return res.status(409).json({ error: "Quote has already been converted to a job" });
+      }
 
       const { clientId, workerId, departmentId, scheduledDate, scheduledTime, address,
               notes, estimatedValue, frequency, specialInstructions, salespersonId } = req.body;
@@ -2239,7 +2354,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const quote = await storage.getQuoteSubmission(req.params.id);
       if (!quote) return res.status(404).json({ error: "Quote not found" });
-      if (quote.status === "converted") return res.status(409).json({ error: "Quote is already converted" });
+      const existingContracts = await storage.getRentalContracts();
+      if (existingContracts.some(c => (c as any).linkedQuoteId === quote.id)) {
+        return res.status(409).json({ error: "Quote has already been converted to a contract" });
+      }
 
       const { clientId, departmentId, serviceType, frequency, contractPrice, startDate, notes } = req.body;
 
@@ -2378,6 +2496,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quoteAmount: amount,
         quoteSentAt: new Date(),
       } as any);
+
+      if (lead.status !== "quoted") {
+        await storage.createLeadActivity({
+          leadId: lead.id,
+          type: "quote_created",
+          description: `Quote created and sent (R ${amountNum.toFixed(2)})`,
+        });
+      }
 
       res.json({ success: true, lead: updated });
     } catch (error) {
@@ -3780,6 +3906,24 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const { insertSalesAppointmentSchema } = await import("@shared/schema");
       const data = insertSalesAppointmentSchema.parse(req.body);
       const appt = await storage.createSalesAppointment(data);
+
+      // Booking an appointment against a lead advances it to "Appointment Booked"
+      // (unless it's already further along the pipeline than that).
+      if (appt.leadId) {
+        const lead = await storage.getQuoteSubmission(appt.leadId);
+        if (lead) {
+          const EARLY_STATUSES = new Set(["new", "contacted"]);
+          await storage.createLeadActivity({
+            leadId: lead.id,
+            type: "appointment_booked",
+            description: `Appointment booked: ${appt.title} on ${appt.date} at ${appt.startTime}`,
+          });
+          if (EARLY_STATUSES.has(normalizeLeadStatus(lead.status, (lead as any).stage))) {
+            await storage.updateQuoteSubmission(lead.id, { status: "appointment_booked" } as any);
+          }
+        }
+      }
+
       res.status(201).json(appt);
     } catch (err: any) {
       res.status(400).json({ error: "Failed to create appointment", details: err.message });
@@ -3788,7 +3932,37 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
   app.patch("/api/sales-appointments/:id", async (req, res) => {
     try {
+      const before = await storage.getSalesAppointment(req.params.id);
       const appt = await storage.updateSalesAppointment(req.params.id, req.body);
+
+      // Completing a site-visit appointment marks the lead's site visit done
+      // and advances it to "Quote Required" — this is the fix for leads that
+      // used to silently vanish from the board on "Site Done".
+      const justCompleted = req.body?.status === "completed" && before?.status !== "completed";
+      if (justCompleted && appt.leadId) {
+        const lead = await storage.getQuoteSubmission(appt.leadId);
+        if (lead) {
+          await storage.createLeadActivity({
+            leadId: lead.id,
+            type: "appointment_completed",
+            description: `Appointment completed: ${appt.title}${appt.completionNote ? ` — ${appt.completionNote}` : ""}`,
+          });
+          if (appt.appointmentType === "site_visit") {
+            const currentStatus = normalizeLeadStatus(lead.status, (lead as any).stage);
+            const NOT_YET_QUOTED = new Set(["new", "contacted", "appointment_booked"]);
+            await storage.updateQuoteSubmission(lead.id, {
+              siteVisitDone: true,
+              ...(NOT_YET_QUOTED.has(currentStatus) ? { status: "quote_required" } : {}),
+            } as any);
+            await storage.createLeadActivity({
+              leadId: lead.id,
+              type: "site_visit_done",
+              description: "Site visit marked done — lead ready for quoting",
+            });
+          }
+        }
+      }
+
       res.json(appt);
     } catch (err: any) {
       res.status(400).json({ error: "Failed to update appointment", details: err.message });

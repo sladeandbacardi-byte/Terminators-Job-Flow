@@ -40,6 +40,7 @@ import {
   type TreatmentReport, type InsertTreatmentReport,
   type CommunicationNote, type InsertCommunicationNote,
   type AcceptedWorkflow, type InsertAcceptedWorkflow,
+  type LeadActivity, type InsertLeadActivity,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -233,6 +234,10 @@ export interface IStorage {
   createQuoteSubmission(submission: InsertQuoteSubmission): Promise<QuoteSubmission>;
   updateQuoteSubmission(id: string, submission: Partial<InsertQuoteSubmission>): Promise<QuoteSubmission>;
   deleteQuoteSubmission(id: string): Promise<boolean>;
+
+  // Lead Activities
+  getLeadActivities(leadId: string): Promise<LeadActivity[]>;
+  createLeadActivity(activity: InsertLeadActivity): Promise<LeadActivity>;
 
   // Pricing Library
   getPricingLibrary(): Promise<PricingLibraryItem[]>;
@@ -479,6 +484,7 @@ export class MemStorage implements IStorage {
   private salesAppointments: Map<string, SalesAppointment> = new Map();
   private customReports: Map<string, CustomReport> = new Map();
   private quoteSubmissions: Map<string, QuoteSubmission> = new Map();
+  private leadActivities: Map<string, LeadActivity> = new Map();
   private pricingLibraryMap: Map<string, PricingLibraryItem> = new Map();
   private salesFollowUpsMap: Map<string, SalesFollowUp> = new Map();
   private vehicles: Map<string, Vehicle> = new Map();
@@ -3779,6 +3785,21 @@ export class MemStorage implements IStorage {
 
   async deleteQuoteSubmission(id: string): Promise<boolean> {
     return this.quoteSubmissions.delete(id);
+  }
+
+  // ── Lead Activities ─────────────────────────────────────────────────────────
+
+  async getLeadActivities(leadId: string): Promise<LeadActivity[]> {
+    return Array.from(this.leadActivities.values())
+      .filter(a => a.leadId === leadId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async createLeadActivity(activity: InsertLeadActivity): Promise<LeadActivity> {
+    const id = randomUUID();
+    const newActivity: LeadActivity = { ...activity, id, createdAt: new Date() };
+    this.leadActivities.set(id, newActivity);
+    return newActivity;
   }
 
   // ── Pricing Library ────────────────────────────────────────────────────────
