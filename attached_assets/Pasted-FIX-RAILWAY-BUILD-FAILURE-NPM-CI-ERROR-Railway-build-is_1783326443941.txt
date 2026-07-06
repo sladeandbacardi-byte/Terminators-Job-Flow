@@ -1,0 +1,99 @@
+FIX RAILWAY BUILD FAILURE - NPM CI ERROR
+
+Railway build is failing during npm ci with this error:
+
+npm error Exit handler never called!
+Build Failed: process "npm ci" did not complete successfully: exit code: 1
+
+Please fix the Railway build setup.
+
+1. Check package-lock.json
+
+Make sure package-lock.json is valid and matches package.json.
+
+If needed, regenerate the lock file cleanly:
+
+* delete node_modules
+* delete package-lock.json
+* run npm install
+* commit the new package-lock.json
+
+2. Set Node and npm versions
+
+Add or update the engines section in package.json:
+
+"engines": {
+"node": "20.x",
+"npm": "10.x"
+}
+
+3. Avoid Railway using production install too early
+
+Railway needs devDependencies during build because the app likely uses:
+
+* vite
+* tsx
+* esbuild
+* drizzle-kit
+* TypeScript tools
+
+Make sure devDependencies are installed during build.
+
+4. Add or confirm package.json scripts:
+
+"scripts": {
+"dev": "tsx server/index.ts",
+"build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+"start": "NODE_ENV=production node dist/index.js",
+"db:push": "drizzle-kit push"
+}
+
+Adjust paths only if this project structure is different.
+
+5. Add Railway build/start settings
+
+Build command:
+npm install && npm run build
+
+Start command:
+npm run start
+
+This avoids the npm ci issue for now.
+
+6. If Railway has Nixpacks variables, add:
+
+NIXPACKS_NODE_VERSION=20
+
+7. Make sure these packages are in devDependencies, not missing:
+
+vite
+tsx
+typescript
+esbuild
+drizzle-kit
+
+8. Make sure production dependencies include whatever the server uses at runtime, such as:
+
+express
+drizzle-orm
+postgres
+@neondatabase/serverless, only if actually used
+nodemailer or email API package if used
+xlsx or Excel export package if used
+
+9. Do not run database migration during build.
+
+Do not run:
+npm run db:push
+npx drizzle-kit push
+
+during build or start.
+
+Database setup must be run manually after deploy:
+npm run db:push
+
+10. Commit the package.json and package-lock.json fixes to GitHub.
+
+11. Redeploy Railway.
+
+END
