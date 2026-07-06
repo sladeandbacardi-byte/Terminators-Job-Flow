@@ -1,0 +1,113 @@
+FIX RAILWAY BUILD ONCE AND FOR ALL
+
+Railway keeps failing with:
+
+sh: 1: vite: not found
+
+This means Railway is not installing the build tools before running npm run build.
+
+Please stop trying small Railway setting changes and make the repository build reliably from a fresh Railway clone.
+
+Apply this fix:
+
+1. Move build tools from devDependencies into dependencies
+
+In package.json, make sure these packages are in dependencies, not only devDependencies:
+
+vite
+typescript
+tsx
+esbuild
+drizzle-kit
+
+Reason:
+Railway/Nixpacks is installing production dependencies and then trying to build. If Vite is only in devDependencies, the build fails with “vite: not found”.
+
+2. Keep runtime dependencies in dependencies as normal.
+
+Make sure dependencies also include server/runtime packages used by the app, such as:
+
+express
+drizzle-orm
+postgres
+xlsx
+nodemailer or Brevo email package
+zod
+any other packages imported by server/index.ts or shared code
+
+3. Keep package.json scripts correct
+
+Use:
+
+"scripts": {
+"dev": "tsx server/index.ts",
+"build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+"start": "NODE_ENV=production node dist/index.js",
+"db:push": "drizzle-kit push"
+}
+
+Adjust only if the actual project paths are different.
+
+4. Add .npmrc in the project root
+
+Use:
+
+maxsockets=3
+legacy-peer-deps=true
+production=false
+fund=false
+audit=false
+
+5. Regenerate package-lock.json cleanly
+
+Do this in Replit:
+
+* Delete node_modules
+* Delete package-lock.json
+* Run npm install
+* Run npm run build
+* Confirm build passes
+* Commit package.json, package-lock.json and .npmrc
+
+6. Railway build command
+
+Set Railway build command to:
+
+npm install --legacy-peer-deps && npm run build
+
+If Railway still forces npm ci, the fix should still work because Vite will now be in dependencies.
+
+7. Railway start command
+
+Set Railway start command to:
+
+npm run start
+
+8. Do not run database setup during build or startup
+
+Do not run:
+
+npm run db:push
+npx drizzle-kit push
+drizzle-kit push
+
+during build or normal server startup.
+
+Database setup must be run manually only after successful deployment.
+
+9. Confirm the app listens on Railway port
+
+server/index.ts must use:
+
+const port = process.env.PORT || 5000;
+server.listen(port, "0.0.0.0", () => {
+console.log(`Server listening on port ${port}`);
+});
+
+10. Push to GitHub and redeploy Railway
+
+After this fix, Railway should no longer fail with:
+
+vite: not found
+
+END
