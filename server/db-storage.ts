@@ -235,7 +235,29 @@ export class DbStorage implements IStorage {
     } else {
       console.log("[DbStorage] Database already seeded.");
     }
+    // Legal entities are seeded independently of the core-table check above so
+    // that existing production databases (which already have clients/jobs/
+    // invoices/workers and therefore skip seedDatabase()) still get the
+    // default issuing entities the New Quote/Invoice forms depend on.
+    await this.ensureLegalEntitiesSeeded();
     await this.runDataMigrations();
+  }
+
+  private async ensureLegalEntitiesSeeded(): Promise<void> {
+    // Only seed when the table is genuinely empty — some databases already
+    // have legal entities (created via the Settings UI or an earlier seed),
+    // and we must never create duplicate "Terminators CC" / "Terminators Pty
+    // Ltd" rows alongside them.
+    const existing = await db.select({ id: legalEntities.id }).from(legalEntities).limit(1);
+    if (existing.length > 0) return;
+    const defaultLegalEntities = [
+      { id: "terminators_cc", name: "Terminators CC", isActive: true, isDefault: true },
+      { id: "terminators_pty_ltd", name: "Terminators Pty Ltd", isActive: true, isDefault: false },
+    ];
+    for (const entity of defaultLegalEntities) {
+      await db.insert(legalEntities).values(entity).onConflictDoNothing();
+    }
+    console.log("[DbStorage] Seeded default legal entities (Terminators CC, Terminators Pty Ltd).");
   }
 
   private async runDataMigrations(): Promise<void> {

@@ -9,3 +9,4 @@
 - [xlsx SheetJS registry limitation](xlsx-sheetjs-registry-limitation.md) — npm's xlsx is permanently stale; audit scanners always flag it even after installing SheetJS's own patched CDN build, since "fixed" is null in their data.
 - [Browser UI verification without click tool](browser-ui-verification-without-click-tool.md) — temp query-param-gated harness (real login + real DOM click) to prove a UI fix in-browser when no interact tool exists; remove immediately, it's an auth bypass if left in.
 - [Dual auth token formats](dual-auth-token-formats.md) — two incompatible login systems coexist; requireAuth must resolve worker profile-login tokens too, or admin-gated routes silently 401 for every real user.
+- [DB auto-seed gating](db-seed-gating.md) — startup seed only checks 4 core tables (clients/jobs/invoices/workers); new tables need their own unconditional "seed if empty" check or they stay empty forever on existing DBs.

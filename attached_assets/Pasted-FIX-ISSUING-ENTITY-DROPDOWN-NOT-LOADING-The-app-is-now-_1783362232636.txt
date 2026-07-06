@@ -1,0 +1,91 @@
+FIX ISSUING ENTITY DROPDOWN NOT LOADING
+
+The app is now live on Railway, but in the New Quote window the Issuing Entity dropdown shows:
+
+Could not load issuing entities from the server — using default list.
+
+The user cannot select the issuing entity.
+
+Please fix this.
+
+1. Check the API endpoint:
+
+GET /api/legal-entities
+
+It must return active legal entities.
+
+Expected default response should include:
+
+* Terminators CC
+* Terminators Pty Ltd
+
+2. If the legal_entities table does not exist, make sure the database schema includes it and that:
+
+pnpm run db:push
+
+creates it.
+
+3. Add default seed data for legal entities.
+
+Create a safe seed/default function that ensures these two records exist:
+
+Legal Entity 1:
+Name: Terminators CC
+Active: true
+
+Legal Entity 2:
+Name: Terminators Pty Ltd
+Active: true
+
+4. The seed/default function must be safe to run multiple times.
+
+It must not create duplicates.
+
+Use upsert logic or check existing records first.
+
+5. Add a script if needed:
+
+"db:seed": "tsx server/seed.ts"
+
+or similar.
+
+6. After database setup, run:
+
+pnpm run db:push
+pnpm run db:seed
+
+7. The New Quote form must load legal entities from:
+
+GET /api/legal-entities
+
+8. If the API fails, the dropdown must still show fallback options:
+
+* Terminators CC
+* Terminators Pty Ltd
+
+The user must never be blocked from creating a quote because the legal entity API failed.
+
+9. If using fallback entities, clearly mark them internally as fallback but still allow selection.
+
+10. The Issuing Entity field must be required before saving a quote.
+
+11. Quote save payload must include:
+
+legalEntityId
+legalEntityName
+
+12. Invoice creation must also use the selected legal entity.
+
+13. Add an Admin > Legal Entities page later, but for now make sure the two default entities load and can be selected.
+
+14. Test:
+
+* Open New Quote
+* Issuing Entity dropdown loads
+* Select Terminators CC
+* Select Terminators Pty Ltd
+* Save quote
+* Quote stores selected entity
+* Invoice defaults to quote entity
+
+END
