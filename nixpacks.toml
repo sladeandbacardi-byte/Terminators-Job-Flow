@@ -1,8 +1,8 @@
 [phases.install]
-cmds = ["npm install --legacy-peer-deps"]
+cmds = ["corepack enable", "pnpm install --frozen-lockfile=false"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["pnpm run build"]
 
 [start]
-cmd = "npm run start"
+cmd = "pnpm run start"
