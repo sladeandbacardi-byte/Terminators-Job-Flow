@@ -47,33 +47,61 @@ const TYPE_COLORS: Record<string, string> = {
   other:                 "#64748b",
 };
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 7); // 07:00–18:00
-const HOUR_PX = 60; // 1 pixel per minute
+const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 07:00–19:00
+const HOUR_PX = 80; // pixels per hour
 const DAY_START_HOUR = HOURS[0]; // 7
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m || 0);
+  return h * 60 + (isNaN(m) ? 0 : m);
 }
 
 function calcDuration(startTime: string, endTime: string): number {
+  if (!startTime || !endTime) return 0;
   return Math.max(0, timeToMinutes(endTime) - timeToMinutes(startTime));
 }
 
 function formatDuration(minutes: number): string {
+  if (minutes <= 0) return "";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
-  return `${h}h ${m}min`;
+  return `${h}h ${m}m`;
 }
 
-// Returns top offset and height (in pixels) for an appointment block in the
-// day / week grid.  1 hour = HOUR_PX pixels = 1 px per minute.
+// Returns top/height in pixels using the HOUR_PX scale.
+// Scale factor = HOUR_PX / 60 so 1 minute = HOUR_PX/60 px.
 function apptOffset(startTime: string, endTime: string): { top: number; height: number } {
+  if (!startTime || !endTime) return { top: 0, height: HOUR_PX };
+  const scale = HOUR_PX / 60; // px per minute
   const startMin = Math.max(0, timeToMinutes(startTime) - DAY_START_HOUR * 60);
-  const endMin   = Math.max(0, timeToMinutes(endTime)   - DAY_START_HOUR * 60);
-  return { top: startMin, height: Math.max(endMin - startMin, 20) };
+  const durationMin = Math.max(15, calcDuration(startTime, endTime)); // minimum 15min tall
+  return { top: Math.round(startMin * scale), height: Math.round(durationMin * scale) };
+}
+
+// Detects overlaps and assigns column positions so appointments display side-by-side.
+type ApptWithLayout = SalesAppointment & { col: number; cols: number };
+
+function resolveOverlaps(appts: SalesAppointment[]): ApptWithLayout[] {
+  if (appts.length === 0) return [];
+  const sorted = [...appts].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const result: ApptWithLayout[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    // Build a cluster of all appointments that overlap with any in the cluster
+    let clusterEndMin = timeToMinutes(sorted[i].endTime || "23:59");
+    let j = i + 1;
+    while (j < sorted.length && timeToMinutes(sorted[j].startTime) < clusterEndMin) {
+      clusterEndMin = Math.max(clusterEndMin, timeToMinutes(sorted[j].endTime || "23:59"));
+      j++;
+    }
+    const cluster = sorted.slice(i, j);
+    const cols = cluster.length;
+    cluster.forEach((a, idx) => result.push({ ...a, col: idx, cols }));
+    i = j;
+  }
+  return result;
 }
 
 function emptyForm(): Partial<SalesAppointment> {
@@ -366,41 +394,56 @@ export default function SalesDiary() {
       );
     }
 
+    const withLayout = resolveOverlaps(dayAppts);
     return (
       <div className="border rounded-lg overflow-hidden bg-white flex">
         {/* Hour labels */}
-        <div className="w-16 flex-shrink-0 border-r">
+        <div className="w-16 flex-shrink-0 border-r bg-gray-50">
           {HOURS.map(h => (
-            <div key={h} style={{ height: HOUR_PX }} className="border-b bg-gray-50 flex items-start justify-end pr-2 pt-1.5 text-xs text-gray-400 font-medium">
+            <div key={h} style={{ height: HOUR_PX }} className="border-b flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 font-medium">
               {String(h).padStart(2, "0")}:00
             </div>
           ))}
         </div>
         {/* Appointment area — absolute positioning so blocks span their real time */}
-        <div className="flex-1 relative" style={{ height: gridH }}>
-          {/* Grid lines */}
-          {HOURS.map((h, i) => (
-            <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
+        <div className="flex-1 relative overflow-hidden" style={{ height: gridH }}>
+          {/* Hour grid lines */}
+          {HOURS.map((_, i) => (
+            <div key={i} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
+          ))}
+          {/* Half-hour lines */}
+          {HOURS.map((_, i) => (
+            <div key={`h${i}`} className="absolute w-full border-b border-gray-50" style={{ top: i * HOUR_PX + HOUR_PX / 2 }} />
           ))}
           {/* Click-to-add */}
-          <div className="absolute inset-0 cursor-pointer" onClick={() => openNew(dateStr)} />
-          {/* Appointments */}
-          {dayAppts.map(a => {
+          <div className="absolute inset-0" onClick={() => openNew(dateStr)} />
+          {/* Appointments — side-by-side for overlaps */}
+          {withLayout.map(a => {
             const { top, height } = apptOffset(a.startTime, a.endTime);
             const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+            const colW = 100 / a.cols;
+            const leftPct = a.col * colW;
+            const dur = calcDuration(a.startTime, a.endTime);
             return (
               <div
                 key={a.id}
-                className="absolute rounded border-l-4 bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
-                style={{ top, height, left: 4, right: 4, borderLeftColor: color, zIndex: 1 }}
+                className="absolute rounded border-l-4 bg-white shadow-sm cursor-pointer hover:shadow-md hover:z-10 transition-shadow overflow-hidden"
+                style={{
+                  top, height,
+                  left: `calc(${leftPct}% + 3px)`,
+                  width: `calc(${colW}% - 6px)`,
+                  borderLeftColor: color,
+                  backgroundColor: color + "18",
+                  zIndex: 2,
+                }}
                 onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
               >
-                <div className="p-1.5 h-full flex flex-col gap-0.5">
+                <div className="p-1.5 h-full flex flex-col gap-0.5 overflow-hidden">
                   <div className="flex items-start justify-between gap-1">
-                    <p className="text-xs font-semibold text-gray-900 line-clamp-1">{a.title || a.clientName}</p>
+                    <p className="text-xs font-semibold text-gray-900 line-clamp-1 leading-tight">{a.title || a.clientName}</p>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="h-4 w-4 p-0 flex-shrink-0"><MoreHorizontal className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-4 w-4 p-0 flex-shrink-0 opacity-60 hover:opacity-100"><MoreHorizontal className="h-3 w-3" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={e => { e.stopPropagation(); markComplete(a); }}><CheckCircle2 className="h-4 w-4 mr-2" />Mark Completed</DropdownMenuItem>
@@ -412,14 +455,13 @@ export default function SalesDiary() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <Clock className="h-3 w-3 flex-shrink-0" />{a.startTime}–{a.endTime} · {formatDuration(calcDuration(a.startTime, a.endTime))}
+                  <p className="text-xs font-medium" style={{ color }}>
+                    {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
                   </p>
-                  {height >= 50 && <p className="text-xs text-gray-500 line-clamp-1"><User className="h-3 w-3 inline mr-0.5" />{a.clientName}</p>}
-                  {height >= 72 && (
+                  {height >= 56 && <p className="text-xs text-gray-600 line-clamp-1"><User className="h-3 w-3 inline mr-0.5" />{a.clientName}</p>}
+                  {height >= 80 && (
                     <div className="flex items-center gap-1 flex-wrap mt-auto">
-                      <Badge variant="outline" className={`text-xs border px-1.5 py-0 ${STATUS_META[a.status]?.classes}`}>{STATUS_META[a.status]?.label}</Badge>
-                      <Badge variant="outline" className="text-xs px-1.5 py-0 text-gray-500">{TYPE_LABELS[a.appointmentType]}</Badge>
+                      <Badge variant="outline" className={`text-xs border px-1 py-0 ${STATUS_META[a.status]?.classes}`}>{STATUS_META[a.status]?.label}</Badge>
                     </div>
                   )}
                 </div>
@@ -439,22 +481,26 @@ export default function SalesDiary() {
     return (
       <div className="border rounded-lg overflow-hidden bg-white">
         {/* Day headers */}
-        <div className="flex border-b">
+        <div className="flex border-b sticky top-0 z-10 bg-white">
           <div className="w-16 flex-shrink-0 bg-gray-50 border-r" />
-          {days.map(d => (
-            <div key={d.toISOString()} className={`flex-1 border-r p-2 text-center ${isSameDay(d, new Date()) ? "bg-blue-50" : "bg-gray-50"}`}>
-              <p className="text-xs text-gray-500 font-medium">{format(d, "EEE")}</p>
-              <p className={`text-sm font-bold ${isSameDay(d, new Date()) ? "text-blue-600" : "text-gray-800"}`}>{format(d, "d")}</p>
-              <p className="text-xs text-gray-400">{(apptsByDate[format(d, "yyyy-MM-dd")] || []).length > 0 ? `${(apptsByDate[format(d, "yyyy-MM-dd")] || []).length}` : ""}</p>
-            </div>
-          ))}
+          {days.map(d => {
+            const cnt = (apptsByDate[format(d, "yyyy-MM-dd")] || []).length;
+            return (
+              <div key={d.toISOString()} className={`flex-1 border-r p-2 text-center cursor-pointer hover:bg-blue-50/50 ${isSameDay(d, new Date()) ? "bg-blue-50" : "bg-gray-50"}`}
+                onClick={() => { setCurrentDate(d); setView("day"); }}>
+                <p className="text-xs text-gray-500 font-medium">{format(d, "EEE")}</p>
+                <p className={`text-sm font-bold ${isSameDay(d, new Date()) ? "text-blue-600" : "text-gray-800"}`}>{format(d, "d")}</p>
+                {cnt > 0 && <p className="text-xs text-blue-500 font-medium">{cnt} appt{cnt !== 1 ? "s" : ""}</p>}
+              </div>
+            );
+          })}
         </div>
         {/* Body: hour labels + 7 day columns */}
         <div className="flex overflow-auto">
           {/* Hour labels */}
-          <div className="w-16 flex-shrink-0 border-r">
+          <div className="w-16 flex-shrink-0 border-r bg-gray-50">
             {HOURS.map(h => (
-              <div key={h} style={{ height: HOUR_PX }} className="border-b bg-gray-50 flex items-start justify-end pr-2 pt-1.5 text-xs text-gray-400 font-medium">
+              <div key={h} style={{ height: HOUR_PX }} className="border-b flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 font-medium">
                 {String(h).padStart(2, "0")}:00
               </div>
             ))}
@@ -463,29 +509,46 @@ export default function SalesDiary() {
           {days.map(d => {
             const dateStr = format(d, "yyyy-MM-dd");
             const dayAppts = (apptsByDate[dateStr] || []);
+            const withLayout = resolveOverlaps(dayAppts);
             return (
               <div
                 key={dateStr}
-                className={`flex-1 border-r relative ${isSameDay(d, new Date()) ? "bg-blue-50/20" : ""}`}
-                style={{ height: gridH, minWidth: 80 }}
+                className={`flex-1 border-r relative overflow-hidden ${isSameDay(d, new Date()) ? "bg-blue-50/20" : ""}`}
+                style={{ height: gridH, minWidth: 90 }}
               >
-                {/* Grid lines */}
-                {HOURS.map((h, i) => (
-                  <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
+                {/* Hour grid lines */}
+                {HOURS.map((_, i) => (
+                  <div key={i} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
                 ))}
-                {/* Appointments */}
-                {dayAppts.map(a => {
+                {/* Half-hour lines */}
+                {HOURS.map((_, i) => (
+                  <div key={`h${i}`} className="absolute w-full border-b border-gray-50" style={{ top: i * HOUR_PX + HOUR_PX / 2 }} />
+                ))}
+                {/* Click-to-add */}
+                <div className="absolute inset-0" onClick={() => openNew(dateStr)} />
+                {/* Appointments — side-by-side if overlapping */}
+                {withLayout.map(a => {
                   const { top, height } = apptOffset(a.startTime, a.endTime);
                   const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+                  const colW = 100 / a.cols;
+                  const leftPct = a.col * colW;
+                  const dur = calcDuration(a.startTime, a.endTime);
                   return (
                     <div
                       key={a.id}
-                      className="absolute rounded border-l-2 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                      style={{ top, height: Math.max(height, 18), left: 1, right: 1, borderLeftColor: color, backgroundColor: color + "22", zIndex: 1 }}
-                      onClick={() => setDetailAppt(a)}
+                      className="absolute rounded border-l-2 overflow-hidden cursor-pointer hover:shadow-md hover:z-10 transition-shadow"
+                      style={{
+                        top, height,
+                        left: `calc(${leftPct}% + 1px)`,
+                        width: `calc(${colW}% - 2px)`,
+                        borderLeftColor: color,
+                        backgroundColor: color + "22",
+                        zIndex: 2,
+                      }}
+                      onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
                     >
-                      <p className="text-xs font-semibold px-1 pt-0.5 truncate text-gray-800">{a.startTime} {a.clientName || a.title}</p>
-                      {height >= 36 && <p className="text-xs px-1 text-gray-500 truncate">{formatDuration(calcDuration(a.startTime, a.endTime))} · {TYPE_LABELS[a.appointmentType]}</p>}
+                      <p className="text-xs font-semibold px-1 pt-0.5 truncate text-gray-800 leading-tight">{a.startTime} {a.clientName || a.title}</p>
+                      {height >= 40 && <p className="text-xs px-1 text-gray-500 truncate">{dur > 0 ? formatDuration(dur) : ""} · {TYPE_LABELS[a.appointmentType]}</p>}
                     </div>
                   );
                 })}

@@ -228,5 +228,28 @@ export async function runStartupMigrations(): Promise<void> {
     }
   }
 
+  // ── Fix sales_appointments.estimated_duration: recalculate from start/end times ─
+  // Any appointment that has both startTime and endTime gets its estimatedDuration
+  // recalculated so old records with hardcoded 60-minute values are corrected.
+  await run(
+    "sales_appointments.recalc_estimated_duration",
+    `UPDATE sales_appointments
+     SET estimated_duration = (
+       EXTRACT(HOUR FROM (end_time::time - start_time::time)) * 60 +
+       EXTRACT(MINUTE FROM (end_time::time - start_time::time))
+     )
+     WHERE start_time IS NOT NULL
+       AND end_time IS NOT NULL
+       AND end_time > start_time
+       AND (
+         estimated_duration IS NULL
+         OR estimated_duration = 60
+         OR estimated_duration != (
+           EXTRACT(HOUR FROM (end_time::time - start_time::time)) * 60 +
+           EXTRACT(MINUTE FROM (end_time::time - start_time::time))
+         )
+       )`
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

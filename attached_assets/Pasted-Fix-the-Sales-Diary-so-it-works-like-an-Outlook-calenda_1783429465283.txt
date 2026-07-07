@@ -1,0 +1,220 @@
+Fix the Sales Diary so it works like an Outlook calendar.
+
+Current problem:
+Appointments show the correct time range text, for example:
+09:00–15:00
+
+But the appointment block still displays as a 60-minute block.
+The diary card says:
+(60min)
+
+This is wrong.
+
+The diary must behave like Outlook:
+- User selects start time
+- User selects end time
+- Calendar visually blocks out the full time range
+- Duration is calculated automatically from start and end time
+
+Example:
+Start Time: 09:00
+End Time: 15:00
+
+The appointment must:
+- Display as 09:00–15:00
+- Show duration as 6h or 360min
+- Visually block the calendar from 09:00 to 15:00
+- Not appear as a 60-minute appointment
+
+REMOVE ESTIMATED DURATION AS SOURCE OF TRUTH:
+Do not use estimatedDurationMinutes to determine calendar block size.
+
+The source of truth must be:
+- startTime
+- endTime
+
+Calculate duration dynamically:
+durationMinutes = endTime - startTime
+
+If durationMinutes exists in the database but is wrong, ignore it for visual layout and recalculate from startTime/endTime.
+
+APPOINTMENT FORM:
+Remove or hide manual Estimated Duration field from create/edit appointment forms.
+
+Keep:
+- Start Time
+- End Time
+
+Show read-only calculated duration:
+Example:
+Duration: 6 hours
+
+When start or end time changes, update the calculated duration immediately.
+
+VALIDATION:
+Required:
+- Appointment Type
+- Assigned User
+- Date
+- Start Time
+- End Time
+
+Validation rules:
+- End Time must be after Start Time
+- If invalid, show:
+"End time must be after start time."
+
+CALENDAR DAY/WEEK VIEW LAYOUT:
+Update the day/week calendar layout calculation.
+
+Appointment top position must be calculated from startTime.
+
+Appointment height must be calculated from:
+endTime - startTime
+
+Example layout:
+If 1 hour row = 80px:
+09:00 to 10:00 = 80px height
+09:00 to 15:00 = 480px height
+13:30 to 15:00 = 120px height
+
+Do not use a fixed appointment height.
+Do not use 60 minutes as default for every appointment.
+Do not use estimatedDurationMinutes for card height.
+
+CALENDAR CARD TEXT:
+Appointment cards must show:
+- Title
+- Time range
+- Calculated duration
+- Status
+
+Examples:
+09:00–15:00
+6h
+
+09:00–10:00
+1h
+
+13:30–15:00
+1h 30m
+
+Do not show "(60min)" if the selected time range is longer than 60 minutes.
+
+OVERLAPPING APPOINTMENTS:
+If two appointments overlap in the same user/day:
+- Display them side-by-side like Outlook
+- Do not stack them as if they are separate time blocks
+- Do not let one hide behind the other
+
+Example:
+Appointment A: 09:00–15:00
+Appointment B: 10:00–11:00
+
+They must appear side-by-side within the overlapping time area.
+
+MONTH VIEW:
+Month view can show compact text only:
+09:00–15:00 Site Visit - Client Name
+
+DAY VIEW AND WEEK VIEW:
+Must show true block duration.
+
+SALES REPS / USERS:
+Remove separate Sales Rep list logic.
+
+Sales reps must be normal JobFlow users.
+
+The appointment assigned person must come from the users table, not a separate sales_reps table.
+
+Use users where:
+- role = Sales Rep
+- or department = Sales
+- or permission includes sales
+
+The Assigned Sales Rep dropdown should be renamed:
+Assigned User
+
+But the displayed label can still say:
+Assigned Sales Rep
+if only sales users are shown.
+
+Dropdown must show active users only.
+
+Default assigned user:
+- Current logged-in user
+
+Allowed users:
+- Sales reps
+- Sales admins
+- Managers/admins if they need to appear in the diary
+
+Do not create duplicate sales rep records.
+
+APPOINTMENT DATABASE:
+Appointments should store:
+- assignedUserId
+- assignedUserName, optional display snapshot
+- appointmentType
+- status
+- date
+- startTime
+- endTime
+- notes
+- leadId, nullable
+- clientId, nullable
+
+If the current database has:
+assigned_sales_rep_id
+then map it to user id.
+
+If there is a sales_reps table, stop using it for diary assignment unless it is already linked directly to users.
+
+MIGRATION / DATA FIX:
+For existing appointments:
+- Recalculate durationMinutes from startTime and endTime
+- Update any incorrect 60-minute duration values
+
+Example:
+09:00–15:00 must become 360 minutes.
+
+TESTING:
+Test in Replit Preview and Railway URL.
+
+Test cases:
+1. Create appointment 09:00–10:00
+Expected:
+- Shows 1h
+- Blocks one hour
+
+2. Create appointment 09:00–15:00
+Expected:
+- Shows 6h
+- Blocks 09:00 to 15:00
+
+3. Create appointment 13:30–15:00
+Expected:
+- Shows 1h 30m
+- Blocks correct time
+
+4. Edit an appointment from 09:00–10:00 to 09:00–15:00
+Expected:
+- Duration updates to 6h
+- Calendar block expands
+
+5. Try invalid time 15:00–09:00
+Expected:
+- Save blocked
+- Message: End time must be after start time
+
+6. Assign appointment to Sheryl-Lyn Lee
+Expected:
+- Sheryl-Lyn comes from users table
+- Appointment appears under her diary
+
+7. Team view:
+Expected:
+- Appointments grouped by assigned user
+- No separate fake sales rep list
+
+Do not mark complete until the Railway URL shows a 09:00–15:00 appointment visually blocking the full 6-hour time slot.
