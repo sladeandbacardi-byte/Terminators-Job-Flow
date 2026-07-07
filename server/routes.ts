@@ -3981,7 +3981,21 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   app.patch("/api/sales-appointments/:id", async (req, res) => {
     try {
       const before = await storage.getSalesAppointment(req.params.id);
-      const appt = await storage.updateSalesAppointment(req.params.id, req.body);
+
+      // Strip read-only / auto-generated fields that must not be passed to .set()
+      // (Drizzle throws "value.toISOString is not a function" when createdAt is
+      // sent as a date string instead of a real Date object, and id must never
+      // change).  Apply the same null-sanitisation as the POST route so empty-
+      // string FK values don't violate constraints.
+      const { id: _id, createdAt: _ca, ...rest } = req.body as Record<string, any>;
+      const body: Record<string, any> = { ...rest };
+      if (!body.assignedToId || body.assignedToId === "unassigned") body.assignedToId = null;
+      if (!body.leadId)       body.leadId       = null;
+      if (!body.quoteId)      body.quoteId      = null;
+      if (!body.departmentId) body.departmentId = null;
+      if (body.estimatedDuration === "" || body.estimatedDuration === undefined) body.estimatedDuration = null;
+
+      const appt = await storage.updateSalesAppointment(req.params.id, body);
 
       // Completing a site-visit appointment marks the lead's site visit done
       // and advances it to "Quote Required" — this is the fix for leads that

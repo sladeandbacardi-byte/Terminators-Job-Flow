@@ -1,0 +1,292 @@
+Fix Sales Diary appointment editing and Outlook-style calendar display.
+
+CURRENT PROBLEMS:
+
+1. Editing an appointment fails.
+When saving changes to an existing appointment, the app shows:
+"Could not update appointment."
+
+2. The diary must behave like Outlook.
+If an appointment is:
+- 30 minutes long, it must block 30 minutes
+- 1 hour long, it must block 1 hour
+- 5 hours long, it must block 5 hours
+
+The appointment block must visually extend from start time to end time.
+
+Example:
+Start Time: 11:30
+End Time: 16:30
+Duration: 5h
+
+The calendar must show a coloured appointment block from 11:30 to 16:30.
+
+Do not show all appointments as the same height.
+Do not use a fixed 60-minute card height.
+Do not use estimated duration as the source of truth.
+
+PART 1: FIX UPDATE APPOINTMENT ERROR
+
+Debug the appointment edit/update flow.
+
+When the user edits an existing appointment and clicks Save Changes:
+- Identify the API route being called
+- Confirm the appointment ID is being passed
+- Confirm the payload field names match the backend schema
+- Confirm the backend route updates the appointment
+- Confirm the database columns exist
+- Return a useful error if update fails
+
+Check the browser Network tab for the update request.
+
+Possible routes:
+- PATCH /api/sales-appointments/:id
+- PUT /api/sales-appointments/:id
+- PATCH /api/appointments/:id
+- PUT /api/appointments/:id
+
+Make sure frontend and backend use the same route.
+
+The update payload should include:
+- appointmentType
+- assignedUserId
+- assignedUserName
+- status
+- date
+- startTime
+- endTime
+- durationMinutes
+- phone
+- siteAddress
+- notes
+- leadId, nullable
+- clientId, nullable
+
+Make sure the payload does not send invalid values:
+- Empty strings for numbers must become null
+- Empty leadId/clientId must become null
+- date must be YYYY-MM-DD
+- startTime must be HH:mm
+- endTime must be HH:mm
+- durationMinutes must be calculated number
+
+If assigned sales rep currently uses users, store:
+- assignedUserId
+
+If the backend still expects assignedSalesRepId or assigned_sales_rep_id, map the selected user id correctly.
+
+Fix field name mismatches such as:
+- assignedSalesRep vs assignedUserId
+- assignedSalesRepId vs assigned_user_id
+- appointment_type vs appointmentType
+- start_time vs startTime
+- end_time vs endTime
+- site_address vs siteAddress
+
+Frontend error handling:
+Do not show only:
+"Could not update appointment."
+
+Show the actual backend error:
+"Could not update appointment: assigned user is required"
+or
+"Could not update appointment: invalid appointment id"
+or
+"Could not update appointment: column assigned_user_id does not exist"
+
+Backend error handling:
+Log the real error in server logs.
+Return:
+{
+  "success": false,
+  "message": "Could not update appointment",
+  "details": "actual error here"
+}
+
+PART 2: REMOVE MANUAL DURATION AS INPUT
+
+The appointment form must use:
+- Start Time
+- End Time
+
+The duration must be calculated automatically and shown as read-only.
+
+Remove any editable Estimated Duration field.
+
+Show:
+Duration: 5h
+or
+Duration: 1h 30m
+or
+Duration: 30m
+
+Calculation:
+durationMinutes = minutesBetween(startTime, endTime)
+
+Validation:
+- Start Time is required
+- End Time is required
+- End Time must be after Start Time
+- If invalid, block saving and show:
+"End time must be after start time."
+
+PART 3: FIX OUTLOOK-STYLE DIARY DISPLAY
+
+The day/week calendar view must calculate appointment position and height from startTime and endTime.
+
+Source of truth:
+- date
+- startTime
+- endTime
+
+Do not use:
+- fixed height
+- default 60 minutes
+- estimatedDurationMinutes for visual layout
+
+Calendar layout logic:
+
+top = minutesSinceCalendarStart(startTime) * pixelsPerMinute
+
+height = minutesBetween(startTime, endTime) * pixelsPerMinute
+
+Example:
+If calendar starts at 07:00 and pixelsPerMinute is 1.2:
+
+Appointment 11:30–16:30:
+minutes since 07:00 = 270
+top = 270 * 1.2 = 324px
+duration = 300 minutes
+height = 300 * 1.2 = 360px
+
+The appointment must visually block from 11:30 to 16:30.
+
+Test examples:
+- 08:00–08:30 must display as a short 30-minute block
+- 09:00–10:00 must display as a 1-hour block
+- 11:30–16:30 must display as a 5-hour block
+- 09:00–15:00 must display as a 6-hour block
+
+PART 4: COLOURS
+
+Appointments must display as coloured blocks.
+
+Use colour based on appointment type or status.
+
+Suggested appointment type colours:
+- Site Visit: purple
+- New Lead Meeting: blue
+- Quote Follow-up: orange
+- Existing Client Visit: teal
+- Internal Sales Meeting: grey
+- Complaint / Issue Visit: red
+- After-sales Follow-up: green
+- Other: slate
+
+Status badge:
+- Planned: blue
+- Confirmed: green
+- Completed: grey
+- Cancelled: red
+- Rescheduled: orange
+- No Show: red
+
+The appointment block should have:
+- coloured left border or coloured background tint
+- title
+- time range
+- calculated duration
+- client/lead name
+- status badge
+
+Example:
+Site Visit - Blue Waters Hotel
+11:30–16:30 · 5h
+Confirmed
+
+PART 5: OVERLAPPING APPOINTMENTS
+
+If appointments overlap for the same assigned user on the same day, display them side-by-side like Outlook.
+
+Do not stack them vertically as if they do not overlap.
+Do not hide one behind another.
+
+Example:
+A: 09:00–15:00
+B: 10:00–11:00
+
+Both must be visible side-by-side during the overlap.
+
+PART 6: USERS, NOT SEPARATE SALES REPS
+
+Sales reps must just be JobFlow users.
+
+Do not use a separate sales reps table/list unless it is directly linked to users.
+
+The Assigned Sales Rep dropdown must pull from active users where:
+- role = Sales Rep
+- role = Sales Admin
+- role = Manager
+- role = Admin
+or user has sales permission.
+
+Default assigned user:
+- current logged-in user
+
+Store appointment assignment as:
+- assignedUserId
+- assignedUserName for display if needed
+
+PART 7: MIGRATE/FIX EXISTING APPOINTMENTS
+
+For all existing appointments:
+- Recalculate durationMinutes from startTime and endTime
+- Update wrong 60-minute duration values
+
+Example:
+If appointment has:
+startTime = 11:30
+endTime = 16:30
+durationMinutes = 60
+
+Change durationMinutes to:
+300
+
+But remember:
+The calendar display must still use startTime/endTime as the source of truth.
+
+PART 8: TESTING
+
+Test editing existing appointments:
+
+1. Edit appointment from 11:30–12:30 to 11:30–16:30
+Expected:
+- Save succeeds
+- Duration shows 5h
+- Diary block stretches from 11:30 to 16:30
+
+2. Edit 09:00–10:00 to 09:00–09:30
+Expected:
+- Save succeeds
+- Duration shows 30m
+- Diary block shrinks to 30 minutes
+
+3. Edit appointment assigned user
+Expected:
+- Save succeeds
+- Appointment appears under the selected user's diary
+
+4. Invalid time 16:30–11:30
+Expected:
+- Save blocked
+- Error says "End time must be after start time"
+
+5. Test on both:
+- Replit Preview
+- Railway URL
+
+Do not mark complete until:
+- Editing appointments works
+- Railway URL works
+- Appointment blocks visually stretch according to start/end time
+- 11:30–16:30 shows as a 5-hour block, not a 60-minute block
