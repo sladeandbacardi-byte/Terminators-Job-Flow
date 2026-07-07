@@ -1,0 +1,181 @@
+Fix Sales Diary appointment saving.
+
+Current issue:
+When creating a Sales Diary appointment, the user gets:
+"Error - Could not save appointment."
+
+The form shown has "Assigned Sales Rep" blank, and this may be causing the save to fail.
+
+Required fixes:
+
+1. Auto-fill Assigned Sales Rep
+When creating an appointment, default the Assigned Sales Rep to the currently logged-in user.
+
+Example:
+If logged in as Sheryl-Lyn Lee, the Assigned Sales Rep field must default to Sheryl-Lyn Lee.
+
+The user can still change it if they have permission.
+
+2. Make required fields visually clear
+If Assigned Sales Rep is required, the label must show:
+Assigned Sales Rep *
+
+Required fields should be:
+- Appointment Type
+- Assigned Sales Rep
+- Status
+- Date
+- Start Time
+- End Time
+
+Optional fields:
+- Notes
+- Site Address
+- Phone
+- Estimated Duration
+- Client/lead, unless appointment is created from a lead
+
+3. Add proper frontend validation before saving
+Before calling the API, check:
+- appointmentType is selected
+- assignedSalesRep is selected
+- date is selected
+- startTime is selected
+- endTime is selected
+- endTime is after startTime
+
+If validation fails, show a specific message:
+"Please select an assigned sales rep."
+or
+"End time must be after start time."
+
+Do not send the request if required fields are missing.
+
+4. Improve backend error response
+Do not return only:
+"Could not save appointment."
+
+Return the actual reason:
+- Missing assigned sales rep
+- Invalid date
+- Invalid time
+- Invalid lead ID
+- Database column missing
+- Invalid enum value
+- Permission denied
+
+Example response:
+{
+  "success": false,
+  "message": "Could not save appointment",
+  "details": "assigned_sales_rep_id is required"
+}
+
+5. Improve frontend toast message
+Show:
+"Could not save appointment: assigned sales rep is required"
+
+instead of only:
+"Could not save appointment."
+
+6. Check the appointment create payload
+Confirm frontend sends the exact fields the backend expects.
+
+Check for naming mismatches such as:
+- assignedSalesRep
+- assignedSalesRepId
+- salesRep
+- salesRepId
+- assigned_sales_rep_id
+
+Make frontend and backend use the same field names.
+
+7. Fix date/time format
+Ensure the appointment save payload sends valid values:
+- date as YYYY-MM-DD
+- startTime as HH:mm
+- endTime as HH:mm
+- estimatedDurationMinutes as number or null
+
+Do not send empty strings for optional numeric fields.
+Convert empty strings to null.
+
+8. Check database table
+Check the appointment table exists and has the required columns.
+
+Possible table names:
+- sales_appointments
+- appointments
+- diary_entries
+
+Required columns:
+- id
+- title
+- lead_id, nullable
+- client_id, nullable
+- contact_person
+- phone
+- site_address
+- appointment_type
+- assigned_sales_rep_id
+- assigned_sales_rep_name
+- status
+- date
+- start_time
+- end_time
+- estimated_duration_minutes
+- notes
+- created_at
+- updated_at
+
+9. If appointment is created from a lead
+When creating appointment from a lead card:
+- Auto-fill lead ID
+- Auto-fill client/company name
+- Auto-fill contact person
+- Auto-fill phone
+- Auto-fill site address
+- Auto-fill assigned sales rep from lead if available
+- If lead has no assigned rep, default to logged-in user
+
+10. If creating appointment directly from Diary
+Allow appointment without a lead, but require:
+- Appointment title or client name
+- Assigned sales rep
+- Date
+- Start time
+- End time
+- Appointment type
+
+11. Test cases
+Test appointment creation with:
+
+A. From lead:
+- Open lead
+- Book appointment
+- Confirm sales rep is auto-filled
+- Save appointment
+- Confirm appointment appears in Diary
+
+B. From Diary:
+- Create appointment manually
+- Select rep
+- Save
+- Confirm appointment appears in Diary
+
+C. Missing rep:
+- Clear Assigned Sales Rep
+- Click save
+- Confirm validation message says:
+"Please select an assigned sales rep."
+
+D. Invalid time:
+- Start time 15:00
+- End time 09:00
+- Confirm validation message says:
+"End time must be after start time."
+
+12. Do not mark complete until tested on Railway URL and Replit Preview.
+
+The goal:
+Sales reps must be able to save appointments, and if something is missing, the app must show the exact field that needs attention.

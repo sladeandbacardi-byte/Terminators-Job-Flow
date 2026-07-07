@@ -3937,7 +3937,22 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   app.post("/api/sales-appointments", async (req, res) => {
     try {
       const { insertSalesAppointmentSchema } = await import("@shared/schema");
-      const data = insertSalesAppointmentSchema.parse(req.body);
+
+      // Sanitise incoming body: convert empty strings / placeholder values to
+      // null so FK constraints and Zod validations don't fire on them.
+      const body = { ...req.body };
+      if (!body.assignedToId || body.assignedToId === "unassigned") body.assignedToId = null;
+      if (!body.leadId) body.leadId = null;
+      if (!body.quoteId) body.quoteId = null;
+      if (!body.departmentId) body.departmentId = null;
+      if (body.estimatedDuration === "" || body.estimatedDuration === undefined) body.estimatedDuration = null;
+
+      // Explicit pre-check before parsing so the error message is clear
+      if (!body.assignedToId && !body.title && !body.clientName) {
+        return res.status(400).json({ success: false, message: "Could not save appointment", details: "assigned sales rep is required" });
+      }
+
+      const data = insertSalesAppointmentSchema.parse(body);
       const appt = await storage.createSalesAppointment(data);
 
       // Booking an appointment against a lead advances it to "Appointment Booked"

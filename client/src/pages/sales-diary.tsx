@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isSameMonth, parseISO, addWeeks, subWeeks, addMonths, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,7 @@ function emptyForm(): Partial<SalesAppointment> {
 
 export default function SalesDiary() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [view, setView] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterRep, setFilterRep] = useState("all");
@@ -83,12 +85,31 @@ export default function SalesDiary() {
   const { data: appointments = [] } = useQuery<SalesAppointment[]>({ queryKey: ["/api/sales-appointments"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
 
+  // Match the logged-in admin user to a worker record (by email, then by full name)
+  const currentWorker = useMemo(() => {
+    if (!user) return null;
+    const byEmail = workers.find(w => w.email?.toLowerCase() === (user.email || "").toLowerCase());
+    if (byEmail) return byEmail;
+    const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+    return workers.find(w => w.name.toLowerCase() === fullName) || null;
+  }, [workers, user]);
+
+  // Auto-fill assignedToId with the current user's worker record whenever the
+  // form opens for a new appointment and no rep has been chosen yet.
+  useEffect(() => {
+    if (showForm && !editAppt && currentWorker && !formData.assignedToId) {
+      setFormData(f => ({ ...f, assignedToId: currentWorker.id }));
+    }
+  }, [showForm, editAppt, currentWorker]);
+
   // Pre-fill form from URL params (e.g. when coming from the Leads page)
   useEffect(() => {
     if (!searchStr) return;
     const params = new URLSearchParams(searchStr);
     const clientName = params.get("clientName");
     if (!clientName) return;
+    // Prefer the lead's assigned rep; fall back to the current user's worker
+    const repId = params.get("assignedTo") || currentWorker?.id || "";
     setFormData({
       ...emptyForm(),
       clientName,
@@ -98,6 +119,7 @@ export default function SalesDiary() {
       leadId: params.get("leadId") || undefined,
       appointmentType: (params.get("appointmentType") as any) || "new_lead_meeting",
       title: `${TYPE_LABELS[params.get("appointmentType") || "new_lead_meeting"] || "New Lead Meeting"} – ${clientName}`,
+      assignedToId: repId,
     });
     setEditAppt(null);
     setShowForm(true);
@@ -109,13 +131,33 @@ export default function SalesDiary() {
   const createMut = useMutation({
     mutationFn: (data: Partial<SalesAppointment>) => apiRequest("POST", "/api/sales-appointments", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setShowForm(false); toast({ title: "Appointment created" }); },
-    onError: () => toast({ title: "Error", description: "Could not save appointment.", variant: "destructive" }),
+    onError: (err: any) => {
+      let detail = "Could not save appointment.";
+      try {
+        const raw = String(err?.message ?? "");
+        const jsonPart = raw.replace(/^\d+:\s*/, "");
+        const parsed = JSON.parse(jsonPart);
+        if (parsed?.details) detail = `Could not save appointment: ${parsed.details}`;
+        else if (parsed?.error) detail = `Could not save appointment: ${parsed.error}`;
+      } catch { /* ignore parse errors */ }
+      toast({ title: "Error", description: detail, variant: "destructive" });
+    },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...data }: Partial<SalesAppointment> & { id: string }) => apiRequest("PATCH", `/api/sales-appointments/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setShowForm(false); setEditAppt(null); setDetailAppt(null); setCompleteAppt(null); toast({ title: "Appointment updated" }); },
-    onError: () => toast({ title: "Error", description: "Could not update appointment.", variant: "destructive" }),
+    onError: (err: any) => {
+      let detail = "Could not update appointment.";
+      try {
+        const raw = String(err?.message ?? "");
+        const jsonPart = raw.replace(/^\d+:\s*/, "");
+        const parsed = JSON.parse(jsonPart);
+        if (parsed?.details) detail = `Could not update appointment: ${parsed.details}`;
+        else if (parsed?.error) detail = `Could not update appointment: ${parsed.error}`;
+      } catch { /* ignore parse errors */ }
+      toast({ title: "Error", description: detail, variant: "destructive" });
+    },
   });
 
   const deleteMut = useMutation({
@@ -150,7 +192,11 @@ export default function SalesDiary() {
 
   const openNew = (date?: string) => {
     setEditAppt(null);
-    setFormData({ ...emptyForm(), date: date || format(currentDate, "yyyy-MM-dd") });
+    setFormData({
+      ...emptyForm(),
+      date: date || format(currentDate, "yyyy-MM-dd"),
+      assignedToId: currentWorker?.id || "",
+    });
     setShowForm(true);
   };
 
@@ -162,13 +208,43 @@ export default function SalesDiary() {
   };
 
   const saveForm = () => {
-    if (!formData.title || !formData.clientName || !formData.date || !formData.startTime || !formData.endTime) {
-      toast({ title: "Required fields missing", variant: "destructive" }); return;
+    if (!formData.appointmentType) {
+      toast({ title: "Appointment type is required", variant: "destructive" }); return;
     }
+    if (!formData.assignedToId) {
+      toast({ title: "Please select an assigned sales rep.", variant: "destructive" }); return;
+    }
+    if (!formData.date) {
+      toast({ title: "Date is required", variant: "destructive" }); return;
+    }
+    if (!formData.startTime) {
+      toast({ title: "Start time is required", variant: "destructive" }); return;
+    }
+    if (!formData.endTime) {
+      toast({ title: "End time is required", variant: "destructive" }); return;
+    }
+    if (timeToMinutes(formData.endTime) <= timeToMinutes(formData.startTime)) {
+      toast({ title: "End time must be after start time.", variant: "destructive" }); return;
+    }
+    if (!formData.title && !formData.clientName) {
+      toast({ title: "Please enter a title or client name.", variant: "destructive" }); return;
+    }
+
+    // Sanitise: strip placeholder values and empty strings for optional fields
+    const payload: Partial<SalesAppointment> = {
+      ...formData,
+      title: formData.title || formData.clientName || "Appointment",
+      assignedToId: formData.assignedToId || null,
+      estimatedDuration: formData.estimatedDuration || null,
+      leadId: formData.leadId || null,
+      quoteId: formData.quoteId || null,
+      departmentId: formData.departmentId || null,
+    };
+
     if (editAppt) {
-      updateMut.mutate({ ...formData, id: editAppt.id } as SalesAppointment & { id: string });
+      updateMut.mutate({ ...payload, id: editAppt.id } as SalesAppointment & { id: string });
     } else {
-      createMut.mutate(formData);
+      createMut.mutate(payload);
     }
   };
 
@@ -537,12 +613,13 @@ export default function SalesDiary() {
               </div>
             )}
             <div className="space-y-1">
-              <Label className="text-xs">Assigned Sales Rep</Label>
-              <Select value={formData.assignedToId || ""} onValueChange={v => setFormData(f => ({ ...f, assignedToId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select rep" /></SelectTrigger>
+              <Label className="text-xs">Assigned Sales Rep *</Label>
+              <Select value={formData.assignedToId || ""} onValueChange={v => setFormData(f => ({ ...f, assignedToId: v || "" }))}>
+                <SelectTrigger className={!formData.assignedToId ? "border-orange-300" : ""}><SelectValue placeholder="Select sales rep" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {workers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                  {(salesWorkers.length > 0 ? salesWorkers : workers).map(w => (
+                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

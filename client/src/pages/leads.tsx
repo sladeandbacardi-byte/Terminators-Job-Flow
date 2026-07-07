@@ -507,6 +507,7 @@ export default function Leads() {
                           siteAddress: lead.address || "",
                           leadId: lead.id,
                           appointmentType: "site_visit",
+                          ...(lead.assignedTo ? { assignedTo: lead.assignedTo } : {}),
                         });
                         navigate(`/sales-diary?${p.toString()}`);
                       }}
