@@ -1,0 +1,106 @@
+Update the Sales Diary appointment time and duration handling.
+
+Current issue:
+The appointment form has:
+- Start Time
+- End Time
+- Estimated Duration
+
+This is confusing and unnecessary.
+
+If the user selects a start time and an end time, the system must calculate the duration automatically.
+
+Remove or hide the manual "Estimated Duration (minutes)" field from the appointment form.
+
+The form must keep:
+- Start Time
+- End Time
+
+When the user selects:
+Start Time: 09:00
+End Time: 15:00
+
+The system must calculate:
+Duration: 6 hours / 360 minutes
+
+Appointment duration must be calculated as:
+endTime - startTime
+
+Save the calculated duration to the database as:
+durationMinutes
+
+or the existing equivalent field if already present.
+
+Do not require the user to type estimated duration manually.
+
+Validation:
+- Start Time is required
+- End Time is required
+- End Time must be after Start Time
+- If End Time is before or equal to Start Time, show:
+"End time must be after start time."
+
+Diary display:
+The Sales Diary must display appointments using the actual start and end time.
+
+Example:
+09:00 - 15:00
+Site Visit - Greenacres Medical Centre
+6 hours
+
+Calendar blocking:
+On the day/week calendar view, the appointment must visually block out the full time range from 09:00 to 15:00.
+
+It must not display as a short 30-minute or 60-minute appointment if the selected time is 09:00 to 15:00.
+
+The visual height/length of the appointment block must be based on:
+startTime and endTime
+
+not on estimated duration.
+
+Month view:
+In month view, show the appointment as:
+09:00 - 15:00 Site Visit - Client Name
+
+Day/week view:
+In day/week view, block the time from start to end.
+
+Appointment card should show:
+- Time range: 09:00 - 15:00
+- Duration: 6h
+- Appointment type
+- Client / lead name
+- Assigned sales rep
+- Status
+
+Edit appointment:
+When editing an appointment:
+- Show Start Time
+- Show End Time
+- Show calculated duration as read-only text if useful
+Example:
+"Duration: 6 hours"
+
+Do not allow manual editing of duration unless there is a specific reason.
+
+Backend:
+When creating or updating an appointment:
+- Calculate durationMinutes from startTime and endTime
+- Store durationMinutes
+- Keep startTime and endTime as the source of truth
+
+If durationMinutes is missing, the frontend must still calculate duration from startTime and endTime.
+
+Testing:
+Test these appointment times:
+1. 09:00 to 10:00 = 1 hour
+2. 09:00 to 15:00 = 6 hours
+3. 13:30 to 15:00 = 1 hour 30 minutes
+4. 15:00 to 09:00 must fail validation
+5. 09:00 to 09:00 must fail validation
+
+Test on:
+- Replit Preview
+- Railway URL
+
+Do not mark complete until a 09:00 to 15:00 appointment visibly blocks out the diary from 09:00 to 15:00.

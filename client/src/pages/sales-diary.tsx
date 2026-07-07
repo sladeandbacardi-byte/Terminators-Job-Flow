@@ -48,10 +48,32 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 7); // 07:00–18:00
+const HOUR_PX = 60; // 1 pixel per minute
+const DAY_START_HOUR = HOURS[0]; // 7
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + (m || 0);
+}
+
+function calcDuration(startTime: string, endTime: string): number {
+  return Math.max(0, timeToMinutes(endTime) - timeToMinutes(startTime));
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
+
+// Returns top offset and height (in pixels) for an appointment block in the
+// day / week grid.  1 hour = HOUR_PX pixels = 1 px per minute.
+function apptOffset(startTime: string, endTime: string): { top: number; height: number } {
+  const startMin = Math.max(0, timeToMinutes(startTime) - DAY_START_HOUR * 60);
+  const endMin   = Math.max(0, timeToMinutes(endTime)   - DAY_START_HOUR * 60);
+  return { top: startMin, height: Math.max(endMin - startMin, 20) };
 }
 
 function emptyForm(): Partial<SalesAppointment> {
@@ -59,7 +81,7 @@ function emptyForm(): Partial<SalesAppointment> {
     title: "", clientName: "", contactPerson: "", phone: "", siteAddress: "",
     appointmentType: "new_lead_meeting", appointmentTypeOther: "", assignedToId: "",
     date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00",
-    estimatedDuration: 60, status: "planned", notes: "",
+    status: "planned", notes: "",
   };
 }
 
@@ -230,12 +252,14 @@ export default function SalesDiary() {
       toast({ title: "Please enter a title or client name.", variant: "destructive" }); return;
     }
 
-    // Sanitise: strip placeholder values and empty strings for optional fields
+    // Sanitise: strip placeholder values and empty strings for optional fields.
+    // Auto-calculate estimatedDuration from start/end times so it's always correct.
+    const duration = calcDuration(formData.startTime!, formData.endTime!);
     const payload: Partial<SalesAppointment> = {
       ...formData,
       title: formData.title || formData.clientName || "Appointment",
       assignedToId: formData.assignedToId || null,
-      estimatedDuration: formData.estimatedDuration || null,
+      estimatedDuration: duration > 0 ? duration : null,
       leadId: formData.leadId || null,
       quoteId: formData.quoteId || null,
       departmentId: formData.departmentId || null,
@@ -291,7 +315,7 @@ export default function SalesDiary() {
           </div>
           <p className={`text-gray-600 ${compact ? "text-xs" : "text-xs"} flex items-center gap-1`}>
             <Clock className="h-3 w-3 flex-shrink-0" />{a.startTime}–{a.endTime}
-            {a.estimatedDuration ? ` (${a.estimatedDuration}min)` : ""}
+            {" · "}{formatDuration(calcDuration(a.startTime, a.endTime))}
           </p>
           {!compact && <p className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1"><User className="h-3 w-3" />{a.clientName}</p>}
           {!compact && a.siteAddress && <p className="text-xs text-gray-400 flex items-center gap-1 line-clamp-1"><MapPin className="h-3 w-3" />{a.siteAddress}</p>}
@@ -309,6 +333,8 @@ export default function SalesDiary() {
   const DayView = () => {
     const dateStr = format(currentDate, "yyyy-MM-dd");
     const dayAppts = (apptsByDate[dateStr] || []).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const gridH = HOURS.length * HOUR_PX;
+
     if (managerView) {
       const reps = salesWorkers.length > 0 ? salesWorkers : workers.slice(0, 3);
       return (
@@ -326,9 +352,9 @@ export default function SalesDiary() {
                 <CardContent className="p-3 space-y-2">
                   {repAppts.length === 0 ? <p className="text-xs text-gray-400 text-center py-4">No appointments</p> :
                     repAppts.map(a => (
-                      <div key={a.id} className="border-l-4 pl-2 py-1 rounded-sm" style={{ borderLeftColor: TYPE_COLORS[a.appointmentType] }}>
-                        <p className="text-xs font-semibold text-gray-800">{a.startTime} – {TYPE_LABELS[a.appointmentType]}</p>
-                        <p className="text-xs text-gray-600">{a.clientName}</p>
+                      <div key={a.id} className="border-l-4 pl-2 py-1 rounded-sm cursor-pointer hover:bg-gray-50" style={{ borderLeftColor: TYPE_COLORS[a.appointmentType] }} onClick={() => setDetailAppt(a)}>
+                        <p className="text-xs font-semibold text-gray-800">{a.startTime}–{a.endTime} · {formatDuration(calcDuration(a.startTime, a.endTime))}</p>
+                        <p className="text-xs text-gray-600">{a.clientName} · {TYPE_LABELS[a.appointmentType]}</p>
                         <Badge variant="outline" className={`text-xs border px-1.5 py-0 mt-0.5 ${STATUS_META[a.status]?.classes}`}>{STATUS_META[a.status]?.label}</Badge>
                       </div>
                     ))}
@@ -339,25 +365,68 @@ export default function SalesDiary() {
         </div>
       );
     }
+
     return (
-      <div className="grid grid-cols-[64px_1fr] border rounded-lg overflow-hidden bg-white">
-        {HOURS.map(h => {
-          const hStr = `${String(h).padStart(2, "0")}:00`;
-          const slotAppts = dayAppts.filter(a => {
-            const start = timeToMinutes(a.startTime);
-            return start >= h * 60 && start < (h + 1) * 60;
-          });
-          return [
-            <div key={`h-${h}`} className="border-r border-b bg-gray-50 flex items-start justify-end pr-2 pt-1.5 text-xs text-gray-400 font-medium">{hStr}</div>,
-            <div key={`s-${h}`} className="border-b min-h-[60px] p-1 space-y-1 relative">
-              {slotAppts.map(a => <ApptCard key={a.id} a={a} />)}
-              {slotAppts.length === 0 && (
-                <button className="w-full h-full absolute inset-0 opacity-0 hover:opacity-100 flex items-center justify-center text-xs text-gray-300 hover:text-gray-400"
-                  onClick={() => openNew(dateStr)}>+ Add</button>
-              )}
-            </div>,
-          ];
-        })}
+      <div className="border rounded-lg overflow-hidden bg-white flex">
+        {/* Hour labels */}
+        <div className="w-16 flex-shrink-0 border-r">
+          {HOURS.map(h => (
+            <div key={h} style={{ height: HOUR_PX }} className="border-b bg-gray-50 flex items-start justify-end pr-2 pt-1.5 text-xs text-gray-400 font-medium">
+              {String(h).padStart(2, "0")}:00
+            </div>
+          ))}
+        </div>
+        {/* Appointment area — absolute positioning so blocks span their real time */}
+        <div className="flex-1 relative" style={{ height: gridH }}>
+          {/* Grid lines */}
+          {HOURS.map((h, i) => (
+            <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
+          ))}
+          {/* Click-to-add */}
+          <div className="absolute inset-0 cursor-pointer" onClick={() => openNew(dateStr)} />
+          {/* Appointments */}
+          {dayAppts.map(a => {
+            const { top, height } = apptOffset(a.startTime, a.endTime);
+            const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+            return (
+              <div
+                key={a.id}
+                className="absolute rounded border-l-4 bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
+                style={{ top, height, left: 4, right: 4, borderLeftColor: color, zIndex: 1 }}
+                onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
+              >
+                <div className="p-1.5 h-full flex flex-col gap-0.5">
+                  <div className="flex items-start justify-between gap-1">
+                    <p className="text-xs font-semibold text-gray-900 line-clamp-1">{a.title || a.clientName}</p>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="h-4 w-4 p-0 flex-shrink-0"><MoreHorizontal className="h-3 w-3" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); markComplete(a); }}><CheckCircle2 className="h-4 w-4 mr-2" />Mark Completed</DropdownMenuItem>
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "rescheduled" }); }}><RefreshCw className="h-4 w-4 mr-2" />Reschedule</DropdownMenuItem>
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); openEdit(a); }}><FileText className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "cancelled" }); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Cancel</DropdownMenuItem>
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); if (confirm("Delete this appointment?")) deleteMut.mutate(a.id); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <Clock className="h-3 w-3 flex-shrink-0" />{a.startTime}–{a.endTime} · {formatDuration(calcDuration(a.startTime, a.endTime))}
+                  </p>
+                  {height >= 50 && <p className="text-xs text-gray-500 line-clamp-1"><User className="h-3 w-3 inline mr-0.5" />{a.clientName}</p>}
+                  {height >= 72 && (
+                    <div className="flex items-center gap-1 flex-wrap mt-auto">
+                      <Badge variant="outline" className={`text-xs border px-1.5 py-0 ${STATUS_META[a.status]?.classes}`}>{STATUS_META[a.status]?.label}</Badge>
+                      <Badge variant="outline" className="text-xs px-1.5 py-0 text-gray-500">{TYPE_LABELS[a.appointmentType]}</Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -366,37 +435,64 @@ export default function SalesDiary() {
   const WeekView = () => {
     const start = startOfWeek(currentDate, { weekStartsOn: 1 });
     const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    const gridH = HOURS.length * HOUR_PX;
     return (
       <div className="border rounded-lg overflow-hidden bg-white">
-        {/* Header */}
-        <div className="grid border-b" style={{ gridTemplateColumns: "64px repeat(7, 1fr)" }}>
-          <div className="bg-gray-50 border-r" />
+        {/* Day headers */}
+        <div className="flex border-b">
+          <div className="w-16 flex-shrink-0 bg-gray-50 border-r" />
           {days.map(d => (
-            <div key={d.toISOString()} className={`border-r p-2 text-center ${isSameDay(d, new Date()) ? "bg-blue-50" : "bg-gray-50"}`}>
+            <div key={d.toISOString()} className={`flex-1 border-r p-2 text-center ${isSameDay(d, new Date()) ? "bg-blue-50" : "bg-gray-50"}`}>
               <p className="text-xs text-gray-500 font-medium">{format(d, "EEE")}</p>
               <p className={`text-sm font-bold ${isSameDay(d, new Date()) ? "text-blue-600" : "text-gray-800"}`}>{format(d, "d")}</p>
-              <p className="text-xs text-gray-400">{(apptsByDate[format(d, "yyyy-MM-dd")] || []).length > 0 ? `${(apptsByDate[format(d, "yyyy-MM-dd")] || []).length} appt` : ""}</p>
+              <p className="text-xs text-gray-400">{(apptsByDate[format(d, "yyyy-MM-dd")] || []).length > 0 ? `${(apptsByDate[format(d, "yyyy-MM-dd")] || []).length}` : ""}</p>
             </div>
           ))}
         </div>
-        {/* Hour rows */}
-        {HOURS.map(h => (
-          <div key={h} className="grid border-b" style={{ gridTemplateColumns: "64px repeat(7, 1fr)" }}>
-            <div className="border-r bg-gray-50 flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 min-h-[56px]">{`${String(h).padStart(2, "0")}:00`}</div>
-            {days.map(d => {
-              const dateStr = format(d, "yyyy-MM-dd");
-              const slotAppts = (apptsByDate[dateStr] || []).filter(a => {
-                const start2 = timeToMinutes(a.startTime);
-                return start2 >= h * 60 && start2 < (h + 1) * 60;
-              });
-              return (
-                <div key={d.toISOString()} className={`border-r p-0.5 min-h-[56px] space-y-0.5 ${isSameDay(d, new Date()) ? "bg-blue-50/30" : ""}`}>
-                  {slotAppts.map(a => <ApptCard key={a.id} a={a} compact />)}
-                </div>
-              );
-            })}
+        {/* Body: hour labels + 7 day columns */}
+        <div className="flex overflow-auto">
+          {/* Hour labels */}
+          <div className="w-16 flex-shrink-0 border-r">
+            {HOURS.map(h => (
+              <div key={h} style={{ height: HOUR_PX }} className="border-b bg-gray-50 flex items-start justify-end pr-2 pt-1.5 text-xs text-gray-400 font-medium">
+                {String(h).padStart(2, "0")}:00
+              </div>
+            ))}
           </div>
-        ))}
+          {/* Day columns with absolutely-positioned appointment blocks */}
+          {days.map(d => {
+            const dateStr = format(d, "yyyy-MM-dd");
+            const dayAppts = (apptsByDate[dateStr] || []);
+            return (
+              <div
+                key={dateStr}
+                className={`flex-1 border-r relative ${isSameDay(d, new Date()) ? "bg-blue-50/20" : ""}`}
+                style={{ height: gridH, minWidth: 80 }}
+              >
+                {/* Grid lines */}
+                {HOURS.map((h, i) => (
+                  <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
+                ))}
+                {/* Appointments */}
+                {dayAppts.map(a => {
+                  const { top, height } = apptOffset(a.startTime, a.endTime);
+                  const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+                  return (
+                    <div
+                      key={a.id}
+                      className="absolute rounded border-l-2 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                      style={{ top, height: Math.max(height, 18), left: 1, right: 1, borderLeftColor: color, backgroundColor: color + "22", zIndex: 1 }}
+                      onClick={() => setDetailAppt(a)}
+                    >
+                      <p className="text-xs font-semibold px-1 pt-0.5 truncate text-gray-800">{a.startTime} {a.clientName || a.title}</p>
+                      {height >= 36 && <p className="text-xs px-1 text-gray-500 truncate">{formatDuration(calcDuration(a.startTime, a.endTime))} · {TYPE_LABELS[a.appointmentType]}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -642,10 +738,15 @@ export default function SalesDiary() {
               <Label className="text-xs">End Time *</Label>
               <Input type="time" value={formData.endTime || ""} onChange={e => setFormData(f => ({ ...f, endTime: e.target.value }))} />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Estimated Duration (minutes)</Label>
-              <Input type="number" value={formData.estimatedDuration || ""} onChange={e => setFormData(f => ({ ...f, estimatedDuration: parseInt(e.target.value) || undefined }))} placeholder="60" />
-            </div>
+            {/* Duration is auto-calculated from start/end times — shown as read-only */}
+            {formData.startTime && formData.endTime && timeToMinutes(formData.endTime) > timeToMinutes(formData.startTime) && (
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Duration (calculated)</Label>
+                <p className="text-sm text-gray-700 font-medium py-2 px-3 bg-gray-50 border rounded-md">
+                  {formatDuration(calcDuration(formData.startTime, formData.endTime))}
+                </p>
+              </div>
+            )}
             <div className="col-span-2 space-y-1">
               <Label className="text-xs">Notes</Label>
               <Textarea value={formData.notes || ""} onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Any notes for this appointment…" />
@@ -680,7 +781,7 @@ export default function SalesDiary() {
                 {detailAppt.contactPerson && <div><p className="text-xs text-gray-400 mb-0.5">Contact</p><p>{detailAppt.contactPerson}</p></div>}
                 {detailAppt.phone && <div><p className="text-xs text-gray-400 mb-0.5">Phone</p><p>{detailAppt.phone}</p></div>}
                 <div><p className="text-xs text-gray-400 mb-0.5">Date</p><p>{detailAppt.date && format(parseISO(detailAppt.date), "EEE d MMM yyyy")}</p></div>
-                <div><p className="text-xs text-gray-400 mb-0.5">Time</p><p>{detailAppt.startTime} – {detailAppt.endTime}{detailAppt.estimatedDuration ? ` (${detailAppt.estimatedDuration}min)` : ""}</p></div>
+                <div><p className="text-xs text-gray-400 mb-0.5">Time</p><p>{detailAppt.startTime} – {detailAppt.endTime} <span className="text-gray-500 text-xs">({formatDuration(calcDuration(detailAppt.startTime, detailAppt.endTime))})</span></p></div>
                 <div><p className="text-xs text-gray-400 mb-0.5">Sales Rep</p><p>{workerName(detailAppt.assignedToId)}</p></div>
                 {detailAppt.siteAddress && <div className="col-span-2"><p className="text-xs text-gray-400 mb-0.5">Address</p><p className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-gray-400" />{detailAppt.siteAddress}</p></div>}
                 {detailAppt.notes && <div className="col-span-2"><p className="text-xs text-gray-400 mb-0.5">Notes</p><p className="text-sm text-gray-700 bg-gray-50 rounded p-2">{detailAppt.notes}</p></div>}
