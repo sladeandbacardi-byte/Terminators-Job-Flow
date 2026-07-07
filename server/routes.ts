@@ -2256,37 +2256,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lead = await storage.getQuoteSubmission(req.params.id);
       if (!lead) return res.status(404).json({ error: "Lead not found" });
 
-      let clientId = lead.clientId;
-      if (!clientId) {
-        const client = await storage.createClient({
-          name: lead.companyName,
-          tradingName: (lead as any).tradingName ?? null,
-          email: lead.email || null,
-          phone: lead.phone || null,
-          address: lead.address ?? null,
-          contactPerson: lead.contactPerson ?? null,
-          departmentId: (lead as any).departmentId ?? null,
-          status: "active",
-        } as any);
-        clientId = client.id;
+      const { linkToExistingId, forceCreate } = req.body as any;
+
+      // If lead is already linked to a client, just confirm
+      if (lead.clientId && !linkToExistingId) {
+        return res.json({ clientId: lead.clientId, alreadyLinked: true });
       }
 
-      const updated = await storage.updateQuoteSubmission(lead.id, {
-        clientId,
-        status: "converted",
-      } as any);
-
-      if (lead.status !== "converted") {
+      // Link to an existing client the user chose
+      if (linkToExistingId) {
+        const updated = await storage.updateQuoteSubmission(lead.id, { clientId: linkToExistingId } as any);
         await storage.createLeadActivity({
           leadId: lead.id,
-          type: "converted_to_client",
-          description: "Lead converted to client",
+          type: "client_profile_linked",
+          description: "Lead linked to existing client profile",
         });
+        return res.json({ ...updated, clientId: linkToExistingId });
       }
 
-      res.json({ ...updated, clientId });
+      // Duplicate check (skipped if forceCreate === true)
+      if (!forceCreate) {
+        const allClients = await storage.getClients();
+        const normName  = (s: string) => (s || "").toLowerCase().trim();
+        const normPhone = (s: string) => (s || "").replace(/\D/g, "");
+        const duplicates = allClients.filter(c => {
+          const nameMatch  = normName(c.name) === normName(lead.companyName);
+          const emailMatch = lead.email && c.email && c.email.toLowerCase() === lead.email.toLowerCase();
+          const ph = normPhone(lead.phone ?? "");
+          const phoneMatch = ph.length >= 7 && normPhone(c.phone ?? "") === ph;
+          return nameMatch || emailMatch || phoneMatch;
+        });
+        if (duplicates.length > 0) {
+          return res.status(409).json({
+            code: "DUPLICATE_FOUND",
+            message: "Possible duplicate client found",
+            duplicates: duplicates.map(c => ({ id: c.id, name: c.name, email: c.email, phone: c.phone })),
+          });
+        }
+      }
+
+      // Create new client from lead details
+      const client = await storage.createClient({
+        name: lead.companyName,
+        tradingName: (lead as any).tradingName ?? null,
+        email: lead.email || null,
+        phone: lead.phone || null,
+        address: lead.address ?? null,
+        contactPerson: lead.contactPerson ?? null,
+        departmentId: (lead as any).departmentId ?? null,
+        notes: lead.notes ?? null,
+        status: "active",
+      } as any);
+
+      // Link the lead to the new client — do NOT change the lead status
+      const updated = await storage.updateQuoteSubmission(lead.id, { clientId: client.id } as any);
+
+      await storage.createLeadActivity({
+        leadId: lead.id,
+        type: "client_profile_created",
+        description: "Client profile created from lead",
+      });
+
+      res.json({ ...updated, clientId: client.id, newClientId: client.id });
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to convert lead to client", details: error?.message });
+      res.status(500).json({ error: "Failed to create client profile", details: error?.message });
     }
   });
 

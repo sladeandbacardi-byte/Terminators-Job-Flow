@@ -1,0 +1,129 @@
+Update the JobFlow Sales lead actions.
+
+Rename the button:
+"Convert to Client"
+
+to:
+
+"Create Client Profile"
+
+This button must be treated as optional and secondary.
+
+Purpose:
+A lead is a prospect.
+A client profile is the saved client/customer record.
+Creating a client profile does not mean the work has been won.
+
+Main sales workflow must remain:
+
+Lead → Quote → Accepted Work / Job → Invoice
+
+Do not make "Create Client Profile" the main sales path.
+
+Button behaviour:
+
+When the user clicks "Create Client Profile":
+
+1. Create a new client record using the lead details:
+- Company name
+- Trading name, if available
+- Contact person
+- Phone number
+- Email address
+- Site address
+- Billing address, if available
+- Department / service interest
+- Lead origination
+- Assigned sales rep
+- Notes
+- Client flags, if any
+
+2. If a matching client already exists, do not create a duplicate.
+Check for duplicates using:
+- Company name
+- Email address
+- Phone number
+
+If a possible duplicate is found, show:
+"Possible existing client found. Link this lead to the existing client instead?"
+
+Give options:
+- Link to existing client
+- Create new client anyway
+- Cancel
+
+3. Link the lead to the client profile.
+
+4. Keep the lead visible in the lead pipeline.
+Do not hide or delete the lead.
+
+5. Add a timeline/activity note to the lead:
+"Client profile created."
+
+6. Add the lead history to the client profile.
+
+7. Do not create a quote.
+8. Do not create a job.
+9. Do not create an invoice.
+10. Do not mark the lead as won/accepted.
+
+Lead status handling:
+
+If the lead does not yet have a quote:
+- Keep its current visible status, or move it to "Quote Needed" only if the site visit is done.
+
+If the lead already has a quote:
+- Keep it in the relevant quote/lead status.
+
+Only mark the lead as Converted/Won when:
+- A quote is accepted, or
+- An accepted work/job is created.
+
+Create Quote must remain the main next step.
+
+Update button priority on lead cards:
+
+Primary actions:
+- Mark Contacted
+- Book Appointment
+- Site Done / Quote Needed
+- Create Quote
+
+Secondary actions:
+- Create Client Profile
+- Notes
+- Lost
+
+Button wording:
+- Use "Create Client Profile" instead of "Convert to Client"
+- Use "Site Done → Quote Needed" instead of only "Site Done"
+
+Client profile page:
+
+When a client is created from a lead, show a section called "Sales History" with:
+- Original lead
+- Origination
+- Sales rep
+- Lead notes
+- Appointments
+- Site notes
+- Quotes linked to this lead
+- Follow-ups
+- Lost/won status if applicable
+
+Quotes:
+
+When creating a quote from a lead:
+- If the lead is already linked to a client profile, use that client.
+- If no client profile exists yet, either:
+  a) create a client profile automatically in the background, or
+  b) create the quote linked to the lead and create/link the client when the quote is accepted.
+
+Preferred behaviour:
+When a quote is accepted, automatically create or link the client profile if it does not already exist.
+
+The goal:
+Sales reps should understand that "Create Client Profile" only saves the prospect/client details.
+Winning the work happens when the quote is accepted.
+The simple workflow must stay:
+Lead → Quote → Job → Invoice.

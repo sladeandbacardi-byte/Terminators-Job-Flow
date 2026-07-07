@@ -23,6 +23,10 @@ import {
   XCircle,
   CheckCircle,
   Circle,
+  Megaphone,
+  FileText,
+  History,
+  Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +79,7 @@ import { ExportButton } from "@/components/export-button";
 import { apiRequest } from "@/lib/queryClient";
 import { exportClients } from "@/lib/data-export";
 import { Link } from "wouter";
-import { formatClientAddress, hasStructuredAddress, type Client, type Department } from "@shared/schema";
+import { formatClientAddress, hasStructuredAddress, type Client, type Department, ORIGINATION_LABELS } from "@shared/schema";
 
 export default function ClientsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -103,6 +107,18 @@ export default function ClientsPage() {
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
+  });
+
+  const { data: allLeads = [] } = useQuery<any[]>({
+    queryKey: ["/api/quote-submissions"],
+    enabled: !!viewingClient,
+  });
+
+  const clientLeads = allLeads.filter((l: any) => l.clientId === viewingClient?.id);
+
+  const { data: allWorkers = [] } = useQuery<any[]>({
+    queryKey: ["/api/workers"],
+    enabled: !!viewingClient,
   });
 
   const createMutation = useMutation({
@@ -686,6 +702,77 @@ export default function ClientsPage() {
                   <p className="text-sm text-muted-foreground">{viewingClient.notes}</p>
                 </div>
               )}
+
+              {/* Sales History */}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <History className="h-4 w-4 text-indigo-500" />
+                  Sales History
+                  {clientLeads.length > 0 && (
+                    <span className="text-xs font-normal text-gray-400">({clientLeads.length} lead{clientLeads.length !== 1 ? "s" : ""})</span>
+                  )}
+                </h3>
+                {clientLeads.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No leads linked to this client yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {clientLeads.map((lead: any) => {
+                      const salesRep = lead.assignedTo ? allWorkers.find((w: any) => w.id === lead.assignedTo) : null;
+                      const SERVICE_LABELS: Record<string, string> = {
+                        pest_control: "Pest Control", sanitary_bins: "Sanitary Bins",
+                        washroom: "Washroom", deep_cleaning: "Deep Cleaning",
+                      };
+                      const STATUS_COLORS: Record<string, string> = {
+                        new: "bg-blue-100 text-blue-700",
+                        contacted: "bg-indigo-100 text-indigo-700",
+                        appointment_booked: "bg-purple-100 text-purple-700",
+                        quote_required: "bg-amber-100 text-amber-700",
+                        quoted: "bg-yellow-100 text-yellow-700",
+                        lost: "bg-red-100 text-red-700",
+                        converted: "bg-green-100 text-green-700",
+                      };
+                      const statusCls = STATUS_COLORS[lead.status] ?? "bg-gray-100 text-gray-600";
+                      return (
+                        <div key={lead.id} className="border rounded-lg p-3 space-y-1.5 bg-gray-50">
+                          <div className="flex items-center justify-between flex-wrap gap-1">
+                            <span className="text-sm font-medium">{SERVICE_LABELS[lead.serviceType] ?? lead.serviceType}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusCls}`}>
+                              {lead.status?.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          {lead.origination && (
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <Megaphone className="h-3 w-3" />
+                              {ORIGINATION_LABELS[lead.origination] ?? lead.origination}
+                              {lead.origination === "other" && lead.originationOther ? `: ${lead.originationOther}` : ""}
+                            </p>
+                          )}
+                          {salesRep && (
+                            <p className="text-xs text-blue-600 flex items-center gap-1">
+                              <Briefcase className="h-3 w-3" />Sales rep: {salesRep.name}
+                            </p>
+                          )}
+                          {lead.quoteAmount && (
+                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                              <FileText className="h-3 w-3" />Quote: R{lead.quoteAmount}
+                              {lead.quoteNumber ? ` (${lead.quoteNumber})` : ""}
+                            </p>
+                          )}
+                          {lead.notes && (
+                            <p className="text-xs text-indigo-600 italic border-l-2 border-indigo-200 pl-2 line-clamp-2">{lead.notes}</p>
+                          )}
+                          {lead.submittedAt && (
+                            <p className="text-xs text-gray-400 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Lead created: {new Date(lead.submittedAt).toLocaleDateString("en-ZA")}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Phone, Mail, MapPin, Clock, ChevronRight, Briefcase,
   XCircle, ArrowRight, Calendar, User, Building2, AlertCircle,
   Send, Search, X, Megaphone, Download, BookOpen, Flag,
-  PhoneCall, CalendarClock, ClipboardCheck, FileText, UserCheck,
+  PhoneCall, CalendarClock, ClipboardCheck, FileText, UserCheck, Link2,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import DocumentForm from "@/components/forms/document-form";
@@ -209,15 +209,44 @@ export default function Leads() {
     onError: () => toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" }),
   });
 
-  const convertToClient = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/quote-submissions/${id}/convert-to-client`, {}),
-    onSuccess: () => {
+  // State for the duplicate-client dialog
+  const [dupDialog, setDupDialog] = useState<{
+    open: boolean;
+    leadId: string;
+    duplicates: Array<{ id: string; name: string; email: string | null; phone: string | null }>;
+  }>({ open: false, leadId: "", duplicates: [] });
+
+  const createClientProfile = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body?: Record<string, any> }) => {
+      const res = await fetch(`/api/quote-submissions/${id}/convert-to-client`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body ?? {}),
+      });
+      if (res.status === 409) {
+        const data = await res.json();
+        if (data.code === "DUPLICATE_FOUND") return { _dupFound: true, leadId: id, duplicates: data.duplicates };
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? "Failed to create client profile");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data?._dupFound) {
+        setDupDialog({ open: true, leadId: data.leadId, duplicates: data.duplicates });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/quote-submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accepted-workflows"] });
-      toast({ title: "Converted to client! 🎉", description: "Client created and lead marked Converted." });
+      if (data?.alreadyLinked) {
+        toast({ title: "Already linked", description: "This lead is already linked to a client profile." });
+      } else {
+        toast({ title: "Client profile created", description: "The lead stays in the pipeline. Create a quote to move it forward." });
+      }
     },
-    onError: () => toast({ title: "Error", description: "Failed to convert lead to client.", variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err?.message ?? "Failed to create client profile.", variant: "destructive" }),
   });
 
   const saveLeadEdits = useMutation({
@@ -484,7 +513,7 @@ export default function Leads() {
                       onMarkSiteVisitDone={() => markSiteVisitDone.mutate(lead.id)}
                       onCreateQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
                       onMarkLost={() => advanceLead.mutate({ id: lead.id, status: "lost" })}
-                      onConvertToClient={() => convertToClient.mutate(lead.id)}
+                      onCreateClientProfile={() => createClientProfile.mutate({ id: lead.id })}
                       onNotes={() => {
                         setNotesLead(lead);
                         setNotesText(lead.notes ?? "");
@@ -777,6 +806,57 @@ export default function Leads() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── Duplicate Client dialog ── */}
+      <Dialog open={dupDialog.open} onOpenChange={open => !open && setDupDialog(d => ({ ...d, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Possible existing client found
+            </DialogTitle>
+            <DialogDescription>
+              A client with a similar name, email, or phone already exists. What would you like to do?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 my-2">
+            {dupDialog.duplicates.map(dup => (
+              <div key={dup.id} className="border rounded-lg p-3 space-y-1">
+                <p className="font-medium text-sm">{dup.name}</p>
+                {dup.email && <p className="text-xs text-gray-500 flex items-center gap-1"><Mail className="h-3 w-3" />{dup.email}</p>}
+                {dup.phone && <p className="text-xs text-gray-500 flex items-center gap-1"><Phone className="h-3 w-3" />{dup.phone}</p>}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs mt-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  onClick={() => {
+                    setDupDialog(d => ({ ...d, open: false }));
+                    createClientProfile.mutate({ id: dupDialog.leadId, body: { linkToExistingId: dup.id } });
+                  }}
+                >
+                  <Link2 className="h-3 w-3 mr-1" /> Link this lead to {dup.name}
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDupDialog(d => ({ ...d, open: false }));
+                createClientProfile.mutate({ id: dupDialog.leadId, body: { forceCreate: true } });
+              }}
+            >
+              Create new client anyway
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setDupDialog(d => ({ ...d, open: false }))}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
         </main>
       </div>
@@ -794,7 +874,7 @@ function LeadCard({
   onMarkSiteVisitDone,
   onCreateQuote,
   onMarkLost,
-  onConvertToClient,
+  onCreateClientProfile,
   onNotes,
 }: {
   lead: QuoteSubmission;
@@ -804,7 +884,7 @@ function LeadCard({
   onMarkSiteVisitDone: () => void;
   onCreateQuote: () => void;
   onMarkLost: () => void;
-  onConvertToClient: () => void;
+  onCreateClientProfile: () => void;
   onNotes: () => void;
 }) {
   const fu = followUpLabel(lead.followUpDate);
@@ -923,9 +1003,10 @@ function LeadCard({
       {/* Age */}
       <p className="text-xs text-gray-400 flex items-center gap-1"><Clock className="h-3 w-3" />{daysAgo(lead.submittedAt)}</p>
 
-      {/* Actions — the 6 canonical lead actions (always available while the lead is active) */}
+      {/* Actions — primary pipeline actions + secondary optional actions */}
       {!isTerminal && (
         <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
+          {/* ── Primary actions ── */}
           <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={onMarkContacted}>
             <PhoneCall className="h-3 w-3 mr-0.5" /> Mark Contacted
           </Button>
@@ -933,19 +1014,20 @@ function LeadCard({
             <CalendarClock className="h-3 w-3 mr-0.5" /> Book Appointment
           </Button>
           <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-purple-300 text-purple-700 hover:bg-purple-50" onClick={onMarkSiteVisitDone} disabled={!!siteVisitDone}>
-            <ClipboardCheck className="h-3 w-3 mr-0.5" /> {siteVisitDone ? "Site Visit Done" : "Mark Site Visit Done"}
+            <ClipboardCheck className="h-3 w-3 mr-0.5" /> {siteVisitDone ? "Site Done ✓" : "Site Done → Quote Needed"}
           </Button>
           <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={onCreateQuote}>
             <FileText className="h-3 w-3 mr-0.5" /> Create Quote
           </Button>
-          <Button size="sm" variant="outline" className="text-xs h-6 px-2 border-green-300 text-green-700 hover:bg-green-50" onClick={onConvertToClient}>
-            <UserCheck className="h-3 w-3 mr-0.5" /> Convert to Client
+          {/* ── Secondary actions ── */}
+          <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={onCreateClientProfile} title="Save the prospect details as a client record (optional — does not win the work)">
+            <UserCheck className="h-3 w-3 mr-0.5" /> Create Client Profile
           </Button>
           <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-gray-500" onClick={onNotes}>
             Notes
           </Button>
           <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-red-500 hover:text-red-700" onClick={onMarkLost}>
-            <XCircle className="h-3 w-3" /> Mark Lost
+            <XCircle className="h-3 w-3" /> Lost
           </Button>
         </div>
       )}
