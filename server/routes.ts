@@ -4946,6 +4946,58 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // manual, admin-triggered, one-time utility to bring a production database
   // schema in sync with shared/schema.ts. It does NOT run automatically on
   // startup. Remove this route once the schema has been confirmed in sync.
+  // ── Normalize lead statuses — maps every legacy status value in quote_submissions
+  //    to the 7 canonical LEAD_STATUSES (new/contacted/appointment_booked/
+  //    quote_required/quoted/lost/converted). Safe to re-run on production.
+  app.post("/api/admin/normalize-lead-statuses", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const MAPPINGS: Array<{ from: string[]; to: string }> = [
+        { from: ["appointment_scheduled", "appointment_set"],                to: "appointment_booked" },
+        { from: ["site_assessment_done", "assessment_done", "site_done", "quote_needed"], to: "quote_required" },
+        { from: ["quote_sent", "follow_up_due"],                            to: "quoted" },
+        { from: ["declined"],                                               to: "lost" },
+        { from: ["accepted", "won", "contract_pending", "client_registration_pending",
+                 "installation_scheduled", "invoiced", "after_sales_followup",
+                 "after_sales_follow_up_due", "complete", "converted_contract", "converted_job"], to: "converted" },
+      ];
+
+      let totalUpdated = 0;
+      const details: string[] = [];
+
+      for (const mapping of MAPPINGS) {
+        for (const fromStatus of mapping.from) {
+          const result = await db.execute(
+            sql`UPDATE quote_submissions SET status = ${mapping.to} WHERE status = ${fromStatus}`
+          );
+          const count = (result as any).rowCount ?? (result as any).count ?? 0;
+          if (count > 0) {
+            details.push(`${fromStatus} → ${mapping.to}: ${count} row(s)`);
+            totalUpdated += count;
+          }
+        }
+      }
+
+      // Report remaining non-canonical statuses (shown as Needs Review on board)
+      const canonical = ["new", "contacted", "appointment_booked", "quote_required", "quoted", "lost", "converted"];
+      const unknownResult = await db.execute(
+        sql`SELECT status, count(*) FROM quote_submissions WHERE status NOT IN (${sql.join(canonical.map(s => sql`${s}`), sql`, `)}) GROUP BY status ORDER BY count(*) DESC`
+      );
+      const unknownRows = (unknownResult as any).rows ?? unknownResult;
+
+      res.json({
+        success: true,
+        totalUpdated,
+        details,
+        unknownStatuses: unknownRows,
+        message: totalUpdated === 0 && unknownRows.length === 0
+          ? "All statuses are already canonical — no changes needed."
+          : `Updated ${totalUpdated} row(s). ${unknownRows.length > 0 ? `${unknownRows.length} unknown status value(s) remain (shown as Needs Review).` : "All rows now use canonical statuses."}`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.post("/api/admin/run-db-push", requireAuth, requireAdmin, logActivity("admin_db_push", "database"), async (req: AuthenticatedRequest, res) => {
     try {
       const { stdout, stderr } = await execAsync("npx drizzle-kit push --force", {

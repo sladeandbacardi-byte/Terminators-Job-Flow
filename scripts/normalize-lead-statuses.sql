@@ -5,11 +5,14 @@
 -- status is not already canonical.
 --
 -- Run with: psql "$DATABASE_URL" -f scripts/normalize-lead-statuses.sql
+--
+-- Alternatively use the in-app "Normalize Lead Statuses" button at:
+--   <railway-url>/admin (Admin > Data Integrity tab)
 
 BEGIN;
 
 UPDATE quote_submissions SET status = 'appointment_booked'
-  WHERE status = 'appointment_scheduled';
+  WHERE status IN ('appointment_scheduled', 'appointment_set');
 
 UPDATE quote_submissions SET status = 'quote_required'
   WHERE status IN ('site_assessment_done', 'assessment_done', 'site_done', 'quote_needed');
@@ -18,11 +21,11 @@ UPDATE quote_submissions SET status = 'quoted'
   WHERE status IN ('quote_sent', 'follow_up_due');
 
 UPDATE quote_submissions SET status = 'lost'
-  WHERE status = 'declined';
+  WHERE status IN ('declined');
 
 UPDATE quote_submissions SET status = 'converted'
   WHERE status IN (
-    'accepted', 'contract_pending', 'client_registration_pending',
+    'accepted', 'won', 'contract_pending', 'client_registration_pending',
     'installation_scheduled', 'invoiced', 'after_sales_followup',
     'after_sales_follow_up_due', 'complete', 'converted_contract', 'converted_job'
   );
@@ -31,7 +34,7 @@ UPDATE quote_submissions SET status = 'converted'
 -- non-canonical after the mapping above (mirrors normalizeLeadStatus's stage fallback).
 UPDATE quote_submissions SET status = 'appointment_booked'
   WHERE status NOT IN ('new','contacted','appointment_booked','quote_required','quoted','lost','converted')
-    AND stage = 'appointment_scheduled';
+    AND stage IN ('appointment_scheduled', 'appointment_set');
 
 UPDATE quote_submissions SET status = 'quote_required'
   WHERE status NOT IN ('new','contacted','appointment_booked','quote_required','quoted','lost','converted')
@@ -43,12 +46,12 @@ UPDATE quote_submissions SET status = 'quoted'
 
 UPDATE quote_submissions SET status = 'lost'
   WHERE status NOT IN ('new','contacted','appointment_booked','quote_required','quoted','lost','converted')
-    AND stage = 'declined';
+    AND stage IN ('declined');
 
 UPDATE quote_submissions SET status = 'converted'
   WHERE status NOT IN ('new','contacted','appointment_booked','quote_required','quoted','lost','converted')
     AND stage IN (
-      'accepted', 'contract_pending', 'client_registration_pending',
+      'accepted', 'won', 'contract_pending', 'client_registration_pending',
       'installation_scheduled', 'invoiced', 'after_sales_followup',
       'after_sales_follow_up_due', 'complete', 'converted_contract', 'converted_job'
     );

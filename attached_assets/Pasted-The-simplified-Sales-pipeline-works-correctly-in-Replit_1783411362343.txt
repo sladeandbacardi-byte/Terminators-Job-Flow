@@ -1,0 +1,124 @@
+The simplified Sales pipeline works correctly in Replit Preview, but the Railway deployed URL still shows the older/broken lead workflow.
+
+In Replit Preview the Lead Pipeline now correctly shows:
+New Lead → Contacted → Appt. Scheduled → Quote Needed → Quote Sent → Accepted
+
+But on the Railway URL it still appears to use the older version where leads can disappear after clicking Site Visit Done.
+
+This is a Railway deployment issue, not just a UI design issue.
+
+Please fix the Railway production deployment.
+
+Required checks:
+
+1. Confirm Railway has deployed the latest code.
+- Force a fresh Railway redeploy.
+- Do not rely on an old successful deployment.
+- Check the latest deployment timestamp.
+- Confirm the deployed commit matches the Replit Preview code.
+
+2. Clear Railway build cache if needed.
+The live app may be serving an old frontend bundle.
+Force a clean build.
+
+3. Confirm the Railway build command is correct.
+The frontend must rebuild from the latest source files.
+
+Check:
+- package.json scripts
+- build command
+- start command
+- client build output path
+- server static file serving path
+
+4. Confirm Railway is not serving an old dist/public folder.
+Delete old build output before building if needed.
+
+Example:
+rm -rf dist
+rm -rf client/dist
+npm run build
+
+5. Confirm the live Railway URL is using the same frontend code as Replit Preview.
+
+Specifically check these Sales files/components:
+- Lead Pipeline page
+- Lead Kanban board
+- Lead card actions
+- Lead status mapping
+- Sales sidebar menu
+- Accepted Work page
+- Quote workflow components
+
+6. Check production database statuses.
+Railway may still have old lead statuses in the database.
+
+Map all old statuses to the new simplified statuses:
+
+- new → new
+- contacted → contacted
+- appointment_set → appointment_booked
+- appointment_booked → appointment_booked
+- site_assessment_done → quote_required
+- site_done → quote_required
+- assessment_done → quote_required
+- quote_needed → quote_required
+- quote_required → quote_required
+- quoted → quoted
+- quote_sent → quoted
+- follow_up_due → quoted
+- accepted → converted
+- won → converted
+- contract_pending → converted
+- client_registration_pending → converted
+- installation_scheduled → converted
+- invoiced → converted
+- lost → lost
+
+7. Add a fallback visible column for unknown statuses.
+
+If a lead has any unknown status, do not hide it.
+Show it under:
+"Needs Review"
+
+This prevents leads from disappearing.
+
+8. Fix the Site Done action in production.
+
+When clicking Site Done / Site Visit Done:
+- Do not hide the lead
+- Do not move it to an unmapped status
+- Set status to quote_required
+- Set siteVisitDone = true
+- Add a timeline note: "Site visit completed"
+- Show the lead in the Quote Needed / Quote Required column
+
+9. Confirm Railway environment variables.
+Check that Railway has the correct:
+- DATABASE_URL
+- NODE_ENV
+- build/start variables
+- any VITE_API_URL or frontend API base URL
+
+The production frontend should call relative API paths like:
+/api/leads
+/api/quotes
+/api/sales
+
+Do not hardcode the Replit preview URL or localhost.
+
+10. Test on the Railway URL only.
+
+Test this exact flow:
+- Create a new lead
+- Mark Contacted
+- Book Appointment
+- Click Site Done
+- Confirm the lead moves to Quote Needed / Quote Required
+- Confirm the lead does not disappear
+- Create Quote
+- Confirm quote appears in Quotes page
+- Mark quote accepted
+- Confirm Accepted Work item is created
+
+Do not mark this fixed until it works on the Railway URL, not only in Replit Preview.

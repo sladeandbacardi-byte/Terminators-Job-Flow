@@ -292,6 +292,112 @@ function DatabaseStatusSection() {
 // Admin-only, manual, one-time trigger for `npm run db:push`. This does NOT run
 // automatically — it only runs when this button is clicked. Remove this section
 // (and the matching server route) once the production schema is confirmed in sync.
+function NormalizeStatusSection() {
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message?: string; totalUpdated?: number; details?: string[]; unknownStatuses?: any[]; error?: string } | null>(null);
+
+  async function runNormalize() {
+    setConfirmOpen(false);
+    setRunning(true);
+    setResult(null);
+    try {
+      const resp = await apiRequest("POST", "/api/admin/normalize-lead-statuses");
+      const json = await resp.json();
+      setResult(json);
+      if (json.success) {
+        toast({ title: "Lead statuses normalized", description: json.message });
+      } else {
+        toast({ title: "Normalization failed", description: json.error ?? "Unknown error", variant: "destructive" });
+      }
+    } catch (err: any) {
+      const message = err?.message ?? "Unknown error";
+      setResult({ success: false, error: message });
+      toast({ title: "Normalization failed", description: message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <Card className="border-blue-300 bg-blue-50">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <RefreshCw className="h-5 w-5 text-blue-600" />
+          <div>
+            <CardTitle className="text-base text-blue-900">Normalize Lead Statuses</CardTitle>
+            <CardDescription className="text-blue-800 text-xs">
+              Maps any old/legacy lead status values in the database to the current 7 canonical statuses
+              (New, Contacted, Appointment Booked, Quote Required, Quoted, Lost, Converted).
+              Run this once on a fresh production database to fix leads that may be hidden or showing under "Needs Review".
+              Safe to run more than once — it only changes rows with legacy status values.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Button
+          variant="outline"
+          className="border-blue-400 text-blue-900 hover:bg-blue-100"
+          onClick={() => setConfirmOpen(true)}
+          disabled={running}
+        >
+          {running ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+          {running ? "Normalizing statuses…" : "Normalize Lead Statuses"}
+        </Button>
+
+        {result && (
+          <div className={`rounded-lg border p-3 text-sm ${result.success ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`}>
+            <p className="font-medium flex items-center gap-1.5">
+              {result.success ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {result.success ? result.message : "Failed"}
+            </p>
+            {result.error && <p className="mt-1 text-xs">{result.error}</p>}
+            {result.details && result.details.length > 0 && (
+              <ul className="mt-2 text-xs space-y-0.5">
+                {result.details.map((d: string, i: number) => <li key={i}>• {d}</li>)}
+              </ul>
+            )}
+            {result.unknownStatuses && result.unknownStatuses.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-medium text-orange-700">Unknown statuses (shown as "Needs Review" on board):</p>
+                <ul className="mt-1 text-xs space-y-0.5">
+                  {result.unknownStatuses.map((r: any, i: number) => (
+                    <li key={i}>• "{r.status}": {r.count} row(s)</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-600" />
+              Normalize lead statuses?
+            </DialogTitle>
+            <DialogDescription>
+              This will update any leads in the database that have old/legacy status values
+              (e.g. "site_done", "quote_sent", "accepted") and map them to the current canonical statuses.
+              No data will be deleted. This may take a few seconds.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={runNormalize}>
+              Yes, normalize
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function DbPushSection() {
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1337,6 +1443,9 @@ export default function DataIntegrity() {
 
             {/* TEMPORARY — remove once production schema is confirmed in sync */}
             <DbPushSection />
+
+            {/* Normalize lead statuses — run once on production to fix hidden/missing leads */}
+            <NormalizeStatusSection />
 
             <Tabs defaultValue="health-check" className="space-y-4">
               <TabsList className="flex-wrap h-auto gap-1">
