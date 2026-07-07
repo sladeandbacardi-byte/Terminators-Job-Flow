@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
 import { runDailyBackupEmail } from "./email-backup";
+import { runStartupMigrations } from "./startup-migrations";
 
 console.log("[startup] Job Flow server starting");
 
@@ -50,6 +51,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run schema migrations before anything else — adds missing columns/tables
+  // automatically on every deploy so Railway's production DB stays in sync.
+  await runStartupMigrations();
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
