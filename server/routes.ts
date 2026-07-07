@@ -3989,11 +3989,13 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       // string FK values don't violate constraints.
       const { id: _id, createdAt: _ca, ...rest } = req.body as Record<string, any>;
       const body: Record<string, any> = { ...rest };
-      if (!body.assignedToId || body.assignedToId === "unassigned") body.assignedToId = null;
-      if (!body.leadId)       body.leadId       = null;
-      if (!body.quoteId)      body.quoteId      = null;
-      if (!body.departmentId) body.departmentId = null;
-      if (body.estimatedDuration === "" || body.estimatedDuration === undefined) body.estimatedDuration = null;
+      // Only normalise a field if it was actually sent — partial updates (e.g.
+      // just { status: "rescheduled" }) must NOT touch fields they don't include.
+      if ("assignedToId" in body && (!body.assignedToId || body.assignedToId === "unassigned")) body.assignedToId = null;
+      if ("leadId"       in body && !body.leadId)       body.leadId       = null;
+      if ("quoteId"      in body && !body.quoteId)      body.quoteId      = null;
+      if ("departmentId" in body && !body.departmentId) body.departmentId = null;
+      if ("estimatedDuration" in body && body.estimatedDuration === "") body.estimatedDuration = null;
 
       const appt = await storage.updateSalesAppointment(req.params.id, body);
 
