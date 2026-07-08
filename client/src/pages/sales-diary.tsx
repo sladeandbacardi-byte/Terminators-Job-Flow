@@ -1,10 +1,18 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import listPlugin from "@fullcalendar/list";
+import interactionPlugin from "@fullcalendar/interaction";
+import type { EventClickArg, EventContentArg, EventMouseEnterArg, EventMouseLeaveArg, DateSelectArg } from "@fullcalendar/core";
+import type { EventDropArg } from "@fullcalendar/core";
+import type { EventResizeDoneArg } from "@fullcalendar/interaction";
+import { format, differenceInMinutes, parseISO, addDays } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isSameMonth, parseISO, addWeeks, subWeeks, addMonths, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Calendar, ChevronLeft, ChevronRight, Plus, Clock, MapPin, Phone, User,
-  CheckCircle2, RefreshCw, FileText, Link2, XCircle, MoreHorizontal, Users, List, Filter,
+  Calendar, ChevronLeft, ChevronRight, Plus, MapPin, Phone, User,
+  CheckCircle2, FileText, XCircle, MoreHorizontal, Users, Filter,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -25,8 +33,7 @@ import { SALES_APPT_TYPES, SALES_APPT_STATUSES } from "@shared/schema";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
-type ViewMode = "day" | "week" | "month" | "list";
-
+// ── Constants
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(SALES_APPT_TYPES.map(t => [t.value, t.label]));
 const STATUS_META: Record<string, { label: string; classes: string }> = {
   planned:     { label: "Planned",     classes: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -46,76 +53,35 @@ const TYPE_COLORS: Record<string, string> = {
   internal_meeting:      "#6b7280",
   other:                 "#64748b",
 };
+type CalView = "timeGridWeek" | "timeGridDay" | "dayGridMonth" | "listWeek" | "team";
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 07:00–19:00
-const HOUR_PX = 80;
-const DAY_START_HOUR = HOURS[0]; // 7
-const PX_PER_MIN = HOUR_PX / 60; // 1.333... px per minute
-
+// ── Helpers
 function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
+  const [h, m] = (t || "00:00").split(":").map(Number);
   return h * 60 + (isNaN(m) ? 0 : m);
 }
-
-function calcDuration(startTime: string, endTime: string): number {
-  if (!startTime || !endTime) return 0;
-  return Math.max(0, timeToMinutes(endTime) - timeToMinutes(startTime));
+function calcDuration(s: string, e: string): number {
+  return Math.max(0, timeToMinutes(e) - timeToMinutes(s));
 }
-
-function formatDuration(minutes: number): string {
-  if (minutes <= 0) return "";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}min`;
+function formatDuration(min: number): string {
+  if (min <= 0) return "";
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
-
-function snap15(min: number): number {
-  return Math.round(min / 15) * 15;
+function getApptLabel(a: SalesAppointment): string {
+  const name = a.clientName || a.title || "Appointment";
+  const type = TYPE_LABELS[a.appointmentType] || "";
+  if (!type || name === type) return name;
+  return `${name} – ${type}`;
 }
-
-function minToTime(totalMin: number): string {
-  const clamped = Math.max(0, Math.min(totalMin, 23 * 60 + 59));
-  return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
-}
-
-function apptOffset(startTime: string, endTime: string): { top: number; height: number } {
-  if (!startTime || !endTime) return { top: 0, height: HOUR_PX };
-  const startMin = Math.max(0, timeToMinutes(startTime) - DAY_START_HOUR * 60);
-  const durationMin = Math.max(15, calcDuration(startTime, endTime));
-  return {
-    top: Math.round(startMin * PX_PER_MIN),
-    height: Math.round(durationMin * PX_PER_MIN),
-  };
-}
-
-type ApptWithLayout = SalesAppointment & { col: number; cols: number };
-
-function resolveOverlaps(appts: SalesAppointment[]): ApptWithLayout[] {
-  if (appts.length === 0) return [];
-  const sorted = [...appts].sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const result: ApptWithLayout[] = [];
-  let i = 0;
-  while (i < sorted.length) {
-    let clusterEndMin = timeToMinutes(sorted[i].endTime || "23:59");
-    let j = i + 1;
-    while (j < sorted.length && timeToMinutes(sorted[j].startTime) < clusterEndMin) {
-      clusterEndMin = Math.max(clusterEndMin, timeToMinutes(sorted[j].endTime || "23:59"));
-      j++;
-    }
-    const cluster = sorted.slice(i, j);
-    cluster.forEach((a, idx) => result.push({ ...a, col: idx, cols: cluster.length }));
-    i = j;
-  }
-  return result;
-}
-
-function emptyForm(): Partial<SalesAppointment> {
+function emptyForm(date?: string, start?: string, end?: string): Partial<SalesAppointment> {
   return {
     title: "", clientName: "", contactPerson: "", phone: "", siteAddress: "",
     appointmentType: "new_lead_meeting", appointmentTypeOther: "", assignedToId: "",
-    date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00",
+    date: date || format(new Date(), "yyyy-MM-dd"),
+    startTime: start || "09:00", endTime: end || "10:00",
     status: "planned", notes: "",
   };
 }
@@ -123,41 +89,45 @@ function emptyForm(): Partial<SalesAppointment> {
 export default function SalesDiary() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [view, setView] = useState<ViewMode>("week");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const calendarRef = useRef<FullCalendar>(null);
+
+  const [view, setView] = useState<CalView>("timeGridWeek");
+  const [viewTitle, setViewTitle] = useState("");
+  const [teamDate, setTeamDate] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  // Filters
   const [filterRep, setFilterRep] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterClient, setFilterClient] = useState("");
+
+  // Dialogs
   const [showForm, setShowForm] = useState(false);
   const [editAppt, setEditAppt] = useState<SalesAppointment | null>(null);
   const [formData, setFormData] = useState<Partial<SalesAppointment>>(emptyForm());
+  const [detailAppt, setDetailAppt] = useState<SalesAppointment | null>(null);
   const [completeAppt, setCompleteAppt] = useState<SalesAppointment | null>(null);
   const [completionData, setCompletionData] = useState({ completionNote: "", clientFeedback: "", nextAction: "", followUpDate: "" });
-  const [detailAppt, setDetailAppt] = useState<SalesAppointment | null>(null);
-  const [managerView, setManagerView] = useState(false);
 
-  // ── Drag state (ref so changes don't re-render during drag)
-  const dragRef = useRef<{ appt: SalesAppointment; offsetMin: number } | null>(null);
-  const [dragOverInfo, setDragOverInfo] = useState<{ date: string; startTime: string } | null>(null);
-  // ── Team View drag state
+  // Team view drag
   const [dragOverRep, setDragOverRep] = useState<string | null>(null);
+  const teamDragRef = useRef<SalesAppointment | null>(null);
 
-  // ── Resize state
-  const [resizing, setResizing] = useState<{
-    appt: SalesAppointment;
-    origEndTime: string;
-    origEndMin: number;
-    startY: number;
-    previewEnd: string;
-  } | null>(null);
-
-  // ── Tooltip state
+  // Hover tooltip
   const [tipAppt, setTipAppt] = useState<SalesAppointment | null>(null);
   const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
 
+  // Track mouse for tooltip repositioning
+  useEffect(() => {
+    if (!tipAppt) return;
+    const onMove = (e: MouseEvent) => setTipPos({ x: e.clientX, y: e.clientY });
+    document.addEventListener("mousemove", onMove);
+    return () => document.removeEventListener("mousemove", onMove);
+  }, [!!tipAppt]);
+
   const searchStr = useSearch();
 
+  // ── Queries
   const { data: appointments = [] } = useQuery<SalesAppointment[]>({ queryKey: ["/api/sales-appointments"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
 
@@ -175,6 +145,7 @@ export default function SalesDiary() {
     }
   }, [showForm, editAppt, currentWorker]);
 
+  // Handle deep-link from leads
   useEffect(() => {
     if (!searchStr) return;
     const params = new URLSearchParams(searchStr);
@@ -189,7 +160,7 @@ export default function SalesDiary() {
       siteAddress: params.get("siteAddress") || "",
       leadId: params.get("leadId") || undefined,
       appointmentType: (params.get("appointmentType") as any) || "new_lead_meeting",
-      title: `${TYPE_LABELS[params.get("appointmentType") || "new_lead_meeting"] || "New Lead Meeting"} – ${clientName}`,
+      title: `${TYPE_LABELS[params.get("appointmentType") || "new_lead_meeting"]} – ${clientName}`,
       assignedToId: repId,
     });
     setEditAppt(null);
@@ -197,37 +168,41 @@ export default function SalesDiary() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const salesWorkers = useMemo(() => workers.filter(w => w.departmentId === "div-5" || appointments.some(a => a.assignedToId === w.id)), [workers, appointments]);
+  const salesWorkers = useMemo(
+    () => workers.filter(w => w.departmentId === "div-5" || appointments.some(a => a.assignedToId === w.id)),
+    [workers, appointments]
+  );
 
+  const workerName = (id: string | null | undefined) => workers.find(w => w.id === id)?.name || "Unassigned";
+
+  // ── Mutations
   const createMut = useMutation({
     mutationFn: (data: Partial<SalesAppointment>) => apiRequest("POST", "/api/sales-appointments", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setShowForm(false); toast({ title: "Appointment created" }); },
     onError: (err: any) => {
-      let detail = "Could not save appointment.";
-      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || detail; } catch {}
-      toast({ title: "Error", description: detail, variant: "destructive" });
+      let detail = "";
+      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+      toast({ title: "Could not create appointment" + (detail ? `: ${detail}` : ""), variant: "destructive" });
     },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...data }: Partial<SalesAppointment> & { id: string }) => apiRequest("PATCH", `/api/sales-appointments/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setShowForm(false); setEditAppt(null); setDetailAppt(null); setCompleteAppt(null); toast({ title: "Appointment updated" }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
+      setShowForm(false); setEditAppt(null); setDetailAppt(null); setCompleteAppt(null);
+      toast({ title: "Appointment updated" });
+    },
     onError: (err: any) => {
-      let detail = "Could not update appointment.";
-      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = `Could not update appointment: ${p?.details || p?.error || "unknown error"}`; } catch {}
-      toast({ title: "Error", description: detail, variant: "destructive" });
+      let detail = "";
+      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+      toast({ title: "Could not update appointment" + (detail ? `: ${detail}` : ""), variant: "destructive" });
     },
   });
 
   const moveMut = useMutation({
     mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/sales-appointments/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); toast({ title: "Appointment moved." }); },
-    onError: (err: any) => {
-      let detail = "";
-      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
-      queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
-      toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
-    },
   });
 
   const deleteMut = useMutation({
@@ -235,79 +210,65 @@ export default function SalesDiary() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setDetailAppt(null); toast({ title: "Appointment deleted" }); },
   });
 
-  // ── Resize mouse handlers via useEffect
-  useEffect(() => {
-    if (!resizing) return;
-    const onMove = (e: MouseEvent) => {
-      const deltaY = e.clientY - resizing.startY;
-      const deltaMin = snap15(Math.round(deltaY / PX_PER_MIN));
-      const newEndMin = Math.max(
-        timeToMinutes(resizing.appt.startTime) + 15,
-        Math.min(resizing.origEndMin + deltaMin, 19 * 60)
-      );
-      setResizing(r => r ? { ...r, previewEnd: minToTime(newEndMin) } : null);
-    };
-    const onUp = () => {
-      if (!resizing.previewEnd || resizing.previewEnd === resizing.origEndTime) {
-        setResizing(null);
-        return;
-      }
-      const dur = calcDuration(resizing.appt.startTime, resizing.previewEnd);
-      moveMut.mutate({ id: resizing.appt.id, endTime: resizing.previewEnd, estimatedDuration: dur });
-      setResizing(null);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
-  }, [resizing]);
-
-  // ── filtering
+  // ── Filtered appointments → FullCalendar events
   const filtered = useMemo(() => appointments.filter(a => {
     if (filterRep !== "all" && a.assignedToId !== filterRep) return false;
     if (filterType !== "all" && a.appointmentType !== filterType) return false;
     if (filterStatus !== "all" && a.status !== filterStatus) return false;
-    if (filterClient && !a.clientName.toLowerCase().includes(filterClient.toLowerCase())) return false;
+    if (filterClient && !a.clientName?.toLowerCase().includes(filterClient.toLowerCase())) return false;
     return true;
   }), [appointments, filterRep, filterType, filterStatus, filterClient]);
 
-  const apptsByDate = useMemo(() => {
-    const map: Record<string, SalesAppointment[]> = {};
-    for (const a of filtered) (map[a.date] = map[a.date] || []).push(a);
-    return map;
-  }, [filtered]);
+  const fcEvents = useMemo(() => filtered.map(a => {
+    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+    return {
+      id: a.id,
+      title: a.clientName || a.title || "Appointment",
+      start: `${a.date}T${a.startTime}`,
+      end: `${a.date}T${a.endTime}`,
+      backgroundColor: color + "1a",
+      borderColor: color,
+      textColor: "#1f2937",
+      extendedProps: { ...a, _color: color } as SalesAppointment & { _color: string },
+    };
+  }), [filtered]);
 
-  // ── navigation
-  const nav = (dir: 1 | -1) => {
-    if (view === "day")   setCurrentDate(d => addDays(d, dir));
-    if (view === "week")  setCurrentDate(d => dir === 1 ? addWeeks(d, 1) : subWeeks(d, 1));
-    if (view === "month") setCurrentDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
-    if (view === "list")  setCurrentDate(d => addDays(d, dir * 14));
-  };
-
-  const openNew = (date?: string) => {
+  // ── Open / edit helpers
+  const openNew = useCallback((date?: string, startTime?: string, endTime?: string) => {
     setEditAppt(null);
-    setFormData({ ...emptyForm(), date: date || format(currentDate, "yyyy-MM-dd"), assignedToId: currentWorker?.id || "" });
+    setFormData({ ...emptyForm(date, startTime, endTime), assignedToId: currentWorker?.id || "" });
     setShowForm(true);
-  };
+  }, [currentWorker]);
 
-  const openEdit = (a: SalesAppointment) => {
+  const openEdit = useCallback((a: SalesAppointment) => {
     setEditAppt(a);
     setFormData({ ...a });
-    setShowForm(true);
     setDetailAppt(null);
-  };
+    setShowForm(true);
+  }, []);
 
-  const saveForm = () => {
+  const markComplete = useCallback((a: SalesAppointment) => {
+    setCompleteAppt(a);
+    setCompletionData({ completionNote: a.completionNote || "", clientFeedback: a.clientFeedback || "", nextAction: a.nextAction || "", followUpDate: a.followUpDate || "" });
+    setDetailAppt(null);
+  }, []);
+
+  const saveCompletion = useCallback(() => {
+    if (!completeAppt) return;
+    updateMut.mutate({ id: completeAppt.id, status: "completed", ...completionData });
+    setCompleteAppt(null);
+  }, [completeAppt, completionData]);
+
+  const saveForm = useCallback(() => {
     if (!formData.appointmentType) { toast({ title: "Appointment type is required", variant: "destructive" }); return; }
     if (!formData.assignedToId) { toast({ title: "Please select an assigned sales rep.", variant: "destructive" }); return; }
     if (!formData.date) { toast({ title: "Date is required", variant: "destructive" }); return; }
-    if (!formData.startTime) { toast({ title: "Start time is required", variant: "destructive" }); return; }
-    if (!formData.endTime) { toast({ title: "End time is required", variant: "destructive" }); return; }
+    if (!formData.startTime || !formData.endTime) { toast({ title: "Start and end time are required", variant: "destructive" }); return; }
     if (timeToMinutes(formData.endTime) <= timeToMinutes(formData.startTime)) { toast({ title: "End time must be after start time.", variant: "destructive" }); return; }
     if (!formData.title && !formData.clientName) { toast({ title: "Please enter a title or client name.", variant: "destructive" }); return; }
 
     const duration = calcDuration(formData.startTime!, formData.endTime!);
-    const payload: Partial<SalesAppointment> = {
+    const payload: any = {
       ...formData,
       title: formData.title || formData.clientName || "Appointment",
       assignedToId: formData.assignedToId || null,
@@ -316,589 +277,281 @@ export default function SalesDiary() {
       quoteId: formData.quoteId || null,
       departmentId: formData.departmentId || null,
     };
+    if (editAppt) updateMut.mutate({ ...payload, id: editAppt.id });
+    else createMut.mutate(payload);
+  }, [formData, editAppt]);
 
-    if (editAppt) {
-      updateMut.mutate({ ...payload, id: editAppt.id } as SalesAppointment & { id: string });
-    } else {
-      createMut.mutate(payload);
-    }
-  };
-
-  const markComplete = (a: SalesAppointment) => {
-    setCompleteAppt(a);
-    setCompletionData({ completionNote: a.completionNote || "", clientFeedback: a.clientFeedback || "", nextAction: a.nextAction || "", followUpDate: a.followUpDate || "" });
-    setDetailAppt(null);
-  };
-
-  const saveCompletion = () => {
-    if (!completeAppt) return;
-    updateMut.mutate({ id: completeAppt.id, status: "completed", ...completionData });
-    setCompleteAppt(null);
-  };
-
-  const workerName = (id: string | null | undefined) => workers.find(w => w.id === id)?.name || "Unassigned";
-
-  // ── Drag handlers
-  const onApptDragStart = useCallback((e: React.DragEvent, appt: SalesAppointment) => {
-    const blockEl = e.currentTarget as HTMLElement;
-    const rect = blockEl.getBoundingClientRect();
-    const offsetY = Math.max(0, e.clientY - rect.top);
-    const offsetMin = snap15(Math.round(offsetY / PX_PER_MIN));
-    dragRef.current = { appt, offsetMin };
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", appt.id);
-    // Make dragging block semi-transparent
-    const ghost = blockEl.cloneNode(true) as HTMLElement;
-    ghost.style.opacity = "0.8";
-    document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, 20, offsetY);
-    setTimeout(() => document.body.removeChild(ghost), 0);
-  }, []);
-
-  const onGridDragOver = useCallback((e: React.DragEvent, dateStr: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const gridEl = e.currentTarget as HTMLElement;
-    const rect = gridEl.getBoundingClientRect();
-    const y = Math.max(0, e.clientY - rect.top);
-    const minuteFromGridTop = y / PX_PER_MIN;
-    const offsetMin = dragRef.current?.offsetMin ?? 0;
-    const newStartGridMin = snap15(Math.max(0, minuteFromGridTop - offsetMin));
-    const newStartTotal = DAY_START_HOUR * 60 + newStartGridMin;
-    setDragOverInfo({ date: dateStr, startTime: minToTime(newStartTotal) });
-  }, []);
-
-  const onGridDrop = useCallback((e: React.DragEvent, dateStr: string) => {
-    e.preventDefault();
-    const drag = dragRef.current;
-    if (!drag) return;
-    const gridEl = e.currentTarget as HTMLElement;
-    const rect = gridEl.getBoundingClientRect();
-    const y = Math.max(0, e.clientY - rect.top);
-    const minuteFromGridTop = y / PX_PER_MIN;
-    const newStartGridMin = snap15(Math.max(0, minuteFromGridTop - drag.offsetMin));
-    const newStartTotal = DAY_START_HOUR * 60 + newStartGridMin;
-    const duration = calcDuration(drag.appt.startTime, drag.appt.endTime);
-    const newEndTotal = newStartTotal + duration;
-    const newStart = minToTime(newStartTotal);
-    const newEnd = minToTime(Math.min(newEndTotal, 23 * 60 + 59));
-
-    if (drag.appt.date === dateStr && newStart === drag.appt.startTime) {
-      dragRef.current = null;
-      setDragOverInfo(null);
-      return;
-    }
-    moveMut.mutate({ id: drag.appt.id, date: dateStr, startTime: newStart, endTime: newEnd, estimatedDuration: duration });
-    dragRef.current = null;
-    setDragOverInfo(null);
-  }, []);
-
-  // ── Team View drag: reassign assignedToId
-  const onTeamCardDragStart = useCallback((e: React.DragEvent, appt: SalesAppointment) => {
-    dragRef.current = { appt, offsetMin: 0 };
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", appt.id);
-  }, []);
-
-  const onRepColDragOver = useCallback((e: React.DragEvent, repId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragOverRep(repId);
-  }, []);
-
-  const onRepColDrop = useCallback((e: React.DragEvent, repId: string, repName: string) => {
-    e.preventDefault();
-    const drag = dragRef.current;
-    setDragOverRep(null);
-    if (!drag) return;
-    if (drag.appt.assignedToId === repId) { dragRef.current = null; return; }
+  // ── FullCalendar callbacks
+  const handleEventDrop = useCallback((info: EventDropArg) => {
+    const newDate = format(info.event.start!, "yyyy-MM-dd");
+    const newStart = format(info.event.start!, "HH:mm");
+    const newEnd = format(info.event.end!, "HH:mm");
     moveMut.mutate(
-      { id: drag.appt.id, assignedToId: repId },
+      { id: info.event.id, date: newDate, startTime: newStart, endTime: newEnd },
       {
-        onSuccess: () => toast({ title: `Appointment moved to ${repName}.` }),
         onError: (err: any) => {
+          info.revert();
           let detail = "";
           try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
           toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
-          queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
         },
       }
     );
-    dragRef.current = null;
   }, []);
 
-  // ── Appointment block label (priority: clientName > type > time > duration > status)
-  const BlockLabel = ({ a, height, color }: { a: SalesAppointment; height: number; color: string }) => {
-    const dur = calcDuration(a.startTime, a.endTime);
-    const timeRange = `${a.startTime}–${a.endTime}`;
-    const durLabel = dur > 0 ? formatDuration(dur) : "";
+  const handleEventResize = useCallback((info: EventResizeDoneArg) => {
+    const newEnd = format(info.event.end!, "HH:mm");
+    moveMut.mutate(
+      { id: info.event.id, endTime: newEnd },
+      {
+        onError: (err: any) => {
+          info.revert();
+          let detail = "";
+          try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+          toast({ title: `Could not resize appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
+        },
+      }
+    );
+  }, []);
+
+  const handleEventClick = useCallback((info: EventClickArg) => {
+    info.jsEvent.preventDefault();
+    const a = info.event.extendedProps as SalesAppointment;
+    setDetailAppt(a);
+  }, []);
+
+  const handleEventMouseEnter = useCallback((info: EventMouseEnterArg) => {
+    const a = info.event.extendedProps as SalesAppointment;
+    setTipAppt(a);
+    setTipPos({ x: info.jsEvent.clientX, y: info.jsEvent.clientY });
+  }, []);
+
+  const handleEventMouseLeave = useCallback((_info: EventMouseLeaveArg) => {
+    setTipAppt(null);
+  }, []);
+
+  const handleSelect = useCallback((info: DateSelectArg) => {
+    const d = format(info.start, "yyyy-MM-dd");
+    const s = format(info.start, "HH:mm");
+    const e = format(info.end, "HH:mm");
+    openNew(d, s === e ? "09:00" : s, s === e ? "10:00" : e);
+    calendarRef.current?.getApi().unselect();
+  }, [openNew]);
+
+  // ── Custom event content (Outlook-style labels)
+  const renderEventContent = useCallback((info: EventContentArg) => {
+    const a = info.event.extendedProps as SalesAppointment & { _color: string };
+    const color = a._color || "#64748b";
     const name = a.clientName || a.title || "Appointment";
+    const typeLabel = TYPE_LABELS[a.appointmentType] || "";
     const sm = STATUS_META[a.status] || STATUS_META.planned;
+    const startStr = format(info.event.start!, "HH:mm");
+    const endStr = format(info.event.end!, "HH:mm");
+    const dur = differenceInMinutes(info.event.end!, info.event.start!);
+    const durLabel = formatDuration(dur);
+    const vType = info.view.type;
 
-    if (height < 25) {
+    // ── MONTH VIEW: compact "HH:mm Name – Type" bar
+    if (vType === "dayGridMonth") {
+      const label = typeLabel && name !== typeLabel ? `${name} – ${typeLabel}` : name;
       return (
-        <p className="text-xs px-1 pt-0.5 truncate font-semibold leading-tight" style={{ color }}>
-          {a.startTime} {name}
-        </p>
-      );
-    }
-    if (height < 45) {
-      return (
-        <div className="px-1.5 pt-0.5 overflow-hidden">
-          <p className="text-xs font-bold text-gray-900 leading-tight truncate">{name}</p>
-          <p className="text-xs truncate" style={{ color }}>{timeRange}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 3, padding: "1px 4px", overflow: "hidden", width: "100%" }}>
+          <span style={{ fontSize: 10, color, fontWeight: 700, flexShrink: 0, lineHeight: 1.2 }}>{startStr}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2 }}>
+            {label}
+          </span>
         </div>
       );
     }
-    if (height < 80) {
+
+    // ── LIST VIEW: full row
+    if (vType === "listWeek") {
       return (
-        <div className="px-1.5 pt-0.5 overflow-hidden">
-          <p className="text-xs font-bold text-gray-900 leading-tight truncate">{name}</p>
-          <p className="text-xs" style={{ color }}>{timeRange}{durLabel ? ` · ${durLabel}` : ""}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px" }}>
+          <strong style={{ color: "#111827", fontSize: 13 }}>{name}</strong>
+          <span style={{ color: "#6b7280", fontSize: 12 }}>{typeLabel}</span>
+          <span style={{ color, fontSize: 11, fontWeight: 600 }}>{startStr}–{endStr}{durLabel ? ` · ${durLabel}` : ""}</span>
+          <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, border: "1px solid" }} className={sm.classes}>{sm.label}</span>
         </div>
       );
     }
+
+    // ── TIME GRID (week/day): Outlook-style block
+    // Priority: time > client name > type > duration > status
+    if (dur <= 15) {
+      // Tiny block: just time + name on one line
+      return (
+        <div style={{ padding: "0 4px", overflow: "hidden", height: "100%", display: "flex", alignItems: "center" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {startStr} {name}
+          </span>
+        </div>
+      );
+    }
+
     return (
-      <div className="px-1.5 pt-1 flex flex-col gap-0.5 overflow-hidden h-full">
-        <p className="text-xs font-bold text-gray-900 leading-tight line-clamp-2">{name}</p>
-        <p className="text-xs text-gray-600 truncate">{TYPE_LABELS[a.appointmentType]}</p>
-        <p className="text-xs font-medium" style={{ color }}>{timeRange}{durLabel ? ` · ${durLabel}` : ""}</p>
-        {height >= 110 && (
-          <div className="mt-auto pb-1">
-            <span className={`text-xs px-1 py-0 rounded border inline-block ${sm.classes}`}>{sm.label}</span>
-          </div>
+      <div style={{ display: "flex", flexDirection: "column", padding: "2px 4px 2px 0", overflow: "hidden", height: "100%", gap: 1 }}>
+        {/* Time always first */}
+        <span style={{ fontSize: 10, fontWeight: 600, color, whiteSpace: "nowrap", lineHeight: 1.2 }}>
+          {startStr}–{endStr}{durLabel ? ` · ${durLabel}` : ""}
+        </span>
+        {/* Client name */}
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3 }}>
+          {name}
+        </span>
+        {/* Type — only if enough height */}
+        {dur >= 30 && (
+          <span style={{ fontSize: 10, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2 }}>
+            {typeLabel}
+          </span>
+        )}
+        {/* Status badge — only for large blocks */}
+        {dur >= 75 && (
+          <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, border: "1px solid currentColor", display: "inline-block", marginTop: "auto", lineHeight: 1.4 }} className={sm.classes}>
+            {sm.label}
+          </span>
         )}
       </div>
     );
-  };
+  }, []);
 
-  // ── Single appointment block (shared by Day + Week views)
-  const ApptBlock = ({
-    a, dateStr, compact = false,
-  }: { a: ApptWithLayout; dateStr: string; compact?: boolean }) => {
-    const displayEnd = resizing?.appt.id === a.id ? resizing.previewEnd : a.endTime;
-    const { top, height } = apptOffset(a.startTime, displayEnd);
-    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-    const colW = 100 / a.cols;
-    const leftPct = a.col * colW;
-    const isDraggingThis = dragRef.current?.appt.id === a.id;
+  // ── Calendar navigation
+  const navPrev  = () => { if (view === "team") setTeamDate(d => format(addDays(parseISO(d), -1), "yyyy-MM-dd")); else calendarRef.current?.getApi().prev(); };
+  const navNext  = () => { if (view === "team") setTeamDate(d => format(addDays(parseISO(d), 1), "yyyy-MM-dd"));  else calendarRef.current?.getApi().next(); };
+  const navToday = () => { if (view === "team") setTeamDate(format(new Date(), "yyyy-MM-dd"));                    else calendarRef.current?.getApi().today(); };
 
-    return (
-      <div
-        draggable={!resizing}
-        key={a.id}
-        className="absolute rounded border-l-4 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:z-20 transition-shadow select-none overflow-hidden"
-        style={{
-          top,
-          height,
-          left: `calc(${leftPct}% + 2px)`,
-          width: `calc(${colW}% - 4px)`,
-          borderLeftColor: color,
-          backgroundColor: color + "1a",
-          zIndex: resizing?.appt.id === a.id ? 30 : 2,
-          opacity: isDraggingThis ? 0.5 : 1,
-        }}
-        onDragStart={e => onApptDragStart(e, a)}
-        onDragEnd={() => { dragRef.current = null; setDragOverInfo(null); }}
-        onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
-        onMouseEnter={e => { setTipAppt(a); setTipPos({ x: e.clientX, y: e.clientY }); }}
-        onMouseMove={e => setTipPos({ x: e.clientX, y: e.clientY })}
-        onMouseLeave={() => setTipAppt(null)}
-      >
-        <BlockLabel a={a} height={height} color={color} />
-
-        {/* Resize handle — bottom strip */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-2.5 cursor-s-resize hover:bg-black/10 rounded-b"
-          onMouseDown={e => {
-            e.stopPropagation();
-            e.preventDefault();
-            setTipAppt(null);
-            setResizing({
-              appt: a,
-              origEndTime: a.endTime,
-              origEndMin: timeToMinutes(a.endTime),
-              startY: e.clientY,
-              previewEnd: a.endTime,
-            });
-          }}
-        />
-      </div>
-    );
-  };
-
-  // ── Drop preview block
-  const DropPreview = ({ dateStr }: { dateStr: string }) => {
-    const drag = dragRef.current;
-    if (!dragOverInfo || dragOverInfo.date !== dateStr || !drag) return null;
-    const dur = calcDuration(drag.appt.startTime, drag.appt.endTime);
-    const startMin = timeToMinutes(dragOverInfo.startTime);
-    const endMin = startMin + dur;
-    const { top, height } = apptOffset(dragOverInfo.startTime, minToTime(endMin));
-    return (
-      <div
-        className="absolute left-1 right-1 rounded border-2 border-dashed border-blue-500 bg-blue-50/40 pointer-events-none z-20"
-        style={{ top, height }}
-      />
-    );
-  };
-
-  // ── ApptCard (used in Manager + List views)
-  const ApptCard = ({ a, compact = false }: { a: SalesAppointment; compact?: boolean }) => {
-    const sm = STATUS_META[a.status] || STATUS_META.planned;
-    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-    const dur = calcDuration(a.startTime, a.endTime);
-    return (
-      <div
-        className="bg-white rounded border-l-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow p-3"
-        style={{ borderLeftColor: color }}
-        onClick={() => setDetailAppt(a)}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{a.clientName || a.title}</p>
-            <p className="text-xs text-gray-500">{TYPE_LABELS[a.appointmentType]}</p>
-            <p className="text-xs font-medium mt-0.5" style={{ color }}>
-              {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Badge variant="outline" className={`text-xs border px-1.5 py-0 ${sm.classes}`}>{sm.label}</Badge>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); markComplete(a); }}><CheckCircle2 className="h-4 w-4 mr-2" />Mark Completed</DropdownMenuItem>
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); openEdit(a); }}><FileText className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "cancelled" }); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Cancel</DropdownMenuItem>
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); if (confirm("Delete this appointment?")) deleteMut.mutate(a.id); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-        {!compact && a.siteAddress && (
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 truncate">
-            <MapPin className="h-3 w-3 flex-shrink-0" />{a.siteAddress}
-          </p>
-        )}
-        {!compact && (
-          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-            <User className="h-3 w-3 flex-shrink-0" />{workerName(a.assignedToId)}
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  // ═══ DAY VIEW
-  const DayView = () => {
-    const dateStr = format(currentDate, "yyyy-MM-dd");
-    const dayAppts = (apptsByDate[dateStr] || []).sort((a, b) => a.startTime.localeCompare(b.startTime));
-    const gridH = HOURS.length * HOUR_PX;
-
-    if (managerView) {
-      const reps = salesWorkers.length > 0 ? salesWorkers : workers.slice(0, 4);
-      return (
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(reps.length, 4)}, minmax(220px,1fr))` }}>
-          {reps.map(rep => {
-            const repAppts = dayAppts.filter(a => a.assignedToId === rep.id)
-              .sort((a, b) => a.startTime.localeCompare(b.startTime));
-            const isOver = dragOverRep === rep.id;
-            return (
-              <div
-                key={rep.id}
-                className={`rounded-xl border-2 transition-colors ${isOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white"}`}
-                onDragOver={e => onRepColDragOver(e, rep.id)}
-                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRep(null); }}
-                onDrop={e => onRepColDrop(e, rep.id, rep.name)}
-              >
-                {/* Column header */}
-                <div className={`flex items-center gap-2 px-3 py-2.5 border-b rounded-t-xl ${isOver ? "border-blue-300 bg-blue-100" : "border-gray-100 bg-gray-50"}`}>
-                  <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
-                    {rep.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 truncate">{rep.name}</p>
-                    <p className="text-xs text-gray-400">{rep.role || "Sales Rep"}</p>
-                  </div>
-                  <Badge variant="secondary" className="text-xs ml-auto flex-shrink-0">
-                    {repAppts.length}
-                  </Badge>
-                </div>
-
-                {/* Drop hint */}
-                {isOver && (
-                  <div className="mx-2 mt-2 rounded border-2 border-dashed border-blue-400 bg-blue-50 py-3 text-center text-xs text-blue-500 font-medium">
-                    Drop to reassign
-                  </div>
-                )}
-
-                {/* Appointment cards */}
-                <div className="p-2 space-y-1.5 min-h-[80px]">
-                  {repAppts.length === 0 && !isOver && (
-                    <p className="text-xs text-gray-400 text-center py-6">No appointments today</p>
-                  )}
-                  {repAppts.map(a => {
-                    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-                    const dur = calcDuration(a.startTime, a.endTime);
-                    const sm = STATUS_META[a.status] || STATUS_META.planned;
-                    return (
-                      <div
-                        key={a.id}
-                        draggable
-                        className="rounded-lg border-l-4 bg-white shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow p-2.5 select-none"
-                        style={{ borderLeftColor: color }}
-                        onDragStart={e => { e.stopPropagation(); onTeamCardDragStart(e, a); }}
-                        onDragEnd={() => { dragRef.current = null; setDragOverRep(null); }}
-                        onClick={() => setDetailAppt(a)}
-                        onMouseEnter={e => { setTipAppt(a); setTipPos({ x: e.clientX, y: e.clientY }); }}
-                        onMouseMove={e => setTipPos({ x: e.clientX, y: e.clientY })}
-                        onMouseLeave={() => setTipAppt(null)}
-                      >
-                        <p className="text-xs font-bold text-gray-900 leading-tight truncate">{a.clientName || a.title}</p>
-                        <p className="text-xs text-gray-500 truncate">{TYPE_LABELS[a.appointmentType]}</p>
-                        <p className="text-xs font-medium mt-0.5" style={{ color }}>
-                          {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
-                        </p>
-                        <div className="mt-1">
-                          <span className={`text-xs px-1.5 py-0 rounded border inline-block ${sm.classes}`}>{sm.label}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
+  const switchView = (v: CalView) => {
+    setView(v);
+    if (v !== "team") {
+      setTimeout(() => calendarRef.current?.getApi().changeView(v), 0);
     }
-
-    const withLayout = resolveOverlaps(dayAppts);
-    return (
-      <div className="border rounded-lg overflow-hidden bg-white flex">
-        <div className="w-16 flex-shrink-0 border-r bg-gray-50">
-          {HOURS.map(h => (
-            <div key={h} style={{ height: HOUR_PX }} className="border-b flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 font-medium">
-              {String(h).padStart(2, "0")}:00
-            </div>
-          ))}
-        </div>
-        <div
-          className="flex-1 relative overflow-hidden"
-          style={{ height: gridH, cursor: resizing ? "s-resize" : "default" }}
-          onDragOver={e => onGridDragOver(e, dateStr)}
-          onDrop={e => onGridDrop(e, dateStr)}
-          onDragLeave={() => setDragOverInfo(null)}
-          onClick={() => openNew(dateStr)}
-        >
-          {HOURS.map((_, i) => (
-            <div key={i} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
-          ))}
-          {HOURS.map((_, i) => (
-            <div key={`h${i}`} className="absolute w-full border-b border-gray-50" style={{ top: i * HOUR_PX + HOUR_PX / 2 }} />
-          ))}
-          <DropPreview dateStr={dateStr} />
-          {withLayout.map(a => (
-            <ApptBlock key={a.id} a={a} dateStr={dateStr} />
-          ))}
-        </div>
-      </div>
-    );
   };
 
-  // ═══ WEEK VIEW
-  const WeekView = () => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-    const gridH = HOURS.length * HOUR_PX;
-    return (
-      <div className="border rounded-lg overflow-hidden bg-white">
-        <div className="flex border-b sticky top-0 z-10 bg-white">
-          <div className="w-16 flex-shrink-0 bg-gray-50 border-r" />
-          {days.map(d => {
-            const cnt = (apptsByDate[format(d, "yyyy-MM-dd")] || []).length;
-            return (
-              <div key={d.toISOString()} className={`flex-1 border-r p-2 text-center cursor-pointer hover:bg-blue-50/50 ${isSameDay(d, new Date()) ? "bg-blue-50" : "bg-gray-50"}`}
-                onClick={() => { setCurrentDate(d); setView("day"); }}>
-                <p className="text-xs text-gray-500 font-medium">{format(d, "EEE")}</p>
-                <p className={`text-sm font-bold ${isSameDay(d, new Date()) ? "text-blue-600" : "text-gray-800"}`}>{format(d, "d")}</p>
-                {cnt > 0 && <p className="text-xs text-blue-500 font-medium">{cnt} appt{cnt !== 1 ? "s" : ""}</p>}
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex overflow-auto">
-          <div className="w-16 flex-shrink-0 border-r bg-gray-50">
-            {HOURS.map(h => (
-              <div key={h} style={{ height: HOUR_PX }} className="border-b flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 font-medium">
-                {String(h).padStart(2, "0")}:00
-              </div>
-            ))}
-          </div>
-          {days.map(d => {
-            const dateStr = format(d, "yyyy-MM-dd");
-            const dayAppts = (apptsByDate[dateStr] || []);
-            const withLayout = resolveOverlaps(dayAppts);
-            return (
-              <div
-                key={dateStr}
-                className={`flex-1 border-r relative overflow-hidden ${isSameDay(d, new Date()) ? "bg-blue-50/20" : ""}`}
-                style={{ height: gridH, minWidth: 90, cursor: resizing ? "s-resize" : "default" }}
-                onDragOver={e => onGridDragOver(e, dateStr)}
-                onDrop={e => onGridDrop(e, dateStr)}
-                onDragLeave={e => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverInfo(null);
-                }}
-                onClick={() => openNew(dateStr)}
-              >
-                {HOURS.map((_, i) => (
-                  <div key={i} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
-                ))}
-                {HOURS.map((_, i) => (
-                  <div key={`h${i}`} className="absolute w-full border-b border-gray-50" style={{ top: i * HOUR_PX + HOUR_PX / 2 }} />
-                ))}
-                <DropPreview dateStr={dateStr} />
-                {withLayout.map(a => (
-                  <ApptBlock key={a.id} a={a} dateStr={dateStr} compact />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+  const VIEW_LABELS: Record<CalView, string> = {
+    timeGridDay: "Day", timeGridWeek: "Week", dayGridMonth: "Month", listWeek: "List", team: "Team",
   };
 
-  // ═══ MONTH VIEW
-  const MonthView = () => {
-    const start = startOfMonth(currentDate);
-    const end = endOfMonth(currentDate);
-    const gridStart = startOfWeek(start, { weekStartsOn: 1 });
-    const gridEnd = endOfWeek(end, { weekStartsOn: 1 });
-    const days: Date[] = [];
-    let cur = gridStart;
-    while (cur <= gridEnd) { days.push(cur); cur = addDays(cur, 1); }
-    return (
-      <div className="border rounded-lg overflow-hidden bg-white">
-        <div className="grid grid-cols-7 border-b bg-gray-50">
-          {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-            <div key={d} className="py-2 text-center text-xs font-semibold text-gray-500 border-r last:border-r-0">{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 overflow-y-auto" style={{ maxHeight: "calc(100vh - 300px)" }}>
-          {days.map(d => {
-            const dateStr = format(d, "yyyy-MM-dd");
-            const dayAppts2 = (apptsByDate[dateStr] || []).slice(0, 4);
-            const extra = (apptsByDate[dateStr] || []).length - dayAppts2.length;
-            return (
-              <div key={dateStr} className={`border-r border-b min-h-[100px] p-1 cursor-pointer hover:bg-gray-50/50 ${!isSameMonth(d, currentDate) ? "bg-gray-50/70" : ""} ${isSameDay(d, new Date()) ? "bg-blue-50/40" : ""}`}
-                onClick={() => { setCurrentDate(d); setView("day"); }}>
-                <p className={`text-xs font-semibold mb-1 ${isSameDay(d, new Date()) ? "text-blue-600" : !isSameMonth(d, currentDate) ? "text-gray-300" : "text-gray-700"}`}>
-                  {format(d, "d")}
-                </p>
-                <div className="space-y-0.5" onClick={e => e.stopPropagation()}>
-                  {dayAppts2.map(a => {
-                    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-                    const dur = calcDuration(a.startTime, a.endTime);
-                    return (
-                      <div key={a.id} className="text-xs rounded px-1 py-0.5 truncate cursor-pointer hover:opacity-80"
-                        style={{ backgroundColor: color + "22", borderLeft: `3px solid ${color}` }}
-                        onClick={() => setDetailAppt(a)}>
-                        <span className="font-semibold text-gray-900">{a.clientName || a.title}</span>
-                        <span className="text-gray-500 ml-1">{a.startTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}</span>
-                      </div>
-                    );
-                  })}
-                  {extra > 0 && <p className="text-xs text-gray-400 font-medium">+{extra} more</p>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
+  // ── Team View
+  const TeamView = () => {
+    const dateStr = teamDate;
+    const reps = salesWorkers.length > 0 ? salesWorkers : workers.slice(0, 4);
+    const dayAppts = filtered.filter(a => a.date === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  // ═══ LIST VIEW
-  const ListView = () => {
-    const start = currentDate;
-    const end = addDays(start, 14);
-    const days: Date[] = [];
-    let c = start;
-    while (c <= end) { days.push(c); c = addDays(c, 1); }
     return (
-      <div className="space-y-4">
-        {days.map(d => {
-          const dateStr = format(d, "yyyy-MM-dd");
-          const dayAppts3 = (apptsByDate[dateStr] || []).sort((a, b) => a.startTime.localeCompare(b.startTime));
-          if (dayAppts3.length === 0) return null;
+      <div className="grid gap-3 overflow-auto" style={{ gridTemplateColumns: `repeat(${Math.min(reps.length, 4)}, minmax(220px,1fr))` }}>
+        {reps.map(rep => {
+          const repAppts = dayAppts.filter(a => a.assignedToId === rep.id);
+          const isOver = dragOverRep === rep.id;
           return (
-            <div key={dateStr}>
-              <div className={`flex items-center gap-2 mb-2 ${isSameDay(d, new Date()) ? "text-blue-600" : "text-gray-600"}`}>
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm font-semibold">{format(d, "EEEE, d MMMM yyyy")}</span>
-                <Badge variant="secondary" className="text-xs">{dayAppts3.length}</Badge>
+            <div
+              key={rep.id}
+              className={`rounded-xl border-2 transition-colors ${isOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white"}`}
+              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverRep(rep.id); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRep(null); }}
+              onDrop={e => {
+                e.preventDefault();
+                const drag = teamDragRef.current;
+                setDragOverRep(null);
+                if (!drag || drag.assignedToId === rep.id) { teamDragRef.current = null; return; }
+                moveMut.mutate(
+                  { id: drag.id, assignedToId: rep.id },
+                  {
+                    onSuccess: () => toast({ title: `Moved to ${rep.name}.` }),
+                    onError: (err: any) => {
+                      let detail = "";
+                      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+                      queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
+                      toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
+                    },
+                  }
+                );
+                teamDragRef.current = null;
+              }}
+            >
+              <div className={`flex items-center gap-2 px-3 py-2.5 border-b rounded-t-xl ${isOver ? "border-blue-300 bg-blue-100" : "border-gray-100 bg-gray-50"}`}>
+                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+                  {rep.name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 truncate">{rep.name}</p>
+                  <p className="text-xs text-gray-400">{rep.role || "Sales Rep"}</p>
+                </div>
+                <Badge variant="secondary" className="text-xs ml-auto flex-shrink-0">{repAppts.length}</Badge>
               </div>
-              <div className="space-y-2 ml-6">
-                {dayAppts3.map(a => <ApptCard key={a.id} a={a} />)}
+              {isOver && (
+                <div className="mx-2 mt-2 rounded border-2 border-dashed border-blue-400 bg-blue-50/50 py-2 text-center text-xs text-blue-500 font-medium">
+                  Drop to reassign
+                </div>
+              )}
+              <div className="p-2 space-y-1.5 min-h-[80px]">
+                {repAppts.length === 0 && !isOver && (
+                  <p className="text-xs text-gray-400 text-center py-5">No appointments today</p>
+                )}
+                {repAppts.map(a => {
+                  const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+                  const dur = calcDuration(a.startTime, a.endTime);
+                  const sm = STATUS_META[a.status] || STATUS_META.planned;
+                  return (
+                    <div
+                      key={a.id}
+                      draggable
+                      className="rounded-lg border-l-4 bg-white shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow p-2.5 select-none"
+                      style={{ borderLeftColor: color }}
+                      onDragStart={e => { e.stopPropagation(); teamDragRef.current = a; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", a.id); }}
+                      onDragEnd={() => { teamDragRef.current = null; setDragOverRep(null); }}
+                      onClick={() => setDetailAppt(a)}
+                      onMouseEnter={e => { setTipAppt(a); setTipPos({ x: e.clientX, y: e.clientY }); }}
+                      onMouseLeave={() => setTipAppt(null)}
+                    >
+                      <p className="text-xs font-bold text-gray-900 leading-tight truncate">{a.clientName || a.title}</p>
+                      <p className="text-xs text-gray-500 truncate">{TYPE_LABELS[a.appointmentType]}</p>
+                      <p className="text-xs font-medium mt-0.5" style={{ color }}>
+                        {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
+                      </p>
+                      <span className={`text-xs px-1.5 py-0 rounded border inline-block mt-1 ${sm.classes}`}>{sm.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
         })}
-        {days.every(d => !(apptsByDate[format(d, "yyyy-MM-dd")] || []).length) && (
-          <div className="text-center py-16 text-gray-400">
-            <Calendar className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No appointments in this period</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => openNew()}>Schedule one</Button>
-          </div>
-        )}
       </div>
     );
-  };
-
-  // ── date range label
-  const rangeLabel = () => {
-    if (view === "day") return format(currentDate, "EEEE, d MMMM yyyy");
-    if (view === "week") {
-      const s = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const e = endOfWeek(currentDate, { weekStartsOn: 1 });
-      return `${format(s, "d MMM")} – ${format(e, "d MMM yyyy")}`;
-    }
-    if (view === "month") return format(currentDate, "MMMM yyyy");
-    return `${format(currentDate, "d MMM")} – ${format(addDays(currentDate, 14), "d MMM yyyy")}`;
   };
 
   const hasFilters = filterRep !== "all" || filterType !== "all" || filterStatus !== "all" || filterClient !== "";
 
   return (
-    <div className="flex min-h-screen bg-gray-50" style={{ cursor: resizing ? "s-resize" : undefined }}>
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
         <Header title="Sales Diary" />
-        <main className="flex-1 overflow-auto p-4 space-y-4">
+        <main className="flex-1 overflow-auto p-4 space-y-3">
 
-          {/* ── Top bar */}
+          {/* ── Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
-              {(["day","week","month","list"] as ViewMode[]).map(v => (
-                <Button key={v} variant={view === v ? "default" : "ghost"} size="sm" className="h-7 text-xs capitalize"
-                  onClick={() => setView(v)}>{v}</Button>
+            {/* View switcher */}
+            <div className="flex items-center gap-0.5 bg-white border rounded-lg p-1">
+              {(["timeGridDay","timeGridWeek","dayGridMonth","listWeek","team"] as CalView[]).map(v => (
+                <Button key={v} variant={view === v ? "default" : "ghost"} size="sm"
+                  className="h-7 text-xs px-2.5" onClick={() => switchView(v)}>
+                  {VIEW_LABELS[v]}
+                </Button>
               ))}
             </div>
+
+            {/* Navigation */}
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => nav(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <span className="text-sm font-medium text-gray-700 min-w-[180px] text-center">{rangeLabel()}</span>
-              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => nav(1)}><ChevronRight className="h-4 w-4" /></Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentDate(new Date())}>Today</Button>
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={navPrev}><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-sm font-medium text-gray-700 min-w-[200px] text-center">
+                {view === "team" ? `Team · ${format(parseISO(teamDate), "EEEE, d MMMM yyyy")}` : viewTitle}
+              </span>
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={navNext}><ChevronRight className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={navToday}>Today</Button>
             </div>
+
             <div className="flex-1" />
-            <Button variant="outline" size="sm" className={`h-7 text-xs gap-1 ${managerView ? "border-indigo-400 text-indigo-700 bg-indigo-50" : ""}`}
-              onClick={() => setManagerView(v => !v)}>
-              <Users className="h-3.5 w-3.5" />{managerView ? "Manager View" : "Team View"}
-            </Button>
             <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700" onClick={() => openNew()}>
               <Plus className="h-3.5 w-3.5" />New Appointment
             </Button>
@@ -928,8 +581,7 @@ export default function SalesDiary() {
                 {SALES_APPT_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input placeholder="Search client…" value={filterClient} onChange={e => setFilterClient(e.target.value)}
-              className="h-7 text-xs w-36" />
+            <Input placeholder="Search client…" value={filterClient} onChange={e => setFilterClient(e.target.value)} className="h-7 text-xs w-36" />
             {hasFilters && (
               <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-400"
                 onClick={() => { setFilterRep("all"); setFilterType("all"); setFilterStatus("all"); setFilterClient(""); }}>
@@ -938,11 +590,47 @@ export default function SalesDiary() {
             )}
           </div>
 
-          {/* ── Calendar view */}
-          {view === "day"   && <DayView />}
-          {view === "week"  && <WeekView />}
-          {view === "month" && <MonthView />}
-          {view === "list"  && <ListView />}
+          {/* ── Calendar / Team View */}
+          {view === "team" ? (
+            <TeamView />
+          ) : (
+            <div className="bg-white border rounded-xl overflow-hidden sales-diary-fc">
+              <FullCalendar
+                ref={calendarRef}
+                plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                initialView="timeGridWeek"
+                headerToolbar={false}
+                editable={true}
+                selectable={true}
+                selectMirror={true}
+                eventDurationEditable={true}
+                eventStartEditable={true}
+                snapDuration="00:15:00"
+                slotDuration="00:30:00"
+                slotLabelInterval="01:00"
+                slotMinTime="06:00:00"
+                slotMaxTime="19:00:00"
+                allDaySlot={false}
+                nowIndicator={true}
+                expandRows={true}
+                height="auto"
+                contentHeight={680}
+                firstDay={1}
+                dayHeaderFormat={{ weekday: "short", day: "numeric" }}
+                slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+                eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+                events={fcEvents}
+                eventContent={renderEventContent}
+                eventClick={handleEventClick}
+                eventDrop={handleEventDrop}
+                eventResize={handleEventResize}
+                eventMouseEnter={handleEventMouseEnter}
+                eventMouseLeave={handleEventMouseLeave}
+                select={handleSelect}
+                datesSet={(arg) => setViewTitle(arg.view.title)}
+              />
+            </div>
+          )}
 
         </main>
       </div>
@@ -950,8 +638,12 @@ export default function SalesDiary() {
       {/* ── Hover Tooltip */}
       {tipAppt && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-xs max-w-xs pointer-events-none"
-          style={{ left: Math.min(tipPos.x + 14, window.innerWidth - 280), top: Math.min(tipPos.y + 14, window.innerHeight - 220) }}
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-xs pointer-events-none"
+          style={{
+            maxWidth: 280,
+            left: Math.min(tipPos.x + 14, window.innerWidth - 290),
+            top: Math.min(tipPos.y + 14, window.innerHeight - 230),
+          }}
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TYPE_COLORS[tipAppt.appointmentType] }} />
@@ -960,9 +652,9 @@ export default function SalesDiary() {
           {tipAppt.contactPerson && <p className="text-gray-600 flex items-center gap-1 mb-0.5"><User className="h-3 w-3 text-gray-400" />{tipAppt.contactPerson}</p>}
           {tipAppt.phone && <p className="text-gray-600 flex items-center gap-1 mb-0.5"><Phone className="h-3 w-3 text-gray-400" />{tipAppt.phone}</p>}
           {tipAppt.siteAddress && <p className="text-gray-600 flex items-center gap-1 mb-0.5"><MapPin className="h-3 w-3 text-gray-400" />{tipAppt.siteAddress}</p>}
-          <div className="border-t border-gray-100 mt-2 pt-2 space-y-0.5">
+          <div className="border-t border-gray-100 mt-2 pt-2 space-y-0.5 text-gray-700">
             <p><span className="text-gray-400 mr-1">Type:</span>{TYPE_LABELS[tipAppt.appointmentType]}</p>
-            <p><span className="text-gray-400 mr-1">Assigned:</span>{workerName(tipAppt.assignedToId)}</p>
+            <p><span className="text-gray-400 mr-1">Rep:</span>{workerName(tipAppt.assignedToId)}</p>
             <p><span className="text-gray-400 mr-1">Date:</span>{tipAppt.date}</p>
             <p><span className="text-gray-400 mr-1">Time:</span>{tipAppt.startTime}–{tipAppt.endTime}
               {calcDuration(tipAppt.startTime, tipAppt.endTime) > 0 ? ` (${formatDuration(calcDuration(tipAppt.startTime, tipAppt.endTime))})` : ""}
@@ -983,7 +675,7 @@ export default function SalesDiary() {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
             <div className="col-span-2 space-y-1">
-              <Label className="text-xs">Title *</Label>
+              <Label className="text-xs">Title</Label>
               <Input value={formData.title || ""} onChange={e => setFormData(f => ({ ...f, title: e.target.value }))} placeholder="Appointment title" />
             </div>
             <div className="space-y-1">
@@ -992,15 +684,15 @@ export default function SalesDiary() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Contact Person</Label>
-              <Input value={formData.contactPerson || ""} onChange={e => setFormData(f => ({ ...f, contactPerson: e.target.value }))} placeholder="Contact person" />
+              <Input value={formData.contactPerson || ""} onChange={e => setFormData(f => ({ ...f, contactPerson: e.target.value }))} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Phone</Label>
-              <Input value={formData.phone || ""} onChange={e => setFormData(f => ({ ...f, phone: e.target.value }))} placeholder="Phone number" />
+              <Input value={formData.phone || ""} onChange={e => setFormData(f => ({ ...f, phone: e.target.value }))} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Site Address</Label>
-              <Input value={formData.siteAddress || ""} onChange={e => setFormData(f => ({ ...f, siteAddress: e.target.value }))} placeholder="Site address" />
+              <Input value={formData.siteAddress || ""} onChange={e => setFormData(f => ({ ...f, siteAddress: e.target.value }))} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Appointment Type *</Label>
@@ -1011,8 +703,8 @@ export default function SalesDiary() {
             </div>
             {formData.appointmentType === "other" && (
               <div className="space-y-1">
-                <Label className="text-xs">Other Appointment Details</Label>
-                <Input value={formData.appointmentTypeOther || ""} onChange={e => setFormData(f => ({ ...f, appointmentTypeOther: e.target.value }))} placeholder="Describe the appointment" />
+                <Label className="text-xs">Describe the Appointment</Label>
+                <Input value={formData.appointmentTypeOther || ""} onChange={e => setFormData(f => ({ ...f, appointmentTypeOther: e.target.value }))} />
               </div>
             )}
             <div className="space-y-1">
@@ -1047,15 +739,15 @@ export default function SalesDiary() {
             </div>
             {formData.startTime && formData.endTime && timeToMinutes(formData.endTime) > timeToMinutes(formData.startTime) && (
               <div className="space-y-1">
-                <Label className="text-xs text-gray-500">Duration (calculated)</Label>
-                <p className="text-sm text-gray-700 font-medium py-2 px-3 bg-gray-50 border rounded-md">
+                <Label className="text-xs text-gray-500">Duration</Label>
+                <p className="text-sm font-medium py-2 px-3 bg-gray-50 border rounded-md text-gray-700">
                   {formatDuration(calcDuration(formData.startTime, formData.endTime))}
                 </p>
               </div>
             )}
             <div className="col-span-2 space-y-1">
               <Label className="text-xs">Notes</Label>
-              <Textarea value={formData.notes || ""} onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Any notes for this appointment…" />
+              <Textarea value={formData.notes || ""} onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))} rows={3} />
             </div>
           </div>
           <DialogFooter>
@@ -1074,7 +766,7 @@ export default function SalesDiary() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: TYPE_COLORS[detailAppt.appointmentType] }} />
-                {detailAppt.title || detailAppt.clientName}
+                {detailAppt.clientName || detailAppt.title}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3 py-1">
@@ -1087,7 +779,11 @@ export default function SalesDiary() {
                 {detailAppt.contactPerson && <div><p className="text-xs text-gray-400 mb-0.5">Contact</p><p>{detailAppt.contactPerson}</p></div>}
                 {detailAppt.phone && <div><p className="text-xs text-gray-400 mb-0.5">Phone</p><p>{detailAppt.phone}</p></div>}
                 <div><p className="text-xs text-gray-400 mb-0.5">Date</p><p>{detailAppt.date && format(parseISO(detailAppt.date), "EEE d MMM yyyy")}</p></div>
-                <div><p className="text-xs text-gray-400 mb-0.5">Time</p><p>{detailAppt.startTime} – {detailAppt.endTime} <span className="text-gray-500 text-xs">({formatDuration(calcDuration(detailAppt.startTime, detailAppt.endTime))})</span></p></div>
+                <div><p className="text-xs text-gray-400 mb-0.5">Time</p>
+                  <p>{detailAppt.startTime} – {detailAppt.endTime}
+                    <span className="text-gray-500 text-xs ml-1">({formatDuration(calcDuration(detailAppt.startTime, detailAppt.endTime))})</span>
+                  </p>
+                </div>
                 <div><p className="text-xs text-gray-400 mb-0.5">Sales Rep</p><p>{workerName(detailAppt.assignedToId)}</p></div>
                 {detailAppt.siteAddress && <div className="col-span-2"><p className="text-xs text-gray-400 mb-0.5">Address</p><p className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-gray-400" />{detailAppt.siteAddress}</p></div>}
                 {detailAppt.notes && <div className="col-span-2"><p className="text-xs text-gray-400 mb-0.5">Notes</p><p className="text-sm text-gray-700 bg-gray-50 rounded p-2">{detailAppt.notes}</p></div>}
@@ -1096,7 +792,7 @@ export default function SalesDiary() {
                 <div className="border rounded-lg p-3 bg-green-50 space-y-1 text-sm">
                   <p className="text-xs font-semibold text-green-700 mb-1">Completion Summary</p>
                   {detailAppt.completionNote && <p><span className="text-xs text-gray-500">What happened:</span> {detailAppt.completionNote}</p>}
-                  {detailAppt.clientFeedback && <p><span className="text-xs text-gray-500">Client feedback:</span> {detailAppt.clientFeedback}</p>}
+                  {detailAppt.clientFeedback && <p><span className="text-xs text-gray-500">Feedback:</span> {detailAppt.clientFeedback}</p>}
                   {detailAppt.nextAction && <p><span className="text-xs text-gray-500">Next action:</span> {detailAppt.nextAction}</p>}
                   {detailAppt.followUpDate && <p><span className="text-xs text-gray-500">Follow-up:</span> {format(parseISO(detailAppt.followUpDate), "d MMM yyyy")}</p>}
                 </div>
@@ -1111,10 +807,13 @@ export default function SalesDiary() {
                 )}
                 <Button size="sm" variant="outline" onClick={() => openEdit(detailAppt)}><FileText className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 {detailAppt.status !== "cancelled" && (
-                  <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => { updateMut.mutate({ id: detailAppt.id, status: "cancelled" }); }}>
+                  <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => updateMut.mutate({ id: detailAppt.id, status: "cancelled" })}>
                     <XCircle className="h-3.5 w-3.5 mr-1" />Cancel
                   </Button>
                 )}
+                <Button size="sm" variant="outline" className="text-red-700 border-red-200" onClick={() => { if (confirm("Delete?")) deleteMut.mutate(detailAppt.id); }}>
+                  <XCircle className="h-3.5 w-3.5 mr-1" />Delete
+                </Button>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setDetailAppt(null)}>Close</Button>
             </DialogFooter>
@@ -1135,15 +834,15 @@ export default function SalesDiary() {
               )}
               <div className="space-y-1">
                 <Label className="text-xs">What happened?</Label>
-                <Textarea value={completionData.completionNote} onChange={e => setCompletionData(d => ({ ...d, completionNote: e.target.value }))} rows={3} placeholder="Brief summary of the appointment…" />
+                <Textarea value={completionData.completionNote} onChange={e => setCompletionData(d => ({ ...d, completionNote: e.target.value }))} rows={3} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Client Feedback</Label>
-                <Textarea value={completionData.clientFeedback} onChange={e => setCompletionData(d => ({ ...d, clientFeedback: e.target.value }))} rows={2} placeholder="What did the client say?" />
+                <Textarea value={completionData.clientFeedback} onChange={e => setCompletionData(d => ({ ...d, clientFeedback: e.target.value }))} rows={2} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Next Action Required</Label>
-                <Input value={completionData.nextAction} onChange={e => setCompletionData(d => ({ ...d, nextAction: e.target.value }))} placeholder="e.g. Send quote, Call back next week" />
+                <Input value={completionData.nextAction} onChange={e => setCompletionData(d => ({ ...d, nextAction: e.target.value }))} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Follow-up Date (optional)</Label>

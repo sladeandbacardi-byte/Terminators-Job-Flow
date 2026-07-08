@@ -1,0 +1,330 @@
+Fix the Sales Diary drag-and-drop and appointment label display.
+
+The current diary drag-and-drop is not working properly, and the appointment labels are not good enough.
+
+The Sales Diary must behave like Microsoft Outlook Calendar.
+
+MAIN REQUIREMENTS:
+
+1. Drag-and-drop must work
+Users must be able to drag appointments:
+- To another time on the same day
+- To another day in week view
+- To another user in Team View
+- To another date in month view
+
+When an appointment is dropped:
+- Update date
+- Update startTime
+- Update endTime
+- Preserve the same duration
+- Update assignedUserId if moved to another user in Team View
+- Save immediately to the database
+
+If saving fails:
+- Move the appointment back to its original position
+- Show the actual error message
+
+Do not show only:
+"Could not update appointment."
+
+Show:
+"Could not move appointment: [actual reason]"
+
+2. Resize must work
+Users must be able to resize an appointment by dragging the bottom edge.
+
+Example:
+09:00–10:00 dragged down to 12:00 becomes:
+09:00–12:00
+
+Save the new endTime and calculated duration.
+
+3. Use Outlook-style time logic
+Source of truth:
+- date
+- startTime
+- endTime
+
+Do not use fixed 60-minute height.
+Do not use estimated duration as source of truth.
+
+Calendar block position:
+top = minutesSinceCalendarStart(startTime) * pixelsPerMinute
+
+Calendar block height:
+height = minutesBetween(startTime, endTime) * pixelsPerMinute
+
+Examples:
+08:00–08:30 = 30-minute block
+09:00–10:00 = 1-hour block
+11:30–16:30 = 5-hour block
+09:00–15:00 = 6-hour block
+
+4. Snap drag and resize to 15-minute intervals
+Allowed time increments:
+- 08:00
+- 08:15
+- 08:30
+- 08:45
+- 09:00
+
+5. Fix appointment labels
+
+The current labels are too cramped and unclear.
+
+Use Outlook-style appointment display.
+
+MONTH VIEW LABEL:
+In month view, show appointments as compact horizontal bars.
+
+Format:
+Time Client / Subject
+
+Examples:
+07:30 Preventive Maintenance Plan
+09:00 Blue Waters Hotel
+11:30 Site Visit - Greenacres Medical Centre
+
+If the appointment is all day or very long, show:
+Blue Waters Hotel - Site Visit
+
+Do not show bulky cards in month view.
+Do not show confusing clipped labels like:
+"07:..."
+"3h ..."
+"08:..."
+"1h ..."
+
+6. WEEK/DAY VIEW LABEL:
+In week/day view, the appointment block must show:
+
+For blocks with enough space:
+Client / Lead Name
+Appointment Type
+09:00–15:00 · 6h
+Status
+
+Example:
+Blue Waters Hotel
+Site Visit
+11:30–16:30 · 5h
+Confirmed
+
+For smaller blocks:
+Blue Waters Hotel
+11:30–12:00
+
+For very small blocks:
+11:30 Blue Waters
+
+Label priority:
+1. Time
+2. Client / lead / company name
+3. Appointment type
+4. Status
+5. Duration
+
+Never hide the time completely.
+Never show only duration without the client/appointment name.
+
+7. Appointment title logic
+The appointment title should be generated cleanly.
+
+Use this priority:
+- If linked client exists: client name
+- Else if linked lead exists: lead company name
+- Else use appointment title
+- Else use appointment type
+
+Display label should combine:
+Client/Lead Name + Appointment Type
+
+Examples:
+Blue Waters Hotel - Site Visit
+Greenacres Medical Centre - Quote Follow-up
+Internal Sales Meeting
+Fuel Price
+Preventive Maintenance Plan
+
+8. Hover tooltip
+On hover, show full details:
+- Client / lead name
+- Appointment type
+- Date
+- Start time
+- End time
+- Duration
+- Assigned user
+- Contact person
+- Phone
+- Site address
+- Status
+- Notes
+
+9. Click to edit
+Clicking an appointment must open the edit appointment modal.
+
+10. Use users, not separate sales reps
+Sales reps must be JobFlow users.
+
+Assigned user dropdown must use active users with:
+- Sales Rep
+- Sales Admin
+- Manager
+- Admin
+or sales permission.
+
+Do not use a separate sales rep table unless it is directly linked to users.
+
+11. Team View
+Team View must show appointments grouped by assigned user.
+
+Dragging an appointment from one user to another must update:
+assignedUserId
+
+12. API update route
+Ensure drag/drop and resize use the same reliable update endpoint.
+
+Preferred:
+PATCH /api/sales-appointments/:id
+
+Payload for moving:
+{
+  "date": "2026-07-08",
+  "startTime": "09:00",
+  "endTime": "14:00",
+  "assignedUserId": "user-id"
+}
+
+Payload for resizing:
+{
+  "endTime": "12:00"
+}
+
+Backend must validate:
+- appointment exists
+- user has permission
+- date is valid
+- startTime is valid
+- endTime is valid
+- endTime is after startTime
+- assignedUserId is valid
+
+13. Recommended implementation
+If the custom diary is becoming too difficult, replace it with a proper calendar library that supports Outlook-style behaviour.
+
+Recommended:
+FullCalendar React
+
+Use:
+- timeGridWeek for week view
+- timeGridDay for day view
+- dayGridMonth for month view
+- listWeek for list view
+- interactionPlugin for drag-and-drop
+- editable: true
+- eventResizableFromStart if needed
+- eventDrop for moving appointments
+- eventResize for resizing appointments
+- eventClick for opening edit modal
+
+FullCalendar already handles:
+- drag-and-drop
+- resizing
+- week/day/month/list views
+- proper event blocks
+- overlapping appointments
+- compact month labels
+- Outlook-style interaction
+
+14. FullCalendar behaviour settings
+Use these settings:
+- editable: true
+- droppable: true
+- selectable: true
+- eventDurationEditable: true
+- eventStartEditable: true
+- slotDuration: "00:15:00"
+- snapDuration: "00:15:00"
+- slotMinTime: "06:00:00"
+- slotMaxTime: "18:00:00"
+- allDaySlot: false
+- nowIndicator: true
+- expandRows: true
+- height: "auto"
+
+15. Event data mapping
+Map appointment to calendar event:
+
+event.id = appointment.id
+event.title = clean label
+event.start = appointment.date + "T" + appointment.startTime
+event.end = appointment.date + "T" + appointment.endTime
+event.extendedProps = {
+  clientName,
+  leadName,
+  appointmentType,
+  status,
+  assignedUserId,
+  contactPerson,
+  phone,
+  siteAddress,
+  notes
+}
+
+16. Event label rendering
+Use custom eventContent to display Outlook-style labels.
+
+Month view:
+Show:
+time + title
+
+Week/day view:
+Show:
+client/lead name
+appointment type
+time range + duration
+status badge if space allows
+
+17. Testing
+Test on Replit Preview and Railway URL.
+
+Test cases:
+A. Month view drag
+Move appointment from Tuesday to Wednesday.
+Expected:
+- Date updates
+- Appointment remains same time and duration
+
+B. Week view drag
+Move 09:00–10:00 to 10:30–11:30.
+Expected:
+- Start/end update
+- Save succeeds
+
+C. Long appointment
+Create 11:30–16:30.
+Expected:
+- Shows 5h
+- Visually blocks full 5 hours
+
+D. Resize
+Resize 09:00–10:00 to 09:00–12:00.
+Expected:
+- Shows 3h
+- Block stretches correctly
+
+E. Team View
+Move appointment from Sheryl-Lyn Lee to Chané du Toit.
+Expected:
+- assignedUserId updates
+- Appointment appears under correct user
+
+F. Labels
+Month view should look like Outlook:
+07:30 Preventive Maintenance Plan
+09:00 Blue Waters Hotel
+11:30 Site Visit - Greenacres
+
+Do not mark complete until drag-and-drop works on the Railway URL and the appointment labels look close to Outlook Calendar.
