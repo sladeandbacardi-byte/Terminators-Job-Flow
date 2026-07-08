@@ -1,0 +1,268 @@
+Update the Sales Diary to work like Outlook calendar with drag-and-drop and proper appointment labelling.
+
+CURRENT ISSUE:
+The diary displays appointment blocks, but users cannot easily drag and drop appointments.
+Appointment labels are also not clear enough. Some cards show truncated text like:
+"07:..."
+"3h ..."
+"08:..."
+"1h ..."
+
+The diary must be usable like Outlook.
+
+REQUIRED DIARY BEHAVIOUR:
+
+1. Drag and drop appointments
+Users must be able to drag an appointment block:
+- To a different time on the same day
+- To a different day in week view
+- To a different user in Team View
+- To another date in day/week/month views where applicable
+
+When an appointment is dropped:
+- Update the appointment date
+- Update the start time
+- Update the end time while preserving the same duration
+- Update assigned user if dropped onto another user in Team View
+- Save changes immediately to the database
+- Show success toast:
+"Appointment moved."
+
+If save fails:
+- Revert the appointment to its previous position
+- Show specific error:
+"Could not move appointment: [reason]"
+
+2. Resize appointment duration
+Users must be able to drag the bottom edge of an appointment block to change the end time.
+
+Example:
+Appointment: 09:00–10:00
+User drags bottom edge to 11:30
+New appointment: 09:00–11:30
+Duration: 2h 30m
+
+Save the new end time to the database.
+
+If save fails:
+- Revert to previous duration
+- Show clear error.
+
+3. Use 15-minute increments
+Dragging and resizing must snap to 15-minute increments.
+
+Examples:
+- 09:00
+- 09:15
+- 09:30
+- 09:45
+- 10:00
+
+4. Preserve duration when moving
+If appointment is 5 hours long:
+11:30–16:30
+
+And user drags it to 09:00:
+New time must be:
+09:00–14:00
+
+5. Outlook-style block display
+Appointment block height must be based on actual start and end time.
+
+Source of truth:
+- startTime
+- endTime
+
+Do not use fixed 60-minute height.
+
+Formula:
+- top = minutesSinceCalendarStart(startTime) * pixelsPerMinute
+- height = minutesBetween(startTime, endTime) * pixelsPerMinute
+
+Examples:
+- 08:00–08:30 = short 30-minute block
+- 09:00–10:00 = 1-hour block
+- 11:30–16:30 = 5-hour block
+- 09:00–15:00 = 6-hour block
+
+6. Correct appointment labels
+Each appointment block must show clear information.
+
+For normal/large appointment blocks show:
+- Client or lead name
+- Appointment type
+- Time range
+- Duration
+- Status badge
+
+Example:
+Blue Waters Hotel
+Site Visit
+11:30–16:30 · 5h
+Confirmed
+
+For small appointment blocks, show compact label:
+Blue Waters Hotel
+11:30–12:00
+
+For very small blocks, show:
+11:30 Blue Waters
+
+Do not show unclear text like:
+"07:..."
+"3h ..."
+"08:..."
+"1h ..."
+
+7. Label priority
+Use this display priority:
+1. Client / lead / company name
+2. Appointment type
+3. Time range
+4. Duration
+5. Status
+
+If space is limited, hide lower-priority fields first, but never hide the client/lead name and start time.
+
+8. Tooltip / hover detail
+On hover, show full appointment details:
+- Client / lead name
+- Contact person
+- Phone
+- Site address
+- Appointment type
+- Assigned user
+- Date
+- Start time
+- End time
+- Duration
+- Status
+- Notes
+
+9. Click appointment to edit
+Clicking an appointment must open the edit appointment modal.
+
+The edit modal must show:
+- Client / lead
+- Contact person
+- Phone
+- Site address
+- Appointment type
+- Assigned user
+- Date
+- Start time
+- End time
+- Calculated duration
+- Status
+- Notes
+
+10. Users, not separate sales reps
+Appointments must be assignable to JobFlow users.
+
+Sales reps must not be a separate list.
+
+Assigned user dropdown must pull from active users where:
+- role = Sales Rep
+- role = Sales Admin
+- role = Manager
+- role = Admin
+or user has sales permission.
+
+Default assigned user:
+- Current logged-in user
+
+Team View:
+- Show appointments grouped by assigned user.
+- Dragging an appointment from one user column/row to another must reassign it to that user.
+
+11. Permissions
+Sales reps can drag/drop and edit their own appointments.
+
+Managers/admins can drag/drop and edit any sales appointment.
+
+If a user does not have permission to move an appointment:
+- Do not allow the drop
+- Show:
+"You do not have permission to move this appointment."
+
+12. Update API
+Create/fix an appointment move/update endpoint.
+
+Suggested route:
+PATCH /api/sales-appointments/:id
+
+Payload for moving appointment:
+{
+  "date": "2026-07-08",
+  "startTime": "09:00",
+  "endTime": "14:00",
+  "assignedUserId": "user-id-if-changed"
+}
+
+Payload for resizing appointment:
+{
+  "endTime": "11:30"
+}
+
+Backend must:
+- Validate appointment exists
+- Validate user permission
+- Validate endTime > startTime
+- Save updated date/start/end/user
+- Recalculate durationMinutes from start/end
+- Return updated appointment
+
+13. Error handling
+Do not show generic:
+"Could not update appointment."
+
+Show:
+"Could not update appointment: end time must be after start time"
+or
+"Could not update appointment: appointment not found"
+or
+"Could not update appointment: permission denied"
+
+14. Mobile behaviour
+On mobile/tablet:
+- Tap opens appointment
+- Long press starts drag if supported
+- If drag is awkward on mobile, allow quick edit through modal
+
+15. Testing
+Test on Replit Preview and Railway URL.
+
+Test cases:
+A. Drag same day
+- Move 09:00–10:00 to 10:00–11:00
+- Confirm save and visual update
+
+B. Drag to another day
+- Move Monday appointment to Tuesday
+- Confirm date updates
+
+C. Drag long appointment
+- Move 11:30–16:30 to 09:00
+- Confirm it becomes 09:00–14:00
+
+D. Resize appointment
+- Resize 09:00–10:00 to 09:00–12:00
+- Confirm duration becomes 3h
+
+E. Team View reassignment
+- Move appointment from Sheryl-Lyn Lee to Chané du Toit
+- Confirm assigned user updates
+
+F. Invalid resize
+- Try resize so end time is before start time
+- Confirm save is blocked
+
+G. Labels
+- Confirm appointment card shows:
+Client/lead name
+Appointment type
+Time range
+Duration
+Status
+
+Do not mark this complete until appointments can be dragged, dropped, resized, and correctly labelled on the Railway URL.

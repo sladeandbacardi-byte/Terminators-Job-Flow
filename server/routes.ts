@@ -3997,6 +3997,24 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       if ("departmentId" in body && !body.departmentId) body.departmentId = null;
       if ("estimatedDuration" in body && body.estimatedDuration === "") body.estimatedDuration = null;
 
+      // Validate time ordering when both times are present in this update
+      if (body.startTime && body.endTime) {
+        const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
+        if (toMin(body.endTime) <= toMin(body.startTime)) {
+          return res.status(400).json({ error: "Failed to update appointment", details: "end time must be after start time" });
+        }
+        // Auto-recalculate estimatedDuration when both times are provided
+        body.estimatedDuration = toMin(body.endTime) - toMin(body.startTime);
+      } else if (body.endTime && !body.startTime) {
+        // Resize-only update: fetch current appointment to validate against saved startTime
+        if (!before) return res.status(404).json({ error: "Failed to update appointment", details: "appointment not found" });
+        const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
+        if (toMin(body.endTime) <= toMin(before.startTime)) {
+          return res.status(400).json({ error: "Failed to update appointment", details: "end time must be after start time" });
+        }
+        body.estimatedDuration = toMin(body.endTime) - toMin(before.startTime);
+      }
+
       const appt = await storage.updateSalesAppointment(req.params.id, body);
 
       // Completing a site-visit appointment marks the lead's site visit done

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -48,8 +48,9 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 07:00–19:00
-const HOUR_PX = 80; // pixels per hour
+const HOUR_PX = 80;
 const DAY_START_HOUR = HOURS[0]; // 7
+const PX_PER_MIN = HOUR_PX / 60; // 1.333... px per minute
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -70,17 +71,25 @@ function formatDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-// Returns top/height in pixels using the HOUR_PX scale.
-// Scale factor = HOUR_PX / 60 so 1 minute = HOUR_PX/60 px.
-function apptOffset(startTime: string, endTime: string): { top: number; height: number } {
-  if (!startTime || !endTime) return { top: 0, height: HOUR_PX };
-  const scale = HOUR_PX / 60; // px per minute
-  const startMin = Math.max(0, timeToMinutes(startTime) - DAY_START_HOUR * 60);
-  const durationMin = Math.max(15, calcDuration(startTime, endTime)); // minimum 15min tall
-  return { top: Math.round(startMin * scale), height: Math.round(durationMin * scale) };
+function snap15(min: number): number {
+  return Math.round(min / 15) * 15;
 }
 
-// Detects overlaps and assigns column positions so appointments display side-by-side.
+function minToTime(totalMin: number): string {
+  const clamped = Math.max(0, Math.min(totalMin, 23 * 60 + 59));
+  return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
+}
+
+function apptOffset(startTime: string, endTime: string): { top: number; height: number } {
+  if (!startTime || !endTime) return { top: 0, height: HOUR_PX };
+  const startMin = Math.max(0, timeToMinutes(startTime) - DAY_START_HOUR * 60);
+  const durationMin = Math.max(15, calcDuration(startTime, endTime));
+  return {
+    top: Math.round(startMin * PX_PER_MIN),
+    height: Math.round(durationMin * PX_PER_MIN),
+  };
+}
+
 type ApptWithLayout = SalesAppointment & { col: number; cols: number };
 
 function resolveOverlaps(appts: SalesAppointment[]): ApptWithLayout[] {
@@ -89,7 +98,6 @@ function resolveOverlaps(appts: SalesAppointment[]): ApptWithLayout[] {
   const result: ApptWithLayout[] = [];
   let i = 0;
   while (i < sorted.length) {
-    // Build a cluster of all appointments that overlap with any in the cluster
     let clusterEndMin = timeToMinutes(sorted[i].endTime || "23:59");
     let j = i + 1;
     while (j < sorted.length && timeToMinutes(sorted[j].startTime) < clusterEndMin) {
@@ -97,8 +105,7 @@ function resolveOverlaps(appts: SalesAppointment[]): ApptWithLayout[] {
       j++;
     }
     const cluster = sorted.slice(i, j);
-    const cols = cluster.length;
-    cluster.forEach((a, idx) => result.push({ ...a, col: idx, cols }));
+    cluster.forEach((a, idx) => result.push({ ...a, col: idx, cols: cluster.length }));
     i = j;
   }
   return result;
@@ -130,12 +137,28 @@ export default function SalesDiary() {
   const [detailAppt, setDetailAppt] = useState<SalesAppointment | null>(null);
   const [managerView, setManagerView] = useState(false);
 
+  // ── Drag state (ref so changes don't re-render during drag)
+  const dragRef = useRef<{ appt: SalesAppointment; offsetMin: number } | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{ date: string; startTime: string } | null>(null);
+
+  // ── Resize state
+  const [resizing, setResizing] = useState<{
+    appt: SalesAppointment;
+    origEndTime: string;
+    origEndMin: number;
+    startY: number;
+    previewEnd: string;
+  } | null>(null);
+
+  // ── Tooltip state
+  const [tipAppt, setTipAppt] = useState<SalesAppointment | null>(null);
+  const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
+
   const searchStr = useSearch();
 
   const { data: appointments = [] } = useQuery<SalesAppointment[]>({ queryKey: ["/api/sales-appointments"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
 
-  // Match the logged-in admin user to a worker record (by email, then by full name)
   const currentWorker = useMemo(() => {
     if (!user) return null;
     const byEmail = workers.find(w => w.email?.toLowerCase() === (user.email || "").toLowerCase());
@@ -144,21 +167,17 @@ export default function SalesDiary() {
     return workers.find(w => w.name.toLowerCase() === fullName) || null;
   }, [workers, user]);
 
-  // Auto-fill assignedToId with the current user's worker record whenever the
-  // form opens for a new appointment and no rep has been chosen yet.
   useEffect(() => {
     if (showForm && !editAppt && currentWorker && !formData.assignedToId) {
       setFormData(f => ({ ...f, assignedToId: currentWorker.id }));
     }
   }, [showForm, editAppt, currentWorker]);
 
-  // Pre-fill form from URL params (e.g. when coming from the Leads page)
   useEffect(() => {
     if (!searchStr) return;
     const params = new URLSearchParams(searchStr);
     const clientName = params.get("clientName");
     if (!clientName) return;
-    // Prefer the lead's assigned rep; fall back to the current user's worker
     const repId = params.get("assignedTo") || currentWorker?.id || "";
     setFormData({
       ...emptyForm(),
@@ -183,13 +202,7 @@ export default function SalesDiary() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setShowForm(false); toast({ title: "Appointment created" }); },
     onError: (err: any) => {
       let detail = "Could not save appointment.";
-      try {
-        const raw = String(err?.message ?? "");
-        const jsonPart = raw.replace(/^\d+:\s*/, "");
-        const parsed = JSON.parse(jsonPart);
-        if (parsed?.details) detail = `Could not save appointment: ${parsed.details}`;
-        else if (parsed?.error) detail = `Could not save appointment: ${parsed.error}`;
-      } catch { /* ignore parse errors */ }
+      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || detail; } catch {}
       toast({ title: "Error", description: detail, variant: "destructive" });
     },
   });
@@ -199,14 +212,19 @@ export default function SalesDiary() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setShowForm(false); setEditAppt(null); setDetailAppt(null); setCompleteAppt(null); toast({ title: "Appointment updated" }); },
     onError: (err: any) => {
       let detail = "Could not update appointment.";
-      try {
-        const raw = String(err?.message ?? "");
-        const jsonPart = raw.replace(/^\d+:\s*/, "");
-        const parsed = JSON.parse(jsonPart);
-        if (parsed?.details) detail = `Could not update appointment: ${parsed.details}`;
-        else if (parsed?.error) detail = `Could not update appointment: ${parsed.error}`;
-      } catch { /* ignore parse errors */ }
+      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = `Could not update appointment: ${p?.details || p?.error || "unknown error"}`; } catch {}
       toast({ title: "Error", description: detail, variant: "destructive" });
+    },
+  });
+
+  const moveMut = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/sales-appointments/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); toast({ title: "Appointment moved." }); },
+    onError: (err: any) => {
+      let detail = "";
+      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
+      toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
     },
   });
 
@@ -214,6 +232,32 @@ export default function SalesDiary() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/sales-appointments/${id}`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setDetailAppt(null); toast({ title: "Appointment deleted" }); },
   });
+
+  // ── Resize mouse handlers via useEffect
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - resizing.startY;
+      const deltaMin = snap15(Math.round(deltaY / PX_PER_MIN));
+      const newEndMin = Math.max(
+        timeToMinutes(resizing.appt.startTime) + 15,
+        Math.min(resizing.origEndMin + deltaMin, 19 * 60)
+      );
+      setResizing(r => r ? { ...r, previewEnd: minToTime(newEndMin) } : null);
+    };
+    const onUp = () => {
+      if (!resizing.previewEnd || resizing.previewEnd === resizing.origEndTime) {
+        setResizing(null);
+        return;
+      }
+      const dur = calcDuration(resizing.appt.startTime, resizing.previewEnd);
+      moveMut.mutate({ id: resizing.appt.id, endTime: resizing.previewEnd, estimatedDuration: dur });
+      setResizing(null);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+  }, [resizing]);
 
   // ── filtering
   const filtered = useMemo(() => appointments.filter(a => {
@@ -226,9 +270,7 @@ export default function SalesDiary() {
 
   const apptsByDate = useMemo(() => {
     const map: Record<string, SalesAppointment[]> = {};
-    for (const a of filtered) {
-      (map[a.date] = map[a.date] || []).push(a);
-    }
+    for (const a of filtered) (map[a.date] = map[a.date] || []).push(a);
     return map;
   }, [filtered]);
 
@@ -242,11 +284,7 @@ export default function SalesDiary() {
 
   const openNew = (date?: string) => {
     setEditAppt(null);
-    setFormData({
-      ...emptyForm(),
-      date: date || format(currentDate, "yyyy-MM-dd"),
-      assignedToId: currentWorker?.id || "",
-    });
+    setFormData({ ...emptyForm(), date: date || format(currentDate, "yyyy-MM-dd"), assignedToId: currentWorker?.id || "" });
     setShowForm(true);
   };
 
@@ -258,30 +296,14 @@ export default function SalesDiary() {
   };
 
   const saveForm = () => {
-    if (!formData.appointmentType) {
-      toast({ title: "Appointment type is required", variant: "destructive" }); return;
-    }
-    if (!formData.assignedToId) {
-      toast({ title: "Please select an assigned sales rep.", variant: "destructive" }); return;
-    }
-    if (!formData.date) {
-      toast({ title: "Date is required", variant: "destructive" }); return;
-    }
-    if (!formData.startTime) {
-      toast({ title: "Start time is required", variant: "destructive" }); return;
-    }
-    if (!formData.endTime) {
-      toast({ title: "End time is required", variant: "destructive" }); return;
-    }
-    if (timeToMinutes(formData.endTime) <= timeToMinutes(formData.startTime)) {
-      toast({ title: "End time must be after start time.", variant: "destructive" }); return;
-    }
-    if (!formData.title && !formData.clientName) {
-      toast({ title: "Please enter a title or client name.", variant: "destructive" }); return;
-    }
+    if (!formData.appointmentType) { toast({ title: "Appointment type is required", variant: "destructive" }); return; }
+    if (!formData.assignedToId) { toast({ title: "Please select an assigned sales rep.", variant: "destructive" }); return; }
+    if (!formData.date) { toast({ title: "Date is required", variant: "destructive" }); return; }
+    if (!formData.startTime) { toast({ title: "Start time is required", variant: "destructive" }); return; }
+    if (!formData.endTime) { toast({ title: "End time is required", variant: "destructive" }); return; }
+    if (timeToMinutes(formData.endTime) <= timeToMinutes(formData.startTime)) { toast({ title: "End time must be after start time.", variant: "destructive" }); return; }
+    if (!formData.title && !formData.clientName) { toast({ title: "Please enter a title or client name.", variant: "destructive" }); return; }
 
-    // Sanitise: strip placeholder values and empty strings for optional fields.
-    // Auto-calculate estimatedDuration from start/end times so it's always correct.
     const duration = calcDuration(formData.startTime!, formData.endTime!);
     const payload: Partial<SalesAppointment> = {
       ...formData,
@@ -314,26 +336,204 @@ export default function SalesDiary() {
 
   const workerName = (id: string | null | undefined) => workers.find(w => w.id === id)?.name || "Unassigned";
 
-  // ═══ RENDER APPOINTMENT CARD (reused across views)
+  // ── Drag handlers
+  const onApptDragStart = useCallback((e: React.DragEvent, appt: SalesAppointment) => {
+    const blockEl = e.currentTarget as HTMLElement;
+    const rect = blockEl.getBoundingClientRect();
+    const offsetY = Math.max(0, e.clientY - rect.top);
+    const offsetMin = snap15(Math.round(offsetY / PX_PER_MIN));
+    dragRef.current = { appt, offsetMin };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", appt.id);
+    // Make dragging block semi-transparent
+    const ghost = blockEl.cloneNode(true) as HTMLElement;
+    ghost.style.opacity = "0.8";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 20, offsetY);
+    setTimeout(() => document.body.removeChild(ghost), 0);
+  }, []);
+
+  const onGridDragOver = useCallback((e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const gridEl = e.currentTarget as HTMLElement;
+    const rect = gridEl.getBoundingClientRect();
+    const y = Math.max(0, e.clientY - rect.top);
+    const minuteFromGridTop = y / PX_PER_MIN;
+    const offsetMin = dragRef.current?.offsetMin ?? 0;
+    const newStartGridMin = snap15(Math.max(0, minuteFromGridTop - offsetMin));
+    const newStartTotal = DAY_START_HOUR * 60 + newStartGridMin;
+    setDragOverInfo({ date: dateStr, startTime: minToTime(newStartTotal) });
+  }, []);
+
+  const onGridDrop = useCallback((e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    const drag = dragRef.current;
+    if (!drag) return;
+    const gridEl = e.currentTarget as HTMLElement;
+    const rect = gridEl.getBoundingClientRect();
+    const y = Math.max(0, e.clientY - rect.top);
+    const minuteFromGridTop = y / PX_PER_MIN;
+    const newStartGridMin = snap15(Math.max(0, minuteFromGridTop - drag.offsetMin));
+    const newStartTotal = DAY_START_HOUR * 60 + newStartGridMin;
+    const duration = calcDuration(drag.appt.startTime, drag.appt.endTime);
+    const newEndTotal = newStartTotal + duration;
+    const newStart = minToTime(newStartTotal);
+    const newEnd = minToTime(Math.min(newEndTotal, 23 * 60 + 59));
+
+    if (drag.appt.date === dateStr && newStart === drag.appt.startTime) {
+      dragRef.current = null;
+      setDragOverInfo(null);
+      return;
+    }
+    moveMut.mutate({ id: drag.appt.id, date: dateStr, startTime: newStart, endTime: newEnd, estimatedDuration: duration });
+    dragRef.current = null;
+    setDragOverInfo(null);
+  }, []);
+
+  // ── Appointment block label (priority: clientName > type > time > duration > status)
+  const BlockLabel = ({ a, height, color }: { a: SalesAppointment; height: number; color: string }) => {
+    const dur = calcDuration(a.startTime, a.endTime);
+    const timeRange = `${a.startTime}–${a.endTime}`;
+    const durLabel = dur > 0 ? formatDuration(dur) : "";
+    const name = a.clientName || a.title || "Appointment";
+    const sm = STATUS_META[a.status] || STATUS_META.planned;
+
+    if (height < 25) {
+      return (
+        <p className="text-xs px-1 pt-0.5 truncate font-semibold leading-tight" style={{ color }}>
+          {a.startTime} {name}
+        </p>
+      );
+    }
+    if (height < 45) {
+      return (
+        <div className="px-1.5 pt-0.5 overflow-hidden">
+          <p className="text-xs font-bold text-gray-900 leading-tight truncate">{name}</p>
+          <p className="text-xs truncate" style={{ color }}>{timeRange}</p>
+        </div>
+      );
+    }
+    if (height < 80) {
+      return (
+        <div className="px-1.5 pt-0.5 overflow-hidden">
+          <p className="text-xs font-bold text-gray-900 leading-tight truncate">{name}</p>
+          <p className="text-xs" style={{ color }}>{timeRange}{durLabel ? ` · ${durLabel}` : ""}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="px-1.5 pt-1 flex flex-col gap-0.5 overflow-hidden h-full">
+        <p className="text-xs font-bold text-gray-900 leading-tight line-clamp-2">{name}</p>
+        <p className="text-xs text-gray-600 truncate">{TYPE_LABELS[a.appointmentType]}</p>
+        <p className="text-xs font-medium" style={{ color }}>{timeRange}{durLabel ? ` · ${durLabel}` : ""}</p>
+        {height >= 110 && (
+          <div className="mt-auto pb-1">
+            <span className={`text-xs px-1 py-0 rounded border inline-block ${sm.classes}`}>{sm.label}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Single appointment block (shared by Day + Week views)
+  const ApptBlock = ({
+    a, dateStr, compact = false,
+  }: { a: ApptWithLayout; dateStr: string; compact?: boolean }) => {
+    const displayEnd = resizing?.appt.id === a.id ? resizing.previewEnd : a.endTime;
+    const { top, height } = apptOffset(a.startTime, displayEnd);
+    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+    const colW = 100 / a.cols;
+    const leftPct = a.col * colW;
+    const isDraggingThis = dragRef.current?.appt.id === a.id;
+
+    return (
+      <div
+        draggable={!resizing}
+        key={a.id}
+        className="absolute rounded border-l-4 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:z-20 transition-shadow select-none overflow-hidden"
+        style={{
+          top,
+          height,
+          left: `calc(${leftPct}% + 2px)`,
+          width: `calc(${colW}% - 4px)`,
+          borderLeftColor: color,
+          backgroundColor: color + "1a",
+          zIndex: resizing?.appt.id === a.id ? 30 : 2,
+          opacity: isDraggingThis ? 0.5 : 1,
+        }}
+        onDragStart={e => onApptDragStart(e, a)}
+        onDragEnd={() => { dragRef.current = null; setDragOverInfo(null); }}
+        onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
+        onMouseEnter={e => { setTipAppt(a); setTipPos({ x: e.clientX, y: e.clientY }); }}
+        onMouseMove={e => setTipPos({ x: e.clientX, y: e.clientY })}
+        onMouseLeave={() => setTipAppt(null)}
+      >
+        <BlockLabel a={a} height={height} color={color} />
+
+        {/* Resize handle — bottom strip */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-2.5 cursor-s-resize hover:bg-black/10 rounded-b"
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.preventDefault();
+            setTipAppt(null);
+            setResizing({
+              appt: a,
+              origEndTime: a.endTime,
+              origEndMin: timeToMinutes(a.endTime),
+              startY: e.clientY,
+              previewEnd: a.endTime,
+            });
+          }}
+        />
+      </div>
+    );
+  };
+
+  // ── Drop preview block
+  const DropPreview = ({ dateStr }: { dateStr: string }) => {
+    const drag = dragRef.current;
+    if (!dragOverInfo || dragOverInfo.date !== dateStr || !drag) return null;
+    const dur = calcDuration(drag.appt.startTime, drag.appt.endTime);
+    const startMin = timeToMinutes(dragOverInfo.startTime);
+    const endMin = startMin + dur;
+    const { top, height } = apptOffset(dragOverInfo.startTime, minToTime(endMin));
+    return (
+      <div
+        className="absolute left-1 right-1 rounded border-2 border-dashed border-blue-500 bg-blue-50/40 pointer-events-none z-20"
+        style={{ top, height }}
+      />
+    );
+  };
+
+  // ── ApptCard (used in Manager + List views)
   const ApptCard = ({ a, compact = false }: { a: SalesAppointment; compact?: boolean }) => {
     const sm = STATUS_META[a.status] || STATUS_META.planned;
     const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+    const dur = calcDuration(a.startTime, a.endTime);
     return (
       <div
-        className="bg-white rounded border-l-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-white rounded border-l-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow p-3"
         style={{ borderLeftColor: color }}
         onClick={() => setDetailAppt(a)}
       >
-        <div className={`p-2 ${compact ? "space-y-0.5" : "space-y-1"}`}>
-          <div className="flex items-start justify-between gap-1">
-            <p className={`font-semibold text-gray-900 ${compact ? "text-xs" : "text-sm"} line-clamp-1`}>{a.title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{a.clientName || a.title}</p>
+            <p className="text-xs text-gray-500">{TYPE_LABELS[a.appointmentType]}</p>
+            <p className="text-xs font-medium mt-0.5" style={{ color }}>
+              {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Badge variant="outline" className={`text-xs border px-1.5 py-0 ${sm.classes}`}>{sm.label}</Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 flex-shrink-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={e => { e.stopPropagation(); markComplete(a); }}><CheckCircle2 className="h-4 w-4 mr-2" />Mark Completed</DropdownMenuItem>
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "rescheduled" }); }}><RefreshCw className="h-4 w-4 mr-2" />Reschedule</DropdownMenuItem>
                 <DropdownMenuItem onClick={e => { e.stopPropagation(); openEdit(a); }}><FileText className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "cancelled" }); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Cancel</DropdownMenuItem>
@@ -341,18 +541,17 @@ export default function SalesDiary() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <p className={`text-gray-600 ${compact ? "text-xs" : "text-xs"} flex items-center gap-1`}>
-            <Clock className="h-3 w-3 flex-shrink-0" />{a.startTime}–{a.endTime}
-            {" · "}{formatDuration(calcDuration(a.startTime, a.endTime))}
-          </p>
-          {!compact && <p className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1"><User className="h-3 w-3" />{a.clientName}</p>}
-          {!compact && a.siteAddress && <p className="text-xs text-gray-400 flex items-center gap-1 line-clamp-1"><MapPin className="h-3 w-3" />{a.siteAddress}</p>}
-          <div className="flex items-center gap-1 flex-wrap">
-            <Badge variant="outline" className={`text-xs border px-1.5 py-0 ${sm.classes}`}>{sm.label}</Badge>
-            {!compact && <Badge variant="outline" className="text-xs px-1.5 py-0 text-gray-500">{TYPE_LABELS[a.appointmentType]}</Badge>}
-          </div>
-          {!compact && <p className="text-xs text-blue-600 font-medium">{workerName(a.assignedToId)}</p>}
         </div>
+        {!compact && a.siteAddress && (
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 truncate">
+            <MapPin className="h-3 w-3 flex-shrink-0" />{a.siteAddress}
+          </p>
+        )}
+        {!compact && (
+          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+            <User className="h-3 w-3 flex-shrink-0" />{workerName(a.assignedToId)}
+          </p>
+        )}
       </div>
     );
   };
@@ -379,13 +578,7 @@ export default function SalesDiary() {
                 </CardHeader>
                 <CardContent className="p-3 space-y-2">
                   {repAppts.length === 0 ? <p className="text-xs text-gray-400 text-center py-4">No appointments</p> :
-                    repAppts.map(a => (
-                      <div key={a.id} className="border-l-4 pl-2 py-1 rounded-sm cursor-pointer hover:bg-gray-50" style={{ borderLeftColor: TYPE_COLORS[a.appointmentType] }} onClick={() => setDetailAppt(a)}>
-                        <p className="text-xs font-semibold text-gray-800">{a.startTime}–{a.endTime} · {formatDuration(calcDuration(a.startTime, a.endTime))}</p>
-                        <p className="text-xs text-gray-600">{a.clientName} · {TYPE_LABELS[a.appointmentType]}</p>
-                        <Badge variant="outline" className={`text-xs border px-1.5 py-0 mt-0.5 ${STATUS_META[a.status]?.classes}`}>{STATUS_META[a.status]?.label}</Badge>
-                      </div>
-                    ))}
+                    repAppts.map(a => <ApptCard key={a.id} a={a} compact />)}
                 </CardContent>
               </Card>
             );
@@ -397,7 +590,6 @@ export default function SalesDiary() {
     const withLayout = resolveOverlaps(dayAppts);
     return (
       <div className="border rounded-lg overflow-hidden bg-white flex">
-        {/* Hour labels */}
         <div className="w-16 flex-shrink-0 border-r bg-gray-50">
           {HOURS.map(h => (
             <div key={h} style={{ height: HOUR_PX }} className="border-b flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 font-medium">
@@ -405,69 +597,24 @@ export default function SalesDiary() {
             </div>
           ))}
         </div>
-        {/* Appointment area — absolute positioning so blocks span their real time */}
-        <div className="flex-1 relative overflow-hidden" style={{ height: gridH }}>
-          {/* Hour grid lines */}
+        <div
+          className="flex-1 relative overflow-hidden"
+          style={{ height: gridH, cursor: resizing ? "s-resize" : "default" }}
+          onDragOver={e => onGridDragOver(e, dateStr)}
+          onDrop={e => onGridDrop(e, dateStr)}
+          onDragLeave={() => setDragOverInfo(null)}
+          onClick={() => openNew(dateStr)}
+        >
           {HOURS.map((_, i) => (
             <div key={i} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
           ))}
-          {/* Half-hour lines */}
           {HOURS.map((_, i) => (
             <div key={`h${i}`} className="absolute w-full border-b border-gray-50" style={{ top: i * HOUR_PX + HOUR_PX / 2 }} />
           ))}
-          {/* Click-to-add */}
-          <div className="absolute inset-0" onClick={() => openNew(dateStr)} />
-          {/* Appointments — side-by-side for overlaps */}
-          {withLayout.map(a => {
-            const { top, height } = apptOffset(a.startTime, a.endTime);
-            const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-            const colW = 100 / a.cols;
-            const leftPct = a.col * colW;
-            const dur = calcDuration(a.startTime, a.endTime);
-            return (
-              <div
-                key={a.id}
-                className="absolute rounded border-l-4 bg-white shadow-sm cursor-pointer hover:shadow-md hover:z-10 transition-shadow overflow-hidden"
-                style={{
-                  top, height,
-                  left: `calc(${leftPct}% + 3px)`,
-                  width: `calc(${colW}% - 6px)`,
-                  borderLeftColor: color,
-                  backgroundColor: color + "18",
-                  zIndex: 2,
-                }}
-                onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
-              >
-                <div className="p-1.5 h-full flex flex-col gap-0.5 overflow-hidden">
-                  <div className="flex items-start justify-between gap-1">
-                    <p className="text-xs font-semibold text-gray-900 line-clamp-1 leading-tight">{a.title || a.clientName}</p>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="h-4 w-4 p-0 flex-shrink-0 opacity-60 hover:opacity-100"><MoreHorizontal className="h-3 w-3" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={e => { e.stopPropagation(); markComplete(a); }}><CheckCircle2 className="h-4 w-4 mr-2" />Mark Completed</DropdownMenuItem>
-                        <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "rescheduled" }); }}><RefreshCw className="h-4 w-4 mr-2" />Reschedule</DropdownMenuItem>
-                        <DropdownMenuItem onClick={e => { e.stopPropagation(); openEdit(a); }}><FileText className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={e => { e.stopPropagation(); updateMut.mutate({ id: a.id, status: "cancelled" }); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Cancel</DropdownMenuItem>
-                        <DropdownMenuItem onClick={e => { e.stopPropagation(); if (confirm("Delete this appointment?")) deleteMut.mutate(a.id); }} className="text-red-600"><XCircle className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <p className="text-xs font-medium" style={{ color }}>
-                    {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
-                  </p>
-                  {height >= 56 && <p className="text-xs text-gray-600 line-clamp-1"><User className="h-3 w-3 inline mr-0.5" />{a.clientName}</p>}
-                  {height >= 80 && (
-                    <div className="flex items-center gap-1 flex-wrap mt-auto">
-                      <Badge variant="outline" className={`text-xs border px-1 py-0 ${STATUS_META[a.status]?.classes}`}>{STATUS_META[a.status]?.label}</Badge>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          <DropPreview dateStr={dateStr} />
+          {withLayout.map(a => (
+            <ApptBlock key={a.id} a={a} dateStr={dateStr} />
+          ))}
         </div>
       </div>
     );
@@ -480,7 +627,6 @@ export default function SalesDiary() {
     const gridH = HOURS.length * HOUR_PX;
     return (
       <div className="border rounded-lg overflow-hidden bg-white">
-        {/* Day headers */}
         <div className="flex border-b sticky top-0 z-10 bg-white">
           <div className="w-16 flex-shrink-0 bg-gray-50 border-r" />
           {days.map(d => {
@@ -495,9 +641,7 @@ export default function SalesDiary() {
             );
           })}
         </div>
-        {/* Body: hour labels + 7 day columns */}
         <div className="flex overflow-auto">
-          {/* Hour labels */}
           <div className="w-16 flex-shrink-0 border-r bg-gray-50">
             {HOURS.map(h => (
               <div key={h} style={{ height: HOUR_PX }} className="border-b flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 font-medium">
@@ -505,7 +649,6 @@ export default function SalesDiary() {
               </div>
             ))}
           </div>
-          {/* Day columns with absolutely-positioned appointment blocks */}
           {days.map(d => {
             const dateStr = format(d, "yyyy-MM-dd");
             const dayAppts = (apptsByDate[dateStr] || []);
@@ -514,44 +657,24 @@ export default function SalesDiary() {
               <div
                 key={dateStr}
                 className={`flex-1 border-r relative overflow-hidden ${isSameDay(d, new Date()) ? "bg-blue-50/20" : ""}`}
-                style={{ height: gridH, minWidth: 90 }}
+                style={{ height: gridH, minWidth: 90, cursor: resizing ? "s-resize" : "default" }}
+                onDragOver={e => onGridDragOver(e, dateStr)}
+                onDrop={e => onGridDrop(e, dateStr)}
+                onDragLeave={e => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverInfo(null);
+                }}
+                onClick={() => openNew(dateStr)}
               >
-                {/* Hour grid lines */}
                 {HOURS.map((_, i) => (
                   <div key={i} className="absolute w-full border-b border-gray-100" style={{ top: i * HOUR_PX, height: HOUR_PX }} />
                 ))}
-                {/* Half-hour lines */}
                 {HOURS.map((_, i) => (
                   <div key={`h${i}`} className="absolute w-full border-b border-gray-50" style={{ top: i * HOUR_PX + HOUR_PX / 2 }} />
                 ))}
-                {/* Click-to-add */}
-                <div className="absolute inset-0" onClick={() => openNew(dateStr)} />
-                {/* Appointments — side-by-side if overlapping */}
-                {withLayout.map(a => {
-                  const { top, height } = apptOffset(a.startTime, a.endTime);
-                  const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-                  const colW = 100 / a.cols;
-                  const leftPct = a.col * colW;
-                  const dur = calcDuration(a.startTime, a.endTime);
-                  return (
-                    <div
-                      key={a.id}
-                      className="absolute rounded border-l-2 overflow-hidden cursor-pointer hover:shadow-md hover:z-10 transition-shadow"
-                      style={{
-                        top, height,
-                        left: `calc(${leftPct}% + 1px)`,
-                        width: `calc(${colW}% - 2px)`,
-                        borderLeftColor: color,
-                        backgroundColor: color + "22",
-                        zIndex: 2,
-                      }}
-                      onClick={e => { e.stopPropagation(); setDetailAppt(a); }}
-                    >
-                      <p className="text-xs font-semibold px-1 pt-0.5 truncate text-gray-800 leading-tight">{a.startTime} {a.clientName || a.title}</p>
-                      {height >= 40 && <p className="text-xs px-1 text-gray-500 truncate">{dur > 0 ? formatDuration(dur) : ""} · {TYPE_LABELS[a.appointmentType]}</p>}
-                    </div>
-                  );
-                })}
+                <DropPreview dateStr={dateStr} />
+                {withLayout.map(a => (
+                  <ApptBlock key={a.id} a={a} dateStr={dateStr} compact />
+                ))}
               </div>
             );
           })}
@@ -571,32 +694,36 @@ export default function SalesDiary() {
     while (cur <= gridEnd) { days.push(cur); cur = addDays(cur, 1); }
     return (
       <div className="border rounded-lg overflow-hidden bg-white">
-        <div className="grid grid-cols-7 border-b">
+        <div className="grid grid-cols-7 border-b bg-gray-50">
           {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-            <div key={d} className="bg-gray-50 border-r last:border-r-0 text-center py-2 text-xs font-semibold text-gray-500">{d}</div>
+            <div key={d} className="py-2 text-center text-xs font-semibold text-gray-500 border-r last:border-r-0">{d}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-7 overflow-y-auto" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {days.map(d => {
             const dateStr = format(d, "yyyy-MM-dd");
-            const dayAppts2 = (apptsByDate[dateStr] || []);
-            const isToday = isSameDay(d, new Date());
-            const isCurrentMonth = isSameMonth(d, currentDate);
+            const dayAppts2 = (apptsByDate[dateStr] || []).slice(0, 4);
+            const extra = (apptsByDate[dateStr] || []).length - dayAppts2.length;
             return (
-              <div key={dateStr} className={`border-r border-b min-h-[90px] p-1 ${isCurrentMonth ? "" : "bg-gray-50"}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-blue-600 text-white" : isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}>{format(d, "d")}</span>
-                  {isCurrentMonth && <button className="text-gray-300 hover:text-gray-500 text-xs" onClick={() => openNew(dateStr)}>+</button>}
-                </div>
-                <div className="space-y-0.5">
-                  {dayAppts2.slice(0, 3).map(a => (
-                    <div key={a.id} className="text-xs rounded px-1 py-0.5 truncate cursor-pointer hover:opacity-80"
-                      style={{ backgroundColor: TYPE_COLORS[a.appointmentType] + "22", color: TYPE_COLORS[a.appointmentType], borderLeft: `2px solid ${TYPE_COLORS[a.appointmentType]}` }}
-                      onClick={() => setDetailAppt(a)}>
-                      {a.startTime} {a.clientName}
-                    </div>
-                  ))}
-                  {dayAppts2.length > 3 && <p className="text-xs text-gray-400 pl-1">+{dayAppts2.length - 3} more</p>}
+              <div key={dateStr} className={`border-r border-b min-h-[100px] p-1 cursor-pointer hover:bg-gray-50/50 ${!isSameMonth(d, currentDate) ? "bg-gray-50/70" : ""} ${isSameDay(d, new Date()) ? "bg-blue-50/40" : ""}`}
+                onClick={() => { setCurrentDate(d); setView("day"); }}>
+                <p className={`text-xs font-semibold mb-1 ${isSameDay(d, new Date()) ? "text-blue-600" : !isSameMonth(d, currentDate) ? "text-gray-300" : "text-gray-700"}`}>
+                  {format(d, "d")}
+                </p>
+                <div className="space-y-0.5" onClick={e => e.stopPropagation()}>
+                  {dayAppts2.map(a => {
+                    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+                    const dur = calcDuration(a.startTime, a.endTime);
+                    return (
+                      <div key={a.id} className="text-xs rounded px-1 py-0.5 truncate cursor-pointer hover:opacity-80"
+                        style={{ backgroundColor: color + "22", borderLeft: `3px solid ${color}` }}
+                        onClick={() => setDetailAppt(a)}>
+                        <span className="font-semibold text-gray-900">{a.clientName || a.title}</span>
+                        <span className="text-gray-500 ml-1">{a.startTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}</span>
+                      </div>
+                    );
+                  })}
+                  {extra > 0 && <p className="text-xs text-gray-400 font-medium">+{extra} more</p>}
                 </div>
               </div>
             );
@@ -658,7 +785,7 @@ export default function SalesDiary() {
   const hasFilters = filterRep !== "all" || filterType !== "all" || filterStatus !== "all" || filterClient !== "";
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50" style={{ cursor: resizing ? "s-resize" : undefined }}>
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
         <Header title="Sales Diary" />
@@ -731,6 +858,34 @@ export default function SalesDiary() {
         </main>
       </div>
 
+      {/* ── Hover Tooltip */}
+      {tipAppt && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-xs max-w-xs pointer-events-none"
+          style={{ left: Math.min(tipPos.x + 14, window.innerWidth - 280), top: Math.min(tipPos.y + 14, window.innerHeight - 220) }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TYPE_COLORS[tipAppt.appointmentType] }} />
+            <p className="font-bold text-sm text-gray-900 leading-tight">{tipAppt.clientName || tipAppt.title}</p>
+          </div>
+          {tipAppt.contactPerson && <p className="text-gray-600 flex items-center gap-1 mb-0.5"><User className="h-3 w-3 text-gray-400" />{tipAppt.contactPerson}</p>}
+          {tipAppt.phone && <p className="text-gray-600 flex items-center gap-1 mb-0.5"><Phone className="h-3 w-3 text-gray-400" />{tipAppt.phone}</p>}
+          {tipAppt.siteAddress && <p className="text-gray-600 flex items-center gap-1 mb-0.5"><MapPin className="h-3 w-3 text-gray-400" />{tipAppt.siteAddress}</p>}
+          <div className="border-t border-gray-100 mt-2 pt-2 space-y-0.5">
+            <p><span className="text-gray-400 mr-1">Type:</span>{TYPE_LABELS[tipAppt.appointmentType]}</p>
+            <p><span className="text-gray-400 mr-1">Assigned:</span>{workerName(tipAppt.assignedToId)}</p>
+            <p><span className="text-gray-400 mr-1">Date:</span>{tipAppt.date}</p>
+            <p><span className="text-gray-400 mr-1">Time:</span>{tipAppt.startTime}–{tipAppt.endTime}
+              {calcDuration(tipAppt.startTime, tipAppt.endTime) > 0 ? ` (${formatDuration(calcDuration(tipAppt.startTime, tipAppt.endTime))})` : ""}
+            </p>
+            <p><span className="text-gray-400 mr-1">Status:</span>
+              <span className={`px-1 rounded border text-xs ${STATUS_META[tipAppt.status]?.classes}`}>{STATUS_META[tipAppt.status]?.label}</span>
+            </p>
+            {tipAppt.notes && <p className="border-t border-gray-100 pt-1 mt-1 text-gray-600 line-clamp-3"><span className="text-gray-400 mr-1">Notes:</span>{tipAppt.notes}</p>}
+          </div>
+        </div>
+      )}
+
       {/* ═══ CREATE / EDIT DIALOG */}
       <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) setEditAppt(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -801,7 +956,6 @@ export default function SalesDiary() {
               <Label className="text-xs">End Time *</Label>
               <Input type="time" value={formData.endTime || ""} onChange={e => setFormData(f => ({ ...f, endTime: e.target.value }))} />
             </div>
-            {/* Duration is auto-calculated from start/end times — shown as read-only */}
             {formData.startTime && formData.endTime && timeToMinutes(formData.endTime) > timeToMinutes(formData.startTime) && (
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">Duration (calculated)</Label>
@@ -831,7 +985,7 @@ export default function SalesDiary() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: TYPE_COLORS[detailAppt.appointmentType] }} />
-                {detailAppt.title}
+                {detailAppt.title || detailAppt.clientName}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3 py-1">
@@ -919,4 +1073,3 @@ export default function SalesDiary() {
     </div>
   );
 }
-
