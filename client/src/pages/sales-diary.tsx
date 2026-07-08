@@ -140,6 +140,8 @@ export default function SalesDiary() {
   // ── Drag state (ref so changes don't re-render during drag)
   const dragRef = useRef<{ appt: SalesAppointment; offsetMin: number } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ date: string; startTime: string } | null>(null);
+  // ── Team View drag state
+  const [dragOverRep, setDragOverRep] = useState<string | null>(null);
 
   // ── Resize state
   const [resizing, setResizing] = useState<{
@@ -391,6 +393,40 @@ export default function SalesDiary() {
     setDragOverInfo(null);
   }, []);
 
+  // ── Team View drag: reassign assignedToId
+  const onTeamCardDragStart = useCallback((e: React.DragEvent, appt: SalesAppointment) => {
+    dragRef.current = { appt, offsetMin: 0 };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", appt.id);
+  }, []);
+
+  const onRepColDragOver = useCallback((e: React.DragEvent, repId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverRep(repId);
+  }, []);
+
+  const onRepColDrop = useCallback((e: React.DragEvent, repId: string, repName: string) => {
+    e.preventDefault();
+    const drag = dragRef.current;
+    setDragOverRep(null);
+    if (!drag) return;
+    if (drag.appt.assignedToId === repId) { dragRef.current = null; return; }
+    moveMut.mutate(
+      { id: drag.appt.id, assignedToId: repId },
+      {
+        onSuccess: () => toast({ title: `Appointment moved to ${repName}.` }),
+        onError: (err: any) => {
+          let detail = "";
+          try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+          toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
+          queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
+        },
+      }
+    );
+    dragRef.current = null;
+  }, []);
+
   // ── Appointment block label (priority: clientName > type > time > duration > status)
   const BlockLabel = ({ a, height, color }: { a: SalesAppointment; height: number; color: string }) => {
     const dur = calcDuration(a.startTime, a.endTime);
@@ -563,24 +599,77 @@ export default function SalesDiary() {
     const gridH = HOURS.length * HOUR_PX;
 
     if (managerView) {
-      const reps = salesWorkers.length > 0 ? salesWorkers : workers.slice(0, 3);
+      const reps = salesWorkers.length > 0 ? salesWorkers : workers.slice(0, 4);
       return (
-        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(reps.length, 3)}, 1fr)` }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(reps.length, 4)}, minmax(220px,1fr))` }}>
           {reps.map(rep => {
-            const repAppts = dayAppts.filter(a => a.assignedToId === rep.id);
+            const repAppts = dayAppts.filter(a => a.assignedToId === rep.id)
+              .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const isOver = dragOverRep === rep.id;
             return (
-              <Card key={rep.id}>
-                <CardHeader className="py-3 px-4 border-b">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-400" />{rep.name}
-                    <Badge variant="secondary" className="text-xs ml-auto">{repAppts.length} appt{repAppts.length !== 1 ? "s" : ""}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 space-y-2">
-                  {repAppts.length === 0 ? <p className="text-xs text-gray-400 text-center py-4">No appointments</p> :
-                    repAppts.map(a => <ApptCard key={a.id} a={a} compact />)}
-                </CardContent>
-              </Card>
+              <div
+                key={rep.id}
+                className={`rounded-xl border-2 transition-colors ${isOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white"}`}
+                onDragOver={e => onRepColDragOver(e, rep.id)}
+                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRep(null); }}
+                onDrop={e => onRepColDrop(e, rep.id, rep.name)}
+              >
+                {/* Column header */}
+                <div className={`flex items-center gap-2 px-3 py-2.5 border-b rounded-t-xl ${isOver ? "border-blue-300 bg-blue-100" : "border-gray-100 bg-gray-50"}`}>
+                  <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+                    {rep.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 truncate">{rep.name}</p>
+                    <p className="text-xs text-gray-400">{rep.role || "Sales Rep"}</p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs ml-auto flex-shrink-0">
+                    {repAppts.length}
+                  </Badge>
+                </div>
+
+                {/* Drop hint */}
+                {isOver && (
+                  <div className="mx-2 mt-2 rounded border-2 border-dashed border-blue-400 bg-blue-50 py-3 text-center text-xs text-blue-500 font-medium">
+                    Drop to reassign
+                  </div>
+                )}
+
+                {/* Appointment cards */}
+                <div className="p-2 space-y-1.5 min-h-[80px]">
+                  {repAppts.length === 0 && !isOver && (
+                    <p className="text-xs text-gray-400 text-center py-6">No appointments today</p>
+                  )}
+                  {repAppts.map(a => {
+                    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
+                    const dur = calcDuration(a.startTime, a.endTime);
+                    const sm = STATUS_META[a.status] || STATUS_META.planned;
+                    return (
+                      <div
+                        key={a.id}
+                        draggable
+                        className="rounded-lg border-l-4 bg-white shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow p-2.5 select-none"
+                        style={{ borderLeftColor: color }}
+                        onDragStart={e => { e.stopPropagation(); onTeamCardDragStart(e, a); }}
+                        onDragEnd={() => { dragRef.current = null; setDragOverRep(null); }}
+                        onClick={() => setDetailAppt(a)}
+                        onMouseEnter={e => { setTipAppt(a); setTipPos({ x: e.clientX, y: e.clientY }); }}
+                        onMouseMove={e => setTipPos({ x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => setTipAppt(null)}
+                      >
+                        <p className="text-xs font-bold text-gray-900 leading-tight truncate">{a.clientName || a.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{TYPE_LABELS[a.appointmentType]}</p>
+                        <p className="text-xs font-medium mt-0.5" style={{ color }}>
+                          {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
+                        </p>
+                        <div className="mt-1">
+                          <span className={`text-xs px-1.5 py-0 rounded border inline-block ${sm.classes}`}>{sm.label}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>
