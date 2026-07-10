@@ -41,6 +41,7 @@ import {
   type CommunicationNote, type InsertCommunicationNote,
   type AcceptedWorkflow, type InsertAcceptedWorkflow,
   type LeadActivity, type InsertLeadActivity,
+  type ContractOccurrenceException, type InsertContractOccurrenceException,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -371,6 +372,11 @@ export interface IStorage {
   updateServiceContract(id: string, c: Partial<InsertServiceContract>): Promise<ServiceContract | undefined>;
   deleteServiceContract(id: string): Promise<boolean>;
   getContractOccurrences(start: Date, end: Date, opts?: { departmentId?: string; technicianId?: string; teamId?: string }): Promise<ContractOccurrence[]>;
+
+  // Contract occurrence exceptions (per-occurrence overrides for recurring contracts)
+  getContractOccurrenceExceptions(contractId?: string): Promise<ContractOccurrenceException[]>;
+  upsertContractOccurrenceException(data: InsertContractOccurrenceException): Promise<ContractOccurrenceException>;
+  deleteContractOccurrenceException(id: string): Promise<boolean>;
 
   // Expenses
   getExpenses(): Promise<Expense[]>;
@@ -5077,6 +5083,26 @@ export class MemStorage implements IStorage {
     }
     return out.sort((a, b) => +a.scheduledDate - +b.scheduledDate);
   }
+
+  // Contract occurrence exceptions (MemStorage stubs — production uses DbStorage)
+  private contractOccurrenceExceptionsMap = new Map<string, ContractOccurrenceException>();
+  async getContractOccurrenceExceptions(contractId?: string): Promise<ContractOccurrenceException[]> {
+    const all = Array.from(this.contractOccurrenceExceptionsMap.values());
+    return contractId ? all.filter(e => e.contractId === contractId) : all;
+  }
+  async upsertContractOccurrenceException(data: InsertContractOccurrenceException): Promise<ContractOccurrenceException> {
+    const existing = Array.from(this.contractOccurrenceExceptionsMap.values())
+      .find(e => e.contractId === data.contractId && e.contractKind === data.contractKind && e.originalDate === data.originalDate);
+    const now = new Date();
+    const row: ContractOccurrenceException = existing
+      ? { ...existing, ...data, updatedAt: now }
+      : { id: randomUUID(), ...data, createdAt: now, updatedAt: now } as ContractOccurrenceException;
+    this.contractOccurrenceExceptionsMap.set(row.id, row);
+    return row;
+  }
+  async deleteContractOccurrenceException(id: string): Promise<boolean> {
+    return this.contractOccurrenceExceptionsMap.delete(id);
+  }
 }
 
 // ─── Contract occurrence expander ──────────────────────────────────────────
@@ -5098,6 +5124,11 @@ export interface ContractOccurrence {
   address: string | null;
   notes: string | null;
   frequency: string;
+  // Set when a contract_occurrence_exceptions row overrides this occurrence
+  isException?: boolean;
+  exceptionId?: string;
+  originalScheduledDate?: Date;
+  exceptionStatus?: string | null;
 }
 
 const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];

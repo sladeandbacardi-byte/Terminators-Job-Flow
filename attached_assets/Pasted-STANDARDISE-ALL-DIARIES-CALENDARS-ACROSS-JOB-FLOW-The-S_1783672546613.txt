@@ -1,0 +1,509 @@
+STANDARDISE ALL DIARIES / CALENDARS ACROSS JOB FLOW
+
+The Sales Diary functionality must be copied/applied to all diary/calendar areas in Job Flow.
+
+Currently the app has different diary/calendar areas:
+- Sales Diary
+- Service Calendar
+- Daily Diaries
+- Technician Diary / Today’s Jobs
+- Contract Schedule View
+- Operations/Fleet diaries if applicable
+
+These must not all behave differently.
+
+BUSINESS RULE
+
+In Job Flow, Calendar and Diary mean the same thing.
+
+Use one shared Outlook-style calendar/diary component across the app.
+
+The user should get the same behaviour everywhere:
+- Sales
+- Service
+- Daily Diaries
+- Technician view
+- Contracts
+- Operations where relevant
+
+SHARED CALENDAR / DIARY COMPONENT
+
+Create or refactor into one reusable component:
+
+OutlookDiaryCalendar
+
+This component must support:
+
+- Day view
+- Week view
+- Month view
+- Time grid
+- Drag and drop
+- Resize appointment duration
+- Click appointment to open detail
+- Double-click empty time slot to create new entry
+- Filter by user/team/department/status/client
+- Outlook-style event blocks
+- Colour/status badges
+- Mobile-friendly list mode if screen is small
+
+All diary/calendar pages must use this same component.
+
+Do not build separate calendar logic for Sales and Service.
+
+CALENDAR/DAY DIARY VIEWS
+
+Every diary/calendar must have:
+
+View options:
+- Day
+- Week
+- Month
+
+Default view rules:
+
+Sales Diary:
+- default to Week or Day, whichever currently works best
+
+Service Calendar:
+- default to Day
+
+Daily Diaries:
+- default to Day
+
+Technician mobile:
+- default to Today / Day list
+
+Contracts Schedule View:
+- can show schedule list, but if displayed as diary/calendar, use the same component
+
+OUTLOOK-STYLE DISPLAY
+
+Appointments/jobs must display like Outlook.
+
+Each appointment block must show:
+
+- Start time
+- End time
+- Client / customer name
+- Job title or service type
+- Assigned person/team
+- Status
+- Location/suburb if space allows
+
+Example:
+
+08:00 - 09:00
+Volkswagen SA
+Sanitary Bins
+Zain
+Scheduled
+
+If the appointment is long, the block must extend visually according to duration.
+
+Examples:
+- 30 minute job = short block
+- 1 hour job = medium block
+- 5 hour job = long block
+
+Do not show only a small one-line label for a 5-hour appointment.
+
+DRAG AND DROP
+
+Drag and drop must work everywhere this shared component is used.
+
+User must be able to:
+
+- drag an appointment to another time
+- drag an appointment to another day in week view
+- drag an appointment to another technician/team column if using technician/team view
+- resize appointment to change duration if supported
+
+After dragging:
+- update date
+- update start time
+- update end time/duration
+- update assigned technician/team if moved between columns
+- save to PostgreSQL
+- refetch and show updated appointment
+
+Do not only update frontend state.
+
+If save fails:
+- revert appointment back to original position
+- show error toast
+- do not silently lose changes
+
+CONFIRMATION ON DRAG
+
+For important service jobs/contracts, after drag/drop, show a small confirmation:
+
+"Move this job to Tuesday 09:00?"
+
+Buttons:
+- Confirm Move
+- Cancel
+
+If moving a recurring contract occurrence, ask:
+
+"Do you want to move only this occurrence or update the contract schedule?"
+
+Options:
+- This occurrence only
+- Update contract schedule
+- Cancel
+
+This is important because contract jobs are recurring.
+
+DATA SOURCES
+
+The shared calendar must display records from different sources depending on context.
+
+Sales Diary:
+- sales appointments
+- follow-ups
+- quote visits
+- site visits
+- sales tasks
+
+Service Calendar / Daily Diaries:
+- once-off jobs
+- recurring contract occurrences
+- service jobs
+- rental contract occurrences
+- treatment report jobs
+- jobs not completed
+
+Technician Diary:
+- jobs assigned to that technician/team
+- today’s jobs
+- contract occurrences assigned to technician/team
+
+Operations:
+- inspections
+- fleet maintenance
+- fuel/vehicle tasks if relevant
+
+STANDARD EVENT MODEL
+
+Create a standard calendar event shape that all modules can use:
+
+calendarEvent:
+- eventId
+- sourceType
+- sourceId
+- clientId optional
+- title
+- clientName
+- department
+- serviceType
+- assignedUserId optional
+- assignedUserName optional
+- assignedTeamId optional
+- assignedTeamName optional
+- startDateTime
+- endDateTime
+- durationMinutes
+- status
+- priority optional
+- location
+- googleMapsLink optional
+- colour/status badge
+- editable true/false
+- draggable true/false
+
+sourceType options:
+- salesAppointment
+- followUp
+- quoteVisit
+- onceOffJob
+- serviceContractOccurrence
+- rentalContractOccurrence
+- treatmentReport
+- fleetTask
+- inspection
+- other
+
+All calendar views must convert their records into this standard event shape.
+
+STATUS COLOURS
+
+Use the same status colours everywhere:
+
+- Scheduled: blue
+- In Progress: orange
+- Completed: green
+- Cancelled: red
+- Overdue / Not Completed: red
+- Requires Confirmation: yellow/orange
+- Ready to Invoice: purple or badge
+- Invoiced: grey/green badge
+
+Keep colours clean and modern.
+
+FILTERS
+
+The shared calendar component must support filters:
+
+- Date
+- Department
+- Person / Technician / Sales Rep
+- Team
+- Client
+- Area / Suburb
+- Status
+- Job Type
+- Contract / Once-off
+- Invoice Status
+
+Filters should appear depending on the section.
+
+Example:
+
+Sales Diary filters:
+- Sales Rep
+- Client
+- Lead Status
+- Appointment Type
+- Date
+
+Service Calendar filters:
+- Technician
+- Team
+- Department
+- Service Type
+- Client
+- Area
+- Status
+- Invoice Status
+
+Daily Diaries filters:
+- Date
+- Team
+- Technician
+- Service Type
+- Completed / Not Completed
+
+CLEAR FILTERS
+
+If filters are active, show:
+
+"Some appointments may be hidden by filters."
+
+Add:
+Clear Filters
+
+DAILY DIARIES
+
+Daily Diaries must use the same calendar/diary logic.
+
+Daily Diaries are simply filtered calendar views for service work.
+
+Daily Diaries must show:
+- date
+- technician/team
+- route order
+- time
+- client
+- address
+- service type
+- contract number if linked
+- job status
+- invoice status
+- open job
+- open client
+- open Google Maps
+
+They must be sorted by:
+1. time
+2. route sequence
+3. client name
+
+TECHNICIAN/TASK COLUMNS
+
+For Service Daily view, add an optional view mode:
+
+View by:
+- Time only
+- Technician columns
+- Team columns
+
+Technician columns should work like Outlook resource calendar.
+
+Example:
+
+Time | Zain | Reece | Jackie & Re-Alton
+
+Jobs appear under the assigned person/team.
+
+Moving a job from one column to another changes the assigned technician/team after confirmation.
+
+CONTRACT OCCURRENCES
+
+Recurring contracts must appear on the diary/calendar.
+
+If a contract occurrence is moved:
+
+Ask:
+- This occurrence only
+- Update contract schedule
+
+This occurrence only:
+- create/update a job occurrence exception for that date
+- do not change the main contract schedule
+
+Update contract schedule:
+- update the contract’s week/day/time/route/technician schedule
+- future occurrences follow the new schedule
+
+Do not create duplicate contract occurrences.
+
+SAVE TO POSTGRESQL
+
+Every calendar/diary change must save to PostgreSQL.
+
+Drag/drop changes must update the correct table based on sourceType:
+
+salesAppointment:
+- update sales appointment record
+
+onceOffJob:
+- update jobs table
+
+serviceContractOccurrence:
+- either update occurrence exception or contract schedule depending on user choice
+
+rentalContractOccurrence:
+- same as above
+
+fleetTask/inspection:
+- update relevant operations table
+
+Do not store diary changes only in frontend state.
+
+MODAL / DETAIL OPENING
+
+Clicking any appointment/job must open the correct detail modal/page.
+
+Examples:
+
+Sales appointment:
+- open Sales appointment / lead / follow-up detail
+
+Service job:
+- open Job detail
+
+Contract occurrence:
+- open occurrence detail with buttons:
+  - Open Job
+  - Open Contract
+  - Open Client
+
+Invoice-related job:
+- show invoice status
+
+MOBILE VIEW
+
+On mobile, use a simpler Today list.
+
+Mobile job cards must show:
+- time
+- client
+- address
+- service type
+- status
+- open maps
+- start job
+- complete job
+
+Drag/drop can be desktop-only if mobile becomes too difficult, but mobile must still show correct order and allow job actions.
+
+PERMISSIONS
+
+Only users with permission may drag/drop or edit diary entries.
+
+Admin/Manager:
+- can move all events
+
+Sales Rep:
+- can move own sales appointments
+- cannot move service jobs unless allowed
+
+Service Manager:
+- can move service jobs and contract occurrences
+- can reassign technician/team if allowed
+
+Technician:
+- can view assigned jobs
+- can start/complete jobs
+- should not reschedule jobs unless allowed
+
+Finance:
+- view only unless specifically allowed
+
+If user cannot edit:
+- event blocks are not draggable
+- show read-only state
+
+TESTS REQUIRED
+
+Run these tests:
+
+TEST 1: Sales Diary drag/drop
+1. Open Sales Diary.
+2. Create appointment from 09:00 to 10:00.
+3. Drag it to 11:00.
+4. Confirm it saves.
+5. Refresh page.
+6. Confirm it remains at 11:00.
+
+TEST 2: Service Calendar same behaviour
+1. Open Service Calendar.
+2. Create or find once-off job.
+3. Confirm it displays as Outlook-style time block.
+4. Drag it to a new time.
+5. Confirm save.
+6. Refresh page.
+7. Confirm new time persists.
+
+TEST 3: Duration display
+1. Create 30 minute job.
+2. Create 5 hour job.
+3. Confirm blocks visually show different heights/lengths according to duration.
+
+TEST 4: Technician columns
+1. Open Service Calendar Day view.
+2. Switch to Technician columns.
+3. Confirm jobs appear under assigned technician.
+4. Move job from one technician to another.
+5. Confirm assignment updates after save.
+
+TEST 5: Daily Diaries
+1. Open Daily Diaries.
+2. Confirm it uses the same diary/calendar display.
+3. Confirm jobs are sorted by time and route sequence.
+4. Confirm Open Job and Open Client work.
+
+TEST 6: Contract occurrence
+1. Open calendar with recurring contract occurrence.
+2. Drag occurrence to new time.
+3. Confirm prompt asks:
+   This occurrence only or Update contract schedule.
+4. Test This occurrence only.
+5. Confirm main contract schedule does not change.
+6. Test Update contract schedule.
+7. Confirm future occurrences follow the new time.
+
+TEST 7: Permissions
+1. Log in as technician.
+2. Confirm technician cannot drag/drop if not allowed.
+3. Log in as service manager.
+4. Confirm service manager can move service jobs.
+
+IMPORTANT
+
+The Sales Diary behaviour must become the standard for all diaries/calendars.
+
+Do not maintain separate calendar behaviours in different modules.
+
+There should be one shared Outlook-style diary/calendar component used across Job Flow.

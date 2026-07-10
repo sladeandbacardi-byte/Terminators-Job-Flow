@@ -78,3 +78,53 @@ export const dashboardRoleColors: Record<DashboardRole, string> = {
   accounts:    "bg-amber-600",
   coordinator: "bg-cyan-700",
 };
+
+/**
+ * Minimal shape of a calendar event needed for permission checks — deliberately
+ * decoupled from shared/calendar-types.ts to avoid a circular import; any object
+ * matching this shape (including a full CalendarEvent) works.
+ */
+export interface CalendarPermissionEvent {
+  sourceType: string;
+  assignedUserId?: string | null;
+  assignedTeamId?: string | null;
+}
+
+/**
+ * Central permission policy for dragging/resizing/reassigning entries on any
+ * OutlookDiaryCalendar instance. Used identically on the client (to decide
+ * whether an event renders as draggable) and the server (to authorize writes).
+ *
+ * Rules (per the diary standardisation spec):
+ * - Admin / Manager: can move all events.
+ * - Sales Rep: can move only their own sales appointments / follow-ups / quote visits.
+ * - Service Manager (coordinator): can move service jobs and contract occurrences,
+ *   and reassign technician/team.
+ * - Technician (service): view only — can start/complete jobs elsewhere in the UI,
+ *   but cannot drag/reschedule/reassign on the calendar.
+ * - Finance (accounts): view only.
+ */
+export function canMoveCalendarEvent(
+  role: DashboardRole,
+  currentWorkerId: string | null | undefined,
+  event: CalendarPermissionEvent,
+): boolean {
+  if (role === "admin" || role === "manager") return true;
+
+  const SALES_SOURCE_TYPES = new Set(["salesAppointment", "followUp", "quoteVisit"]);
+  const SERVICE_SOURCE_TYPES = new Set([
+    "onceOffJob", "serviceContractOccurrence", "rentalContractOccurrence",
+    "treatmentReport", "fleetTask", "inspection", "other",
+  ]);
+
+  if (role === "sales") {
+    return SALES_SOURCE_TYPES.has(event.sourceType) && !!currentWorkerId && event.assignedUserId === currentWorkerId;
+  }
+
+  if (role === "coordinator") {
+    return SERVICE_SOURCE_TYPES.has(event.sourceType);
+  }
+
+  // service (technician) and accounts (finance) are read-only on the calendar
+  return false;
+}

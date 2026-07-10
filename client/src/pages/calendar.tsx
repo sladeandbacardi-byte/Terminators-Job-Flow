@@ -1,26 +1,18 @@
-import { useState, useRef, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isToday, addWeeks, subWeeks, addMonths, subMonths, startOfDay, endOfDay, addHours, differenceInCalendarDays, isBefore, isAfter, min, max } from "date-fns";
+import { useState, useRef, useMemo, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { format, differenceInMinutes } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight, 
   Plus, 
@@ -28,52 +20,28 @@ import {
   MapPin, 
   User,
   Search,
-  Edit,
-  Save,
   X,
-  FileText
+  Filter,
+  AlertTriangle
 } from "lucide-react";
-import { Link } from "wouter";
-import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatClientAddress, type Job, type Client, type Worker, type Department, type Team, type TeamMember } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
-import { getDashboardRole } from "@/lib/dashboardRole";
+import { getDashboardRole, canMoveCalendarEvent, type DashboardRole } from "@/lib/dashboardRole";
 import JobForm from "@/components/forms/job-form";
+import type { DiaryEvent, CalendarSourceType } from "@shared/calendar-types";
+import { statusColorClasses, statusColor } from "@shared/calendar-types";
+import { 
+  OutlookDiaryCalendar, 
+  OutlookColumnsView, 
+  type OutlookDiaryCalendarHandle, 
+  type OutlookCalView, 
+  type OutlookColumn 
+} from "@/components/calendar/outlook-diary-calendar";
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  startTime: Date;
-  endTime: Date;
-  type: 'job' | 'appointment' | 'meeting' | 'reminder';
-  priority: 'low' | 'medium' | 'high';
-  clientId?: string;
-  workerId?: string;
-  departmentId?: string;
-  location?: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending';
-  color?: string;
-  estimatedDuration?: number;
-}
-
-type ViewType = 'month' | 'week' | 'day' | 'agenda';
-
-// Form schemas
-const appointmentSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
-  startDate: z.string().min(1, "Start date is required"),
-  startTime: z.string().min(1, "Start time is required"),
-  duration: z.number().min(15, "Duration must be at least 15 minutes"),
-  clientId: z.string().optional(),
-  workerId: z.string().optional(),
-  departmentId: z.string().optional(),
-  location: z.string().optional(),
-  priority: z.enum(["low", "medium", "high"]),
-});
+type ViewType = OutlookCalView | "team";
 
 const jobEditSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -89,49 +57,44 @@ const jobEditSchema = z.object({
   status: z.enum(["scheduled", "in_progress", "completed", "cancelled"]),
 });
 
-type AppointmentForm = z.infer<typeof appointmentSchema>;
 type JobEditForm = z.infer<typeof jobEditSchema>;
 
 export default function Calendar() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const calendarRef = useRef<OutlookDiaryCalendarHandle>(null);
+
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewType, setViewType] = useState<ViewType>('day');
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [viewType, setViewType] = useState<ViewType>('timeGridWeek');
+  const [viewTitle, setViewTitle] = useState("");
+  const [teamDate, setTeamDate] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  const [selectedEvent, setSelectedEvent] = useState<DiaryEvent | null>(null);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditJobDialogOpen, setIsEditJobDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
+  
+  // 3-way occurrence move dialog
+  const [occurrenceMoveTarget, setOccurrenceMoveTarget] = useState<{ event: DiaryEvent, newStart: Date, newEnd: Date, revert: () => void } | null>(null);
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
-  // assigneeFilter value is "all" | `worker:<id>` | `team:<id>`
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "oneoff" | "contract">("all");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
-  const [showAllHours, setShowAllHours] = useState(false);
+  const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
 
-  const dragCounter = useRef(0);
-
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { user } = useAuth();
-  const isTechnician = getDashboardRole({ departmentId: user?.departmentId, role: user?.role }) === "service";
-
-  // Form handlers
-  const appointmentForm = useForm<AppointmentForm>({
-    resolver: zodResolver(appointmentSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      startDate: format(new Date(), 'yyyy-MM-dd'),
-      startTime: format(new Date(), 'HH:mm'),
-      duration: 60,
-      priority: "medium",
-    },
-  });
+  const role: DashboardRole = useMemo(() => 
+    getDashboardRole({ departmentId: (user as any)?.departmentId, role: user?.role }),
+    [user]
+  );
+  const isTechnician = role === "service";
 
   const jobEditForm = useForm<JobEditForm>({
     resolver: zodResolver(jobEditSchema),
@@ -146,32 +109,19 @@ export default function Calendar() {
     },
   });
 
-  // Fetch calendar events (jobs and custom events)
-  const { data: events = [], isLoading } = useQuery<CalendarEvent[]>({
+  // Queries
+  const { data: customEvents = [] } = useQuery<any[]>({
     queryKey: ['/api/calendar/events', format(currentDate, 'yyyy-MM')],
-    refetchInterval: 30000,
   });
 
-  const { data: jobs = [] } = useQuery<Job[]>({
-    queryKey: ['/api/jobs'],
-  });
-
-  const { data: departments = [] } = useQuery<Department[]>({
-    queryKey: ['/api/departments'],
-  });
-
-  const { data: workers = [] } = useQuery<Worker[]>({
-    queryKey: ['/api/workers'],
-  });
-
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ['/api/clients'],
-  });
-
+  const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ['/api/departments'] });
+  const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ['/api/workers'] });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const { data: teams = [] } = useQuery<Team[]>({ queryKey: ['/api/teams'] });
   const { data: teamMembers = [] } = useQuery<TeamMember[]>({ queryKey: ['/api/team-members'] });
 
-  // Contract occurrences for the visible window (auto-expand recurring contracts)
+  // Contract occurrences for the visible window
   const occWindow = useMemo(() => {
     const s = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     s.setDate(s.getDate() - 7);
@@ -180,6 +130,7 @@ export default function Calendar() {
     e.setHours(23, 59, 59, 999);
     return { start: s.toISOString(), end: e.toISOString() };
   }, [currentDate]);
+
   const { data: contractOccurrences = [] } = useQuery<any[]>({
     queryKey: ['/api/service-contracts/occurrences', occWindow.start, occWindow.end],
     queryFn: async () => {
@@ -188,6 +139,12 @@ export default function Calendar() {
       return r.json();
     },
   });
+
+  // Resolve the logged-in technician's worker record
+  const myWorker = useMemo(() => {
+    if (role !== "service") return null;
+    return workers.find(w => user?.email && w.email?.toLowerCase() === user.email.toLowerCase()) || null;
+  }, [role, workers, user]);
 
   // worker -> set of team ids
   const workerTeamsMap = useMemo(() => {
@@ -200,1721 +157,735 @@ export default function Calendar() {
     return map;
   }, [teamMembers]);
 
-  // Departments where the user wants individual workers as filter options
-  // (instead of grouping into a single team). Pest Control = div-1.
-  const INDIVIDUAL_WORKER_DEPTS = new Set(["div-1"]);
-
-  // Build assignee dropdown groups: per department, either workers (for
-  // INDIVIDUAL_WORKER_DEPTS) or teams.
-  type AssigneeOption =
-    | { kind: "worker"; id: string; label: string; departmentId: string }
-    | { kind: "team"; id: string; label: string; departmentId: string };
-
-  const ALLOWED_DEPT_IDS = ["div-1","div-2","div-3","div-4"] as const;
-
-  const assigneeGroups = useMemo(() => {
-    const groups: { department: Department; options: AssigneeOption[] }[] = [];
-    const sortedDepts = [...departments]
-      .filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    sortedDepts.forEach(dept => {
-      if (departmentFilter !== "all" && departmentFilter !== dept.id) return;
-      let options: AssigneeOption[] = [];
-      if (INDIVIDUAL_WORKER_DEPTS.has(dept.id)) {
-        options = workers
-          .filter(w => w.departmentId === dept.id && w.isActive !== false)
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map(w => ({ kind: "worker" as const, id: w.id, label: w.name, departmentId: dept.id }));
-      } else {
-        options = teams
-          .filter(t => t.departmentId === dept.id && t.isActive !== false)
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map(t => ({ kind: "team" as const, id: t.id, label: t.name, departmentId: dept.id }));
-      }
-      if (options.length > 0) groups.push({ department: dept, options });
-    });
-    return groups;
-  }, [departments, workers, teams, departmentFilter]);
-
-  const onDepartmentChange = (val: string) => {
-    setDepartmentFilter(val);
-    // Clear assignee if it no longer belongs to the selected department
-    if (val !== "all" && assigneeFilter !== "all") {
-      const [kind, id] = assigneeFilter.split(":");
-      const belongs =
-        (kind === "worker" && workers.find(w => w.id === id)?.departmentId === val) ||
-        (kind === "team" && teams.find(t => t.id === id)?.departmentId === val);
-      if (!belongs) setAssigneeFilter("all");
-    }
-  };
-
-  // Resolve the logged-in technician's worker record
-  const myWorker = useMemo(() => {
-    if (!isTechnician) return null;
-    const byEmail = workers.find(w => user?.email && w.email === user.email);
-    if (byEmail) return byEmail;
-    // Fallback: busiest active worker in user's department (demo mode)
-    const inDept = workers
-      .filter(w => w.departmentId === user?.departmentId && w.isActive !== false)
-      .map(w => ({ w, count: jobs.filter(j => j.workerId === w.id).length }))
-      .sort((a, b) => b.count - a.count);
-    return inDept[0]?.w ?? null;
-  }, [isTechnician, workers, jobs, user]);
-
   // Mutations
-  const createAppointmentMutation = useMutation({
-    mutationFn: async (data: AppointmentForm) => {
-      const appointmentData = {
-        ...data,
-        scheduledDate: `${data.startDate}T${data.startTime}:00.000Z`,
-        estimatedDuration: data.duration,
-        type: 'appointment' as const,
-      };
-      return apiRequest('POST', '/api/calendar/events', appointmentData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
-      setIsCreateDialogOpen(false);
-      appointmentForm.reset();
-      toast({ title: "Appointment created successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to create appointment", variant: "destructive" });
-    },
-  });
-
   const updateJobMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: JobEditForm }) => {
-      const jobData = {
-        ...data,
-        scheduledDate: `${data.scheduledDate}T${data.scheduledTime}:00.000Z`,
-      };
-      return apiRequest('PATCH', `/api/jobs/${id}`, jobData);
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Job> }) => {
+      return apiRequest('PATCH', `/api/jobs/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       setIsEditJobDialogOpen(false);
       setEditingJob(null);
-      jobEditForm.reset();
       toast({ title: "Job updated successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to update job", variant: "destructive" });
+  });
+
+  const moveJobMutation = useMutation({
+    mutationFn: async ({ id, scheduledDate, scheduledTime, estimatedDuration }: { id: string, scheduledDate?: Date, scheduledTime?: string, estimatedDuration?: number }) => {
+      return apiRequest('PATCH', `/api/jobs/${id}`, { scheduledDate, scheduledTime, estimatedDuration });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: "Job moved successfully" });
     },
   });
 
-  const moveEventMutation = useMutation({
-    mutationFn: async ({ eventId, newDate }: { eventId: string; newDate: string }) => {
-      const event = allEvents.find(e => e.id === eventId);
-      if (!event) throw new Error('Event not found');
-
-
-      if (event.type === 'job') {
-        const job = jobs.find(j => j.id === eventId);
-        if (!job) throw new Error('Job not found');
-        
-        return await apiRequest('PATCH', `/api/jobs/${eventId}`, { scheduledDate: newDate });
-      } else {
-        return apiRequest('PATCH', `/api/calendar/events/${eventId}`, { scheduledDate: newDate });
-      }
-    },
-    onSuccess: async (data, variables) => {
-      // Force immediate refetch instead of just invalidation
-      await queryClient.refetchQueries({ queryKey: ['/api/jobs'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/calendar/events'] });
-      
-      // Check if event was moved to a different month
-      const movedToDate = new Date(variables.newDate);
-      const movedToMonth = format(movedToDate, 'yyyy-MM');
-      const currentMonth = format(currentDate, 'yyyy-MM');
-      
-      
-      if (movedToMonth !== currentMonth) {
-        // Only navigate if event moved to a different month
-        setCurrentDate(movedToDate);
-        toast({ 
-          title: "Event moved to " + format(movedToDate, 'MMMM yyyy'),
-          description: "Calendar updated to show the new date"
-        });
-      } else {
-        // Event stayed in same month - just show success message
-        toast({ title: "Event moved successfully" });
-      }
-    },
-    onError: (error) => {
-      console.error('Move failed:', error);
-      toast({ title: "Failed to move event", variant: "destructive" });
+  const upsertExceptionMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest('POST', '/api/contract-occurrence-exceptions', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/service-contracts/occurrences'] });
+      setOccurrenceMoveTarget(null);
+      toast({ title: "Occurrence updated successfully" });
     },
   });
 
-  // Convert jobs to calendar events with safe date handling
-  const jobEvents: CalendarEvent[] = jobs.map(job => {
+  const updateContractMutation = useMutation({
+    mutationFn: async ({ id, kind, data }: { id: string, kind: 'service'|'rental', data: any }) => {
+      const endpoint = kind === 'service' ? `/api/service-contracts/${id}` : `/api/rental-contracts/${id}`;
+      return apiRequest('PATCH', endpoint, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/service-contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/service-contracts/occurrences'] });
+      setOccurrenceMoveTarget(null);
+      toast({ title: "Contract schedule updated" });
+    },
+  });
+
+  // --- Mapping to DiaryEvent ---
+
+  const jobToDiaryEvent = useCallback((job: Job): DiaryEvent | null => {
     const client = clients.find(c => c.id === job.clientId);
     const worker = workers.find(w => w.id === job.workerId);
     
-    const scheduledDate = new Date(job.scheduledDate);
-    
-    // Validate the scheduled date
-    if (isNaN(scheduledDate.getTime())) {
-      console.warn(`Invalid scheduled date for job ${job.id}:`, job.scheduledDate);
-      return null;
-    }
+    const start = new Date(job.scheduledDate);
+    if (isNaN(start.getTime())) return null;
 
-    // Merge scheduledTime ("HH:mm") into the date so events show at the right hour
     if (job.scheduledTime) {
       const parts = job.scheduledTime.split(':');
-      if (parts.length >= 2) {
-        scheduledDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
-      }
+      if (parts.length >= 2) start.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
     }
     
-    const endTime = new Date(scheduledDate.getTime() + (job.estimatedDuration || 60) * 60000);
+    const end = new Date(start.getTime() + (job.estimatedDuration || 60) * 60000);
     
-    
-    const jobColor = (() => {
-      if (job.status !== 'completed' && job.status !== 'cancelled') {
-        const jobDate = new Date(job.scheduledDate);
-        if (!isNaN(jobDate.getTime()) && jobDate < new Date()) return '#dc2626';
-      }
-      if (!job.workerId) return '#9ca3af';
-      switch (job.status) {
-        case 'scheduled':   return '#f97316';
-        case 'in_progress': return '#3b82f6';
-        case 'completed':   return '#22c55e';
-        case 'cancelled':   return '#ef4444';
-        case 'pending':     return '#eab308';
-        default:            return '#9ca3af';
-      }
-    })();
+    const canMove = canMoveCalendarEvent(role, myWorker?.id, { sourceType: "onceOffJob", assignedUserId: job.workerId });
 
     return {
-      id: job.id,
-      title: `${job.title}${client ? ` - ${client.name}` : ''}`,
-      description: job.description || '',
-      startTime: scheduledDate,
-      endTime: endTime,
-      type: 'job',
-      priority: job.priority as 'low' | 'medium' | 'high',
+      eventId: job.id,
+      sourceType: "onceOffJob",
+      sourceId: job.id,
       clientId: job.clientId,
-      workerId: job.workerId || undefined,
-      departmentId: job.departmentId,
-      location: job.location || (client ? formatClientAddress(client) : '') || undefined,
-      status: job.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending',
-      color: jobColor,
+      title: job.title,
+      clientName: client?.name,
+      department: departments.find(d => d.id === job.departmentId)?.name,
+      serviceType: job.serviceType,
+      assignedUserId: job.workerId,
+      assignedUserName: worker?.name,
+      startDateTime: start.toISOString(),
+      endDateTime: end.toISOString(),
+      durationMinutes: job.estimatedDuration || 60,
+      status: job.status,
+      priority: job.priority,
+      location: job.location || (client ? formatClientAddress(client) : ''),
+      colour: statusColor(job.status),
+      editable: canMove,
+      draggable: canMove,
+      meta: { raw: job, invoiceStatus: job.invoiceStatus }
     };
-  }).filter(Boolean) as CalendarEvent[];
+  }, [clients, workers, departments, role, myWorker]);
 
-  // Convert contract occurrences (virtual recurring jobs) into calendar events
-  const contractEvents: CalendarEvent[] = contractOccurrences.map((o: any) => {
-    const start = new Date(o.scheduledDate);
+  const occurrenceToDiaryEvent = useCallback((occ: any): DiaryEvent | null => {
+    const start = new Date(occ.scheduledDate);
     if (isNaN(start.getTime())) return null;
-    const end = new Date(start.getTime() + (o.estimatedDuration || 60) * 60000);
+    const end = new Date(start.getTime() + (occ.estimatedDuration || 60) * 60000);
+    
+    const sourceType: CalendarSourceType = occ.contractKind === 'rental' ? 'rentalContractOccurrence' : 'serviceContractOccurrence';
+    const canMove = canMoveCalendarEvent(role, myWorker?.id, { sourceType, assignedUserId: occ.assignedTechnicianId });
+
     return {
-      id: o.id,
-      title: `${o.serviceType} - ${o.customerName} (Contract)`,
-      description: o.notes || '',
-      startTime: start,
-      endTime: end,
-      // 'appointment' routes the click to the read-only details dialog instead of the job-edit dialog.
-      type: 'appointment' as const,
-      priority: 'medium' as const,
-      clientId: o.clientId,
-      workerId: o.assignedTechnicianId || undefined,
-      departmentId: o.departmentId,
-      location: o.address || undefined,
-      status: 'scheduled' as const,
-      color: '#0d9488', // teal — distinct from one-off jobs
-      estimatedDuration: o.estimatedDuration ?? undefined,
+      eventId: occ.id,
+      sourceType,
+      sourceId: occ.contractId,
+      clientId: occ.clientId,
+      title: `${occ.serviceType || 'Service'} - ${occ.customerName}`,
+      clientName: occ.customerName,
+      department: departments.find(d => d.id === occ.departmentId)?.name,
+      serviceType: occ.serviceType,
+      assignedUserId: occ.assignedTechnicianId,
+      assignedUserName: occ.assignedTechnicianName,
+      assignedTeamId: occ.assignedTeamId,
+      startDateTime: start.toISOString(),
+      endDateTime: end.toISOString(),
+      durationMinutes: occ.estimatedDuration || 60,
+      status: occ.status || 'scheduled',
+      location: occ.address,
+      colour: "#0d9488", // Teal for contracts
+      editable: canMove,
+      draggable: canMove,
+      meta: { raw: occ, isOccurrence: true, originalDate: occ.originalDate }
     };
-  }).filter(Boolean) as CalendarEvent[];
+  }, [departments, role, myWorker]);
 
-  const allEvents = [...events, ...jobEvents, ...contractEvents];
+  const customToDiaryEvent = useCallback((ev: any): DiaryEvent | null => {
+    const start = new Date(ev.scheduledDate);
+    if (isNaN(start.getTime())) return null;
+    const end = new Date(start.getTime() + (ev.estimatedDuration || 60) * 60000);
+    
+    return {
+      eventId: ev.id,
+      sourceType: "other",
+      sourceId: ev.id,
+      title: ev.title,
+      startDateTime: start.toISOString(),
+      endDateTime: end.toISOString(),
+      durationMinutes: ev.estimatedDuration || 60,
+      status: ev.status || 'scheduled',
+      colour: "#64748b",
+      editable: role === 'admin' || role === 'manager',
+      draggable: role === 'admin' || role === 'manager',
+      meta: { raw: ev }
+    };
+  }, [role]);
 
-  const filteredEvents = allEvents.filter(event => {
-    // Safety check for event validity
-    if (!event || !event.startTime || !event.title) {
-      console.warn('Invalid event found:', event);
-      return false;
+  const allEvents = useMemo(() => {
+    const j = jobs.map(jobToDiaryEvent).filter(Boolean) as DiaryEvent[];
+    const o = contractOccurrences.map(occurrenceToDiaryEvent).filter(Boolean) as DiaryEvent[];
+    const c = customEvents.map(customToDiaryEvent).filter(Boolean) as DiaryEvent[];
+    return [...j, ...o, ...c];
+  }, [jobs, contractOccurrences, customEvents, jobToDiaryEvent, occurrenceToDiaryEvent, customToDiaryEvent]);
+
+  const filteredEvents = useMemo(() => allEvents.filter(ev => {
+    if (searchTerm && !ev.title.toLowerCase().includes(searchTerm.toLowerCase()) && !ev.clientName?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    
+    if (departmentFilter !== "all") {
+      const raw = ev.meta?.raw;
+      if (raw?.departmentId !== departmentFilter) return false;
     }
 
-    // Validate startTime is a valid Date
-    if (!(event.startTime instanceof Date) || isNaN(event.startTime.getTime())) {
-      console.warn('Invalid startTime for event:', event.id, event.startTime);
-      return false;
-    }
-
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesDepartment = departmentFilter === "all" || event.departmentId === departmentFilter;
-    let matchesAssignee = true;
     if (assigneeFilter !== "all") {
       const [kind, id] = assigneeFilter.split(":");
       if (kind === "worker") {
-        matchesAssignee = event.workerId === id;
+        if (ev.assignedUserId !== id) return false;
       } else if (kind === "team") {
-        matchesAssignee = event.workerId ? !!workerTeamsMap.get(event.workerId)?.has(id) : false;
+        if (ev.assignedUserId) {
+          if (!workerTeamsMap.get(ev.assignedUserId)?.has(id)) return false;
+        } else if (ev.assignedTeamId !== id) {
+          return false;
+        }
       }
     }
-    const matchesStatus = statusFilter === "all" || event.status === statusFilter;
-    // Technicians only see their own jobs
-    const matchesWorker = !isTechnician || !myWorker || event.workerId === myWorker.id;
 
-    // Type filter: contract occurrences have IDs prefixed `occ-`
-    const isContract = event.id.startsWith('occ-');
-    const matchesType =
-      typeFilter === "all" ||
-      (typeFilter === "contract" && isContract) ||
-      (typeFilter === "oneoff" && !isContract);
+    if (statusFilter !== "all" && ev.status !== statusFilter) return false;
+    if (customerFilter !== "all" && ev.clientId !== customerFilter) return false;
+    if (serviceTypeFilter !== "all" && ev.serviceType !== serviceTypeFilter) return false;
+    if (invoiceStatusFilter !== "all" && ev.meta?.invoiceStatus !== invoiceStatusFilter) return false;
 
-    const matchesCustomer = customerFilter === "all" || event.clientId === customerFilter;
+    if (typeFilter === "contract" && !ev.meta?.isOccurrence) return false;
+    if (typeFilter === "oneoff" && ev.meta?.isOccurrence) return false;
 
-    let matchesArea = true;
     if (areaFilter !== "all") {
-      const client = event.clientId ? clients.find(c => c.id === event.clientId) : undefined;
+      const client = clients.find(c => c.id === ev.clientId);
       const area = (client?.suburb || client?.city || "").trim();
-      matchesArea = area === areaFilter;
+      if (area !== areaFilter) return false;
     }
 
-    return matchesSearch && matchesDepartment && matchesAssignee && matchesStatus && matchesWorker
-      && matchesType && matchesCustomer && matchesArea;
-  });
+    // Technicians only see their own jobs
+    if (isTechnician && myWorker && ev.assignedUserId !== myWorker.id) return false;
 
-  // Build sorted list of unique areas (suburb || city) from clients for the Area filter
-  const areaOptions = Array.from(new Set(
-    clients.map(c => (c.suburb || c.city || "").trim()).filter(Boolean)
-  )).sort((a, b) => a.localeCompare(b));
+    return true;
+  }), [allEvents, searchTerm, departmentFilter, assigneeFilter, statusFilter, typeFilter, customerFilter, areaFilter, serviceTypeFilter, invoiceStatusFilter, workerTeamsMap, isTechnician, myWorker, clients]);
 
-  function getPriorityColor(priority: string): string {
-    switch (priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#10b981';
-      default: return '#6b7280';
-    }
-  }
+  // --- Handlers ---
 
-  function getStatusColor(status: string): string {
-    switch (status) {
-      case 'scheduled':   return 'bg-orange-100 text-orange-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'completed':   return 'bg-green-100 text-green-800';
-      case 'cancelled':   return 'bg-red-100 text-red-800';
-      case 'pending':     return 'bg-yellow-100 text-yellow-800';
-      default:            return 'bg-gray-100 text-gray-700';
-    }
-  }
-
-  // Event handlers
-  const handleEventClick = (event: CalendarEvent) => {
-    if (event.type === 'job') {
-      const job = jobs.find(j => j.id === event.id);
+  const handleEventClick = useCallback((ev: DiaryEvent) => {
+    if (ev.sourceType === 'onceOffJob') {
+      const job = jobs.find(j => j.id === ev.sourceId);
       if (job) {
         setEditingJob(job);
-        const scheduledDate = new Date(job.scheduledDate);
-        
-        // Validate date before formatting
-        if (isNaN(scheduledDate.getTime())) {
-          console.error('Invalid date for job editing:', job.scheduledDate);
-          toast({ title: "Error: Invalid job date", variant: "destructive" });
-          return;
-        }
-        
+        const start = new Date(ev.startDateTime);
         jobEditForm.reset({
           title: job.title,
           description: job.description || "",
-          scheduledDate: format(scheduledDate, 'yyyy-MM-dd'),
-          scheduledTime: format(scheduledDate, 'HH:mm'),
+          scheduledDate: format(start, 'yyyy-MM-dd'),
+          scheduledTime: format(start, 'HH:mm'),
           estimatedDuration: job.estimatedDuration || 60,
           clientId: job.clientId,
           workerId: job.workerId || "",
           departmentId: job.departmentId,
           location: job.location || "",
-          priority: job.priority as "low" | "medium" | "high",
-          status: job.status as "scheduled" | "in_progress" | "completed" | "cancelled",
+          priority: job.priority as any,
+          status: job.status as any,
         });
         setIsEditJobDialogOpen(true);
       }
     } else {
-      setSelectedEvent(event);
+      setSelectedEvent(ev);
       setIsEventDialogOpen(true);
     }
-  };
+  }, [jobs, jobEditForm]);
 
-  const handleCreateAppointment = (data: AppointmentForm) => {
-    createAppointmentMutation.mutate(data);
-  };
-
-  const handleUpdateJob = (data: JobEditForm) => {
-    if (editingJob) {
-      updateJobMutation.mutate({ id: editingJob.id, data });
-    }
-  };
-
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
-    // Contract occurrences are virtual — can't be moved without persisting the contract
-    if (event.id.startsWith('occ-')) {
-      e.preventDefault();
+  const handleEventDrop = useCallback((ev: DiaryEvent, newStart: Date, newEnd: Date, revert: () => void) => {
+    const duration = differenceInMinutes(newEnd, newStart);
+    if (ev.meta?.isOccurrence) {
+      setOccurrenceMoveTarget({ event: ev, newStart, newEnd, revert });
       return;
     }
-    setDraggedEvent(event);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', event.id);
-  };
 
-  const handleDragEnd = () => {
-    setDraggedEvent(null);
-    dragCounter.current = 0;
-  };
+    const confirmMsg = `Move "${ev.title}" to ${format(newStart, 'EEEE, d MMMM')} at ${format(newStart, 'HH:mm')}?`;
+    if (!window.confirm(confirmMsg)) {
+      revert();
+      return;
+    }
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current++;
-  };
+    if (ev.sourceType === 'onceOffJob') {
+      moveJobMutation.mutate({
+        id: ev.sourceId,
+        scheduledDate: newStart,
+        scheduledTime: format(newStart, 'HH:mm'),
+        estimatedDuration: duration
+      }, { onError: revert });
+    } else if (ev.sourceType === 'other') {
+      apiRequest('PATCH', `/api/calendar/events/${ev.sourceId}`, {
+        scheduledDate: newStart,
+        estimatedDuration: duration
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
+      }).catch(revert);
+    }
+  }, [moveJobMutation]);
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current--;
-  };
+  const handleEventResize = useCallback((ev: DiaryEvent, newStart: Date, newEnd: Date, revert: () => void) => {
+    const duration = differenceInMinutes(newEnd, newStart);
+    if (ev.meta?.isOccurrence) {
+      setOccurrenceMoveTarget({ event: ev, newStart, newEnd, revert });
+      return;
+    }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
+    if (ev.sourceType === 'onceOffJob') {
+      moveJobMutation.mutate({ id: ev.sourceId, estimatedDuration: duration }, { onError: revert });
+    } else if (ev.sourceType === 'other') {
+       apiRequest('PATCH', `/api/calendar/events/${ev.sourceId}`, { estimatedDuration: duration })
+        .then(() => queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] }))
+        .catch(revert);
+    }
+  }, [moveJobMutation]);
 
-  const handleDrop = (e: React.DragEvent, targetDate: Date, preserveTime: boolean = true) => {
-    e.preventDefault();
-    dragCounter.current = 0;
+  const handleReassign = useCallback((ev: DiaryEvent, targetColumnId: string) => {
+    if (ev.assignedUserId === targetColumnId) return;
     
-    if (draggedEvent && targetDate && !isNaN(targetDate.getTime())) {
-      try {
-        const newDate = new Date(targetDate);
-        
-        // In day view, use the target time (hour from drop zone)
-        // In month/week view, preserve the original time
-        if (preserveTime && draggedEvent.startTime && !isNaN(draggedEvent.startTime.getTime())) {
-          newDate.setHours(draggedEvent.startTime.getHours());
-          newDate.setMinutes(draggedEvent.startTime.getMinutes());
-          newDate.setSeconds(draggedEvent.startTime.getSeconds());
-        } else if (!preserveTime) {
-          // Use the exact time from targetDate (includes hour from drop zone in day view)
-          // Already set in targetDate, no need to modify
-        } else {
-          // Default to 9 AM if startTime is invalid
-          newDate.setHours(9);
-          newDate.setMinutes(0);
-          newDate.setSeconds(0);
-        }
-        
-        
-        // Validate the final date before sending
-        if (!isNaN(newDate.getTime())) {
-          moveEventMutation.mutate({
-            eventId: draggedEvent.id,
-            newDate: newDate.toISOString()
-          });
-        }
-      } catch (error) {
-        console.error('Error in handleDrop:', error);
-        toast({ title: "Failed to move event", variant: "destructive" });
-      }
-    }
-    setDraggedEvent(null);
-  };
+    const worker = workers.find(w => w.id === targetColumnId);
+    const confirmMsg = `Reassign "${ev.title}" to ${worker?.name || 'Unknown'}?`;
+    if (!window.confirm(confirmMsg)) return;
 
-  const navigateDate = (direction: 'prev' | 'next') => {
-    switch (viewType) {
-      case 'month':
-        setCurrentDate(direction === 'next' ? addMonths(currentDate, 1) : subMonths(currentDate, 1));
-        break;
-      case 'week':
-        setCurrentDate(direction === 'next' ? addWeeks(currentDate, 1) : subWeeks(currentDate, 1));
-        break;
-      case 'day':
-        setCurrentDate(direction === 'next' ? addDays(currentDate, 1) : addDays(currentDate, -1));
-        break;
-    }
-  };
-
-  const getViewTitle = () => {
-    switch (viewType) {
-      case 'month':
-        return format(currentDate, 'MMMM yyyy');
-      case 'week':
-        const weekStart = startOfWeek(currentDate);
-        const weekEnd = endOfWeek(currentDate);
-        return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
-      case 'day':
-        return format(currentDate, 'EEEE, d MMMM yyyy');
-      case 'agenda':
-        return 'Upcoming Events';
-      default:
-        return '';
-    }
-  };
-
-  const getEventsForDate = (date: Date, useFiltered = true) => {
-    if (!date || isNaN(date.getTime())) {
-      console.warn('Invalid date passed to getEventsForDate:', date);
-      return [];
-    }
-    
-    // Use allEvents for day view to show everything, filteredEvents for other views
-    const eventsToSearch = useFiltered ? filteredEvents : allEvents;
-    
-    return eventsToSearch.filter(event => {
-      try {
-        if (!event || !event.startTime) {
-          return false;
-        }
-        
-        // Ensure startTime is a valid Date object
-        const eventDate = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
-        if (isNaN(eventDate.getTime())) {
-          console.warn('Invalid date for event:', event.id);
-          return false;
-        }
-        
-        return isSameDay(eventDate, date);
-      } catch (error) {
-        console.warn('Error comparing dates for event:', event?.id, error);
-        return false;
-      }
-    });
-  };
-
-  const renderMonthView = () => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    const startDate = startOfWeek(monthStart);
-    const endDate = endOfWeek(monthEnd);
-
-    const rows = [];
-    let days = [];
-    let day = new Date(startDate);
-
-    // Generate complete calendar grid - ensuring we show all days including the last day of month
-    while (day <= endDate) {
-      for (let i = 0; i < 7; i++) {
-        const currentDay = new Date(day);
-        const dayEvents = getEventsForDate(currentDay);
-        const isCurrentMonth = isSameMonth(currentDay, currentDate);
-        const isCurrentDayFlag = isToday(currentDay);
-
-        days.push(
-          <div
-            key={currentDay.toISOString()}
-            className={cn(
-              "min-h-[120px] p-2 border border-gray-200 cursor-pointer hover:bg-gray-50",
-              !isCurrentMonth && "bg-gray-100 text-gray-400",
-              isCurrentDayFlag && "bg-blue-50 border-blue-300"
-            )}
-            onClick={() => setCurrentDate(new Date(currentDay))}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, currentDay)}
-          >
-            <div className={cn(
-              "text-sm font-medium mb-1",
-              isCurrentDayFlag && "text-blue-600"
-            )}>
-              {format(currentDay, 'd')}
-            </div>
-            <div className="space-y-1">
-              {dayEvents.slice(0, 3).map((event, index) => (
-                <div
-                  key={event.id}
-                  className="text-xs p-1 rounded cursor-pointer hover:opacity-80 group relative"
-                  style={{ backgroundColor: (event.color || '#6b7280') + '20', color: event.color || '#6b7280' }}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, event)}
-                  onDragEnd={handleDragEnd}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEventClick(event);
-                  }}
-                >
-                  <div className="truncate font-medium">{event.title}</div>
-                  <div className="flex justify-between items-center">
-                    <div className="truncate text-gray-600">
-                      {format(event.startTime, 'HH:mm')}
-                    </div>
-                    {event.type === 'job' && (
-                      <Edit className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
-                  </div>
-                </div>
-              ))}
-              {dayEvents.length > 3 && (
-                <div className="text-xs text-gray-500 text-center">
-                  +{dayEvents.length - 3} more
-                </div>
-              )}
-            </div>
-          </div>
-        );
-        
-        day = addDays(day, 1);
-      }
-      
-      // Create a row with the 7 days
-      rows.push(
-        <div key={`week-${rows.length}`} className="grid grid-cols-7">
-          {days}
-        </div>
-      );
-      days = [];
-    }
-
-    return (
-      <div className="space-y-0">
-        {/* Week headers */}
-        <div className="grid grid-cols-7 border-b">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="p-3 text-center font-medium text-gray-600 border-r border-gray-200 last:border-r-0">
-              {day}
-            </div>
-          ))}
-        </div>
-        {rows}
-      </div>
-    );
-  };
-
-  const renderWeekView = () => {
-    const HOUR_HEIGHT = 64;
-    const weekStart = startOfWeek(currentDate);
-    const weekEnd = addDays(weekStart, 6);
-    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
-    const allHoursArr = Array.from({ length: 24 }, (_, i) => i);
-    const hours = showAllHours ? allHoursArr : businessHours;
-    const hourOffset = showAllHours ? 0 : 7;
-    const totalHeight = hours.length * HOUR_HEIGHT;
-
-    // ── Separate multi-day events from timed events ──────────────────────────
-    const isMultiDay = (ev: CalendarEvent) => {
-      if (!ev.endTime || !(ev.endTime instanceof Date) || isNaN(ev.endTime.getTime())) return false;
-      return differenceInCalendarDays(ev.endTime, ev.startTime) >= 1;
-    };
-
-    // Multi-day events that overlap this week
-    const weekMultiDayEvents = filteredEvents.filter(ev => {
-      if (!isMultiDay(ev)) return false;
-      const evStart = startOfDay(ev.startTime);
-      const evEnd = startOfDay(ev.endTime);
-      return !isAfter(evStart, weekEnd) && !isBefore(evEnd, weekStart);
-    });
-
-    // Build rows of non-overlapping multi-day banners (greedy packing)
-    type BannerRow = Array<{ ev: CalendarEvent; startCol: number; endCol: number }>;
-    const bannerRows: BannerRow[] = [];
-    for (const ev of weekMultiDayEvents) {
-      const evStart = startOfDay(ev.startTime);
-      const evEnd = startOfDay(ev.endTime);
-      const startCol = weekDays.findIndex(d => isSameDay(d, max([evStart, weekStart])));
-      const endCol = weekDays.findLastIndex(d => !isAfter(startOfDay(d), evEnd));
-      const sc = startCol === -1 ? 0 : startCol;
-      const ec = endCol === -1 ? 6 : endCol;
-      // Find first row where this event fits
-      let placed = false;
-      for (const row of bannerRows) {
-        const conflicts = row.some(b => !(ec < b.startCol || sc > b.endCol));
-        if (!conflicts) { row.push({ ev, startCol: sc, endCol: ec }); placed = true; break; }
-      }
-      if (!placed) bannerRows.push([{ ev, startCol: sc, endCol: ec }]);
-    }
-
-    const BANNER_ROW_HEIGHT = 24; // px per row
-    const allDayHeight = Math.max(bannerRows.length * BANNER_ROW_HEIGHT + 4, 28); // min 28px
-
-    // ── Timed events (exclude multi-day) per day column ──────────────────────
-    const getPositionedEventsForDay = (day: Date) => {
-      const dayEvts = filteredEvents.filter(ev => {
-        if (isMultiDay(ev)) return false;
-        try {
-          const d = ev.startTime instanceof Date ? ev.startTime : new Date(ev.startTime);
-          return !isNaN(d.getTime()) && isSameDay(d, day);
-        } catch { return false; }
+    if (ev.meta?.isOccurrence) {
+      upsertExceptionMutation.mutate({
+        contractId: ev.sourceId,
+        contractKind: ev.meta.raw.contractKind,
+        originalDate: ev.meta.originalDate,
+        assignedTechnicianId: targetColumnId,
+        status: ev.status
       });
+    } else if (ev.sourceType === 'onceOffJob') {
+      moveJobMutation.mutate({ id: ev.sourceId, workerId: targetColumnId } as any);
+    }
+  }, [workers, upsertExceptionMutation, moveJobMutation]);
 
-      const raw = dayEvts.map(ev => {
-        const startHour = ev.startTime.getHours();
-        const startMin = ev.startTime.getMinutes();
-        if (!showAllHours && (startHour < 7 || startHour >= 17)) return null;
-        const adjustedHour = startHour - hourOffset;
+  const handleOccurrenceMoveAction = (action: 'occurrence' | 'schedule' | 'cancel') => {
+    if (!occurrenceMoveTarget) return;
+    const { event, newStart, revert } = occurrenceMoveTarget;
+    const raw = event.meta?.raw;
 
-        // Clip duration at end of visible hours
-        const rawDuration =
-          ev.endTime && ev.endTime instanceof Date && !isNaN(ev.endTime.getTime())
-            ? (ev.endTime.getTime() - ev.startTime.getTime()) / 60000
-            : 60;
-        const maxDuration = (hours[hours.length - 1] - startHour + 1) * 60 - startMin;
-        const duration = Math.min(rawDuration, maxDuration);
-
-        const top = adjustedHour * HOUR_HEIGHT + (startMin * HOUR_HEIGHT / 60);
-        const height = Math.max(duration * HOUR_HEIGHT / 60, 24);
-        if (isNaN(top) || isNaN(height) || top < 0 || adjustedHour < 0) return null;
-        return { ...ev, top, height, clipped: rawDuration > maxDuration };
-      }).filter(Boolean) as Array<CalendarEvent & { top: number; height: number; clipped: boolean }>;
-
-      // Group overlapping events side-by-side
-      const groups: Array<typeof raw> = [];
-      for (const ev of raw) {
-        let placed = false;
-        for (const g of groups) {
-          const overlaps = g.some(ge => !(ev.top >= ge.top + ge.height || ge.top >= ev.top + ev.height));
-          if (overlaps) { g.push(ev); placed = true; break; }
-        }
-        if (!placed) groups.push([ev]);
-      }
-      const final: Array<CalendarEvent & { top: number; height: number; clipped: boolean; left: string; width: string }> = [];
-      for (const g of groups) {
-        const n = g.length;
-        g.forEach((ev, i) => final.push({ ...ev, left: `${(i * 100) / n}%`, width: `${100 / n}%` }));
-      }
-      return final;
-    };
-
-    return (
-      <div className="flex flex-col h-full">
-        {/* ── Sticky header: day names + all-day banner ───────────────────── */}
-        <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
-          {/* Day name row */}
-          <div className="grid" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
-            <div className="border-r border-b" />
-            {weekDays.map(day => (
-              <div
-                key={day.toISOString()}
-                className="p-2 text-center border-r border-b last:border-r-0 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => { setCurrentDate(day); setViewType('day'); }}
-              >
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
-                <div className={cn(
-                  "text-xl font-bold w-9 h-9 mx-auto mt-0.5 flex items-center justify-center rounded-full",
-                  isToday(day) ? "bg-blue-600 text-white" : "text-gray-900 hover:bg-gray-100"
-                )}>
-                  {format(day, 'd')}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* All-day / multi-day banner row */}
-          <div className="grid" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
-            <div className="border-r flex items-center justify-end pr-1" style={{ height: allDayHeight + 'px' }}>
-              <span className="text-xs text-gray-400 select-none">all-day</span>
-            </div>
-            {/* Single relative container spanning all 7 columns */}
-            <div className="relative col-span-7 border-b" style={{ height: allDayHeight + 'px' }}>
-              {bannerRows.map((row, rowIdx) =>
-                row.map(({ ev, startCol, endCol }) => {
-                  const colWidth = 100 / 7;
-                  const left = startCol * colWidth;
-                  const width = (endCol - startCol + 1) * colWidth;
-                  const daysTotal = differenceInCalendarDays(ev.endTime, ev.startTime);
-                  const daysLabel = daysTotal > 1 ? ` (${daysTotal}d)` : '';
-                  return (
-                    <div
-                      key={ev.id}
-                      className="absolute rounded cursor-pointer text-white text-xs font-semibold flex items-center px-1.5 truncate hover:opacity-80 transition-opacity"
-                      style={{
-                        top: rowIdx * BANNER_ROW_HEIGHT + 2 + 'px',
-                        height: BANNER_ROW_HEIGHT - 3 + 'px',
-                        left: `calc(${left}% + 2px)`,
-                        width: `calc(${width}% - 4px)`,
-                        backgroundColor: ev.color || '#6b7280',
-                        minWidth: 0,
-                      }}
-                      title={`${ev.title}${daysLabel} — ${format(ev.startTime, 'MMM d')} to ${format(ev.endTime, 'MMM d')}`}
-                      onClick={() => handleEventClick(ev)}
-                    >
-                      {startCol === 0 || !isBefore(startOfDay(ev.startTime), weekStart)
-                        ? <span className="truncate">{ev.title}{daysLabel}</span>
-                        : <span className="truncate opacity-80">↵ {ev.title}{daysLabel}</span>
-                      }
-                      {endCol < 6 && isAfter(startOfDay(ev.endTime), weekEnd) && <span className="ml-auto shrink-0">→</span>}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Scrollable time grid ─────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto">
-          <div className="flex" style={{ minHeight: totalHeight + 'px' }}>
-            {/* Time label column */}
-            <div className="w-16 shrink-0 border-r bg-gray-50 select-none">
-              {hours.map(hour => (
-                <div key={hour} className="border-b border-gray-100 flex items-start justify-end pr-2 pt-1" style={{ height: HOUR_HEIGHT + 'px' }}>
-                  <span className="text-xs text-gray-400">{format(new Date().setHours(hour, 0), 'HH:mm')}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
-            {weekDays.map(day => {
-              const posEvts = getPositionedEventsForDay(day);
-              return (
-                <div
-                  key={day.toISOString()}
-                  className={cn("flex-1 relative border-r last:border-r-0", isToday(day) && "bg-blue-50/20")}
-                  style={{ height: totalHeight + 'px' }}
-                >
-                  {hours.map((hour, idx) => (
-                    <div
-                      key={hour}
-                      className="absolute w-full border-b border-gray-100"
-                      style={{ top: idx * HOUR_HEIGHT + 'px', height: HOUR_HEIGHT + 'px' }}
-                      onDragOver={handleDragOver}
-                      onDragEnter={handleDragEnter}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => { const d = new Date(day); d.setHours(hour, 0, 0, 0); handleDrop(e, d); }}
-                    />
-                  ))}
-
-                  {posEvts.map(ev => (
-                    <div
-                      key={ev.id}
-                      className="absolute rounded overflow-hidden cursor-pointer border hover:opacity-80 transition-opacity"
-                      style={{
-                        top: ev.top + 'px',
-                        height: ev.height + 'px',
-                        left: `calc(${ev.left} + 2px)`,
-                        width: `calc(${ev.width} - 4px)`,
-                        backgroundColor: (ev.color || '#6b7280') + '25',
-                        borderColor: ev.color || '#6b7280',
-                        borderLeftWidth: '3px',
-                        color: ev.color || '#374151',
-                        minHeight: '24px',
-                      }}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, ev)}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => handleEventClick(ev)}
-                    >
-                      <div className="px-1 pt-0.5">
-                        <div className="font-semibold text-xs truncate leading-tight">{ev.title}</div>
-                        {ev.height >= 36 && (
-                          <div className="text-xs opacity-70 truncate leading-tight">
-                            {format(ev.startTime, 'HH:mm')} – {ev.clipped ? `${format(hours[hours.length-1]+1 <= 23 ? hours[hours.length-1]+1 : 23, '00')}:00 →` : format(ev.endTime, 'HH:mm')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
+    if (action === 'occurrence') {
+      upsertExceptionMutation.mutate({
+        contractId: event.sourceId,
+        contractKind: raw.contractKind,
+        originalDate: event.meta?.originalDate,
+        newDate: format(newStart, 'yyyy-MM-dd'),
+        newStartTime: format(newStart, 'HH:mm'),
+        durationMinutes: differenceInMinutes(occurrenceMoveTarget.newEnd, newStart),
+        assignedTechnicianId: event.assignedUserId,
+        status: event.status
+      });
+    } else if (action === 'schedule') {
+       updateContractMutation.mutate({
+         id: event.sourceId,
+         kind: raw.contractKind,
+         data: {
+           startTime: format(newStart, 'HH:mm'),
+           dayOfWeek: format(newStart, 'EEEE'),
+         }
+       });
+    } else {
+      revert();
+      setOccurrenceMoveTarget(null);
+    }
   };
 
-  const renderDayView = () => {
-    // Use filtered events for day view to respect department and status filters
-    const dayEvents = getEventsForDate(currentDate, true).sort((a, b) => {
-      try {
-        return a.startTime.getTime() - b.startTime.getTime();
-      } catch (error) {
-        console.warn('Error sorting events:', error, { a: a?.id, b: b?.id });
-        return 0;
-      }
-    });
+  // --- Filter options ---
+
+  const areaOptions = useMemo(() => Array.from(new Set(
+    clients.map(c => (c.suburb || c.city || "").trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b)), [clients]);
+
+  const serviceTypeOptions = useMemo(() => Array.from(new Set(
+    allEvents.map(e => e.serviceType).filter(Boolean)
+  )).sort() as string[], [allEvents]);
+
+  const assigneeGroups = useMemo(() => {
+    const groups: { department: Department; options: any[] }[] = [];
+    const sortedDepts = [...departments].sort((a, b) => a.name.localeCompare(b.name));
     
-    console.log(`Day view for ${format(currentDate, 'yyyy-MM-dd')}: Found ${dayEvents.length} events`);
-    dayEvents.forEach(event => {
-      console.log(`  Event: ${event.title} at ${format(event.startTime, 'HH:mm')}`);
+    sortedDepts.forEach(dept => {
+      if (departmentFilter !== "all" && departmentFilter !== dept.id) return;
+      
+      const deptWorkers = workers.filter(w => w.departmentId === dept.id && w.isActive !== false)
+        .map(w => ({ kind: "worker", id: w.id, label: w.name }));
+      
+      const deptTeams = teams.filter(t => t.departmentId === dept.id && t.isActive !== false)
+        .map(t => ({ kind: "team", id: t.id, label: t.name }));
+
+      if (deptWorkers.length > 0 || deptTeams.length > 0) {
+        groups.push({ department: dept, options: [...deptWorkers, ...deptTeams] });
+      }
     });
+    return groups;
+  }, [departments, workers, teams, departmentFilter]);
 
-    // Function to detect overlapping events and calculate positioning
-    const calculateEventPositions = (events: CalendarEvent[]) => {
-      const positionedEvents = events.map(event => {
-        // Safety checks for event properties
-        if (!event || !event.startTime) {
-          console.warn('Skipping invalid event in day view:', event?.id);
-          return null;
-        }
+  const teamColumns: OutlookColumn[] = useMemo(() => {
+    const activeWorkers = workers.filter(w => w.isActive !== false);
+    return activeWorkers.map(w => ({
+      id: w.id,
+      label: w.name,
+      sublabel: departments.find(d => d.id === w.departmentId)?.name,
+      events: filteredEvents.filter(ev => ev.assignedUserId === w.id)
+    }));
+  }, [workers, filteredEvents, departments]);
 
-        const startHour = event.startTime.getHours();
-        const startMinute = event.startTime.getMinutes();
-        
-        // Calculate duration with proper fallback
-        let duration = 60; // Default 1 hour
-        if (event.endTime && event.endTime instanceof Date && !isNaN(event.endTime.getTime())) {
-          duration = (event.endTime.getTime() - event.startTime.getTime()) / (1000 * 60);
-        } else if (event.estimatedDuration) {
-          duration = event.estimatedDuration;
-        }
-        
-        // Calculate position based on whether we're showing business hours or full day
-        const hourOffset = showAllHours ? 0 : 7; // Business hours start at 7 AM
-        const adjustedHour = startHour - hourOffset;
-        
-        // Skip events outside visible hours
-        if (!showAllHours && (startHour < 7 || startHour >= 17)) {
-          return null;
-        }
-        
-        const top = (adjustedHour * 64) + (startMinute * 64 / 60);
-        const height = Math.max((duration * 64 / 60), 40); // Ensure minimum height
+  const hasFilters = searchTerm || departmentFilter !== "all" || assigneeFilter !== "all" || statusFilter !== "all" || typeFilter !== "all" || customerFilter !== "all" || areaFilter !== "all" || serviceTypeFilter !== "all" || invoiceStatusFilter !== "all";
 
-        // Validate calculated values
-        if (isNaN(top) || isNaN(height) || top < 0 || height < 0 || adjustedHour < 0) {
-          console.warn('Invalid positioning for event:', event.id, { 
-            top, height, startHour, startMinute, duration, adjustedHour 
-          });
-          return null;
-        }
-
-        return {
-          ...event,
-          top,
-          height,
-          duration,
-          startTime: event.startTime,
-          endTime: event.endTime && event.endTime instanceof Date 
-            ? event.endTime 
-            : new Date(event.startTime.getTime() + duration * 60000)
-        };
-      }).filter(Boolean);
-
-      // Group overlapping events
-      const groups: Array<typeof positionedEvents> = [];
-      
-      for (const event of positionedEvents) {
-        if (!event) continue;
-        
-        let addedToGroup = false;
-        
-        for (const group of groups) {
-          // Check if this event overlaps with any event in the group
-          const overlaps = group.some(groupEvent => {
-            if (!groupEvent) return false;
-            const eventEnd = event.top + event.height;
-            const groupEventEnd = groupEvent.top + groupEvent.height;
-            
-            return !(event.top >= groupEventEnd || groupEvent.top >= eventEnd);
-          });
-          
-          if (overlaps) {
-            group.push(event);
-            addedToGroup = true;
-            break;
-          }
-        }
-        
-        if (!addedToGroup) {
-          groups.push([event]);
-        }
-      }
-
-      // Calculate positions for each group
-      const finalEvents: Array<typeof positionedEvents[0] & { left: string; width: string; column: number }> = [];
-      
-      for (const group of groups) {
-        const groupSize = group.length;
-        const columnWidth = `${100 / groupSize}%`;
-        
-        group.forEach((event, index) => {
-          if (!event) return;
-          finalEvents.push({
-            ...event,
-            left: `${(index * 100) / groupSize}%`,
-            width: columnWidth,
-            column: index
-          });
-        });
-      }
-
-      return finalEvents.filter(Boolean);
-    };
-
-    const positionedEvents = calculateEventPositions(dayEvents);
-    // Display hours: 7 AM to 5 PM (business hours) or full day
-    const businessHours = Array.from({ length: 10 }, (_, i) => i + 7);
-    const allHours = Array.from({ length: 24 }, (_, i) => i);
-    const hours = showAllHours ? allHours : businessHours;
-
-    return (
-      <div className="flex h-full">
-        {/* Time column */}
-        <div className="w-20 border-r bg-gray-50">
-          {hours.map(hour => (
-            <div key={hour} className="h-16 border-b border-gray-100 p-2 text-xs text-gray-500 text-right">
-              {format(new Date().setHours(hour, 0), 'HH:mm')}
-            </div>
-          ))}
-        </div>
-
-        {/* Events column */}
-        <div className="flex-1 relative">
-          {hours.map(hour => (
-            <div 
-              key={hour} 
-              className="h-16 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-              onDragOver={handleDragOver}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => {
-                const dropDate = new Date(currentDate);
-                dropDate.setHours(hour, 0, 0, 0);
-                handleDrop(e, dropDate, false);
-              }}
-            ></div>
-          ))}
-          
-          {/* Events overlay */}
-          {positionedEvents.map(event => {
-            return (
-              <div
-                key={event.id}
-                className="absolute p-2 rounded cursor-pointer hover:opacity-80 border border-gray-200 overflow-hidden"
-                style={{ 
-                  top: `${event.top}px`, 
-                  height: `${event.height}px`,
-                  left: event.left,
-                  width: event.width,
-                  backgroundColor: (event.color || '#6b7280') + '20',
-                  color: event.color || '#6b7280',
-                  minHeight: '40px',
-                  marginLeft: '4px',
-                  marginRight: '4px'
-                }}
-                onClick={() => handleEventClick(event)}
-                draggable
-                  onDragStart={(e) => handleDragStart(e, event)}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="font-medium text-sm truncate">{event.title}</div>
-                  <div className="text-xs text-gray-600">
-                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                  </div>
-                  {event.location && (
-                    <div className="text-xs text-gray-500 truncate">
-                      📍 {event.location}
-                    </div>
-                  )}
-                </div>
-              );
-          }).filter(Boolean)}
-        </div>
-      </div>
-    );
-  };
-
-  const renderAgendaView = () => {
-    const upcomingEvents = filteredEvents
-      .filter(event => event.startTime >= new Date())
-      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-      .slice(0, 50);
-
-    if (upcomingEvents.length === 0) {
-      return (
-        <div className="text-center py-12 text-gray-500">
-          <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No upcoming events found</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {upcomingEvents.map(event => (
-          <Card key={event.id} className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => {
-                  setSelectedEvent(event);
-                  setIsEventDialogOpen(true);
-                }}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div 
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: event.color }}
-                    ></div>
-                    <h3 className="font-medium">{event.title}</h3>
-                    <Badge className={getStatusColor(event.status)} variant="secondary">
-                      {event.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4" />
-                      <span>
-                        {format(event.startTime, 'MMM d, yyyy')} • {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                      </span>
-                    </div>
-                    
-                    {event.location && (
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>{event.location}</span>
-                      </div>
-                    )}
-                    
-                    {event.workerId && (
-                      <div className="flex items-center space-x-2">
-                        <User className="h-4 w-4" />
-                        <span>{workers.find(w => w.id === event.workerId)?.name || 'Unknown Worker'}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {event.description && (
-                    <p className="text-sm text-gray-700 mt-2 line-clamp-2">{event.description}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  };
-
-  const renderCurrentView = () => {
-    try {
-      switch (viewType) {
-        case 'month': return renderMonthView();
-        case 'week': return renderWeekView();
-        case 'day': return renderDayView();
-        case 'agenda': return renderAgendaView();
-        default: return renderMonthView();
-      }
-    } catch (error) {
-      console.error('Error rendering calendar view:', viewType, error);
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="text-red-600 mb-2">Error loading calendar view</div>
-            <Button 
-              onClick={() => {
-                setViewType('month');
-                setDepartmentFilter('all');
-                setAssigneeFilter('all');
-                setStatusFilter('all');
-              }}
-              variant="outline"
-            >
-              Reset Calendar
-            </Button>
-          </div>
-        </div>
-      );
-    }
+  const clearFilters = () => {
+    setSearchTerm("");
+    setDepartmentFilter("all");
+    setAssigneeFilter("all");
+    setStatusFilter("all");
+    setTypeFilter("all");
+    setCustomerFilter("all");
+    setAreaFilter("all");
+    setServiceTypeFilter("all");
+    setInvoiceStatusFilter("all");
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50" data-testid="calendar-page">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg">
-            <Sidebar />
-          </div>
-        </div>
-      )}
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Calendar" 
-          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-        />
-        
-        <main className="flex-1 overflow-hidden p-6 pb-20 lg:pb-6">
-          {/* Technician subtitle */}
-          {isTechnician && (
-            <p className="text-sm text-muted-foreground mb-4">
-              View your assigned jobs by day, week or month.
-            </p>
-          )}
+      <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
+        <Header title="Service Calendar" />
+        <main className="flex-1 overflow-auto p-4 space-y-3">
 
-          {/* Calendar Controls */}
-          <div className="mb-6 space-y-4">
-            {/* Top Controls */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigateDate('prev')}
-                    data-testid="prev-date"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setCurrentDate(new Date())}
-                    data-testid="today-button"
-                  >
-                    Today
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm" 
-                    onClick={() => navigateDate('next')}
-                    data-testid="next-date"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-                {viewType === 'day' ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        className="text-xl font-semibold text-gray-900 hover:bg-gray-100 h-auto p-2"
-                        data-testid="date-picker-trigger"
-                      >
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        {getViewTitle()}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={currentDate}
-                        onSelect={(date) => {
-                          if (date) {
-                            setCurrentDate(date);
-                          }
-                        }}
-                        initialFocus
-                        data-testid="date-picker-calendar"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <h2 className="text-xl font-semibold text-gray-900">{getViewTitle()}</h2>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                {/* Daily Department Card Button — coordinators/admin only */}
-                {!isTechnician && (
-                  <Link href="/daily-department-card">
-                    <Button
-                      variant="outline"
-                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                      data-testid="daily-department-card"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Print Daily Schedule
-                    </Button>
-                  </Link>
-                )}
-                
-                {/* Create Appointment Button — coordinators/admin only */}
-                {!isTechnician && (
-                  <Button
-                    onClick={() => setIsCreateDialogOpen(true)}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    data-testid="create-appointment"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Appointment
-                  </Button>
-                )}
-
-                {/* View Tabs */}
-                <Tabs value={viewType} onValueChange={(value) => setViewType(value as ViewType)}>
-                  <TabsList>
-                    <TabsTrigger value="month" data-testid="month-view">Month</TabsTrigger>
-                    <TabsTrigger value="week" data-testid="week-view">Week</TabsTrigger>
-                    <TabsTrigger value="day" data-testid="day-view">Day</TabsTrigger>
-                    <TabsTrigger value="agenda" data-testid="agenda-view">Agenda</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-0.5 bg-white border rounded-lg p-1">
+              {(['timeGridDay', 'timeGridWeek', 'dayGridMonth', 'listWeek', 'team'] as ViewType[]).map(v => (
+                <Button 
+                  key={v} 
+                  variant={viewType === v ? "default" : "ghost"} 
+                  size="sm" 
+                  className="h-7 text-xs px-2.5" 
+                  onClick={() => {
+                    setViewType(v);
+                    if (v !== 'team') {
+                      setTimeout(() => calendarRef.current?.getApi()?.changeView(v), 0);
+                    }
+                  }}
+                >
+                  {v === 'timeGridDay' ? 'Day' : v === 'timeGridWeek' ? 'Week' : v === 'dayGridMonth' ? 'Month' : v === 'listWeek' ? 'List' : 'Team'}
+                </Button>
+              ))}
             </div>
 
-            {/* Filters — each control has a label above it */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Search</label>
-                <div className="relative">
-                  <Search className="h-4 w-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <Input
-                    placeholder="Search events..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-56 pl-8"
-                    data-testid="search-events"
-                  />
-                </div>
-              </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => calendarRef.current?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-sm font-medium text-gray-700 min-w-[180px] text-center">{viewTitle}</span>
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => calendarRef.current?.next()}><ChevronRight className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => calendarRef.current?.today()}>Today</Button>
+            </div>
 
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Department</label>
-                <Select value={departmentFilter} onValueChange={onDepartmentChange}>
-                  <SelectTrigger className="w-44" data-testid="department-filter">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
-                      <SelectItem key={department.id} value={department.id}>
-                        {department.name}
+            <div className="flex-1" />
+            <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700" onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />New Job
+            </Button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2 bg-white border rounded-lg p-2">
+            <div className="relative w-48">
+              <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-gray-400" />
+              <Input 
+                placeholder="Search jobs/clients..." 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                className="h-7 text-xs pl-7" 
+              />
+            </div>
+            
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="h-7 text-xs w-32"><SelectValue placeholder="Dept" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+              <SelectTrigger className="h-7 text-xs w-40"><SelectValue placeholder="Assignee" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                {assigneeGroups.map(group => (
+                  <SelectGroup key={group.department.id}>
+                    <SelectLabel className="text-[10px] uppercase text-gray-400 px-2 py-1">{group.department.name}</SelectLabel>
+                    {group.options.map(opt => (
+                      <SelectItem key={`${opt.kind}:${opt.id}`} value={`${opt.kind}:${opt.id}`}>
+                        {opt.kind === 'team' ? `Team: ${opt.label}` : opt.label}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Person / Team</label>
-                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                  <SelectTrigger className="w-48" data-testid="assignee-filter">
-                    <SelectValue placeholder="All People & Teams" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All People &amp; Teams</SelectItem>
-                    {assigneeGroups.map(group => (
-                      <SelectGroup key={group.department.id}>
-                        <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                          {group.department.name}
-                        </SelectLabel>
-                        {group.options.map(opt => (
-                          <SelectItem key={`${opt.kind}:${opt.id}`} value={`${opt.kind}:${opt.id}`}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Job Type</label>
-                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
-                  <SelectTrigger className="w-40" data-testid="type-filter">
-                    <SelectValue placeholder="All Job Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Job Types</SelectItem>
-                    <SelectItem value="oneoff">Once-off Jobs</SelectItem>
-                    <SelectItem value="contract">Contract Jobs</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Customer</label>
-                <Select value={customerFilter} onValueChange={setCustomerFilter}>
-                  <SelectTrigger className="w-48" data-testid="customer-filter">
-                    <SelectValue placeholder="All Customers" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    <SelectItem value="all">All Customers</SelectItem>
-                    {clients.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Area</label>
-                <Select value={areaFilter} onValueChange={setAreaFilter}>
-                  <SelectTrigger className="w-44" data-testid="area-filter">
-                    <SelectValue placeholder="All Areas" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    <SelectItem value="all">All Areas</SelectItem>
-                    {areaOptions.map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-medium text-gray-600 mb-1">Status</label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-44" data-testid="status-filter">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="scheduled">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                        Scheduled
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="in_progress">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                        In Progress
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="completed">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                        Completed
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="cancelled">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
-                        Cancelled
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
-                        Pending
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {(typeFilter !== "all" || customerFilter !== "all" || areaFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all" || assigneeFilter !== "all" || searchTerm) && (
-                <div className="flex flex-col">
-                  <label className="text-xs font-medium text-transparent mb-1">.</label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setDepartmentFilter("all");
-                      setAssigneeFilter("all");
-                      setTypeFilter("all");
-                      setCustomerFilter("all");
-                      setAreaFilter("all");
-                      setStatusFilter("all");
-                    }}
-                    data-testid="clear-filters"
-                  >
-                    Clear all
-                  </Button>
-                </div>
-              )}
-
-              {/* Status Colour Legend */}
-              <div className="hidden lg:flex items-center gap-2.5 flex-wrap bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
-                <span className="text-xs text-gray-500 font-medium shrink-0">Legend:</span>
-                {[
-                  { label: 'Scheduled / To Do', color: '#f97316' },
-                  { label: 'In Progress', color: '#3b82f6' },
-                  { label: 'Completed', color: '#22c55e' },
-                  { label: 'Cancelled', color: '#ef4444' },
-                  { label: 'Pending', color: '#eab308' },
-                  { label: 'Unassigned', color: '#9ca3af' },
-                  { label: 'Overdue', color: '#dc2626' },
-                ].map(({ label, color }) => (
-                  <div key={label} className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                    <span className="text-xs text-gray-600">{label}</span>
-                  </div>
+                  </SelectGroup>
                 ))}
-              </div>
+              </SelectContent>
+            </Select>
 
-              {/* Hour View Toggle for Day View */}
-              {viewType === 'day' && (
-                <div className="flex items-center space-x-2">
-                  <label className="text-sm font-medium">View:</label>
-                  <Button
-                    variant={showAllHours ? "outline" : "default"}
-                    size="sm"
-                    onClick={() => setShowAllHours(!showAllHours)}
-                    data-testid="hour-view-toggle"
-                  >
-                    <Clock className="h-4 w-4 mr-2" />
-                    {showAllHours ? "Full Day (24 Hours)" : "Business Hours (7AM-5PM)"}
-                  </Button>
-                </div>
-              )}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-7 text-xs w-32"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
 
-            </div>
-          </div>
+            <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
+              <SelectTrigger className="h-7 text-xs w-32"><SelectValue placeholder="Service" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Services</SelectItem>
+                {serviceTypeOptions.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
 
-          {/* Calendar View */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-[calc(100vh-240px)] overflow-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : (
-              renderCurrentView()
+            <Select value={typeFilter} onValueChange={val => setTypeFilter(val as any)}>
+              <SelectTrigger className="h-7 text-xs w-32"><SelectValue placeholder="Job Type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="oneoff">One-off Jobs</SelectItem>
+                <SelectItem value="contract">Contracts</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={areaFilter} onValueChange={setAreaFilter}>
+              <SelectTrigger className="h-7 text-xs w-32"><SelectValue placeholder="Area" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Areas</SelectItem>
+                {areaOptions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Select value={invoiceStatusFilter} onValueChange={setInvoiceStatusFilter}>
+              <SelectTrigger className="h-7 text-xs w-36"><SelectValue placeholder="Invoice Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Inv Status</SelectItem>
+                <SelectItem value="not_invoiced">Not Invoiced</SelectItem>
+                <SelectItem value="ready_to_invoice">Ready to Invoice</SelectItem>
+                <SelectItem value="invoiced">Invoiced</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-400 gap-1" onClick={clearFilters}>
+                <X className="h-3 w-3" />Clear
+              </Button>
             )}
           </div>
 
-          {/* Event Details Dialog */}
-          <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle className="flex items-center space-x-2">
-                  <div 
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: selectedEvent?.color }}
-                  ></div>
-                  <span>{selectedEvent?.title}</span>
-                </DialogTitle>
-              </DialogHeader>
-              
-              {selectedEvent && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <Label className="font-medium">Date</Label>
-                      <p>{format(selectedEvent.startTime, 'MMM d, yyyy')}</p>
-                    </div>
-                    <div>
-                      <Label className="font-medium">Time</Label>
-                      <p>{format(selectedEvent.startTime, 'HH:mm')} - {format(selectedEvent.endTime, 'HH:mm')}</p>
-                    </div>
-                    <div>
-                      <Label className="font-medium">Type</Label>
-                      <p className="capitalize">{selectedEvent.type}</p>
-                    </div>
-                    <div>
-                      <Label className="font-medium">Status</Label>
-                      <Badge className={getStatusColor(selectedEvent.status)} variant="secondary">
-                        {selectedEvent.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
-                    </div>
-                  </div>
+          {/* Calendar Display */}
+          <div className="relative">
+            {viewType === 'team' ? (
+              <OutlookColumnsView 
+                columns={teamColumns}
+                onEventClick={handleEventClick}
+                onReassign={handleReassign}
+                emptyLabel="No jobs assigned"
+              />
+            ) : (
+              <OutlookDiaryCalendar 
+                ref={calendarRef}
+                events={filteredEvents}
+                view={viewType as OutlookCalView}
+                onDatesSet={setViewTitle}
+                onEventClick={handleEventClick}
+                onEventDrop={handleEventDrop}
+                onEventResize={handleEventResize}
+                onSelect={(start, end) => {
+                  // Since we removed appointmentForm, we can directly open the Job creation dialog
+                  setIsCreateDialogOpen(true);
+                }}
+              />
+            )}
 
-                  {selectedEvent.location && (
-                    <div>
-                      <Label className="font-medium">Location</Label>
-                      <p className="text-sm text-gray-600">{selectedEvent.location}</p>
-                    </div>
-                  )}
-
-                  {selectedEvent.description && (
-                    <div>
-                      <Label className="font-medium">Description</Label>
-                      <p className="text-sm text-gray-600">{selectedEvent.description}</p>
-                    </div>
-                  )}
-
-                  {selectedEvent.workerId && (
-                    <div>
-                      <Label className="font-medium">Assigned Worker</Label>
-                      <p className="text-sm text-gray-600">
-                        {workers.find(w => w.id === selectedEvent.workerId)?.name || 'Unknown Worker'}
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedEvent.clientId && (
-                    <div>
-                      <Label className="font-medium">Client</Label>
-                      <p className="text-sm">
-                        <a href={`/clients/${selectedEvent.clientId}`} className="text-blue-600 hover:text-blue-800 hover:underline">
-                          {clients.find(c => c.id === selectedEvent.clientId)?.name || 'Unknown Client'}
-                        </a>
-                      </p>
-                    </div>
-                  )}
+            {filteredEvents.length === 0 && hasFilters && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/50 pointer-events-none">
+                <div className="bg-white border shadow-lg rounded-lg p-4 flex flex-col items-center gap-2">
+                  <Filter className="h-8 w-8 text-gray-300" />
+                  <p className="text-sm font-medium text-gray-500">No events matching your filters</p>
+                  <Button variant="link" size="sm" onClick={clearFilters}>Clear all filters</Button>
                 </div>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Create Appointment Dialog */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create New Appointment</DialogTitle>
-                <DialogDescription>Schedule a new appointment or meeting</DialogDescription>
-              </DialogHeader>
-              <Form {...appointmentForm}>
-                <form onSubmit={appointmentForm.handleSubmit(handleCreateAppointment)} className="space-y-4">
-                  <FormField
-                    control={appointmentForm.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Appointment title" {...field} data-testid="appointment-title" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={appointmentForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Appointment description" {...field} data-testid="appointment-description" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={appointmentForm.control}
-                    name="departmentId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Department</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="appointment-department">
-                              <SelectValue placeholder="Select department" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {departments.filter(d => (ALLOWED_DEPT_IDS as readonly string[]).includes(d.id)).map(department => (
-                              <SelectItem key={department.id} value={department.id}>
-                                {department.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={appointmentForm.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} data-testid="appointment-date" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={appointmentForm.control}
-                      name="startTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Time</FormLabel>
-                          <FormControl>
-                            <Input type="time" {...field} data-testid="appointment-time" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={appointmentForm.control}
-                    name="duration"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Duration (minutes)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="15" 
-                            step="15" 
-                            {...field} 
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            data-testid="appointment-duration" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={appointmentForm.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="appointment-priority">
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={appointmentForm.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Appointment location" {...field} data-testid="appointment-location" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end space-x-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={createAppointmentMutation.isPending}
-                      data-testid="create-appointment-submit"
-                    >
-                      {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Job Dialog */}
-          <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Edit Job</DialogTitle>
-                <DialogDescription>Update job details and schedule</DialogDescription>
-              </DialogHeader>
-              {editingJob && (
-                <JobForm
-                  job={editingJob}
-                  onSuccess={() => { setIsEditJobDialogOpen(false); setEditingJob(null); }}
-                  onCancel={() => { setIsEditJobDialogOpen(false); setEditingJob(null); }}
-                />
-              )}
-            </DialogContent>
-          </Dialog>
+              </div>
+            )}
+          </div>
         </main>
       </div>
 
-      <MobileNavigation />
+      {/* Dialogs */}
+
+      <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedEvent?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 text-sm">
+              <Clock className="h-4 w-4 text-gray-400" />
+              <span>
+                {selectedEvent && format(new Date(selectedEvent.startDateTime), 'EEEE, d MMMM yyyy')}
+                <br />
+                <span className="text-gray-500">
+                  {selectedEvent && format(new Date(selectedEvent.startDateTime), 'HH:mm')} – {selectedEvent && format(new Date(selectedEvent.endDateTime), 'HH:mm')} ({selectedEvent?.durationMinutes} min)
+                </span>
+              </span>
+            </div>
+            {selectedEvent?.location && (
+              <div className="flex items-center gap-3 text-sm">
+                <MapPin className="h-4 w-4 text-gray-400" />
+                <span className="whitespace-pre-line">{selectedEvent.location}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-3 text-sm">
+              <User className="h-4 w-4 text-gray-400" />
+              <span>Assigned: {selectedEvent?.assignedUserName || 'Unassigned'}</span>
+            </div>
+            <div className="pt-2 flex gap-2">
+              <Badge className={selectedEvent ? statusColorClasses(selectedEvent.status) : ''}>
+                {selectedEvent?.status.replace('_', ' ')}
+              </Badge>
+              {selectedEvent?.meta?.invoiceStatus && (
+                <Badge variant="outline">{selectedEvent.meta.invoiceStatus.replace('_', ' ')}</Badge>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            {selectedEvent?.meta?.isOccurrence ? (
+              <Button variant="outline" onClick={() => setLocation(selectedEvent.meta?.raw.contractKind === 'rental' ? `/contracts?id=${selectedEvent.sourceId}` : `/service-contracts?id=${selectedEvent.sourceId}`)}>
+                Open Contract
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setLocation(`/job-card/${selectedEvent?.sourceId}`)}>
+                Open Job Card
+              </Button>
+            )}
+            <Button onClick={() => setIsEventDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Job</DialogTitle>
+          </DialogHeader>
+          <JobForm 
+            onSuccess={() => {
+              setIsCreateDialogOpen(false);
+              queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+            }}
+            onCancel={() => setIsCreateDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Job: {editingJob?.title}</DialogTitle>
+          </DialogHeader>
+          <Form {...jobEditForm}>
+            <form onSubmit={jobEditForm.handleSubmit(data => {
+              const payload = {
+                ...data,
+                scheduledDate: new Date(`${data.scheduledDate}T${data.scheduledTime}:00.000Z`)
+              };
+              updateJobMutation.mutate({ id: editingJob!.id, data: payload as any });
+            })} className="space-y-4">
+              <FormField
+                control={jobEditForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={jobEditForm.control}
+                  name="scheduledDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date</FormLabel>
+                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobEditForm.control}
+                  name="scheduledTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Time</FormLabel>
+                      <FormControl><Input type="time" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={jobEditForm.control}
+                name="workerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Technician</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select technician" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {workers.filter(w => w.isActive !== false).map(w => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobEditForm.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditJobDialogOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={updateJobMutation.isPending}>Save Changes</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!occurrenceMoveTarget} onOpenChange={open => !open && setOccurrenceMoveTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Update Recurring Service
+            </DialogTitle>
+            <DialogDescription>
+              How would you like to apply this change to the recurring contract?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <Button className="w-full justify-start h-auto py-3 px-4 flex flex-col items-start gap-1" variant="outline" onClick={() => handleOccurrenceMoveAction('occurrence')}>
+              <span className="font-bold">This occurrence only</span>
+              <span className="text-xs text-gray-500 font-normal">Create an exception for this specific date only.</span>
+            </Button>
+            <Button className="w-full justify-start h-auto py-3 px-4 flex flex-col items-start gap-1" variant="outline" onClick={() => handleOccurrenceMoveAction('schedule')}>
+              <span className="font-bold">Update contract schedule</span>
+              <span className="text-xs text-gray-500 font-normal">Change the base schedule for all future occurrences.</span>
+            </Button>
+            <Button className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50" variant="ghost" onClick={() => handleOccurrenceMoveAction('cancel')}>
+              Cancel move
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

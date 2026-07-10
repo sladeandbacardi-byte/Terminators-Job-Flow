@@ -100,12 +100,12 @@
    ═══════════════════════════════════════════ */
 
 /* Remove outer border */
-.sales-diary-fc .fc-theme-standard .fc-scrollgrid {
+.outlook-fc .fc-theme-standard .fc-scrollgrid {
   border: none;
 }
 
 /* Time-grid event blocks: left-border only, Outlook style */
-.sales-diary-fc .fc .fc-timegrid-event {
+.outlook-fc .fc .fc-timegrid-event {
   border-top: none !important;
   border-right: none !important;
   border-bottom: none !important;
@@ -114,13 +114,13 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
 }
 
-.sales-diary-fc .fc .fc-timegrid-event .fc-event-main {
+.outlook-fc .fc .fc-timegrid-event .fc-event-main {
   padding: 0 !important;
   overflow: hidden;
 }
 
 /* Month view compact bars */
-.sales-diary-fc .fc .fc-daygrid-event {
+.outlook-fc .fc .fc-daygrid-event {
   border-top: none !important;
   border-right: none !important;
   border-bottom: none !important;
@@ -129,16 +129,16 @@
   margin-top: 2px !important;
 }
 
-.sales-diary-fc .fc .fc-daygrid-event .fc-event-main {
+.outlook-fc .fc .fc-daygrid-event .fc-event-main {
   padding: 0 2px !important;
 }
 
 /* Column headers */
-.sales-diary-fc .fc .fc-col-header-cell {
+.outlook-fc .fc .fc-col-header-cell {
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
 }
-.sales-diary-fc .fc .fc-col-header-cell-cushion {
+.outlook-fc .fc .fc-col-header-cell-cushion {
   padding: 6px 4px;
   color: #374151;
   font-size: 12px;
@@ -147,15 +147,15 @@
 }
 
 /* Today column highlight */
-.sales-diary-fc .fc .fc-day-today {
+.outlook-fc .fc .fc-day-today {
   background: #eff6ff !important;
 }
-.sales-diary-fc .fc .fc-day-today .fc-col-header-cell-cushion {
+.outlook-fc .fc .fc-day-today .fc-col-header-cell-cushion {
   color: #1d4ed8;
 }
 
 /* Time-slot labels */
-.sales-diary-fc .fc .fc-timegrid-slot-label-cushion {
+.outlook-fc .fc .fc-timegrid-slot-label-cushion {
   font-size: 11px;
   color: #9ca3af;
   font-weight: 500;
@@ -163,35 +163,35 @@
 }
 
 /* Current-time indicator */
-.sales-diary-fc .fc .fc-timegrid-now-indicator-line {
+.outlook-fc .fc .fc-timegrid-now-indicator-line {
   border-color: #ef4444;
   border-width: 2px;
 }
-.sales-diary-fc .fc .fc-timegrid-now-indicator-arrow {
+.outlook-fc .fc .fc-timegrid-now-indicator-arrow {
   border-color: #ef4444;
 }
 
 /* List view */
-.sales-diary-fc .fc .fc-list-event:hover td {
+.outlook-fc .fc .fc-list-event:hover td {
   background: #f0f9ff;
 }
-.sales-diary-fc .fc .fc-list-event-title a {
+.outlook-fc .fc .fc-list-event-title a {
   color: #111827;
   text-decoration: none;
 }
-.sales-diary-fc .fc .fc-list-event-dot {
+.outlook-fc .fc .fc-list-event-dot {
   border-radius: 50%;
 }
-.sales-diary-fc .fc .fc-list-day-cushion {
+.outlook-fc .fc .fc-list-day-cushion {
   background: #f3f4f6;
 }
 
 /* Selection highlight */
-.sales-diary-fc .fc .fc-highlight {
+.outlook-fc .fc .fc-highlight {
   background: rgba(59, 130, 246, 0.12) !important;
 }
 
 /* Remove the FullCalendar title link styling from event content */
-.sales-diary-fc .fc .fc-event-title {
+.outlook-fc .fc .fc-event-title {
   font-weight: 600;
 }

@@ -11,21 +11,26 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Calendar, Search, Plus, Printer, Edit, X, CheckCircle2, Receipt, FileSignature } from "lucide-react";
+import { 
+  Calendar, Search, Plus, Printer, Edit, X, CheckCircle2, Receipt, 
+  FileSignature, Navigation, Phone as PhoneIcon, Play, CheckCircle,
+  Clock, MapPin
+} from "lucide-react";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
+import { formatClientAddress } from "@shared/schema";
 import type { Job, QuoteSubmission, Worker, Client, Department, Team, TeamMember } from "@shared/schema";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { getDashboardRole } from "@/lib/dashboardRole";
+import { getDashboardRole, canMoveCalendarEvent } from "@/lib/dashboardRole";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Jobs() {
   const { user } = useAuth();
-  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const role = getDashboardRole({ departmentId: (user as any)?.departmentId, role: user?.role });
   const isTechnician = role === "service";
   // Only Admin/Coordinator/Accounts can move jobs into the invoicing pipeline (not manager)
   const canInvoice = role === "admin" || role === "coordinator" || role === "accounts";
@@ -60,6 +65,27 @@ export default function Jobs() {
     onError: () => toast({ title: "Could not create invoice", variant: "destructive" }),
   });
 
+  const updateJobStatus = useMutation({
+    mutationFn: async ({ jobId, status }: { jobId: string; status: string }) => {
+      const r = await apiRequest("PATCH", `/api/jobs/${jobId}`, { status });
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: "Job status updated" });
+    },
+    onError: () => toast({ title: "Could not update status", variant: "destructive" }),
+  });
+
+  const openMaps = (address: string) => {
+    const encodedAddress = encodeURIComponent(address);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+  };
+
+  const callClient = (phone: string) => {
+    window.open(`tel:${phone}`, '_self');
+  };
+
   const [searchTerm, setSearchTerm] = useState("");
   const [addressFilter, setAddressFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -70,8 +96,11 @@ export default function Jobs() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  
+  // For technicians, default to "Today" by setting date filters to current date string
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [dateFrom, setDateFrom] = useState(isTechnician ? todayStr : "");
+  const [dateTo, setDateTo] = useState(isTechnician ? todayStr : "");
 
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -107,7 +136,7 @@ export default function Jobs() {
     const byEmail = workers.find(w => user?.email && w.email === user.email);
     if (byEmail) return byEmail;
     const inDept = workers
-      .filter(w => w.departmentId === user?.departmentId && w.isActive !== false)
+      .filter(w => w.departmentId === (user as any)?.departmentId && w.isActive !== false)
       .map(w => ({ w, count: jobs.filter(j => j.workerId === w.id).length }))
       .sort((a, b) => b.count - a.count);
     return inDept[0]?.w ?? null;
@@ -510,6 +539,100 @@ export default function Jobs() {
                   </Button>
                 )}
               </div>
+            ) : isTechnician ? (
+              <div className="p-4 space-y-4">
+                {filteredJobs.map((job) => {
+                  const client = clientMap.get(job.clientId);
+                  const address = job.location || (client ? formatClientAddress(client) : '');
+                  return (
+                    <div key={job.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" data-testid={`job-mobile-card-${job.id}`}>
+                      <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge className={getStatusColor(job.status)} variant="secondary">
+                                {job.status.replace('_', ' ').toUpperCase()}
+                              </Badge>
+                              {job.jobNumber && (
+                                <span className="text-xs font-mono text-gray-500">{job.jobNumber}</span>
+                              )}
+                            </div>
+                            <h4 className="font-bold text-gray-900 text-lg">{client?.name || 'Unknown Client'}</h4>
+                            <p className="text-sm font-medium text-primary mt-0.5">{job.serviceType}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-start gap-2.5 text-sm text-gray-600">
+                          <Clock className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {new Date(job.scheduledDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                            </p>
+                            <p>{job.scheduledTime || 'Time TBD'}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2.5 text-sm text-gray-600">
+                          <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="whitespace-pre-line">{address}</p>
+                            {address && (
+                              <Button 
+                                variant="link" 
+                                className="h-auto p-0 text-blue-600 font-normal mt-1"
+                                onClick={() => openMaps(address)}
+                              >
+                                <Navigation className="h-3 w-3 mr-1" /> Open in Maps
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {client?.phone && (
+                          <div className="flex items-center gap-2.5 text-sm text-gray-600">
+                            <PhoneIcon className="h-4 w-4 text-gray-400" />
+                            <Button 
+                              variant="link" 
+                              className="h-auto p-0 text-blue-600 font-normal"
+                              onClick={() => callClient(client.phone!)}
+                            >
+                              {client.phone}
+                            </Button>
+                          </div>
+                        )}
+
+                        <div className="pt-2 flex gap-2">
+                          {job.status === 'scheduled' && (
+                            <Button 
+                              className="flex-1 bg-blue-600 hover:bg-blue-700"
+                              onClick={() => updateJobStatus.mutate({ jobId: job.id, status: 'in_progress' })}
+                              disabled={updateJobStatus.isPending}
+                            >
+                              <Play className="h-4 w-4 mr-2" /> Start Job
+                            </Button>
+                          )}
+                          {job.status === 'in_progress' && (
+                            <Button 
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                              onClick={() => updateJobStatus.mutate({ jobId: job.id, status: 'completed' })}
+                              disabled={updateJobStatus.isPending}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" /> Complete Job
+                            </Button>
+                          )}
+                          <Link href={`/jobs/${job.id}/card`} className="flex-1">
+                            <Button variant="outline" className="w-full">
+                              <FileSignature className="h-4 w-4 mr-2" /> Details
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div className="p-6">
                 <div className="space-y-4">
@@ -621,7 +744,7 @@ export default function Jobs() {
                                   <FileSignature className="h-3 w-3 mr-1" /> Convert to Contract
                                 </Button>
                               )}
-                              {!isTechnician && (
+                              {canMoveCalendarEvent(role, myWorker?.id, { sourceType: 'onceOffJob', assignedUserId: job.workerId }) && (
                                 <Button
                                   size="sm"
                                   variant="outline"

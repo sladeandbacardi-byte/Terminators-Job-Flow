@@ -3913,6 +3913,52 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
+  // Per-occurrence overrides for recurring contract occurrences (reschedule / reassign /
+  // cancel a single instance without touching the master contract's recurrence rule).
+  app.get("/api/contract-occurrence-exceptions", async (req, res) => {
+    try {
+      const contractId = req.query.contractId ? String(req.query.contractId) : undefined;
+      const rows = await storage.getContractOccurrenceExceptions(contractId);
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch contract occurrence exceptions", details: err?.message });
+    }
+  });
+
+  app.post("/api/contract-occurrence-exceptions", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { insertContractOccurrenceExceptionSchema } = await import("@shared/schema");
+      const { canMoveCalendarEvent } = await import("@shared/dashboardRole");
+      const data = insertContractOccurrenceExceptionSchema.parse(req.body);
+      const role = req.user!.role as any;
+      const sourceType = data.contractKind === "rental" ? "rentalContractOccurrence" : "serviceContractOccurrence";
+      const allowed = canMoveCalendarEvent(role, req.user!.id, {
+        sourceType,
+        assignedUserId: data.assignedTechnicianId ?? undefined,
+        assignedTeamId: data.assignedTeamId ?? undefined,
+      });
+      if (!allowed) return res.status(403).json({ error: "Not permitted to modify this occurrence" });
+      const row = await storage.upsertContractOccurrenceException(data);
+      res.json(row);
+    } catch (err: any) {
+      res.status(400).json({ error: "Invalid contract occurrence exception data", details: err?.message });
+    }
+  });
+
+  app.delete("/api/contract-occurrence-exceptions/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const role = req.user!.role as any;
+      if (role !== "admin" && role !== "manager" && role !== "coordinator") {
+        return res.status(403).json({ error: "Not permitted to remove this occurrence override" });
+      }
+      const ok = await storage.deleteContractOccurrenceException(req.params.id);
+      if (!ok) return res.status(404).json({ error: "Exception not found" });
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to delete contract occurrence exception", details: err?.message });
+    }
+  });
+
   // ─── Sales Appointments (Diary) ────────────────────────────────────────────
   app.get("/api/sales-appointments", async (_req, res) => {
     try {

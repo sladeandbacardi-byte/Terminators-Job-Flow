@@ -1,13 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import listPlugin from "@fullcalendar/list";
-import interactionPlugin from "@fullcalendar/interaction";
-import type { EventClickArg, EventContentArg, EventMouseEnterArg, EventMouseLeaveArg, DateSelectArg } from "@fullcalendar/core";
-import type { EventDropArg } from "@fullcalendar/core";
-import type { EventResizeDoneArg } from "@fullcalendar/interaction";
-import { format, differenceInMinutes, parseISO, addDays } from "date-fns";
+import { format, parseISO, addDays } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -15,34 +7,30 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Calendar, ChevronLeft, ChevronRight, Plus, MapPin, Phone, User,
-  CheckCircle2, FileText, XCircle, MoreHorizontal, Users, Filter,
+  ChevronLeft, ChevronRight, Plus, MapPin, Phone, User,
+  CheckCircle2, FileText, XCircle, Filter,
 } from "lucide-react";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { Worker, SalesAppointment } from "@shared/schema";
 import { SALES_APPT_TYPES, SALES_APPT_STATUSES } from "@shared/schema";
+import type { DiaryEvent } from "@shared/calendar-types";
+import { statusColorClasses } from "@shared/calendar-types";
+import { getDashboardRole, canMoveCalendarEvent, type DashboardRole } from "@/lib/dashboardRole";
+import {
+  OutlookDiaryCalendar, OutlookColumnsView,
+  type OutlookDiaryCalendarHandle, type OutlookCalView, type OutlookColumn,
+} from "@/components/calendar/outlook-diary-calendar";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
 // ── Constants
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(SALES_APPT_TYPES.map(t => [t.value, t.label]));
-const STATUS_META: Record<string, { label: string; classes: string }> = {
-  planned:     { label: "Planned",     classes: "bg-blue-50 text-blue-700 border-blue-200" },
-  confirmed:   { label: "Confirmed",   classes: "bg-green-50 text-green-700 border-green-200" },
-  completed:   { label: "Completed",   classes: "bg-gray-50 text-gray-600 border-gray-200" },
-  cancelled:   { label: "Cancelled",   classes: "bg-red-50 text-red-700 border-red-200" },
-  rescheduled: { label: "Rescheduled", classes: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  no_show:     { label: "No Show",     classes: "bg-orange-50 text-orange-700 border-orange-200" },
-};
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(SALES_APPT_STATUSES.map(s => [s.value, s.label]));
 const TYPE_COLORS: Record<string, string> = {
   new_lead_meeting:      "#3b82f6",
   site_visit:            "#8b5cf6",
@@ -53,7 +41,10 @@ const TYPE_COLORS: Record<string, string> = {
   internal_meeting:      "#6b7280",
   other:                 "#64748b",
 };
-type CalView = "timeGridWeek" | "timeGridDay" | "dayGridMonth" | "listWeek" | "team";
+type CalView = OutlookCalView | "team";
+const VIEW_LABELS: Record<CalView, string> = {
+  timeGridDay: "Day", timeGridWeek: "Week", dayGridMonth: "Month", listWeek: "List", team: "Team",
+};
 
 // ── Helpers
 function timeToMinutes(t: string): number {
@@ -70,12 +61,6 @@ function formatDuration(min: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
-function getApptLabel(a: SalesAppointment): string {
-  const name = a.clientName || a.title || "Appointment";
-  const type = TYPE_LABELS[a.appointmentType] || "";
-  if (!type || name === type) return name;
-  return `${name} – ${type}`;
-}
 function emptyForm(date?: string, start?: string, end?: string): Partial<SalesAppointment> {
   return {
     title: "", clientName: "", contactPerson: "", phone: "", siteAddress: "",
@@ -86,10 +71,34 @@ function emptyForm(date?: string, start?: string, end?: string): Partial<SalesAp
   };
 }
 
+/** Maps a SalesAppointment record onto the standard cross-app DiaryEvent shape. */
+function apptToDiaryEvent(a: SalesAppointment, workers: Worker[], canMove: boolean): DiaryEvent {
+  return {
+    eventId: a.id,
+    sourceType: "salesAppointment",
+    sourceId: a.id,
+    title: a.title || a.clientName || "Appointment",
+    clientName: a.clientName,
+    department: a.departmentId,
+    serviceType: TYPE_LABELS[a.appointmentType] || a.appointmentType,
+    assignedUserId: a.assignedToId,
+    assignedUserName: workers.find(w => w.id === a.assignedToId)?.name || "Unassigned",
+    startDateTime: `${a.date}T${a.startTime}`,
+    endDateTime: `${a.date}T${a.endTime}`,
+    durationMinutes: calcDuration(a.startTime, a.endTime),
+    status: a.status,
+    location: a.siteAddress,
+    colour: TYPE_COLORS[a.appointmentType] || "#64748b",
+    editable: canMove,
+    draggable: canMove,
+    meta: { raw: a },
+  };
+}
+
 export default function SalesDiary() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const calendarRef = useRef<FullCalendar>(null);
+  const calendarRef = useRef<OutlookDiaryCalendarHandle>(null);
 
   const [view, setView] = useState<CalView>("timeGridWeek");
   const [viewTitle, setViewTitle] = useState("");
@@ -108,10 +117,6 @@ export default function SalesDiary() {
   const [detailAppt, setDetailAppt] = useState<SalesAppointment | null>(null);
   const [completeAppt, setCompleteAppt] = useState<SalesAppointment | null>(null);
   const [completionData, setCompletionData] = useState({ completionNote: "", clientFeedback: "", nextAction: "", followUpDate: "" });
-
-  // Team view drag
-  const [dragOverRep, setDragOverRep] = useState<string | null>(null);
-  const teamDragRef = useRef<SalesAppointment | null>(null);
 
   // Hover tooltip
   const [tipAppt, setTipAppt] = useState<SalesAppointment | null>(null);
@@ -138,6 +143,11 @@ export default function SalesDiary() {
     const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
     return workers.find(w => w.name.toLowerCase() === fullName) || null;
   }, [workers, user]);
+
+  const role: DashboardRole = useMemo(
+    () => getDashboardRole({ departmentId: user?.departmentId, role: user?.role }),
+    [user]
+  );
 
   useEffect(() => {
     if (showForm && !editAppt && currentWorker && !formData.assignedToId) {
@@ -210,7 +220,7 @@ export default function SalesDiary() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] }); setDetailAppt(null); toast({ title: "Appointment deleted" }); },
   });
 
-  // ── Filtered appointments → FullCalendar events
+  // ── Filtered appointments → standardized DiaryEvent shape
   const filtered = useMemo(() => appointments.filter(a => {
     if (filterRep !== "all" && a.assignedToId !== filterRep) return false;
     if (filterType !== "all" && a.appointmentType !== filterType) return false;
@@ -219,19 +229,10 @@ export default function SalesDiary() {
     return true;
   }), [appointments, filterRep, filterType, filterStatus, filterClient]);
 
-  const fcEvents = useMemo(() => filtered.map(a => {
-    const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-    return {
-      id: a.id,
-      title: a.clientName || a.title || "Appointment",
-      start: `${a.date}T${a.startTime}`,
-      end: `${a.date}T${a.endTime}`,
-      backgroundColor: color + "1a",
-      borderColor: color,
-      textColor: "#1f2937",
-      extendedProps: { ...a, _color: color } as SalesAppointment & { _color: string },
-    };
-  }), [filtered]);
+  const diaryEvents = useMemo(() => filtered.map(a => apptToDiaryEvent(
+    a, workers,
+    canMoveCalendarEvent(role, currentWorker?.id, { sourceType: "salesAppointment", assignedUserId: a.assignedToId }),
+  )), [filtered, workers, role, currentWorker]);
 
   // ── Open / edit helpers
   const openNew = useCallback((date?: string, startTime?: string, endTime?: string) => {
@@ -281,16 +282,23 @@ export default function SalesDiary() {
     else createMut.mutate(payload);
   }, [formData, editAppt]);
 
-  // ── FullCalendar callbacks
-  const handleEventDrop = useCallback((info: EventDropArg) => {
-    const newDate = format(info.event.start!, "yyyy-MM-dd");
-    const newStart = format(info.event.start!, "HH:mm");
-    const newEnd = format(info.event.end!, "HH:mm");
+  // ── OutlookDiaryCalendar callbacks
+  const handleEventClick = useCallback((ev: DiaryEvent) => {
+    const a = ev.meta?.raw as SalesAppointment | undefined;
+    if (a) setDetailAppt(a);
+  }, []);
+
+  const handleEventDrop = useCallback((ev: DiaryEvent, newStart: Date, newEnd: Date, revert: () => void) => {
+    const a = ev.meta?.raw as SalesAppointment | undefined;
+    if (!a) return;
+    const newDate = format(newStart, "yyyy-MM-dd");
+    const newStartTime = format(newStart, "HH:mm");
+    const newEndTime = format(newEnd, "HH:mm");
     moveMut.mutate(
-      { id: info.event.id, date: newDate, startTime: newStart, endTime: newEnd },
+      { id: a.id, date: newDate, startTime: newStartTime, endTime: newEndTime },
       {
         onError: (err: any) => {
-          info.revert();
+          revert();
           let detail = "";
           try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
           toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
@@ -299,13 +307,15 @@ export default function SalesDiary() {
     );
   }, []);
 
-  const handleEventResize = useCallback((info: EventResizeDoneArg) => {
-    const newEnd = format(info.event.end!, "HH:mm");
+  const handleEventResize = useCallback((ev: DiaryEvent, _newStart: Date, newEnd: Date, revert: () => void) => {
+    const a = ev.meta?.raw as SalesAppointment | undefined;
+    if (!a) return;
+    const newEndTime = format(newEnd, "HH:mm");
     moveMut.mutate(
-      { id: info.event.id, endTime: newEnd },
+      { id: a.id, endTime: newEndTime },
       {
         onError: (err: any) => {
-          info.revert();
+          revert();
           let detail = "";
           try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
           toast({ title: `Could not resize appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
@@ -314,211 +324,62 @@ export default function SalesDiary() {
     );
   }, []);
 
-  const handleEventClick = useCallback((info: EventClickArg) => {
-    info.jsEvent.preventDefault();
-    const a = info.event.extendedProps as SalesAppointment;
-    setDetailAppt(a);
-  }, []);
-
-  const handleEventMouseEnter = useCallback((info: EventMouseEnterArg) => {
-    const a = info.event.extendedProps as SalesAppointment;
+  const handleEventMouseEnter = useCallback((ev: DiaryEvent, x: number, y: number) => {
+    const a = ev.meta?.raw as SalesAppointment | undefined;
+    if (!a) return;
     setTipAppt(a);
-    setTipPos({ x: info.jsEvent.clientX, y: info.jsEvent.clientY });
+    setTipPos({ x, y });
   }, []);
 
-  const handleEventMouseLeave = useCallback((_info: EventMouseLeaveArg) => {
-    setTipAppt(null);
-  }, []);
-
-  const handleSelect = useCallback((info: DateSelectArg) => {
-    const d = format(info.start, "yyyy-MM-dd");
-    const s = format(info.start, "HH:mm");
-    const e = format(info.end, "HH:mm");
+  const handleSelect = useCallback((start: Date, end: Date) => {
+    const d = format(start, "yyyy-MM-dd");
+    const s = format(start, "HH:mm");
+    const e = format(end, "HH:mm");
     openNew(d, s === e ? "09:00" : s, s === e ? "10:00" : e);
-    calendarRef.current?.getApi().unselect();
   }, [openNew]);
 
-  // ── Custom event content (Outlook-style labels)
-  const renderEventContent = useCallback((info: EventContentArg) => {
-    const a = info.event.extendedProps as SalesAppointment & { _color: string };
-    const color = a._color || "#64748b";
-    const name = a.clientName || a.title || "Appointment";
-    const typeLabel = TYPE_LABELS[a.appointmentType] || "";
-    const sm = STATUS_META[a.status] || STATUS_META.planned;
-    const startStr = format(info.event.start!, "HH:mm");
-    const endStr = format(info.event.end!, "HH:mm");
-    const dur = differenceInMinutes(info.event.end!, info.event.start!);
-    const durLabel = formatDuration(dur);
-    const vType = info.view.type;
-
-    // ── MONTH VIEW: compact "HH:mm Name – Type" bar
-    if (vType === "dayGridMonth") {
-      const label = typeLabel && name !== typeLabel ? `${name} – ${typeLabel}` : name;
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: 3, padding: "1px 4px", overflow: "hidden", width: "100%" }}>
-          <span style={{ fontSize: 10, color, fontWeight: 700, flexShrink: 0, lineHeight: 1.2 }}>{startStr}</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2 }}>
-            {label}
-          </span>
-        </div>
-      );
-    }
-
-    // ── LIST VIEW: full row
-    if (vType === "listWeek") {
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px" }}>
-          <strong style={{ color: "#111827", fontSize: 13 }}>{name}</strong>
-          <span style={{ color: "#6b7280", fontSize: 12 }}>{typeLabel}</span>
-          <span style={{ color, fontSize: 11, fontWeight: 600 }}>{startStr}–{endStr}{durLabel ? ` · ${durLabel}` : ""}</span>
-          <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, border: "1px solid" }} className={sm.classes}>{sm.label}</span>
-        </div>
-      );
-    }
-
-    // ── TIME GRID (week/day): Outlook-style block
-    // Priority: time > client name > type > duration > status
-    if (dur <= 15) {
-      // Tiny block: just time + name on one line
-      return (
-        <div style={{ padding: "0 4px", overflow: "hidden", height: "100%", display: "flex", alignItems: "center" }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {startStr} {name}
-          </span>
-        </div>
-      );
-    }
-
-    return (
-      <div style={{ display: "flex", flexDirection: "column", padding: "2px 4px 2px 0", overflow: "hidden", height: "100%", gap: 1 }}>
-        {/* Time always first */}
-        <span style={{ fontSize: 10, fontWeight: 600, color, whiteSpace: "nowrap", lineHeight: 1.2 }}>
-          {startStr}–{endStr}{durLabel ? ` · ${durLabel}` : ""}
-        </span>
-        {/* Client name */}
-        <span style={{ fontSize: 11, fontWeight: 700, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3 }}>
-          {name}
-        </span>
-        {/* Type — only if enough height */}
-        {dur >= 30 && (
-          <span style={{ fontSize: 10, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2 }}>
-            {typeLabel}
-          </span>
-        )}
-        {/* Status badge — only for large blocks */}
-        {dur >= 75 && (
-          <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, border: "1px solid currentColor", display: "inline-block", marginTop: "auto", lineHeight: 1.4 }} className={sm.classes}>
-            {sm.label}
-          </span>
-        )}
-      </div>
-    );
-  }, []);
-
   // ── Calendar navigation
-  const navPrev  = () => { if (view === "team") setTeamDate(d => format(addDays(parseISO(d), -1), "yyyy-MM-dd")); else calendarRef.current?.getApi().prev(); };
-  const navNext  = () => { if (view === "team") setTeamDate(d => format(addDays(parseISO(d), 1), "yyyy-MM-dd"));  else calendarRef.current?.getApi().next(); };
-  const navToday = () => { if (view === "team") setTeamDate(format(new Date(), "yyyy-MM-dd"));                    else calendarRef.current?.getApi().today(); };
+  const navPrev  = () => { if (view === "team") setTeamDate(d => format(addDays(parseISO(d), -1), "yyyy-MM-dd")); else calendarRef.current?.prev(); };
+  const navNext  = () => { if (view === "team") setTeamDate(d => format(addDays(parseISO(d), 1), "yyyy-MM-dd"));  else calendarRef.current?.next(); };
+  const navToday = () => { if (view === "team") setTeamDate(format(new Date(), "yyyy-MM-dd"));                    else calendarRef.current?.today(); };
 
   const switchView = (v: CalView) => {
     setView(v);
     if (v !== "team") {
-      setTimeout(() => calendarRef.current?.getApi().changeView(v), 0);
+      setTimeout(() => calendarRef.current?.getApi()?.changeView(v), 0);
     }
   };
 
-  const VIEW_LABELS: Record<CalView, string> = {
-    timeGridDay: "Day", timeGridWeek: "Week", dayGridMonth: "Month", listWeek: "List", team: "Team",
-  };
-
-  // ── Team View
-  const TeamView = () => {
-    const dateStr = teamDate;
+  // ── Team View columns (side-by-side reassignment cards)
+  const teamColumns: OutlookColumn[] = useMemo(() => {
     const reps = salesWorkers.length > 0 ? salesWorkers : workers.slice(0, 4);
-    const dayAppts = filtered.filter(a => a.date === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const dayEvents = diaryEvents
+      .filter(ev => ev.startDateTime.startsWith(teamDate))
+      .sort((a, b) => a.startDateTime.localeCompare(b.startDateTime));
+    return reps.map(rep => ({
+      id: rep.id,
+      label: rep.name,
+      sublabel: rep.role || "Sales Rep",
+      events: dayEvents.filter(ev => ev.assignedUserId === rep.id),
+    }));
+  }, [salesWorkers, workers, diaryEvents, teamDate]);
 
-    return (
-      <div className="grid gap-3 overflow-auto" style={{ gridTemplateColumns: `repeat(${Math.min(reps.length, 4)}, minmax(220px,1fr))` }}>
-        {reps.map(rep => {
-          const repAppts = dayAppts.filter(a => a.assignedToId === rep.id);
-          const isOver = dragOverRep === rep.id;
-          return (
-            <div
-              key={rep.id}
-              className={`rounded-xl border-2 transition-colors ${isOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white"}`}
-              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverRep(rep.id); }}
-              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRep(null); }}
-              onDrop={e => {
-                e.preventDefault();
-                const drag = teamDragRef.current;
-                setDragOverRep(null);
-                if (!drag || drag.assignedToId === rep.id) { teamDragRef.current = null; return; }
-                moveMut.mutate(
-                  { id: drag.id, assignedToId: rep.id },
-                  {
-                    onSuccess: () => toast({ title: `Moved to ${rep.name}.` }),
-                    onError: (err: any) => {
-                      let detail = "";
-                      try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
-                      queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
-                      toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
-                    },
-                  }
-                );
-                teamDragRef.current = null;
-              }}
-            >
-              <div className={`flex items-center gap-2 px-3 py-2.5 border-b rounded-t-xl ${isOver ? "border-blue-300 bg-blue-100" : "border-gray-100 bg-gray-50"}`}>
-                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
-                  {rep.name.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-800 truncate">{rep.name}</p>
-                  <p className="text-xs text-gray-400">{rep.role || "Sales Rep"}</p>
-                </div>
-                <Badge variant="secondary" className="text-xs ml-auto flex-shrink-0">{repAppts.length}</Badge>
-              </div>
-              {isOver && (
-                <div className="mx-2 mt-2 rounded border-2 border-dashed border-blue-400 bg-blue-50/50 py-2 text-center text-xs text-blue-500 font-medium">
-                  Drop to reassign
-                </div>
-              )}
-              <div className="p-2 space-y-1.5 min-h-[80px]">
-                {repAppts.length === 0 && !isOver && (
-                  <p className="text-xs text-gray-400 text-center py-5">No appointments today</p>
-                )}
-                {repAppts.map(a => {
-                  const color = TYPE_COLORS[a.appointmentType] || "#64748b";
-                  const dur = calcDuration(a.startTime, a.endTime);
-                  const sm = STATUS_META[a.status] || STATUS_META.planned;
-                  return (
-                    <div
-                      key={a.id}
-                      draggable
-                      className="rounded-lg border-l-4 bg-white shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow p-2.5 select-none"
-                      style={{ borderLeftColor: color }}
-                      onDragStart={e => { e.stopPropagation(); teamDragRef.current = a; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", a.id); }}
-                      onDragEnd={() => { teamDragRef.current = null; setDragOverRep(null); }}
-                      onClick={() => setDetailAppt(a)}
-                      onMouseEnter={e => { setTipAppt(a); setTipPos({ x: e.clientX, y: e.clientY }); }}
-                      onMouseLeave={() => setTipAppt(null)}
-                    >
-                      <p className="text-xs font-bold text-gray-900 leading-tight truncate">{a.clientName || a.title}</p>
-                      <p className="text-xs text-gray-500 truncate">{TYPE_LABELS[a.appointmentType]}</p>
-                      <p className="text-xs font-medium mt-0.5" style={{ color }}>
-                        {a.startTime}–{a.endTime}{dur > 0 ? ` · ${formatDuration(dur)}` : ""}
-                      </p>
-                      <span className={`text-xs px-1.5 py-0 rounded border inline-block mt-1 ${sm.classes}`}>{sm.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+  const handleTeamReassign = useCallback((ev: DiaryEvent, targetColumnId: string) => {
+    const a = ev.meta?.raw as SalesAppointment | undefined;
+    if (!a || a.assignedToId === targetColumnId) return;
+    moveMut.mutate(
+      { id: a.id, assignedToId: targetColumnId },
+      {
+        onSuccess: () => toast({ title: `Moved to ${workerName(targetColumnId)}.` }),
+        onError: (err: any) => {
+          let detail = "";
+          try { const p = JSON.parse(String(err?.message ?? "").replace(/^\d+:\s*/, "")); detail = p?.details || p?.error || ""; } catch {}
+          queryClient.invalidateQueries({ queryKey: ["/api/sales-appointments"] });
+          toast({ title: `Could not move appointment${detail ? ": " + detail : ""}`, variant: "destructive" });
+        },
+      }
     );
-  };
+  }, [workers]);
 
   const hasFilters = filterRep !== "all" || filterType !== "all" || filterStatus !== "all" || filterClient !== "";
 
@@ -592,44 +453,27 @@ export default function SalesDiary() {
 
           {/* ── Calendar / Team View */}
           {view === "team" ? (
-            <TeamView />
+            <OutlookColumnsView
+              columns={teamColumns}
+              onEventClick={handleEventClick}
+              onEventMouseEnter={handleEventMouseEnter}
+              onEventMouseLeave={() => setTipAppt(null)}
+              onReassign={handleTeamReassign}
+              emptyLabel="No appointments today"
+            />
           ) : (
-            <div className="bg-white border rounded-xl overflow-hidden sales-diary-fc">
-              <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-                initialView="timeGridWeek"
-                headerToolbar={false}
-                editable={true}
-                selectable={true}
-                selectMirror={true}
-                eventDurationEditable={true}
-                eventStartEditable={true}
-                snapDuration="00:15:00"
-                slotDuration="00:30:00"
-                slotLabelInterval="01:00"
-                slotMinTime="06:00:00"
-                slotMaxTime="19:00:00"
-                allDaySlot={false}
-                nowIndicator={true}
-                expandRows={true}
-                height="auto"
-                contentHeight={680}
-                firstDay={1}
-                dayHeaderFormat={{ weekday: "short", day: "numeric" }}
-                slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-                eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-                events={fcEvents}
-                eventContent={renderEventContent}
-                eventClick={handleEventClick}
-                eventDrop={handleEventDrop}
-                eventResize={handleEventResize}
-                eventMouseEnter={handleEventMouseEnter}
-                eventMouseLeave={handleEventMouseLeave}
-                select={handleSelect}
-                datesSet={(arg) => setViewTitle(arg.view.title)}
-              />
-            </div>
+            <OutlookDiaryCalendar
+              ref={calendarRef}
+              events={diaryEvents}
+              view={view}
+              onDatesSet={setViewTitle}
+              onEventClick={handleEventClick}
+              onEventDrop={handleEventDrop}
+              onEventResize={handleEventResize}
+              onEventMouseEnter={handleEventMouseEnter}
+              onEventMouseLeave={() => setTipAppt(null)}
+              onSelect={handleSelect}
+            />
           )}
 
         </main>
@@ -660,7 +504,7 @@ export default function SalesDiary() {
               {calcDuration(tipAppt.startTime, tipAppt.endTime) > 0 ? ` (${formatDuration(calcDuration(tipAppt.startTime, tipAppt.endTime))})` : ""}
             </p>
             <p><span className="text-gray-400 mr-1">Status:</span>
-              <span className={`px-1 rounded border text-xs ${STATUS_META[tipAppt.status]?.classes}`}>{STATUS_META[tipAppt.status]?.label}</span>
+              <span className={`px-1 rounded border text-xs ${statusColorClasses(tipAppt.status)}`}>{STATUS_LABELS[tipAppt.status] || tipAppt.status}</span>
             </p>
             {tipAppt.notes && <p className="border-t border-gray-100 pt-1 mt-1 text-gray-600 line-clamp-3"><span className="text-gray-400 mr-1">Notes:</span>{tipAppt.notes}</p>}
           </div>
@@ -771,7 +615,7 @@ export default function SalesDiary() {
             </DialogHeader>
             <div className="space-y-3 py-1">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className={`border ${STATUS_META[detailAppt.status]?.classes}`}>{STATUS_META[detailAppt.status]?.label}</Badge>
+                <Badge variant="outline" className={`border ${statusColorClasses(detailAppt.status)}`}>{STATUS_LABELS[detailAppt.status] || detailAppt.status}</Badge>
                 <Badge variant="outline" className="text-gray-600">{TYPE_LABELS[detailAppt.appointmentType]}</Badge>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">

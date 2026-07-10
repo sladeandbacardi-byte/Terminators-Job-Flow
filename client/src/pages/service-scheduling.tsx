@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { statusColorClasses } from "@shared/calendar-types";
 import {
   SERVICE_SCHEDULE_SERVICE_TYPES,
   SERVICE_SCHEDULE_DAYS,
@@ -31,23 +32,6 @@ import {
 const SERVICE_TYPE_LABELS = Object.fromEntries(
   SERVICE_SCHEDULE_SERVICE_TYPES.map(t => [t.value, t.label])
 );
-
-const SERVICE_TYPE_COLORS: Record<string, string> = {
-  sanitary_bins:     "bg-purple-100 text-purple-800 border-purple-200",
-  washroom_contract: "bg-blue-100 text-blue-800 border-blue-200",
-  washroom_adhoc:    "bg-sky-100 text-sky-800 border-sky-200",
-  dustmats:          "bg-amber-100 text-amber-800 border-amber-200",
-  pest_control:      "bg-green-100 text-green-800 border-green-200",
-  deep_cleaning:     "bg-orange-100 text-orange-800 border-orange-200",
-  other:             "bg-gray-100 text-gray-700 border-gray-200",
-};
-
-const CONTRACT_STATUS_COLORS: Record<string, string> = {
-  active:    "bg-emerald-100 text-emerald-800",
-  inactive:  "bg-gray-100 text-gray-600",
-  suspended: "bg-red-100 text-red-700",
-  pending:   "bg-amber-100 text-amber-700",
-};
 
 const FREQUENCY_OPTIONS = [
   "Daily", "2 x a week", "Weekly", "Twice a month", "Monthly",
@@ -319,7 +303,7 @@ export default function ServiceScheduling() {
     const body: InsertServiceScheduleEntry = {
       ...form,
       weekOfMonth: effectiveWeek,
-      routeOrder: form.routeOrder || nextRouteOrder(effectiveWeek, form.dayOfWeek),
+      routeOrder: form.routeOrder || nextRouteOrder(effectiveWeek, form.dayOfWeek || "Monday"),
     };
     saveMutation.mutate({ id: editing?.id, body });
   }
@@ -592,7 +576,7 @@ export default function ServiceScheduling() {
                                         {svc.suburb && <div className="text-[11px] text-gray-400 truncate">{svc.suburb}</div>}
                                       </td>
                                       <td className="px-3 py-2.5">
-                                        <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${SERVICE_TYPE_COLORS[svc.serviceType] ?? SERVICE_TYPE_COLORS.other}`}>
+                                        <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200`}>
                                           {SERVICE_TYPE_LABELS[svc.serviceType] ?? svc.serviceType}
                                         </span>
                                       </td>
@@ -607,7 +591,7 @@ export default function ServiceScheduling() {
                                       </td>
                                       <td className="px-3 py-2.5 hidden md:table-cell">
                                         {svc.contractStatus ? (
-                                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${CONTRACT_STATUS_COLORS[svc.contractStatus] ?? "bg-gray-100 text-gray-600"}`}>
+                                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${statusColorClasses(svc.contractStatus)}`}>
                                             {svc.contractStatus}
                                           </span>
                                         ) : "—"}
@@ -933,7 +917,7 @@ export default function ServiceScheduling() {
               <Input
                 type="number"
                 min={1}
-                placeholder={`Auto (${nextRouteOrder(weeklyOrDaily ? "Every Week" : (form.weekOfMonth || "Every Week"), form.dayOfWeek)})`}
+                placeholder={`Auto (${nextRouteOrder(weeklyOrDaily ? "Every Week" : (form.weekOfMonth || "Every Week"), form.dayOfWeek || "Monday")})`}
                 value={form.routeOrder || ""}
                 onChange={e => setForm(f => ({ ...f, routeOrder: e.target.value ? parseInt(e.target.value) : (undefined as any) }))}
                 className="text-sm"

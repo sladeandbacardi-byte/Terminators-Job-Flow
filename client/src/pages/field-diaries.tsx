@@ -1,1053 +1,375 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  format, isToday, parseISO, addDays, subDays,
-  startOfWeek, endOfWeek, addWeeks, subWeeks,
-  startOfMonth, endOfMonth, addMonths, subMonths,
-  eachDayOfInterval, isSameMonth, isSameDay as fnsIsSameDay,
+  format, parseISO,
 } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { useAuth } from "@/hooks/useAuth";
-import { getDashboardRole } from "@/lib/dashboardRole";
+import { getDashboardRole, canMoveCalendarEvent, type DashboardRole } from "@/lib/dashboardRole";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, User,
-  Briefcase, CalendarDays, Phone, CheckCircle2, AlertCircle,
-  Circle, Loader2, X, PlusCircle, FileText, ClipboardList,
+  X, Search, Navigation, FileText,
 } from "lucide-react";
-import type { Worker, Job, Client, Department, FieldDiary } from "@shared/schema";
+import type { Worker, Job, Client } from "@shared/schema";
+import type { DiaryEvent } from "@shared/calendar-types";
+import { statusColorClasses } from "@shared/calendar-types";
+import {
+  OutlookDiaryCalendar,
+  type OutlookDiaryCalendarHandle,
+  type OutlookCalView,
+} from "@/components/calendar/outlook-diary-calendar";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SERVICE_DEPT_IDS = ["div-1", "div-2", "div-3", "div-4"];
 
-const DEPT_COLORS: Record<string, string> = {
-  "div-1": "bg-green-500",
-  "div-2": "bg-purple-500",
-  "div-3": "bg-blue-500",
-  "div-4": "bg-amber-500",
-};
+function jobToDiaryEvent(j: Job, clientMap: Record<string, Client>, workers: Worker[], role: DashboardRole, currentWorkerId: string | null | undefined): DiaryEvent {
+  const client = clientMap[j.clientId ?? ""];
+  const worker = workers.find(w => w.id === j.workerId);
+  const start = j.scheduledDate as unknown as string;
+  const time = j.scheduledTime || "09:00";
+  const startDateTime = `${start.split("T")[0]}T${time}`;
+  
+  // End time calculation
+  const startDate = parseISO(startDateTime);
+  const endDate = new Date(startDate.getTime() + (j.estimatedDuration || 60) * 60000);
 
-const DEPT_LIGHT: Record<string, string> = {
-  "div-1": "bg-green-50 border-green-200",
-  "div-2": "bg-purple-50 border-purple-200",
-  "div-3": "bg-blue-50 border-blue-200",
-  "div-4": "bg-amber-50 border-amber-200",
-};
+  const canMove = canMoveCalendarEvent(role, currentWorkerId, {
+    sourceType: j.isContract ? "serviceContractOccurrence" : "onceOffJob",
+    assignedUserId: j.workerId,
+  });
 
-const DEPT_PILL: Record<string, string> = {
-  "div-1": "bg-green-100 text-green-800",
-  "div-2": "bg-purple-100 text-purple-800",
-  "div-3": "bg-blue-100 text-blue-800",
-  "div-4": "bg-amber-100 text-amber-800",
-};
-
-const DEPT_DOT: Record<string, string> = {
-  "div-1": "bg-green-500",
-  "div-2": "bg-purple-500",
-  "div-3": "bg-blue-500",
-  "div-4": "bg-amber-500",
-};
-
-const STATUS_CONFIG: Record<string, { icon: JSX.Element; label: string; class: string }> = {
-  completed:   { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed",   class: "bg-green-100 text-green-700" },
-  in_progress: { icon: <Loader2      className="h-3.5 w-3.5 animate-spin" />, label: "In Progress", class: "bg-blue-100 text-blue-700" },
-  scheduled:   { icon: <Circle       className="h-3.5 w-3.5" />, label: "Scheduled",   class: "bg-gray-100 text-gray-700" },
-  cancelled:   { icon: <AlertCircle  className="h-3.5 w-3.5" />, label: "Cancelled",   class: "bg-red-100 text-red-600" },
-};
-
-type ViewMode = "day" | "week" | "month";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatTime(dateStr: string | null, timeStr: string | null): string {
-  if (timeStr) return timeStr.slice(0, 5);
-  if (dateStr) {
-    try { return format(parseISO(dateStr), "HH:mm"); } catch { return "—"; }
-  }
-  return "—";
+  return {
+    eventId: j.id,
+    sourceType: j.isContract ? "serviceContractOccurrence" : "onceOffJob",
+    sourceId: j.id,
+    clientId: j.clientId,
+    title: j.title,
+    clientName: client?.name || "Unknown Client",
+    department: j.departmentId,
+    serviceType: j.serviceType,
+    assignedUserId: j.workerId,
+    assignedUserName: worker?.name || "Unassigned",
+    startDateTime: startDate.toISOString(),
+    endDateTime: endDate.toISOString(),
+    durationMinutes: j.estimatedDuration || 60,
+    status: j.status,
+    location: j.location || client?.address,
+    googleMapsLink: j.googleMapsLink,
+    editable: canMove,
+    draggable: canMove,
+    meta: {
+      raw: j,
+      routeSequence: j.orderNo,
+      contractNo: j.contractNo,
+      invoiceStatus: j.invoiceStatus,
+      jobNumber: j.jobNumber,
+    },
+  };
 }
 
-function jobOnDay(job: Job, target: Date): boolean {
-  const d = job.scheduledDate;
-  if (!d) return false;
-  try {
-    const jd = parseISO(d as unknown as string);
-    return (
-      jd.getFullYear() === target.getFullYear() &&
-      jd.getMonth()    === target.getMonth()    &&
-      jd.getDate()     === target.getDate()
-    );
-  } catch { return false; }
-}
+export default function FieldDiaries() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const calendarRef = useRef<OutlookDiaryCalendarHandle>(null);
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+  const [view, setView] = useState<OutlookCalView>("timeGridDay");
+  const [viewTitle, setViewTitle] = useState("");
 
-function JobPill({ job, clientMap }: { job: Job; clientMap: Record<string, Client> }) {
-  const client = clientMap[job.clientId ?? ""];
-  const time = formatTime(job.scheduledDate as unknown as string, job.scheduledTime);
-  return (
-    <div className="text-xs bg-white border rounded px-2 py-1 space-y-0.5 shadow-sm">
-      <div className="font-semibold text-gray-800 truncate leading-tight">{job.title}</div>
-      <div className="flex items-center gap-1 text-gray-500">
-        <Clock className="h-2.5 w-2.5 shrink-0" />
-        <span>{time}</span>
-        {client && (
-          <><span>·</span>
-          <Link href={`/clients/${job.clientId}`} className="truncate text-blue-600 hover:underline">
-            {client.name}
-          </Link></>
-        )}
-      </div>
-    </div>
+  // Filters
+  const [filterWorker, setFilterWorker] = useState("all");
+  const [filterSvc, setFilterSvc] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterInv, setFilterInv] = useState("all");
+  const [searchClient, setSearchClient] = useState("");
+
+  // Details Dialog
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+  // ── Queries
+  const { data: jobs = [], isLoading: jobsLoading } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
+  const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+
+  const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients]);
+
+  const role = useMemo(() => getDashboardRole({ departmentId: (user as any)?.departmentId, role: (user as any)?.role }), [user]);
+  const currentWorkerId = useMemo(() => {
+    if (!user) return null;
+    return workers.find(w => w.email === user.email)?.id;
+  }, [user, workers]);
+
+  const fieldWorkers = useMemo(() =>
+    workers.filter(w => SERVICE_DEPT_IDS.includes(w.departmentId ?? "")),
+    [workers]
   );
-}
-
-// ─── Day View ─────────────────────────────────────────────────────────────────
-
-function DayView({
-  selectedDate, fieldWorkers, jobs, clientMap, deptMap, workers: allWorkers, isTechnician,
-}: {
-  selectedDate: Date;
-  fieldWorkers: Worker[];
-  jobs: Job[];
-  clientMap: Record<string, Client>;
-  deptMap: Record<string, Department>;
-  workers: Worker[];
-  isTechnician?: boolean;
-}) {
-  const workerMap = useMemo(
-    () => Object.fromEntries(allWorkers.map(w => [w.id, w])),
-    [allWorkers],
-  );
-  const fieldWorkerIds = useMemo(
-    () => new Set(fieldWorkers.map(w => w.id)),
-    [fieldWorkers],
-  );
-
-  const [workerFilt, setWorkerFilt] = useState("all");
-  const [svcFilt, setSvcFilt] = useState("all");
-  const [statusFilt, setStatusFilt] = useState("all");
-  const [invFilt, setInvFilt] = useState("all");
-
-  const now = new Date();
-
-  function isOverdue(j: Job) {
-    if (j.status === "completed" || j.status === "cancelled") return false;
-    try {
-      const d = parseISO(j.scheduledDate as unknown as string);
-      return d < now && d.toDateString() !== now.toDateString();
-    } catch { return false; }
-  }
-
-  const jobsForDate = useMemo(() => {
-    return jobs
-      .filter(j => jobOnDay(j, selectedDate))
-      .filter(j => !j.workerId || fieldWorkerIds.has(j.workerId))
-      .filter(j => workerFilt === "all" || j.workerId === workerFilt)
-      .filter(j => svcFilt === "all" || (j.serviceType ?? "") === svcFilt)
-      .filter(j => {
-        if (statusFilt === "all") return true;
-        if (statusFilt === "completed") return j.status === "completed";
-        if (statusFilt === "not_completed") return j.status !== "completed" && j.status !== "cancelled";
-        if (statusFilt === "overdue") return isOverdue(j);
-        return true;
-      })
-      .filter(j => {
-        if (invFilt === "all") return true;
-        if (invFilt === "not_invoiced") return !j.invoiceStatus || j.invoiceStatus === "not_invoiced";
-        if (invFilt === "ready") return j.invoiceStatus === "ready_to_invoice";
-        if (invFilt === "invoiced") return j.invoiceStatus === "invoiced" || j.invoiceStatus === "exported";
-        return true;
-      })
-      .sort((a, b) => {
-        const ta = a.scheduledTime ?? formatTime(a.scheduledDate as unknown as string, null);
-        const tb = b.scheduledTime ?? formatTime(b.scheduledDate as unknown as string, null);
-        if (ta !== tb) return ta.localeCompare(tb);
-        const ra = parseInt(String(a.orderNo ?? "9999")), rb = parseInt(String(b.orderNo ?? "9999"));
-        if (ra !== rb) return ra - rb;
-        return (clientMap[a.clientId ?? ""]?.name ?? "").localeCompare(clientMap[b.clientId ?? ""]?.name ?? "");
-      });
-  }, [jobs, selectedDate, fieldWorkerIds, workerFilt, svcFilt, statusFilt, invFilt, clientMap]);
 
   const svcTypes = useMemo(() => {
     const s = new Set<string>();
-    jobs.filter(j => jobOnDay(j, selectedDate) && (!j.workerId || fieldWorkerIds.has(j.workerId)))
-      .forEach(j => { if (j.serviceType) s.add(j.serviceType); });
+    jobs.forEach(j => { if (j.serviceType) s.add(j.serviceType); });
     return Array.from(s).sort();
-  }, [jobs, selectedDate, fieldWorkerIds]);
+  }, [jobs]);
 
-  const activeFilters = [workerFilt !== "all", svcFilt !== "all", statusFilt !== "all", invFilt !== "all"].filter(Boolean).length;
-
-  function rowBg(j: Job) {
-    if (j.status === "completed")   return "bg-green-50/70 hover:bg-green-100/60";
-    if (j.status === "cancelled")   return "bg-gray-50/80 opacity-60";
-    if (isOverdue(j))               return "bg-red-50/70 hover:bg-red-100/60";
-    if (j.status === "in_progress") return "bg-blue-50/60 hover:bg-blue-100/60";
-    return "hover:bg-gray-50";
-  }
-
-  function statusBadge(j: Job) {
-    if (j.status === "completed")   return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">✓ Done</span>;
-    if (j.status === "cancelled")   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">Cancelled</span>;
-    if (isOverdue(j))               return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Overdue</span>;
-    if (j.status === "in_progress") return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">In Progress</span>;
-    return <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Scheduled</span>;
-  }
-
-  function invBadge(s: string | null | undefined) {
-    if (!s || s === "not_invoiced") return <span className="text-[10px] text-gray-300">—</span>;
-    if (s === "ready_to_invoice")  return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Ready</span>;
-    if (s === "invoiced" || s === "exported") return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">Invoiced</span>;
-    if (s === "do_not_invoice")    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Skip</span>;
-    return <span className="text-[10px] text-gray-400">{s}</span>;
-  }
-
-  if (fieldWorkers.length === 0 && !isTechnician) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <User className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>No field staff found for the selected filter.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* Secondary filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {!isTechnician && (
-          <Select value={workerFilt} onValueChange={setWorkerFilt}>
-            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All Staff" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Staff</SelectItem>
-              {fieldWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-        <Select value={svcFilt} onValueChange={setSvcFilt}>
-          <SelectTrigger className="h-8 w-48 text-xs"><SelectValue placeholder="All Service Types" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Service Types</SelectItem>
-            {svcTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilt} onValueChange={setStatusFilt}>
-          <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="not_completed">Not Completed</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={invFilt} onValueChange={setInvFilt}>
-          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Invoice" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Invoice</SelectItem>
-            <SelectItem value="not_invoiced">Not Invoiced</SelectItem>
-            <SelectItem value="ready">Ready to Invoice</SelectItem>
-            <SelectItem value="invoiced">Invoiced</SelectItem>
-          </SelectContent>
-        </Select>
-        {activeFilters > 0 && (
-          <button
-            onClick={() => { setWorkerFilt("all"); setSvcFilt("all"); setStatusFilt("all"); setInvFilt("all"); }}
-            className="h-8 px-2.5 text-xs flex items-center gap-1 border border-gray-200 rounded-md text-gray-500 hover:text-red-500 hover:border-red-300 transition"
-          >
-            <X className="h-3 w-3" /> Clear ({activeFilters})
-          </button>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground font-medium">
-          {jobsForDate.length} job{jobsForDate.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-
-      {jobsForDate.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
-          <CalendarDays className="h-10 w-10 mx-auto mb-2 opacity-30" />
-          <p>{activeFilters > 0 ? "No jobs match the current filters." : "No jobs scheduled for this day."}</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-          <table className="min-w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-left">
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Time</th>
-                <th className="px-2 py-2.5 text-xs font-semibold text-gray-500 uppercase">Fix</th>
-                <th className="px-2 py-2.5 text-xs font-semibold text-gray-500 uppercase">#</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Client</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Address</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Service</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">Contract #</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Team / Tech</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Invoice</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">Job #</th>
-                <th className="px-2 py-2.5 text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobsForDate.map(job => {
-                const client = clientMap[job.clientId ?? ""];
-                const worker = workerMap[job.workerId ?? ""];
-                const dept = deptMap[worker?.departmentId ?? ""] ?? deptMap[job.departmentId ?? ""];
-                const deptBar = DEPT_COLORS[worker?.departmentId ?? job.departmentId ?? ""] ?? "bg-gray-300";
-                return (
-                  <tr key={job.id} className={`border-b border-gray-100 last:border-0 ${rowBg(job)} transition-colors`}>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <div className={`w-1 h-6 rounded-full shrink-0 ${deptBar}`} />
-                        <span className="font-mono text-sm font-semibold text-gray-800">
-                          {formatTime(job.scheduledDate as unknown as string, job.scheduledTime)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2.5 text-center text-sm">
-                      {job.isFixed ? <span title="Fixed time">🔒</span> : <span className="text-gray-200">—</span>}
-                    </td>
-                    <td className="px-2 py-2.5 text-xs text-gray-400 font-medium tabular-nums">{job.orderNo ?? "—"}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-semibold text-gray-900 leading-tight text-sm">
-                        {client ? (
-                          <Link href={`/clients/${job.clientId}`} className="text-blue-700 hover:text-blue-900 hover:underline">
-                            {client.name}
-                          </Link>
-                        ) : "—"}
-                      </div>
-                      {dept && <div className="text-[10px] text-gray-400 mt-0.5">{dept.name}</div>}
-                    </td>
-                    <td className="px-3 py-2.5 hidden md:table-cell">
-                      <span className="text-xs text-gray-600 max-w-[150px] block truncate">{job.location ?? "—"}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs font-medium text-gray-700">{job.serviceType ?? "—"}</span>
-                    </td>
-                    <td className="px-3 py-2.5 hidden lg:table-cell">
-                      <span className="text-xs font-mono text-gray-500">{job.contractNo ?? "—"}</span>
-                    </td>
-                    <td className="px-3 py-2.5 hidden sm:table-cell">
-                      <span className="text-xs text-gray-700">{worker?.name ?? "—"}</span>
-                    </td>
-                    <td className="px-3 py-2.5">{statusBadge(job)}</td>
-                    <td className="px-3 py-2.5 hidden sm:table-cell">{invBadge(job.invoiceStatus)}</td>
-                    <td className="px-3 py-2.5 hidden lg:table-cell">
-                      <span className="text-xs font-mono text-blue-600">{job.jobNumber ?? "—"}</span>
-                    </td>
-                    <td className="px-2 py-2.5 text-right">
-                      {job.googleMapsLink && (
-                        <a href={job.googleMapsLink} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex p-1 rounded text-blue-500 hover:bg-blue-50 transition" title="Open in Maps">
-                          <MapPin className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Week View ────────────────────────────────────────────────────────────────
-
-function WeekView({
-  weekStart, fieldWorkers, jobs, clientMap,
-}: {
-  weekStart: Date;
-  fieldWorkers: Worker[];
-  jobs: Job[];
-  clientMap: Record<string, Client>;
-}) {
-  const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) });
-
-  if (fieldWorkers.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <User className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>No field staff found for the selected filter.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-      <table className="min-w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="text-left px-4 py-3 font-semibold text-gray-600 w-40 shrink-0 sticky left-0 bg-gray-50 z-10 border-r border-gray-200">
-              Staff Member
-            </th>
-            {weekDays.map(day => (
-              <th key={day.toISOString()} className={`text-center px-2 py-3 font-medium min-w-[120px] border-l border-gray-100 ${isToday(day) ? "bg-primary/5 text-primary font-bold" : "text-gray-500"}`}>
-                <div className="text-xs uppercase tracking-wide">{format(day, "EEE")}</div>
-                <div className={`text-base mt-0.5 font-bold rounded-full w-7 h-7 flex items-center justify-center mx-auto ${isToday(day) ? "bg-primary text-white" : ""}`}>
-                  {format(day, "d")}
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {fieldWorkers.map((worker, wi) => {
-            const deptPill = DEPT_PILL[worker.departmentId ?? ""] ?? "bg-gray-100 text-gray-700";
-            const deptBar  = DEPT_COLORS[worker.departmentId ?? ""] ?? "bg-gray-300";
-            return (
-              <tr key={worker.id} className={`border-b border-gray-100 ${wi % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
-                {/* Worker cell */}
-                <td className={`px-4 py-3 sticky left-0 z-10 border-r border-gray-200 ${wi % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-1 h-10 rounded-full shrink-0 ${deptBar}`} />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate leading-tight text-sm">{worker.name}</p>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${deptPill}`}>
-                        {worker.role}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-                {/* Day cells */}
-                {weekDays.map(day => {
-                  const dayJobs = jobs
-                    .filter(j => j.workerId === worker.id && jobOnDay(j, day))
-                    .sort((a, b) => (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? ""));
-                  return (
-                    <td key={day.toISOString()} className={`px-2 py-2 border-l border-gray-100 align-top ${isToday(day) ? "bg-primary/5" : ""}`}>
-                      {dayJobs.length === 0 ? (
-                        <div className="h-8 flex items-center justify-center">
-                          <span className="text-gray-300 text-xs">—</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          {dayJobs.map(job => (
-                            <JobPill key={job.id} job={job} clientMap={clientMap} />
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Month View ───────────────────────────────────────────────────────────────
-
-function MonthView({
-  monthAnchor, jobs, fieldWorkers, onSelectDay,
-}: {
-  monthAnchor: Date;
-  jobs: Job[];
-  fieldWorkers: Worker[];
-  onSelectDay: (d: Date) => void;
-}) {
-  const mStart = startOfMonth(monthAnchor);
-  const mEnd   = endOfMonth(monthAnchor);
-
-  // calendar grid always starts on Mon
-  const gridStart = startOfWeek(mStart, { weekStartsOn: 1 });
-  const gridEnd   = endOfWeek(mEnd, { weekStartsOn: 1 });
-  const gridDays  = eachDayOfInterval({ start: gridStart, end: gridEnd });
-
-  const workerIds = new Set(fieldWorkers.map(w => w.id));
-
-  // Build a map: "yyyy-MM-dd" → jobs[]
-  const jobsByDay = useMemo(() => {
-    const map: Record<string, Job[]> = {};
-    jobs.forEach(j => {
-      if (!j.scheduledDate) return;
-      if (!workerIds.has(j.workerId ?? "")) return;
-      try {
-        const key = format(parseISO(j.scheduledDate as unknown as string), "yyyy-MM-dd");
-        if (!map[key]) map[key] = [];
-        map[key].push(j);
-      } catch {}
-    });
-    return map;
-  }, [jobs, workerIds]);
-
-  const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  return (
-    <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Day headers */}
-      <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
-        {DAY_HEADERS.map(d => (
-          <div key={d} className="py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Grid */}
-      <div className="grid grid-cols-7 divide-x divide-gray-100">
-        {gridDays.map((day, idx) => {
-          const key = format(day, "yyyy-MM-dd");
-          const dayJobs = jobsByDay[key] ?? [];
-          const inMonth = isSameMonth(day, monthAnchor);
-          const today   = isToday(day);
-
-          // Group dots by dept
-          const deptIds = [...new Set(dayJobs
-            .map(j => fieldWorkers.find(w => w.id === j.workerId)?.departmentId)
-            .filter(Boolean) as string[])];
-
-          return (
-            <button
-              key={day.toISOString()}
-              onClick={() => onSelectDay(day)}
-              className={`min-h-[90px] p-2 text-left transition-colors border-b border-gray-100 hover:bg-primary/5 group
-                ${!inMonth ? "opacity-40" : ""}
-                ${today ? "bg-primary/5" : "bg-white"}
-                ${idx % 7 === 6 ? "" : ""}
-              `}
-            >
-              {/* Date number */}
-              <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold mb-1
-                ${today ? "bg-primary text-white" : "text-gray-700 group-hover:bg-primary/10"}
-              `}>
-                {format(day, "d")}
-              </div>
-
-              {/* Job count badge */}
-              {dayJobs.length > 0 && (
-                <div className="text-xs text-gray-500 font-medium mb-1">
-                  {dayJobs.length} job{dayJobs.length !== 1 ? "s" : ""}
-                </div>
-              )}
-
-              {/* Department dots */}
-              {deptIds.length > 0 && (
-                <div className="flex flex-wrap gap-0.5">
-                  {deptIds.map(dId => (
-                    <span key={dId} className={`inline-block w-2 h-2 rounded-full ${DEPT_DOT[dId] ?? "bg-gray-400"}`} />
-                  ))}
-                </div>
-              )}
-
-              {/* Mini job titles */}
-              {dayJobs.slice(0, 2).map(job => {
-                const dId = fieldWorkers.find(w => w.id === job.workerId)?.departmentId ?? "";
-                const pill = DEPT_PILL[dId] ?? "bg-gray-100 text-gray-600";
-                return (
-                  <div key={job.id} className={`mt-0.5 text-[10px] rounded px-1 py-0.5 truncate leading-tight font-medium ${pill}`}>
-                    {job.title}
-                  </div>
-                );
-              })}
-              {dayJobs.length > 2 && (
-                <div className="text-[10px] text-gray-400 mt-0.5">+{dayJobs.length - 2} more</div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-// ─── Submit Diary Modal ───────────────────────────────────────────────────────
-
-const EMPTY_DIARY = {
-  serviceDate: format(new Date(), "yyyy-MM-dd"),
-  arrivalTime: "",
-  departureTime: "",
-  workCompleted: "",
-  productsUsed: "",
-  customerName: "",
-  customerSignature: "",
-  notes: "",
-  jobId: "",
-  jobNumber: "",
-};
-
-function SubmitDiaryModal({
-  open, onClose, jobs, myWorker,
-}: {
-  open: boolean;
-  onClose: () => void;
-  jobs: Job[];
-  myWorker: Worker | null;
-}) {
-  const { toast } = useToast();
-  const [form, setForm] = useState({ ...EMPTY_DIARY });
-
-  const set = (f: keyof typeof EMPTY_DIARY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm(prev => ({ ...prev, [f]: e.target.value }));
-
-  function onJobSelect(jobId: string) {
-    const job = jobs.find(j => j.id === jobId);
-    setForm(prev => ({
-      ...prev,
-      jobId,
-      jobNumber: job?.jobNumber ?? "",
-      serviceDate: job?.scheduledDate ? format(parseISO(job.scheduledDate as unknown as string), "yyyy-MM-dd") : prev.serviceDate,
-    }));
-  }
-
-  const mutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/field-diaries", {
-      ...form,
-      workerId: myWorker?.id ?? null,
-      workerName: myWorker?.name ?? null,
-      clientId: jobs.find(j => j.id === form.jobId)?.clientId ?? null,
-    }),
+  // ── Mutations
+  const updateJobMut = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/jobs/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/field-diaries"] });
-      toast({ title: "Diary submitted", description: "Your field diary has been saved." });
-      setForm({ ...EMPTY_DIARY });
-      onClose();
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      toast({ title: "Job updated" });
+      setSelectedJob(null);
     },
-    onError: () => toast({ title: "Submit failed", description: "Could not save the diary. Please try again.", variant: "destructive" }),
   });
 
-  const myJobs = myWorker
-    ? jobs.filter(j => j.workerId === myWorker.id).slice(0, 50)
-    : [];
+  const filteredEvents = useMemo(() => {
+    return jobs
+      .filter(j => {
+        if (filterWorker !== "all" && j.workerId !== filterWorker) return false;
+        if (filterSvc !== "all" && j.serviceType !== filterSvc) return false;
+        if (filterStatus === "completed" && j.status !== "completed") return false;
+        if (filterStatus === "not_completed" && (j.status === "completed" || j.status === "cancelled")) return false;
+        if (searchClient && !clientMap[j.clientId ?? ""]?.name?.toLowerCase().includes(searchClient.toLowerCase())) return false;
+        if (filterInv !== "all") {
+          if (filterInv === "not_invoiced" && (j.invoiceStatus && j.invoiceStatus !== "not_invoiced")) return false;
+          if (filterInv === "ready" && j.invoiceStatus !== "ready_to_invoice") return false;
+          if (filterInv === "invoiced" && !["invoiced", "exported"].includes(j.invoiceStatus || "")) return false;
+        }
+        return true;
+      })
+      .map(j => jobToDiaryEvent(j, clientMap, workers, role, currentWorkerId));
+  }, [jobs, filterWorker, filterSvc, filterStatus, filterInv, searchClient, clientMap, workers, role, currentWorkerId]);
+
+  const handleEventClick = useCallback((ev: DiaryEvent) => {
+    setSelectedJob(ev.meta?.raw);
+  }, []);
+
+  const handleEventDrop = useCallback((ev: DiaryEvent, newStart: Date, newEnd: Date, revert: () => void) => {
+    const j = ev.meta?.raw as Job;
+    if (!j) return;
+    updateJobMut.mutate(
+      {
+        id: j.id,
+        scheduledDate: format(newStart, "yyyy-MM-dd"),
+        scheduledTime: format(newStart, "HH:mm"),
+        estimatedDuration: Math.round((newEnd.getTime() - newStart.getTime()) / 60000),
+      },
+      { onError: revert }
+    );
+  }, []);
+
+  const hasFilters = filterWorker !== "all" || filterSvc !== "all" || filterStatus !== "all" || filterInv !== "all" || searchClient !== "";
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-green-600" />
-            Submit Field Diary
-          </DialogTitle>
-        </DialogHeader>
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
+        <Header title="Field Diaries" />
+        <main className="flex-1 overflow-auto p-4 space-y-4">
 
-        <div className="space-y-4 py-2">
-          {/* Link to Job */}
-          <div className="space-y-1.5">
-            <Label>Link to Job (optional)</Label>
-            <Select value={form.jobId} onValueChange={onJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job…" />
-              </SelectTrigger>
+          {/* ── Toolbar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
+              {(["timeGridDay", "timeGridWeek", "dayGridMonth", "listWeek"] as OutlookCalView[]).map(v => (
+                <Button
+                  key={v}
+                  variant={view === v ? "default" : "ghost"}
+                  size="sm"
+                  className="h-8 text-xs px-3"
+                  onClick={() => { setView(v); setTimeout(() => calendarRef.current?.getApi()?.changeView(v), 0); }}
+                >
+                  {v === "timeGridDay" ? "Day" : v === "timeGridWeek" ? "Week" : v === "dayGridMonth" ? "Month" : "List"}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => calendarRef.current?.prev()}><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">{viewTitle}</span>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => calendarRef.current?.next()}><ChevronRight className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => calendarRef.current?.today()}>Today</Button>
+            </div>
+          </div>
+
+          {/* ── Filters */}
+          <div className="flex flex-wrap gap-2 bg-white border rounded-xl p-3 shadow-sm">
+            <div className="relative w-48">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search client..."
+                value={searchClient}
+                onChange={e => setSearchClient(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+
+            <Select value={filterWorker} onValueChange={setFilterWorker}>
+              <SelectTrigger className="h-9 w-44 text-sm"><SelectValue placeholder="All Staff" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— No linked job —</SelectItem>
-                {myJobs.map(j => (
-                  <SelectItem key={j.id} value={j.id}>
-                    {j.jobNumber ? `${j.jobNumber} · ` : ""}{j.title}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">All Staff</SelectItem>
+                {fieldWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label>Service Date</Label>
-              <Input type="date" value={form.serviceDate} onChange={set("serviceDate")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Arrival Time</Label>
-              <Input type="time" value={form.arrivalTime} onChange={set("arrivalTime")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Departure Time</Label>
-              <Input type="time" value={form.departureTime} onChange={set("departureTime")} />
-            </div>
-          </div>
+            <Select value={filterSvc} onValueChange={setFilterSvc}>
+              <SelectTrigger className="h-9 w-48 text-sm"><SelectValue placeholder="All Services" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Services</SelectItem>
+                {svcTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
 
-          <Separator />
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="completed">Completed Only</SelectItem>
+                <SelectItem value="not_completed">Not Completed</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <div className="space-y-1.5">
-            <Label>Work Completed <span className="text-red-500">*</span></Label>
-            <Textarea
-              rows={4}
-              value={form.workCompleted}
-              onChange={set("workCompleted")}
-              placeholder="Describe the work carried out on site…"
-            />
-          </div>
+            <Select value={filterInv} onValueChange={setFilterInv}>
+              <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="Invoice Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Invoicing</SelectItem>
+                <SelectItem value="not_invoiced">Not Invoiced</SelectItem>
+                <SelectItem value="ready">Ready to Invoice</SelectItem>
+                <SelectItem value="invoiced">Invoiced / Exported</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <div className="space-y-1.5">
-            <Label>Products / Chemicals Used</Label>
-            <Textarea
-              rows={2}
-              value={form.productsUsed}
-              onChange={set("productsUsed")}
-              placeholder="e.g. Biflex SC 200ml, Rodex bait 50g…"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Additional Notes</Label>
-            <Textarea
-              rows={2}
-              value={form.notes}
-              onChange={set("notes")}
-              placeholder="Follow-up actions, observations…"
-            />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-1.5">
-            <Label>Customer Name</Label>
-            <Input value={form.customerName} onChange={set("customerName")} placeholder="Person on site" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Customer Signature</Label>
-            <Input value={form.customerSignature} onChange={set("customerSignature")} placeholder="Type full name to confirm" />
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
-          <Button
-            className="bg-green-600 hover:bg-green-700 text-white"
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !form.workCompleted.trim()}
-          >
-            {mutation.isPending
-              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</>
-              : <><FileText className="h-4 w-4 mr-2" />Submit Diary</>}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export default function FieldDiariesPage() {
-  const { user } = useAuth();
-  const dashboardRole = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
-  const isTechnician = dashboardRole === "service";
-
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [view, setView]             = useState<ViewMode>("day");
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [weekAnchor, setWeekAnchor]     = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [monthAnchor, setMonthAnchor]   = useState<Date>(startOfMonth(new Date()));
-  const [deptFilter, setDeptFilter]     = useState<string>("all");
-  const [showDiaryModal, setShowDiaryModal] = useState(false);
-
-  const { data: workers    = [] } = useQuery<Worker[]>    ({ queryKey: ["/api/workers"]     });
-  const { data: jobs       = [] } = useQuery<Job[]>       ({ queryKey: ["/api/jobs"]        });
-  const { data: clients    = [] } = useQuery<Client[]>    ({ queryKey: ["/api/clients"]     });
-  const { data: departments= [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
-  const { data: diaries    = [] } = useQuery<FieldDiary[]>({ queryKey: ["/api/field-diaries"] });
-
-  const clientMap = useMemo(() => Object.fromEntries(clients.map(c    => [c.id, c])),    [clients]);
-  const deptMap   = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d])), [departments]);
-
-  // For technicians: find their own worker record
-  // Priority: email match → name match → busiest active worker in user's dept (demo fallback)
-  const myWorker = useMemo(() => {
-    if (!isTechnician) return null;
-    const byEmail = workers.find(w => user?.email && w.email === user.email);
-    if (byEmail) return byEmail;
-    const byName = workers.find(w =>
-      user?.firstName && user?.lastName &&
-      w.name === `${user.firstName} ${user.lastName}`
-    );
-    if (byName) return byName;
-    // Demo fallback: busiest active worker in user's department
-    const inDept = workers
-      .filter(w => w.departmentId === user?.departmentId && w.isActive !== false)
-      .map(w => ({ w, count: jobs.filter(j => j.workerId === w.id).length }))
-      .sort((a, b) => b.count - a.count);
-    return inDept[0]?.w ?? null;
-  }, [isTechnician, workers, jobs, user]);
-
-  const fieldWorkers = useMemo(() => {
-    // Technicians only see their own row
-    if (isTechnician) return myWorker ? [myWorker] : [];
-    return workers
-      .filter(w => w.departmentId && SERVICE_DEPT_IDS.includes(w.departmentId) && w.isActive)
-      .filter(w => deptFilter === "all" || w.departmentId === deptFilter)
-      .sort((a, b) => (a.departmentId ?? "").localeCompare(b.departmentId ?? "") || a.name.localeCompare(b.name));
-  }, [workers, deptFilter, isTechnician, myWorker]);
-
-  const serviceDepts = departments.filter(d => SERVICE_DEPT_IDS.includes(d.id));
-
-  // ── Navigator logic per view ──
-  function prev() {
-    if (view === "day")   setSelectedDate(d => subDays(d, 1));
-    if (view === "week")  setWeekAnchor(d  => subWeeks(d, 1));
-    if (view === "month") setMonthAnchor(d => subMonths(d, 1));
-  }
-  function next() {
-    if (view === "day")   setSelectedDate(d => addDays(d, 1));
-    if (view === "week")  setWeekAnchor(d  => addWeeks(d, 1));
-    if (view === "month") setMonthAnchor(d => addMonths(d, 1));
-  }
-  function goToday() {
-    setSelectedDate(new Date());
-    setWeekAnchor(startOfWeek(new Date(), { weekStartsOn: 1 }));
-    setMonthAnchor(startOfMonth(new Date()));
-  }
-
-  function periodLabel() {
-    if (view === "day") {
-      return isToday(selectedDate)
-        ? `Today — ${format(selectedDate, "EEEE, d MMMM yyyy")}`
-        : format(selectedDate, "EEEE, d MMMM yyyy");
-    }
-    if (view === "week") {
-      const ws = weekAnchor;
-      const we = endOfWeek(weekAnchor, { weekStartsOn: 1 });
-      return `${format(ws, "d MMM")} – ${format(we, "d MMM yyyy")}`;
-    }
-    if (view === "month") {
-      return format(monthAnchor, "MMMM yyyy");
-    }
-    return "";
-  }
-
-  function isCurrentPeriodToday() {
-    if (view === "day")  return isToday(selectedDate);
-    if (view === "week") return fnsIsSameDay(weekAnchor, startOfWeek(new Date(), { weekStartsOn: 1 }));
-    if (view === "month") return fnsIsSameDay(monthAnchor, startOfMonth(new Date()));
-    return false;
-  }
-
-  // When clicking a day in month view → switch to day view
-  function handleMonthDayClick(day: Date) {
-    setSelectedDate(day);
-    setView("day");
-  }
-
-  const jobCountInPeriod = useMemo(() => {
-    const workerIds = new Set(fieldWorkers.map(w => w.id));
-    if (view === "day") return jobs.filter(j => jobOnDay(j, selectedDate) && workerIds.has(j.workerId ?? "")).length;
-    if (view === "week") {
-      const ws = weekAnchor;
-      const we = endOfWeek(weekAnchor, { weekStartsOn: 1 });
-      return jobs.filter(j => {
-        if (!j.scheduledDate || !workerIds.has(j.workerId ?? "")) return false;
-        try {
-          const d = parseISO(j.scheduledDate as unknown as string);
-          return d >= ws && d <= we;
-        } catch { return false; }
-      }).length;
-    }
-    if (view === "month") {
-      const ms = monthAnchor;
-      const me = endOfMonth(monthAnchor);
-      return jobs.filter(j => {
-        if (!j.scheduledDate || !workerIds.has(j.workerId ?? "")) return false;
-        try {
-          const d = parseISO(j.scheduledDate as unknown as string);
-          return d >= ms && d <= me;
-        } catch { return false; }
-      }).length;
-    }
-    return 0;
-  }, [jobs, view, selectedDate, weekAnchor, monthAnchor, fieldWorkers]);
-
-  return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={isTechnician ? "Field Diaries" : "Staff Schedule"} onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-        <MobileNavigation isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
-          <div className="space-y-5">
-
-            {/* Page header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                  <CalendarDays className="h-7 w-7 text-primary" />
-                  {isTechnician ? "Field Diaries" : "Field Staff Schedule"}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  {isTechnician
-                    ? "Submit job reports, notes, photos and signatures after completing work."
-                    : "See each technician's jobs, locations and availability for the day"}
-                </p>
-              </div>
-
-              {/* Submit Diary button — always visible for staff with service role, also for managers */}
+            {hasFilters && (
               <Button
-                className="bg-green-600 hover:bg-green-700 text-white self-start"
-                onClick={() => setShowDiaryModal(true)}
+                variant="ghost"
+                size="sm"
+                className="h-9 text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  setFilterWorker("all");
+                  setFilterSvc("all");
+                  setFilterStatus("all");
+                  setFilterInv("all");
+                  setSearchClient("");
+                }}
               >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Submit Diary
+                <X className="h-3.5 w-3.5 mr-1" /> Clear
               </Button>
-
-              {/* View toggle */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start">
-                {(["day", "week", "month"] as ViewMode[]).map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setView(v)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize
-                      ${view === v ? "bg-white shadow text-primary" : "text-gray-500 hover:text-gray-700"}`}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Controls bar */}
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Department filter — hidden for technicians (they only see themselves) */}
-              {!isTechnician && (
-                <Select value={deptFilter} onValueChange={setDeptFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {serviceDepts.map(d => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {/* Date navigator */}
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" onClick={prev}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={isCurrentPeriodToday() ? "default" : "outline"}
-                  className="min-w-[200px] text-sm"
-                  onClick={goToday}
-                >
-                  {isCurrentPeriodToday() ? "Today" : periodLabel()}
-                </Button>
-                <Button variant="outline" size="icon" onClick={next}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Summary */}
-              <span className="text-sm text-muted-foreground ml-auto">
-                {!isCurrentPeriodToday() && <span className="mr-1">{periodLabel()} ·</span>}
-                <strong>{fieldWorkers.length}</strong> staff ·{" "}
-                <strong>{jobCountInPeriod}</strong> job{jobCountInPeriod !== 1 ? "s" : ""}
-              </span>
-            </div>
-
-            {/* View content */}
-            {view === "day" && (
-              <DayView
-                selectedDate={selectedDate}
-                fieldWorkers={fieldWorkers}
-                jobs={jobs}
-                clientMap={clientMap}
-                deptMap={deptMap}
-                workers={workers}
-                isTechnician={isTechnician}
-              />
-            )}
-
-            {view === "week" && (
-              <WeekView
-                weekStart={weekAnchor}
-                fieldWorkers={fieldWorkers}
-                jobs={jobs}
-                clientMap={clientMap}
-              />
-            )}
-
-            {view === "month" && (
-              <MonthView
-                monthAnchor={monthAnchor}
-                jobs={jobs}
-                fieldWorkers={fieldWorkers}
-                onSelectDay={handleMonthDayClick}
-              />
-            )}
-
-          </div>
-
-          {/* ── Submitted Diaries list ── */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <FileText className="h-5 w-5 text-green-600" />
-                Submitted Diaries
-              </h2>
-              <span className="text-sm text-muted-foreground">{diaries.length} total</span>
-            </div>
-
-            {diaries.length === 0 ? (
-              <div className="rounded-lg border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
-                No diaries submitted yet. Use "Submit Diary" to add your first entry.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {[...diaries].reverse().map(d => (
-                  <Card key={d.id} className="border shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className="font-mono text-xs border-green-300 text-green-700">
-                              {d.diaryNumber ?? "FD-XXXX"}
-                            </Badge>
-                            {d.jobNumber && (
-                              <Badge variant="secondary" className="text-xs">{d.jobNumber}</Badge>
-                            )}
-                            <span className="text-sm font-medium">{d.workerName ?? "Unknown worker"}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 line-clamp-2">{d.workCompleted}</p>
-                          {d.productsUsed && (
-                            <p className="text-xs text-muted-foreground">Products: {d.productsUsed}</p>
-                          )}
-                          {d.customerName && (
-                            <p className="text-xs text-muted-foreground">Signed by: {d.customerName}</p>
-                          )}
-                        </div>
-                        <div className="text-right text-xs text-muted-foreground shrink-0 space-y-1">
-                          <div>{d.serviceDate ? format(parseISO(d.serviceDate as unknown as string), "d MMM yyyy") : "—"}</div>
-                          {d.arrivalTime && d.departureTime && (
-                            <div>{(d.arrivalTime as string).slice(0,5)} – {(d.departureTime as string).slice(0,5)}</div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
             )}
           </div>
 
+          {/* ── Calendar */}
+          <div className="relative flex-1">
+            {jobsLoading && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center">
+                <Badge variant="outline" className="animate-pulse">Loading jobs...</Badge>
+              </div>
+            )}
+            <OutlookDiaryCalendar
+              ref={calendarRef}
+              events={filteredEvents}
+              view={view}
+              onDatesSet={setViewTitle}
+              onEventClick={handleEventClick}
+              onEventDrop={handleEventDrop}
+              height={700}
+            />
+          </div>
         </main>
       </div>
 
-      {/* Diary submission modal */}
-      <SubmitDiaryModal
-        open={showDiaryModal}
-        onClose={() => setShowDiaryModal(false)}
-        jobs={jobs}
-        myWorker={myWorker}
-      />
+      {/* ── Details Dialog */}
+      <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-blue-500" />
+              {selectedJob?.title}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedJob && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Client</Label>
+                  <p className="text-sm font-semibold">{clientMap[selectedJob.clientId]?.name}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Status</Label>
+                  <div>
+                    <Badge className={statusColorClasses(selectedJob.status)}>
+                      {selectedJob.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase text-gray-400">Address</Label>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                  <p className="text-sm">{selectedJob.location || "No address provided"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Time</Label>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-gray-400" />
+                    <p className="text-sm">{selectedJob.scheduledTime || "09:00"} ({selectedJob.estimatedDuration || 60}m)</p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Staff</Label>
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-gray-400" />
+                    <p className="text-sm">{workers.find(w => w.id === selectedJob.workerId)?.name || "Unassigned"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedJob.notes && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Notes</Label>
+                  <p className="text-sm text-gray-600 italic bg-gray-50 p-2 rounded">{selectedJob.notes}</p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-2">
+                {selectedJob.googleMapsLink && (
+                  <Button variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={selectedJob.googleMapsLink} target="_blank" rel="noopener noreferrer">
+                      <Navigation className="h-4 w-4" /> Open Maps
+                    </a>
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" className="gap-2" asChild>
+                  <Link href={`/jobs?id=${selectedJob.id}`}>
+                    <FileText className="h-4 w-4" /> Open Job
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" asChild>
+                  <Link href={`/clients/${selectedJob.clientId}`}>
+                    <User className="h-4 w-4" /> Open Client
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSelectedJob(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

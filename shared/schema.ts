@@ -1268,6 +1268,40 @@ export const insertServiceContractSchema = createInsertSchema(serviceContracts, 
 export type InsertServiceContract = z.infer<typeof insertServiceContractSchema>;
 export type ServiceContract = typeof serviceContracts.$inferSelect;
 
+// ─── CONTRACT OCCURRENCE EXCEPTIONS ─────────────────────────────────────────
+// A single overridden calendar occurrence of a recurring service/rental
+// contract — e.g. dragged to a different date/time or reassigned to a
+// different technician "for this occurrence only". Never mutates the master
+// contract's recurrence rule, and never creates a duplicate occurrence: the
+// expander (server/db-storage.ts getContractOccurrences) matches by
+// contractId + contractKind + originalDate and overlays these fields onto
+// the generated occurrence.
+export const contractOccurrenceExceptions = pgTable("contract_occurrence_exceptions", {
+  id:                     varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId:             varchar("contract_id").notNull(),
+  contractKind:           text("contract_kind").notNull(), // 'service' | 'rental'
+  originalDate:           text("original_date").notNull(), // "YYYY-MM-DD" — the date this occurrence would fall on before the override
+  newDate:                text("new_date"),                 // "YYYY-MM-DD", if rescheduled
+  newStartTime:           text("new_start_time"),           // "HH:MM", if rescheduled
+  durationMinutes:        integer("duration_minutes"),
+  assignedTechnicianId:   varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  assignedTeamId:         varchar("assigned_team_id"),
+  assignedTeamName:       text("assigned_team_name"),
+  status:                 text("status").default("scheduled"), // scheduled | cancelled
+  notes:                  text("notes"),
+  createdAt:              timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt:              timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertContractOccurrenceExceptionSchema = createInsertSchema(contractOccurrenceExceptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertContractOccurrenceException = z.infer<typeof insertContractOccurrenceExceptionSchema>;
+export type ContractOccurrenceException = typeof contractOccurrenceExceptions.$inferSelect;
+
 // ── Captured Expenses ─────────────────────────────────────────────────────────
 export const EXPENSE_CATEGORIES = [
   "Wages",

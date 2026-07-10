@@ -12,3 +12,5 @@
 - [DB auto-seed gating](db-seed-gating.md) — startup seed only checks 4 core tables (clients/jobs/invoices/workers); new tables need their own unconditional "seed if empty" check or they stay empty forever on existing DBs.
 - [DB reset/seed workflow](db-reset-seed-workflow.md) — manual `db:reset`/`db:seed` scripts for fresh DB bootstrap; login picker filters DB workers through a fixed `HARDCODED_STAFF` ID allowlist in routes.ts.
 - [Shared quote/lead status field](shared-quote-lead-status-field.md) — quote_submissions.status is one field driving both the lead board and the quote list; any UI that sets it must only ever use the 7 canonical LEAD_STATUSES values.
+- [Calendar permission enforcement](calendar-permission-enforcement.md) — shared drag-permission policy (canMoveCalendarEvent) must be re-checked server-side on every write route, not just used to hide the UI drag handle.
+- [Calendar list view sorting](calendar-list-view-sorting.md) — calendar libraries only sort list/agenda views by start time; supply an explicit comparator when the spec needs tie-break fields like route sequence.

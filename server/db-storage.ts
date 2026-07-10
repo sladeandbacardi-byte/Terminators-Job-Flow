@@ -18,6 +18,7 @@ import {
   stockLocations, stockBalances, stockMovements, pickingLists, pickingListItems,
   stockChecks, stockCheckItems,
   unifiedContracts, contractLineItems, departmentDefaults, legalEntities,
+  contractOccurrenceExceptions,
 } from "@shared/schema";
 
 import type {
@@ -62,6 +63,7 @@ import type {
   CommunicationNote, InsertCommunicationNote,
   AcceptedWorkflow, InsertAcceptedWorkflow,
   LeadActivity, InsertLeadActivity,
+  ContractOccurrenceException, InsertContractOccurrenceException,
 } from "@shared/schema";
 
 import type {
@@ -1184,7 +1186,7 @@ export class DbStorage implements IStorage {
 
   // ─── Calendar Events ─────────────────────────────────────────────────────
 
-  async getCalendarEvents(): Promise<CalendarEvent[]> { return db.select().from(calendarEvents).orderBy(asc(calendarEvents.startDate)); }
+  async getCalendarEvents(): Promise<CalendarEvent[]> { return db.select().from(calendarEvents).orderBy(asc(calendarEvents.startTime)); }
 
   async getCalendarEvent(id: string): Promise<CalendarEvent | undefined> {
     const [row] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, id)).limit(1);
@@ -1872,7 +1874,86 @@ export class DbStorage implements IStorage {
     return (r.rowCount ?? 0) > 0;
   }
 
+  async getContractOccurrenceExceptions(contractId?: string): Promise<ContractOccurrenceException[]> {
+    if (contractId) return db.select().from(contractOccurrenceExceptions).where(eq(contractOccurrenceExceptions.contractId, contractId));
+    return db.select().from(contractOccurrenceExceptions);
+  }
+
+  async upsertContractOccurrenceException(data: InsertContractOccurrenceException): Promise<ContractOccurrenceException> {
+    const [existing] = await db.select().from(contractOccurrenceExceptions).where(and(
+      eq(contractOccurrenceExceptions.contractId, data.contractId),
+      eq(contractOccurrenceExceptions.contractKind, data.contractKind),
+      eq(contractOccurrenceExceptions.originalDate, data.originalDate),
+    ));
+    if (existing) {
+      const [row] = await db.update(contractOccurrenceExceptions).set({ ...data, updatedAt: new Date() })
+        .where(eq(contractOccurrenceExceptions.id, existing.id)).returning();
+      return row;
+    }
+    const [row] = await db.insert(contractOccurrenceExceptions).values({ id: randomUUID(), ...data, createdAt: new Date(), updatedAt: new Date() }).returning();
+    return row;
+  }
+
+  async deleteContractOccurrenceException(id: string): Promise<boolean> {
+    const r = await db.delete(contractOccurrenceExceptions).where(eq(contractOccurrenceExceptions.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  // Apply per-occurrence exceptions (date/time/duration/assignee overrides or cancellations)
+  // onto expanded occurrences, matched by contractId + contractKind + originalDate
+  // ("YYYY-MM-DD" of the occurrence's un-overridden scheduled date). Never duplicates
+  // occurrences — only overlays fields on the one matching virtual occurrence.
+  private applyOccurrenceExceptions(
+    occs: ContractOccurrence[],
+    exceptions: ContractOccurrenceException[],
+    contractKind: "service" | "rental",
+  ): ContractOccurrence[] {
+    if (exceptions.length === 0) return occs;
+    const byKey = new Map<string, ContractOccurrenceException>();
+    for (const ex of exceptions) {
+      if (ex.contractKind !== contractKind) continue;
+      byKey.set(`${ex.contractId}|${ex.originalDate}`, ex);
+    }
+    if (byKey.size === 0) return occs;
+    const out: ContractOccurrence[] = [];
+    for (const occ of occs) {
+      const originalDateStr = occ.scheduledDate.toISOString().slice(0, 10);
+      const ex = byKey.get(`${occ.contractId}|${originalDateStr}`);
+      if (!ex) { out.push(occ); continue; }
+      if (ex.status === "cancelled") continue; // exception cancels this single occurrence
+      let scheduledDate = occ.scheduledDate;
+      if (ex.newDate || ex.newStartTime) {
+        const dateStr = ex.newDate || originalDateStr;
+        const timeStr = ex.newStartTime || occ.startTime || "00:00";
+        const [h, m] = timeStr.split(":").map((n: string) => parseInt(n, 10) || 0);
+        scheduledDate = new Date(dateStr + "T00:00:00");
+        scheduledDate.setHours(h, m, 0, 0);
+      }
+      out.push({
+        ...occ,
+        id: `${occ.id}-ex`,
+        scheduledDate,
+        startTime: ex.newStartTime || occ.startTime,
+        estimatedDuration: ex.durationMinutes ?? occ.estimatedDuration,
+        assignedTechnicianId: ex.assignedTechnicianId ?? occ.assignedTechnicianId,
+        assignedTechnicianName: ex.assignedTechnicianName ?? occ.assignedTechnicianName,
+        assignedTeamId: ex.assignedTeamId ?? occ.assignedTeamId,
+        assignedTeamName: ex.assignedTeamName ?? occ.assignedTeamName,
+        notes: ex.notes ?? occ.notes,
+        isException: true,
+        exceptionId: ex.id,
+        originalScheduledDate: occ.scheduledDate,
+        exceptionStatus: ex.status,
+      });
+    }
+    return out;
+  }
+
   async getContractOccurrences(start: Date, end: Date, opts?: { departmentId?: string; technicianId?: string; teamId?: string }): Promise<ContractOccurrence[]> {
+    // Exceptions may move an occurrence in or out of the requested window, so we
+    // fetch all exceptions for the relevant contracts up front (cheap — one table).
+    const allExceptions = await db.select().from(contractOccurrenceExceptions);
+
     // ── Service contracts ────────────────────────────────────────────────────
     let q = db.select().from(serviceContracts).where(eq(serviceContracts.activeStatus, true));
     if (opts?.departmentId) q = (q as any).where(and(eq(serviceContracts.activeStatus, true), eq(serviceContracts.departmentId, opts.departmentId)));
@@ -1881,7 +1962,8 @@ export class DbStorage implements IStorage {
     for (const c of svcContracts) {
       if (opts?.technicianId && c.assignedTechnicianId !== opts.technicianId) continue;
       if (opts?.teamId && c.assignedTeamId !== opts.teamId) continue;
-      results.push(...expandContract(c, start, end));
+      const occs = expandContract(c, start, end);
+      results.push(...this.applyOccurrenceExceptions(occs, allExceptions, "service"));
     }
 
     // ── Rental contracts (those with a schedule frequency set) ────────────────
@@ -1940,8 +2022,9 @@ export class DbStorage implements IStorage {
         invoicingFrequency: null,
       };
       const occs = expandContract(shaped as any, start, end);
+      const withExceptions = this.applyOccurrenceExceptions(occs, allExceptions, "rental");
       // Prefix rental occurrences with 'rc-occ-' to distinguish from service contract ones
-      results.push(...occs.map(o => ({ ...o, id: o.id.replace(/^occ-/, "rc-occ-"), serviceType: "rental" })));
+      results.push(...withExceptions.map(o => ({ ...o, id: o.id.replace(/^occ-/, "rc-occ-"), serviceType: "rental" })));
     }
 
     results.sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime());
