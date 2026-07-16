@@ -1,9 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,11 +135,7 @@ export default function CommissionReportsPage() {
   const displayed = showAll ? closedLeads : closedLeads.slice(0, 50);
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Commission Reports" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="max-w-6xl mx-auto space-y-6">
 
             {/* Heading */}
@@ -372,9 +365,6 @@ export default function CommissionReportsPage() {
               </CardContent>
             </Card>
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

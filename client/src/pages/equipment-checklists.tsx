@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +30,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function StatCard({ label, value, color, icon: Icon }: { label: string; value: number; color: string; icon: any }) {
   return (
+  <>
     <div className={`rounded-xl border p-4 flex items-center gap-4 ${color}`}>
       <div className="p-2 rounded-lg bg-white/50">
         <Icon className="h-5 w-5" />
@@ -42,6 +40,7 @@ function StatCard({ label, value, color, icon: Icon }: { label: string; value: n
         <p className="text-xs font-medium opacity-80">{label}</p>
       </div>
     </div>
+  </>
   );
 }
 
@@ -209,7 +208,6 @@ export default function EquipmentChecklistsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { data: checklists = [], isLoading } = useQuery<EquipmentChecklist[]>({
     queryKey: [`/api/equipment-checklists`, dateFilter],
@@ -233,11 +231,7 @@ export default function EquipmentChecklistsPage() {
   const critical = checklists.filter(c => c.hasCriticalMissing).length;
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Equipment Checklists" />
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
           {/* Stat cards */}
           {todayStats && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -309,9 +303,6 @@ export default function EquipmentChecklistsPage() {
               )}
             </div>
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

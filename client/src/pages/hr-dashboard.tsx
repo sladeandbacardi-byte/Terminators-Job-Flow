@@ -1,8 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,11 +87,8 @@ export default function HRDashboard() {
   );
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="HR Dashboard" />
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6 space-y-6">
+      <>
+        <div className="p-6 pb-20 lg:pb-6 space-y-6">
 
           {/* Page header */}
           <div>
@@ -199,9 +193,7 @@ export default function HRDashboard() {
             </TabsContent>
           </Tabs>
 
-        </main>
-        <MobileNavigation />
-      </div>
+        </div>
 
       {/* Staff Profile Dialog */}
       <Dialog open={!!profileWorker} onOpenChange={open => { if (!open) setProfileWorker(null); }}>
@@ -215,7 +207,7 @@ export default function HRDashboard() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }
 

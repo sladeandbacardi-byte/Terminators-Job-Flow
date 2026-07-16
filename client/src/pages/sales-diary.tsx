@@ -25,8 +25,6 @@ import {
   OutlookDiaryCalendar, OutlookColumnsView,
   type OutlookDiaryCalendarHandle, type OutlookCalView, type OutlookColumn,
 } from "@/components/calendar/outlook-diary-calendar";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 // ── Constants
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(SALES_APPT_TYPES.map(t => [t.value, t.label]));
@@ -384,11 +382,8 @@ export default function SalesDiary() {
   const hasFilters = filterRep !== "all" || filterType !== "all" || filterStatus !== "all" || filterClient !== "";
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
-        <Header title="Sales Diary" />
-        <main className="flex-1 overflow-auto p-4 space-y-3">
+      <>
+        <div className="p-4 space-y-3">
 
           {/* ── Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
@@ -476,9 +471,7 @@ export default function SalesDiary() {
             />
           )}
 
-        </main>
-      </div>
-
+        </div>
       {/* ── Hover Tooltip */}
       {tipAppt && (
         <div
@@ -702,6 +695,6 @@ export default function SalesDiary() {
           </DialogContent>
         </Dialog>
       )}
-    </div>
+      </>
   );
 }

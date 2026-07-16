@@ -3,9 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -188,9 +185,11 @@ const DB_COUNT_LABELS: Array<{ key: keyof DbStatusCounts; label: string }> = [
 
 function LoadingRows() {
   return (
+  <>
     <div className="space-y-3 pt-2">
       {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
     </div>
+  </>
   );
 }
 
@@ -245,14 +244,12 @@ function DatabaseStatusSection() {
             Persistent database storage active. Data survives server restarts.
           </Badge>
           {data && (
-            <>
               <Badge variant="outline" className="border-green-300 text-green-800 text-xs">
                 Storage Type: {data.storageType}
               </Badge>
               <Badge variant="outline" className="border-green-300 text-green-800 text-xs">
                 MemStorage: Disabled for production data
               </Badge>
-            </>
           )}
         </div>
 
@@ -1422,11 +1419,7 @@ export default function DataIntegrity() {
   const dupCount = dupData?.groups.length ?? 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header title="Data Integrity" />
-        <main className="flex-1 overflow-auto p-6">
+        <div className="p-6">
           <div className="space-y-6 max-w-5xl">
             <div className="flex items-center gap-3">
               <Database className="h-6 w-6 text-green-600" />
@@ -1570,9 +1563,6 @@ export default function DataIntegrity() {
             {/* Scan history — visible at the bottom of the page */}
             <ScanHistorySection />
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

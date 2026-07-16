@@ -1,8 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -139,11 +136,8 @@ export default function Expenses() {
     setForm(p => ({ ...p, [field]: e.target.value }));
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Expense Capture" />
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6 space-y-5">
+      <>
+        <div className="p-6 pb-20 lg:pb-6 space-y-5">
 
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -304,9 +298,7 @@ export default function Expenses() {
             )}
           </div>
 
-        </main>
-        <MobileNavigation />
-      </div>
+        </div>
 
       {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={open => { if (!open) setDialogOpen(false); }}>
@@ -444,6 +436,6 @@ export default function Expenses() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }

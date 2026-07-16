@@ -1,8 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +119,7 @@ function ClientSearch({
   }, [clients, q]);
 
   return (
+  <>
     <div ref={ref} className="relative">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
@@ -151,6 +149,7 @@ function ClientSearch({
         </div>
       )}
     </div>
+  </>
   );
 }
 
@@ -383,20 +382,8 @@ export default function ServiceScheduling() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg"><Sidebar /></div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Service Scheduling" onMobileMenuToggle={() => setMobileMenuOpen(true)} />
-
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="max-w-screen-xl mx-auto space-y-4">
 
             {/* ── Top bar ── */}
@@ -665,10 +652,8 @@ export default function ServiceScheduling() {
             )}
 
           </div>
-        </main>
-      </div>
+        </div>
 
-      <MobileNavigation />
 
       {/* ════════════════════════════════════════════════════════════════════════
           Add / Edit Dialog
@@ -756,7 +741,6 @@ export default function ServiceScheduling() {
 
             {/* ─── WEEKLY / DAILY: Day + Time ─── */}
             {(weeklyOrDaily) && (
-              <>
                 <div>
                   <Label>Day</Label>
                   <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
@@ -770,12 +754,10 @@ export default function ServiceScheduling() {
                   <Label>Time</Label>
                   <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
                 </div>
-              </>
             )}
 
             {/* ─── 2 x A WEEK: Two days + Time ─── */}
             {showSecondDay && (
-              <>
                 <div>
                   <Label>First Day</Label>
                   <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
@@ -798,12 +780,10 @@ export default function ServiceScheduling() {
                   <Label>Time</Label>
                   <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
                 </div>
-              </>
             )}
 
             {/* ─── TWICE A MONTH: Two week+day+time combos ─── */}
             {showTwiceAMonth && (
-              <>
                 <div className="sm:col-span-2">
                   <p className="text-xs font-semibold text-gray-500 mb-2">First visit</p>
                   <div className="grid grid-cols-3 gap-2">
@@ -862,12 +842,10 @@ export default function ServiceScheduling() {
                     </div>
                   </div>
                 </div>
-              </>
             )}
 
             {/* ─── MONTHLY / EVERY N MONTHS: Week + Day + Time ─── */}
             {showWeekOfMonth && !showTwiceAMonth && (
-              <>
                 <div>
                   <Label>Week</Label>
                   <Select value={form.weekOfMonth ?? "Week 1"} onValueChange={v => setForm(f => ({ ...f, weekOfMonth: v }))}>
@@ -892,7 +870,6 @@ export default function ServiceScheduling() {
                   <Label>Time</Label>
                   <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
                 </div>
-              </>
             )}
 
             {/* Estimated Duration */}
@@ -1004,6 +981,6 @@ export default function ServiceScheduling() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </>
   );
 }

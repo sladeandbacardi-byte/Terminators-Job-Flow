@@ -7,9 +7,6 @@ import {
   startOfWeek, startOfMonth, startOfYear,
   endOfDay,
 } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -264,13 +261,7 @@ export default function Reports() {
   const presetLabel = (p: Preset) => ({ '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days', '6m': 'Last 6 months', 'ytd': 'Year to date', '1y': 'Last year', 'custom': 'Custom' }[p]);
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Reports & Analytics" />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
           {/* Global date range (for overview tabs) */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
@@ -481,12 +472,10 @@ export default function Reports() {
                         />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         {actStatus === 'all' ? (
-                          <>
                             <Bar dataKey="completed"  name="Completed"   fill="#22c55e" stackId="s" radius={[0,0,0,0]} />
                             <Bar dataKey="inProgress" name="In Progress" fill="#f97316" stackId="s" />
                             <Bar dataKey="scheduled"  name="Scheduled"   fill="#94a3b8" stackId="s" />
                             <Bar dataKey="cancelled"  name="Cancelled"   fill="#ef4444" stackId="s" radius={[4,4,0,0]} />
-                          </>
                         ) : (
                           <Bar dataKey="total" name="Jobs" fill="#3b82f6" radius={[4,4,0,0]} />
                         )}
@@ -836,10 +825,6 @@ export default function Reports() {
             </TabsContent>
 
           </Tabs>
-        </main>
-      </div>
-
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

@@ -1,8 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -149,7 +146,6 @@ const TYPE_LABEL: Record<BackupType, string> = {
 };
 
 export default function BackupPage() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isDownloadingJson, setIsDownloadingJson] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
@@ -349,13 +345,8 @@ export default function BackupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Backup & Restore" onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-        <MobileNavigation isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-6 pb-20 lg:pb-6">
           <div className="max-w-3xl mx-auto space-y-6">
 
             <div>
@@ -636,7 +627,6 @@ export default function BackupPage() {
               </CardHeader>
               <CardContent className="space-y-5">
                 {activeSchedule && (
-                  <>
                     <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
                       <div>
                         <p className="text-sm font-medium">Enable scheduled backups</p>
@@ -759,7 +749,6 @@ export default function BackupPage() {
                         ? <><CheckCircle className="mr-2 h-4 w-4" />Schedule saved!</>
                         : <><Save className="mr-2 h-4 w-4" />Save Schedule</>}
                     </Button>
-                  </>
                 )}
               </CardContent>
             </Card>
@@ -1048,8 +1037,7 @@ export default function BackupPage() {
             </Card>
 
           </div>
-        </main>
-      </div>
+        </div>
 
       <AlertDialog open={confirmRestore} onOpenChange={setConfirmRestore}>
         <AlertDialogContent>
@@ -1067,6 +1055,6 @@ export default function BackupPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </>
   );
 }

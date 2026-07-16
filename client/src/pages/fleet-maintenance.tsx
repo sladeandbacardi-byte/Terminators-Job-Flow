@@ -12,8 +12,6 @@ import {
   TrendingUp, DollarSign, ChevronRight,
 } from "lucide-react";
 import { format, isPast, addDays } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 const URGENCY_OPTIONS = [
   { value: "low", label: "Low", color: "bg-gray-100 text-gray-600 border-gray-300" },
@@ -105,11 +103,7 @@ export default function FleetMaintenance() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header title="Fleet Maintenance" onMobileMenuToggle={() => {}} />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
 
             <div className="flex items-center justify-between">
@@ -418,8 +412,6 @@ export default function FleetMaintenance() {
             </Tabs>
 
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
   );
 }

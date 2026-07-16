@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -230,11 +227,7 @@ export default function CustomReports() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
-        <Header />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+        <div className="bg-gray-50 p-6">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">Custom Reports</h1>
@@ -446,9 +439,6 @@ export default function CustomReports() {
               </CardContent>
             </Card>
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -170,11 +168,8 @@ export default function Debtors() {
   const suspendedClients = clients.filter(c => c.status === "suspended");
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Debtors" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      <>
+        <div className="p-6 space-y-5">
 
           {/* KPI tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -371,8 +366,7 @@ export default function Debtors() {
               )}
             </div>
           </div>
-        </main>
-      </div>
+        </div>
 
       {/* Suspend Account Dialog */}
       <Dialog open={!!suspendDialogClient} onOpenChange={open => { if (!open) { setSuspendDialogClient(null); setSuspendReason(""); } }}>
@@ -422,7 +416,7 @@ export default function Debtors() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }
 

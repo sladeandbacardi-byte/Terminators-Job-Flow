@@ -13,8 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useSearch } from "wouter";
 import { ClipboardCheck, ArrowLeft, CheckCircle, XCircle, AlertTriangle, Truck, User } from "lucide-react";
 import { format } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 const INSPECTION_CHECKLIST = [
   "Tyres (condition & pressure)",
@@ -117,11 +115,7 @@ export default function FleetInspection() {
   const failCount = Object.values(items).filter(i => i.result === "fail").length;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header title="Vehicle Inspection" onMobileMenuToggle={() => {}} />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="p-4 sm:p-6">
           <div className="max-w-3xl mx-auto space-y-6">
 
             <div className="flex items-center gap-3">
@@ -295,8 +289,6 @@ export default function FleetInspection() {
             </Card>
 
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
   );
 }

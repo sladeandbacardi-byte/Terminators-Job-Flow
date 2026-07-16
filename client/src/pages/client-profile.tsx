@@ -2,9 +2,6 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -311,39 +308,8 @@ export default function ClientProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex bg-gray-50">
-        <Sidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Loading client profile…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!client) {
-    return (
-      <div className="min-h-screen flex bg-gray-50">
-        <Sidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-muted-foreground mb-4">Client not found.</p>
-            <Link href="/clients">
-              <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />Back to Clients</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Render ─────────────────────────────────────────────────────────────
-
-  return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Client Profile" />
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-6 pb-20 lg:pb-6">
           <div className="max-w-6xl mx-auto space-y-5">
 
             {/* Back */}
@@ -498,7 +464,7 @@ export default function ClientProfilePage() {
                     </CardHeader>
                     <CardContent className="text-sm space-y-1.5">
                       {hasStructuredAddress(client) ? (
-                        <>
+        <>
                           {(client.streetNumber || client.streetName) && (
                             <Row label="Street" value={[client.streetNumber, client.streetName].filter(Boolean).join(" ")} />
                           )}
@@ -506,8 +472,8 @@ export default function ClientProfilePage() {
                           <Row label="City"        value={client.city} />
                           <Row label="Province"    value={client.province} />
                           <Row label="Postal Code" value={client.postalCode} />
-                        </>
-                      ) : client.address ? (
+                      </>
+      ) : client.address ? (
                         <p className="whitespace-pre-line text-muted-foreground">{client.address}</p>
                       ) : (
                         <p className="text-muted-foreground italic">No address on file</p>
@@ -1240,9 +1206,7 @@ export default function ClientProfilePage() {
               </TabsContent>
             </Tabs>
           </div>
-        </main>
-        <MobileNavigation />
-      </div>
+        </div>
 
       {/* ═══ Edit Client Dialog ══════════════════════════════════════════ */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -1427,7 +1391,7 @@ export default function ClientProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }
 
@@ -1535,4 +1499,5 @@ function JobGroup({
       </div>
     </div>
   );
+}
 }

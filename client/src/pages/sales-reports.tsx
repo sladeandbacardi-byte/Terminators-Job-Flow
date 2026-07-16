@@ -2,9 +2,6 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, differenceInDays, isPast, isToday } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,11 +52,13 @@ function daysSince(d: any) { return d ? differenceInDays(new Date(), new Date(d)
 
 function Stat({ label, value, sub, color = "text-gray-900" }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
+  <>
     <div className="bg-white rounded-lg border p-4">
       <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
+  </>
   );
 }
 
@@ -204,11 +203,7 @@ export default function SalesReports() {
   const activeTabCfg = REPORT_TABS.find(t => t.id === activeTab);
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Sales Reports" />
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-6">
+        <div className="pb-20 lg:pb-6">
           <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
 
             {/* Heading */}
@@ -789,9 +784,6 @@ export default function SalesReports() {
             )}
 
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

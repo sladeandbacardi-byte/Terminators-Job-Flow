@@ -1,9 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,11 +110,8 @@ export default function PricingLibraryPage() {
   const f = (v: string) => setForm(p => ({ ...p, ...Object.fromEntries([[v.split(":")[0], v.split(":")[1]]]) }));
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Pricing Library" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="max-w-5xl mx-auto space-y-4">
 
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
@@ -218,9 +212,7 @@ export default function PricingLibraryPage() {
               </div>
             ))}
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
+        </div>
 
       <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setEditing(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -309,6 +301,6 @@ export default function PricingLibraryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }

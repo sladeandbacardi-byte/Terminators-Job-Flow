@@ -150,6 +150,7 @@ function scheduleSummary(c: SC): string {
 
 function SectionHead({ icon: Icon, label }: { icon: any; label: string }) {
   return (
+  <>
     <div className="col-span-2 flex items-center gap-2 mt-4 mb-1">
       <div className="h-px flex-1 bg-gray-100" />
       <span className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">
@@ -157,6 +158,7 @@ function SectionHead({ icon: Icon, label }: { icon: any; label: string }) {
       </span>
       <div className="h-px flex-1 bg-gray-100" />
     </div>
+  </>
   );
 }
 
@@ -1008,7 +1010,7 @@ export function ServiceContractsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+  </>
   );
 }
 

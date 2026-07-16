@@ -1,8 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import JobForm from "@/components/forms/job-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,7 +101,6 @@ export default function Jobs() {
 
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { data: jobs = [], isLoading } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ['/api/workers'] });
@@ -270,23 +266,7 @@ export default function Jobs() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50" data-testid="jobs-page">
-      <Sidebar />
-
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg"><Sidebar /></div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          title={isTechnician ? "My Jobs" : "Jobs"}
-          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-        />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
           {isTechnician && (
             <p className="text-sm text-muted-foreground mb-4">
               Your daily work sheet. Start, continue and complete assigned jobs.
@@ -791,10 +771,6 @@ export default function Jobs() {
               </div>
             )}
           </div>
-        </main>
-      </div>
-
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

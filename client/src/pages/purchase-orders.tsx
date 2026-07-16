@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import {
   Plus,
   Search,
@@ -88,7 +85,6 @@ export default function PurchaseOrdersPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -269,26 +265,7 @@ export default function PurchaseOrdersPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50" data-testid="purchase-orders-page">
-      <Sidebar />
-      
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg">
-            <Sidebar />
-          </div>
-        </div>
-      )}
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Purchase Order Management" 
-          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-        />
-        
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -484,7 +461,6 @@ export default function PurchaseOrdersPage() {
                           View Details
                         </DropdownMenuItem>
                         {po.status === "pending" && (
-                          <>
                             <DropdownMenuItem onClick={() => setEditingPO(po)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
@@ -497,7 +473,6 @@ export default function PurchaseOrdersPage() {
                               <X className="mr-2 h-4 w-4" />
                               Reject
                             </DropdownMenuItem>
-                          </>
                         )}
                         {po.status === "approved" && (
                           <DropdownMenuItem onClick={() => setSendingPO(po)}>
@@ -552,10 +527,8 @@ export default function PurchaseOrdersPage() {
                   <div className="space-y-2 text-sm">
                     <div>Requested By: User {viewingPO.requestedById}</div>
                     {viewingPO.approvedById && (
-                      <>
                         <div>Approved By: User {viewingPO.approvedById}</div>
                         <div>Approval Date: {new Date(viewingPO.approvalDate!).toLocaleDateString()}</div>
-                      </>
                     )}
                     {viewingPO.rejectionReason && (
                       <div>Rejection Reason: {viewingPO.rejectionReason}</div>
@@ -716,10 +689,6 @@ export default function PurchaseOrdersPage() {
         </AlertDialogContent>
       </AlertDialog>
           </div>
-        </main>
-        
-        <MobileNavigation />
-      </div>
-    </div>
+        </div>
   );
 }

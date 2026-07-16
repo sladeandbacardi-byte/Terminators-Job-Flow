@@ -2,9 +2,6 @@ import { useState } from "react";
 import { format, startOfMonth } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { ServiceDashboard } from "@/components/dashboard/service-dashboard";
 import { SalesDashboard } from "@/components/dashboard/sales-dashboard";
 import { AccountsDashboard } from "@/components/dashboard/accounts-dashboard";
@@ -61,7 +58,6 @@ const roleSnapshotLabels: Record<DashboardRole, string> = {
 export default function Dashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAddRep, setShowAddRep] = useState(false);
   const [newRep, setNewRep] = useState({ name: "", email: "", phone: "", role: "Sales Consultant" });
 
@@ -162,25 +158,8 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="min-h-screen flex bg-gray-50" data-testid="dashboard-page">
-      <Sidebar />
-
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg">
-            <Sidebar />
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          title={rolePageTitles[dashboardRole]}
-          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-        />
-
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="space-y-4 max-w-screen-xl mx-auto">
 
             {/* ── Company identity strip ─────────────────────────── */}
@@ -547,10 +526,8 @@ export default function Dashboard() {
             {dashboardRole === "admin"       && <AdminDashboard />}
 
           </div>
-        </main>
-      </div>
+        </div>
 
-      <MobileNavigation />
 
       {/* Add Sales Rep dialog */}
       <Dialog open={showAddRep} onOpenChange={setShowAddRep}>
@@ -588,6 +565,6 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-    </div>
+      </>
   );
 }

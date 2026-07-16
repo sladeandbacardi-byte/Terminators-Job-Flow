@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -239,11 +236,8 @@ export default function FinanceDashboard() {
   });
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Finance Dashboard" />
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6 space-y-6">
+      <>
+        <div className="p-6 pb-20 lg:pb-6 space-y-6">
 
           {/* Page header + period selector */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -756,10 +750,8 @@ export default function FinanceDashboard() {
             </TabsContent>
           </Tabs>
 
-        </main>
-        <MobileNavigation />
-      </div>
-    </div>
+        </div>
+      </>
   );
 }
 

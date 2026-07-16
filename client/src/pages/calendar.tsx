@@ -1,8 +1,6 @@
 import { useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, differenceInMinutes } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -526,11 +524,8 @@ export default function Calendar() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
-        <Header title="Service Calendar" />
-        <main className="flex-1 overflow-auto p-4 space-y-3">
+      <>
+        <div className="p-4 space-y-3">
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
@@ -691,8 +686,7 @@ export default function Calendar() {
               </div>
             )}
           </div>
-        </main>
-      </div>
+        </div>
 
       {/* Dialogs */}
 
@@ -886,6 +880,6 @@ export default function Calendar() {
         </DialogContent>
       </Dialog>
 
-    </div>
+      </>
   );
 }

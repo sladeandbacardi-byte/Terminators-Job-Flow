@@ -2,9 +2,6 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format, isPast, isToday, parseISO } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -114,11 +111,8 @@ export default function FollowUpsPage() {
   ] as const;
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Follow-ups" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="max-w-5xl mx-auto space-y-4">
 
             {/* Summary cards */}
@@ -216,9 +210,7 @@ export default function FollowUpsPage() {
               )}
             </div>
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
+        </div>
 
       {/* Mark complete dialog */}
       <Dialog open={!!completeId} onOpenChange={o => { if (!o) { setCompleteId(null); setCompleteNote(""); } }}>
@@ -298,6 +290,6 @@ export default function FollowUpsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }

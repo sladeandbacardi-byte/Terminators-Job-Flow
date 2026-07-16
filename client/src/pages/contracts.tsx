@@ -1,9 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import UnifiedContractForm from "@/components/forms/unified-contract-form";
 import ContractForm from "@/components/forms/contract-form";
 import { Button } from "@/components/ui/button";
@@ -244,11 +241,8 @@ export default function Contracts() {
   }), [unifiedContracts, legacyAll]);
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Contracts" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
 
           {/* ── Top bar ── */}
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -686,7 +680,6 @@ export default function Contracts() {
                                 </Button>
                               </Link>
                             ) : (
-                              <>
                                 <Button variant="outline" size="sm" className="text-xs"
                                   onClick={() => { setEditingRental(contract as RentalContract); setIsRentalFormOpen(true); }}>
                                   <Edit className="h-3.5 w-3.5 mr-1" />Edit
@@ -695,7 +688,6 @@ export default function Contracts() {
                                   onClick={() => { setDeletingRental(contract as RentalContract); setDeleteReason(""); }}>
                                   <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
                                 </Button>
-                              </>
                             )}
                           </div>
                         )}
@@ -707,9 +699,7 @@ export default function Contracts() {
             )}
           </div>
 
-        </main>
-      </div>
-      <MobileNavigation />
+        </div>
 
       {/* ── New / Edit Unified Contract Dialog ── */}
       <Dialog open={isNewOpen} onOpenChange={open => { if (!open) { setIsNewOpen(false); setEditingUnified(null); } }}>
@@ -799,6 +789,6 @@ export default function Contracts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </>
   );
 }

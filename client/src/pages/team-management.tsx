@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, Pencil, Trash2, UserPlus, UserMinus, Building2 } from "lucide-react";
 import type { Team, Worker, Department } from "@shared/schema";
-import Sidebar from "@/components/layout/sidebar";
 
 const DEPT_COLORS: Record<string, string> = {
   "div-1": "bg-green-100 text-green-800",
@@ -126,9 +125,8 @@ export default function TeamManagementPage() {
   const getWorker = (id: string) => workers.find(w => w.id === id);
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+    <>
+      <div>
         <div className="max-w-4xl mx-auto px-4 py-6">
 
           {/* Header */}
@@ -209,7 +207,7 @@ export default function TeamManagementPage() {
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* Create / Edit dialog */}
       <Dialog open={showCreateDialog || !!editTeam} onOpenChange={(open) => {
@@ -343,6 +341,6 @@ export default function TeamManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

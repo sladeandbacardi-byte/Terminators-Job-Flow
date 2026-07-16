@@ -5,9 +5,6 @@ import {
   format, isToday, isPast, parseISO, differenceInDays, isFuture,
   startOfMonth, addMonths, isWithinInterval, startOfDay
 } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +59,7 @@ function parseNumber(v: any): number { const n = parseFloat(String(v ?? "0").rep
 
 function SectionTitle({ icon: Icon, label, count, color = "text-gray-500" }: { icon: any; label: string; count?: number; color?: string }) {
   return (
+  <>
     <div className="flex items-center gap-2 mb-3">
       <Icon className={`h-5 w-5 ${color}`} />
       <h2 className="text-base font-bold text-gray-900">{label}</h2>
@@ -69,6 +67,7 @@ function SectionTitle({ icon: Icon, label, count, color = "text-gray-500" }: { i
         <Badge className="ml-1 bg-red-500 text-white text-xs">{count}</Badge>
       )}
     </div>
+  </>
   );
 }
 
@@ -383,11 +382,8 @@ export default function SalesDashboard() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Sales Dashboard" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="max-w-7xl mx-auto space-y-6">
 
             {/* ── Page heading ──────────────────────────────────────────── */}
@@ -842,9 +838,7 @@ export default function SalesDashboard() {
             </div>
 
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
+        </div>
 
       {/* ── Add Appointment Dialog ────────────────────────────────────────── */}
       <Dialog open={apptDialog} onOpenChange={setApptDialog}>
@@ -975,6 +969,6 @@ export default function SalesDashboard() {
         </DialogContent>
       </Dialog>
 
-    </div>
+      </>
   );
 }

@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -109,11 +107,8 @@ export default function Creditors() {
   }, [owed, searchTerm, bucketFilter, supplierFilter, supplierMap]);
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Creditors" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      <>
+        <div className="p-6 space-y-5">
 
           {/* KPI tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -263,9 +258,8 @@ export default function Creditors() {
               )}
             </div>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
+      </>
   );
 }
 

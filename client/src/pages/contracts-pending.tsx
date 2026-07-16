@@ -1,9 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -69,11 +66,7 @@ export default function ContractsPendingPage() {
   const totalWarning = byStage.installation_scheduled.length;
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Contracts Pending" />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 lg:pb-6">
+        <div className="p-4 sm:p-6 pb-20 lg:pb-6">
           <div className="max-w-4xl mx-auto space-y-4">
 
             <p className="text-sm text-gray-500">
@@ -194,9 +187,6 @@ export default function ContractsPendingPage() {
               );
             })}
           </div>
-        </main>
-      </div>
-      <MobileNavigation />
-    </div>
+        </div>
   );
 }

@@ -17,8 +17,6 @@ import {
   Plus, Calendar, DollarSign, User, FileText, AlertTriangle,
 } from "lucide-react";
 import { format, isPast, addDays } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 const URGENCY_OPTIONS = [
   { value: "low", label: "Low", color: "bg-gray-100 text-gray-600 border-gray-300" },
@@ -88,6 +86,7 @@ function AddServiceRecordDialog({ vehicleId, vehicleName, onSaved }: { vehicleId
   const canSubmit = serviceDate && odometer && serviceProvider && workDone;
 
   return (
+  <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
@@ -155,6 +154,7 @@ function AddServiceRecordDialog({ vehicleId, vehicleName, onSaved }: { vehicleId
         </div>
       </DialogContent>
     </Dialog>
+  </>
   );
 }
 
@@ -235,15 +235,9 @@ export default function FleetVehicleMaintenance() {
 
   if (!vehicle) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header title="Vehicle Maintenance" onMobileMenuToggle={() => {}} />
-        <div className="flex flex-1">
-          <Sidebar />
-          <main className="flex-1 p-6 flex items-center justify-center">
+          <div className="p-6 flex items-center justify-center">
             <p className="text-gray-400">Loading vehicle...</p>
-          </main>
-        </div>
-      </div>
+          </div>
     );
   }
 

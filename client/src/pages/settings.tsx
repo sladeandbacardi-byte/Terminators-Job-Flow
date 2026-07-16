@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +59,7 @@ function LegalEntityDialog({
   });
 
   return (
+  <>
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -146,13 +144,13 @@ function LegalEntityDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  </>
   );
 }
 
 // ── Main Settings Page ────────────────────────────────────────────────────────
 
 export default function Settings() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("company");
   const { toast } = useToast();
 
@@ -192,14 +190,7 @@ export default function Settings() {
   });
 
   return (
-    <>
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Settings" onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-        <MobileNavigation isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
           <div className="max-w-2xl mx-auto space-y-6">
 
             <div>
@@ -419,16 +410,13 @@ export default function Settings() {
               </>
             )}
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
 
     <LegalEntityDialog
       open={entityDialogOpen}
       entity={editingEntity}
       onClose={() => setEntityDialogOpen(false)}
     />
-    </>
   );
 }
 

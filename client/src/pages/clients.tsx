@@ -2,9 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import {
   Plus,
   Search,
@@ -90,7 +87,6 @@ export default function ClientsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [rentalFilter, setRentalFilter] = useState<string>("all"); // all | with | without | active | inactive
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showDeleteAllClients, setShowDeleteAllClients] = useState(false);
 
   const { user } = useAuth();
@@ -247,26 +243,7 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50" data-testid="clients-page">
-      <Sidebar />
-      
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg">
-            <Sidebar />
-          </div>
-        </div>
-      )}
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Client Management" 
-          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-        />
-        
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
           <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -524,7 +501,7 @@ export default function ClientsPage() {
                           </DropdownMenuItem>
                         )}
                         {!isSales && (
-                          <>
+                            <>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1">
                               Change Status
@@ -556,10 +533,9 @@ export default function ClientsPage() {
                                 Suspend Service
                               </DropdownMenuItem>
                             )}
-                          </>
+                            </>
                         )}
                         {!isSales && !isAccounts && (
-                          <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => setDeletingClient(client)}
@@ -568,7 +544,6 @@ export default function ClientsPage() {
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
-                          </>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -615,7 +590,6 @@ export default function ClientsPage() {
                 <h3 className="font-semibold mb-2">Address</h3>
                 <div className="space-y-2 text-sm">
                   {hasStructuredAddress(viewingClient) ? (
-                    <>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                         <div><span className="text-muted-foreground">Street Number:</span> {viewingClient.streetNumber || "—"}</div>
                         <div><span className="text-muted-foreground">Street Name:</span> {viewingClient.streetName || "—"}</div>
@@ -628,7 +602,6 @@ export default function ClientsPage() {
                         <span className="text-muted-foreground text-xs uppercase tracking-wide">Full Address</span>
                         <p className="whitespace-pre-line mt-1">{formatClientAddress(viewingClient)}</p>
                       </div>
-                    </>
                   ) : viewingClient.address ? (
                     <div className="bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
                       <div className="font-semibold text-xs uppercase tracking-wide mb-1">Old Address (legacy)</div>
@@ -841,10 +814,6 @@ export default function ClientsPage() {
         </AlertDialogContent>
       </AlertDialog>
           </div>
-        </main>
-        
-        <MobileNavigation />
-      </div>
-    </div>
+        </div>
   );
 }

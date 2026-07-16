@@ -12,8 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Link, useSearch } from "wouter";
 import { Fuel, ArrowLeft, Truck, User, ShieldOff } from "lucide-react";
 import { format } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { getDashboardRole } from "@/lib/dashboardRole";
 
 export default function FleetFuel() {
@@ -81,11 +79,8 @@ export default function FleetFuel() {
 
   if (role === "admin") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header title="Fuel Fill-up" onMobileMenuToggle={() => {}} />
-        <div className="flex flex-1">
-          <Sidebar />
-          <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <>
+          <div className="p-4 sm:p-6">
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="flex items-center gap-3">
                 <Link href="/fleet">
@@ -103,18 +98,13 @@ export default function FleetFuel() {
                 </p>
               </div>
             </div>
-          </main>
-        </div>
-      </div>
+          </div>
+        </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header title="Fuel Fill-up" onMobileMenuToggle={() => {}} />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+    <div className="p-4 sm:p-6">
           <div className="max-w-3xl mx-auto space-y-6">
 
             <div className="flex items-center gap-3">
@@ -237,8 +227,6 @@ export default function FleetFuel() {
             </Card>
 
           </div>
-        </main>
-      </div>
     </div>
   );
 }

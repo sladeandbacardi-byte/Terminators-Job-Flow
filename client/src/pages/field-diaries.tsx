@@ -5,8 +5,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   format, parseISO,
 } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, canMoveCalendarEvent, type DashboardRole } from "@/lib/dashboardRole";
 import { Button } from "@/components/ui/button";
@@ -169,11 +167,8 @@ export default function FieldDiaries() {
   const hasFilters = filterWorker !== "all" || filterSvc !== "all" || filterStatus !== "all" || filterInv !== "all" || searchClient !== "";
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden lg:pl-64">
-        <Header title="Field Diaries" />
-        <main className="flex-1 overflow-auto p-4 space-y-4">
+      <>
+        <div className="p-4 space-y-4">
 
           {/* ── Toolbar */}
           <div className="flex flex-wrap items-center gap-3">
@@ -281,8 +276,7 @@ export default function FieldDiaries() {
               height={700}
             />
           </div>
-        </main>
-      </div>
+        </div>
 
       {/* ── Details Dialog */}
       <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
@@ -370,6 +364,6 @@ export default function FieldDiaries() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </>
   );
 }

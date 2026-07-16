@@ -17,8 +17,6 @@ import {
   TriangleAlert, Activity, Mail,
 } from "lucide-react";
 import { format, addMonths, differenceInDays } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 // ── Service interval defaults ─────────────────────────────────────────────────
 const SERVICE_KM_INTERVAL   = 10_000;  // km
@@ -36,10 +34,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 function VehicleStatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.active;
   return (
+  <>
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
+  </>
   );
 }
 
@@ -337,11 +337,7 @@ export default function FleetPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header title="Fleet" onMobileMenuToggle={() => setMobileMenuOpen(o => !o)} />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-5">
 
             {/* ── Page header ─────────────────────────────────────────────── */}
@@ -845,8 +841,6 @@ export default function FleetPage() {
               </TabsContent>
             </Tabs>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
   );
 }

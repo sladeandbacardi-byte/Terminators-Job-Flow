@@ -1,7 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -113,7 +111,6 @@ function followUpLabel(date: any) {
 export default function Leads() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNewLead, setShowNewLead] = useState(false);
   const [quoteLead, setQuoteLead] = useState<QuoteSubmission | null>(null);
   const [notesLead, setNotesLead] = useState<QuoteSubmission | null>(null);
@@ -326,23 +323,7 @@ export default function Leads() {
   const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); setStatusFilter("all"); };
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
-
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative bg-white w-64 shadow-lg">
-            <Sidebar />
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Lead Pipeline" onMobileMenuToggle={() => setIsMobileMenuOpen(true)} />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6">
     <div className="space-y-6 max-w-full">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -859,9 +840,7 @@ export default function Leads() {
       </Dialog>
 
     </div>
-        </main>
-      </div>
-    </div>
+        </div>
   );
 }
 

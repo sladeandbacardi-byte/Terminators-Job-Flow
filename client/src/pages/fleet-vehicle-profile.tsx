@@ -15,8 +15,6 @@ import {
   Edit, TrendingUp, Shield, Clock, Hammer,
 } from "lucide-react";
 import { format, differenceInDays, startOfMonth, subMonths } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 // ─── Status helpers ─────────────────────────────────────────────────────────
 
@@ -31,10 +29,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.active;
   return (
+  <>
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
       <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
+  </>
   );
 }
 
@@ -192,14 +192,9 @@ export default function FleetVehicleProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header title="Vehicle Profile" onMobileMenuToggle={() => setMobileMenuOpen(o => !o)} />
-        <div className="flex flex-1"><Sidebar />
-          <main className="flex-1 flex items-center justify-center">
+          <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </main>
-        </div>
-      </div>
+          </div>
     );
   }
 
@@ -361,13 +356,11 @@ export default function FleetVehicleProfile() {
                     <span className="text-xs text-gray-500 font-medium">Next Service</span>
                   </div>
                   {latestService?.nextServiceDate ? (
-                    <>
                       <p className="text-sm font-semibold text-gray-900">{fmt(latestService.nextServiceDate)}</p>
                       <p className={`text-xs font-medium ${nextServiceDays !== null && nextServiceDays <= 0 ? "text-red-600" : nextServiceDays !== null && nextServiceDays <= 30 ? "text-orange-600" : "text-gray-400"}`}>
                         {nextServiceDays !== null && nextServiceDays <= 0 ? "Overdue" : nextServiceDays !== null ? `${nextServiceDays}d` : ""}
                         {latestService.nextServiceOdometer ? ` · ${latestService.nextServiceOdometer.toLocaleString()} km` : ""}
                       </p>
-                    </>
                   ) : <p className="text-sm text-gray-400">Not scheduled</p>}
                 </CardContent>
               </Card>

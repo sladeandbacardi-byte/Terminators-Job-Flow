@@ -1,8 +1,5 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import InventoryForm from "@/components/forms/inventory-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,7 +56,6 @@ export default function Inventory() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [alertsFilter, setAlertsFilter] = useState("all");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [movTypeFilter, setMovTypeFilter] = useState("all");
@@ -173,11 +169,8 @@ export default function Inventory() {
   const lowStockCount = (stockAlerts?.lowStock?.length ?? 0) + (stockAlerts?.reorderRequired?.length ?? 0);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Stock Management" setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <>
+        <div className="p-4 md:p-6">
 
           {lowStockCount > 0 && (
             <div className="mb-4 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-800">
@@ -542,10 +535,8 @@ export default function Inventory() {
               </div>
             </TabsContent>
           </Tabs>
-        </main>
-      </div>
+        </div>
 
-      <MobileNavigation />
 
       {/* Item Form */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -598,7 +589,7 @@ export default function Inventory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </>
   );
 }
 

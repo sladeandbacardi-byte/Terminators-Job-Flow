@@ -6,9 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -348,6 +345,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
   };
 
   return (
+  <>
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0" onInteractOutside={e => e.preventDefault()}>
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
@@ -651,6 +649,7 @@ function NewQuoteDialog({ open, onClose, clients }: NewQuoteDialogProps) {
         </Tabs>
       </DialogContent>
     </Dialog>
+  </>
   );
 }
 
@@ -1607,7 +1606,6 @@ function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: Qu
 // ── QuotesPage ────────────────────────────────────────────────────────────────
 
 export default function QuotesPage() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [statusFilter, setStatusFilter]   = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [showNewQuote, setShowNewQuote]   = useState(false);
@@ -1630,13 +1628,8 @@ export default function QuotesPage() {
   const countByStatus = (s: string) => quotes.filter(q => q.status === s).length;
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Quotes" onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-        <MobileNavigation isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-
-        <main className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+      <>
+        <div className="p-6 pb-20 lg:pb-6">
           <div className="space-y-5">
 
             {/* Header */}
@@ -1717,10 +1710,9 @@ export default function QuotesPage() {
               </div>
             )}
           </div>
-        </main>
-      </div>
+        </div>
 
       <NewQuoteDialog open={showNewQuote} onClose={() => setShowNewQuote(false)} clients={clients} />
-    </div>
+      </>
   );
 }

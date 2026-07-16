@@ -13,7 +13,6 @@ import {
   CalendarDays, ClipboardCheck,
 } from "lucide-react";
 import type { Team, AttendanceRecord, AttendanceMemberRecord, Worker } from "@shared/schema";
-import Sidebar from "@/components/layout/sidebar";
 
 const TODAY = format(new Date(), "yyyy-MM-dd");
 const TODAY_DISPLAY = format(new Date(), "EEEE, d MMMM yyyy");
@@ -154,9 +153,7 @@ export default function AttendancePage() {
   const hasUnconfirmed = teamWorkers.some(w => getMemberStatus(w.id) === "not_confirmed");
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <div>
         <div className="max-w-2xl mx-auto px-4 py-6">
 
           {/* Header */}
@@ -339,8 +336,7 @@ export default function AttendancePage() {
 
               {/* Submit button */}
               {!isSubmitted && teamWorkers.length > 0 && (
-                <>
-                  {showConfirmSubmit ? (
+                <>{showConfirmSubmit ? (
                     <Card className="border-amber-200 bg-amber-50">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-2 mb-3">
@@ -426,7 +422,6 @@ export default function AttendancePage() {
           )}
 
         </div>
-      </main>
-    </div>
+      </div>
   );
 }

@@ -3,8 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import Sidebar from "@/components/layout/sidebar";
-import MobileNavigation from "@/components/layout/mobile-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -144,6 +142,7 @@ function WorkflowCard({
   }
 
   return (
+  <>
     <Card className={`border-l-4 ${BORDER_COLORS[w.workflowStatus] || "border-l-gray-300"} shadow-sm`}>
       <CardContent className="p-4">
         {/* Header row */}
@@ -424,6 +423,7 @@ function WorkflowCard({
         )}
       </CardContent>
     </Card>
+  </>
   );
 }
 
@@ -593,9 +593,8 @@ export default function AcceptedWork() {
   const totalWarnings = workflows.reduce((acc, w) => acc + getWarnings(w).length, 0);
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
+    <>
+      <div>
         <div className="max-w-5xl mx-auto p-4 sm:p-6">
 
           {/* Header */}
@@ -734,8 +733,7 @@ export default function AcceptedWork() {
             )
           )}
         </div>
-      </main>
-      <MobileNavigation />
+      </div>
 
       <CreateWorkflowDialog
         open={createDialogOpen}
@@ -744,6 +742,6 @@ export default function AcceptedWork() {
         existingQuoteIds={existingQuoteIds}
         onCreated={() => queryClient.invalidateQueries({ queryKey: ["/api/accepted-workflows"] })}
       />
-    </div>
+    </>
   );
 }

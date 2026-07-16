@@ -13,8 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { Gauge, ArrowLeft, Truck, User } from "lucide-react";
 import { format } from "date-fns";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 
 export default function FleetKmLog() {
   const { user } = useAuth();
@@ -90,11 +88,7 @@ export default function FleetKmLog() {
     (parseInt(businessKm) || 0) + (parseInt(privateKm) || 0) <= totalKm + 1;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header title="Log KMs" onMobileMenuToggle={() => {}} />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="p-4 sm:p-6">
           <div className="max-w-3xl mx-auto space-y-6">
 
             <div className="flex items-center gap-3">
@@ -232,8 +226,6 @@ export default function FleetKmLog() {
             </Card>
 
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
   );
 }
