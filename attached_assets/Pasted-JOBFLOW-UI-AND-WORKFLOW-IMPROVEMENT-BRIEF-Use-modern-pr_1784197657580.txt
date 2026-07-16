@@ -1,0 +1,700 @@
+JOBFLOW UI AND WORKFLOW IMPROVEMENT BRIEF
+
+Use modern project-management systems such as Hive as inspiration for the usability, navigation and workflow experience. Do not copy Hive’s branding, colours, logos, exact page layouts, proprietary wording or source code.
+
+The purpose is to make JobFlow feel cleaner, faster and easier to use while retaining JobFlow’s existing custom functionality for sales, contracts, service scheduling, technicians, inventory, invoicing and fleet management.
+
+1. GLOBAL PAGE LAYOUT
+
+Create a consistent application shell across all modules.
+
+The layout should include:
+
+* A collapsible left sidebar.
+* A slim top navigation bar.
+* A main content area.
+* A page title and short description.
+* A primary action button in the top-right corner.
+* Filters and view options directly below the page heading.
+* Consistent spacing, typography and button placement across all modules.
+
+The left navigation must support:
+
+* Dashboard
+* Sales
+* Clients
+* Quotes
+* Accepted Work
+* Contracts
+* Service Calendar
+* My Jobs
+* Inventory
+* Invoices
+* Fleet
+* Reports
+* Administration
+
+Navigation sections must be collapsible.
+
+The application must remember whether the sidebar was expanded or collapsed.
+
+2. MULTIPLE VIEWS
+
+Where appropriate, allow the same information to be viewed in different formats.
+
+Include the following view options:
+
+* List
+* Table
+* Kanban
+* Calendar
+* Timeline
+* Workload
+
+The available views must depend on the module.
+
+Examples:
+
+Sales Leads:
+
+* Table
+* Kanban
+* Calendar
+
+Service Jobs:
+
+* Calendar
+* List
+* Table
+* Workload
+
+Contracts:
+
+* Table
+* List
+* Timeline
+
+Inventory:
+
+* Table
+* List
+
+The selected view must be remembered per user and per module.
+
+3. MY WORK DASHBOARD
+
+Create a personalised dashboard called “My Work”.
+
+This dashboard must show:
+
+* Tasks assigned to the logged-in user.
+* Appointments today.
+* Overdue follow-ups.
+* Jobs requiring action.
+* Contracts needing review.
+* Quotes awaiting follow-up.
+* Repair requests awaiting attention.
+* Notifications requiring action.
+
+Allow the user to filter by:
+
+* Today
+* This week
+* Overdue
+* Upcoming
+* Completed
+
+Each item must clearly show:
+
+* Client
+* Task or appointment title
+* Responsible employee
+* Due date
+* Priority
+* Status
+* Module
+* Quick-action buttons
+
+4. KANBAN BOARDS
+
+Create clean Kanban boards for workflow-based areas.
+
+Examples:
+
+Sales pipeline:
+
+* New Lead
+* Contacted
+* Appointment Booked
+* Site Inspection
+* Quote Required
+* Quote Sent
+* Follow-up
+* Accepted
+* Lost
+
+Repair Requests:
+
+* New
+* Reviewed
+* Approved
+* Parts Required
+* Scheduled
+* In Progress
+* Completed
+* Closed
+
+Allow cards to be moved between columns using drag-and-drop.
+
+When a card is moved:
+
+* Save the status immediately.
+* Show a confirmation toast.
+* Update all linked records.
+* Record who changed the status.
+* Record the date and time.
+* Allow undo for a short period.
+
+Cards must display:
+
+* Client name
+* Short title
+* Assigned employee
+* Due date
+* Priority
+* Relevant value or amount
+* Warning indicators
+* Tags
+
+5. OUTLOOK-STYLE CALENDAR
+
+Improve all calendars so that they behave more like Outlook.
+
+Support:
+
+* Day view
+* Work-week view
+* Full-week view
+* Month view
+* Agenda view
+
+Appointments must display as time blocks according to their actual start and end times.
+
+Example:
+
+An appointment from 09:00 to 12:00 must visually occupy three hours.
+
+Allow:
+
+* Dragging appointments to a new date.
+* Dragging appointments to a new time.
+* Resizing appointments to change duration.
+* Moving appointments between users.
+* Editing by clicking the appointment.
+* Creating an appointment by clicking an empty time slot.
+* Copying an appointment to another user or date.
+* Duplicate appointment option.
+* Colour coding by user, department or job status.
+
+The calendar must clearly display:
+
+* Start time
+* End time
+* Client
+* Appointment type
+* Sales representative or technician
+* Status
+* Location
+
+Appointments must not display unnecessary text such as “estimated duration” when actual start and end times are already available.
+
+6. SAVED FILTERS
+
+Allow users to create and save their own filters.
+
+Examples:
+
+* My open leads
+* Jobs due this week
+* Contracts ending within 60 days
+* Quotes awaiting follow-up
+* Uncompleted washroom jobs
+* Jobs assigned to Zain
+* Overdue repair requests
+* Clients on credit hold
+
+Users must be able to:
+
+* Apply multiple filters.
+* Save a filter.
+* Rename a saved filter.
+* Set a default filter.
+* Share a filter with other users.
+* Delete a saved filter.
+* Reset all filters.
+
+7. TABLE DESIGN
+
+Improve all data tables.
+
+Tables must include:
+
+* Sticky column headings.
+* Sortable columns.
+* Resizable columns.
+* Optional hidden columns.
+* Column selection.
+* Search.
+* Filters.
+* Pagination.
+* Bulk selection.
+* Bulk actions.
+* Export to Excel.
+* Clear empty states.
+* Row highlighting on hover.
+
+Allow users to choose which columns they want to see.
+
+The system must remember column preferences for each user.
+
+Clicking a row must open the record.
+
+Do not require the user to locate a small edit icon before opening a record.
+
+8. QUICK RECORD PANEL
+
+When a record is selected, allow it to open in a side panel where appropriate instead of always opening a separate page.
+
+The panel may include:
+
+* Summary
+* Status
+* Assigned person
+* Notes
+* Activity
+* Linked client
+* Linked contract
+* Linked job
+* Linked invoice
+* Attachments
+* Quick actions
+
+Users must still be able to open the full record.
+
+The panel must only close using:
+
+* The X button.
+* Cancel.
+* Save.
+
+Clicking outside the panel must not close it if unsaved changes exist.
+
+9. ACTIVITY HISTORY
+
+Every important record must have an activity timeline.
+
+The activity timeline should record:
+
+* Record created.
+* Status changed.
+* Assigned employee changed.
+* Appointment moved.
+* Price changed.
+* Discount changed.
+* Contract edited.
+* Job completed.
+* Note added.
+* File uploaded.
+* Email sent.
+* User who made the change.
+* Date and time of the change.
+
+The timeline must be easy to read and displayed in chronological order.
+
+10. QUICK ACTIONS
+
+Add useful quick actions throughout JobFlow.
+
+Examples:
+
+From a lead:
+
+* Create appointment
+* Create quote
+* Add follow-up
+* Convert to client
+* Mark lost
+
+From a client:
+
+* Create quote
+* Create job
+* Create contract
+* Create invoice
+* Add note
+* View statement
+
+From a contract:
+
+* Create job
+* Suspend contract
+* Add item
+* Apply increase
+* Renew contract
+* End contract
+
+From a job:
+
+* Reassign
+* Reschedule
+* Mark completed
+* Add stock usage
+* Create repair request
+* Create invoice
+* Print treatment report
+
+11. TEMPLATES
+
+Allow reusable templates.
+
+Templates should be available for:
+
+* Sales appointments.
+* Follow-up tasks.
+* Site inspections.
+* Pest-control jobs.
+* Washroom service jobs.
+* Sanitary-bin services.
+* Deep-cleaning jobs.
+* Contracts.
+* Repair requests.
+* Treatment reports.
+
+Templates must pre-populate:
+
+* Department
+* Service type
+* Checklist
+* Assigned team
+* Estimated time
+* Stock items
+* Required photographs
+* Required signature
+* Notes
+* Default pricing
+
+12. AUTOMATIONS
+
+Add rule-based automations.
+
+Examples:
+
+* When a lead changes to “Appointment Booked”, create a calendar appointment.
+* When a quote is sent, create a follow-up task after three working days.
+* When a quote is accepted, create Accepted Work.
+* When Accepted Work is approved, create a job or contract.
+* When a recurring contract is saved, generate future scheduled jobs.
+* When a job is completed, create a treatment report.
+* When stock is used, reduce stock on hand.
+* When a job fails an inspection, notify the manager.
+* When a contract is within 60 days of expiry, notify Sales.
+* When an increase date is approaching, create a reminder.
+* When a repair request is approved, create a Job Card.
+* When a job is completed and invoiceable, notify Finance.
+
+Automations must have:
+
+* Trigger
+* Conditions
+* Actions
+* Active or inactive setting
+* Activity history
+* Error logging
+
+13. NOTIFICATIONS
+
+Create a notification centre.
+
+Notifications must include:
+
+* Assignment changes
+* Appointment changes
+* Mentions
+* Overdue actions
+* Quote follow-ups
+* Contracts ending
+* Contract increases
+* Failed vehicle checks
+* Repair requests
+* Jobs not completed
+* Stock below minimum level
+
+Allow users to:
+
+* Mark as read.
+* Mark all as read.
+* Mute certain notification types.
+* Open the related record directly.
+* Receive selected notifications by email.
+
+14. COMMENTS AND MENTIONS
+
+Add comments to relevant records.
+
+Users must be able to:
+
+* Add comments.
+* Mention another user using @name.
+* Reply to comments.
+* Edit their own comments.
+* Attach documents or images.
+* Resolve a comment thread.
+
+A mention must create a notification.
+
+Comments must not replace formal structured record fields.
+
+15. WORKLOAD VIEW
+
+Create a workload page for managers.
+
+Show:
+
+* Users or teams in rows.
+* Dates or weeks in columns.
+* Assigned appointments.
+* Estimated hours.
+* Actual hours.
+* Available capacity.
+* Overloaded users.
+* Unassigned work.
+
+Allow managers to:
+
+* Drag work between employees.
+* Filter by department.
+* Filter by date range.
+* Open jobs from the workload view.
+* View totals by employee.
+
+16. FORMS
+
+Create internal forms that feed directly into JobFlow.
+
+Examples:
+
+* New lead form.
+* Repair request form.
+* Vehicle fault form.
+* Stock request form.
+* Leave request form.
+* Client complaint form.
+* New client onboarding form.
+
+Form submissions must create structured records, not only send emails.
+
+Each form must support:
+
+* Required fields.
+* Dropdowns.
+* Photos.
+* Attachments.
+* Signatures.
+* Conditional fields.
+* Automatic assignment.
+* Confirmation message.
+* Submission history.
+
+17. MOBILE EXPERIENCE
+
+The mobile version must be designed around field users.
+
+For technicians, the default screen should be “My Jobs Today”.
+
+Each job card must show:
+
+* Time
+* Client
+* Address
+* Service
+* Status
+* Navigation button
+* Call client button
+* Start job button
+
+The technician workflow should be:
+
+1. Open job.
+2. Start job.
+3. Complete checklist.
+4. Capture photographs.
+5. Enter treatment details.
+6. Record chemicals and stock used.
+7. Record units completed.
+8. Add notes.
+9. Capture client signature.
+10. Complete job.
+
+Large buttons and simple screens must be used.
+
+Avoid dense office-style tables on mobile.
+
+18. SEARCH
+
+Create one global search box.
+
+The global search must find:
+
+* Clients
+* Contacts
+* Leads
+* Quotes
+* Jobs
+* Contracts
+* Invoices
+* Vehicles
+* Stock items
+* Treatment reports
+
+Search results must be grouped by category.
+
+Users must be able to open results directly.
+
+Search must support:
+
+* Partial names.
+* Telephone numbers.
+* Email addresses.
+* Registration numbers.
+* Invoice numbers.
+* Contract numbers.
+* Job numbers.
+
+19. DASHBOARD WIDGETS
+
+Allow dashboard widgets to be rearranged.
+
+Potential widgets include:
+
+* Sales pipeline
+* Quotes awaiting follow-up
+* Appointments today
+* Jobs today
+* Jobs not completed
+* Contracts ending
+* Upcoming increases
+* Outstanding invoices
+* Low stock
+* Repair requests
+* Vehicle failures
+* Staff attendance
+
+Users must be able to:
+
+* Move widgets.
+* Resize widgets.
+* Hide widgets.
+* Save the dashboard layout.
+
+20. VISUAL DESIGN
+
+Use a clean, professional and original visual style.
+
+Requirements:
+
+* White or very light backgrounds.
+* Strong spacing between sections.
+* Clear heading hierarchy.
+* Rounded cards used sparingly.
+* Consistent border radius.
+* Consistent button sizes.
+* Clear status badges.
+* Minimal unnecessary icons.
+* Accessible colour contrast.
+* Responsive design.
+* Red may be used as a JobFlow brand accent, but not excessively.
+
+Status colours:
+
+* Completed: green
+* Cancelled: red
+* To be completed: orange
+* In progress: blue
+* Draft: grey
+* Overdue: dark red
+* On hold: amber
+
+21. PERFORMANCE
+
+The improvements must not only be visual.
+
+Requirements:
+
+* Pages should load quickly.
+* Filters should not reload the entire page.
+* Drag-and-drop changes should save immediately.
+* Display loading indicators.
+* Prevent duplicate submissions.
+* Show meaningful error messages.
+* Support optimistic updates where safe.
+* Preserve user inputs if a save fails.
+* Do not silently lose data.
+
+22. IMPLEMENTATION PRIORITY
+
+Implement in this order:
+
+PHASE 1
+
+* Application shell and navigation
+* Improved tables
+* Saved filters
+* Sales Kanban
+* Outlook-style diary
+* My Work dashboard
+
+PHASE 2
+
+* Service calendar
+* Drag-and-drop scheduling
+* Quick record panel
+* Activity history
+* Comments and mentions
+* Notifications
+
+PHASE 3
+
+* Workload view
+* Templates
+* Automations
+* Dashboard widgets
+* Global search
+
+PHASE 4
+
+* Mobile technician workflow
+* Internal forms
+* Advanced reporting
+* User personalisation
+
+IMPORTANT
+
+Do not replace JobFlow’s existing business logic merely to make the system look like a project-management platform.
+
+Retain and improve:
+
+* Central client database
+* Quotes
+* Jobs
+* Contracts
+* Recurring schedules
+* Inventory
+* Rental items
+* Treatment reports
+* Invoicing
+* Legal entity selection
+* Permissions
+* Fleet Guard integration
+* Reporting
+
+The goal is to combine a polished modern workflow experience with JobFlow’s purpose-built operational functionality.
