@@ -221,6 +221,8 @@ export const jobs = pgTable("jobs", {
   completionExtraFaultFound: boolean("completion_extra_fault_found").default(false),
   completionCustomerSignature: text("completion_customer_signature"),
   googleMapsLink: text("google_maps_link"),
+  legalEntityId: varchar("legal_entity_id"),
+  legalEntityName: text("legal_entity_name"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

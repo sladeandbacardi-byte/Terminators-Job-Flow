@@ -731,8 +731,9 @@ export class DbStorage implements IStorage {
   }
 
   async createRentalContract(data: InsertRentalContract): Promise<RentalContract> {
-    const contractNumber = await this.generateContractNumber();
-    const [row] = await db.insert(rentalContracts).values({ id: randomUUID(), contractNumber, ...data, createdAt: new Date() }).returning();
+    const contractNumber = (data as any).contractNumber || await this.generateContractNumber();
+    const { contractNumber: _cn, ...restData } = data as any;
+    const [row] = await db.insert(rentalContracts).values({ id: randomUUID(), ...restData, contractNumber, createdAt: new Date() }).returning();
     return row;
   }
 
@@ -865,8 +866,9 @@ export class DbStorage implements IStorage {
   }
 
   async createJob(data: InsertJob): Promise<Job> {
-    const jobNumber = await this.generateJobNumber();
-    const [row] = await db.insert(jobs).values({ id: randomUUID(), jobNumber, ...data, createdAt: new Date(), updatedAt: new Date() }).returning();
+    const jobNumber = (data as any).jobNumber || await this.generateJobNumber();
+    const { jobNumber: _jn, ...restData } = data as any;
+    const [row] = await db.insert(jobs).values({ id: randomUUID(), ...restData, jobNumber, createdAt: new Date(), updatedAt: new Date() }).returning();
     return row;
   }
 

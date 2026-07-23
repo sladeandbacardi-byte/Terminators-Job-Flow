@@ -1248,15 +1248,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const job = await storage.getJob(req.params.id);
       if (!job) return res.status(404).json({ error: "Job not found" });
 
-      let legalEntityId: string | null = null;
-      let legalEntityName: string | null = null;
-      const linkedQuoteId = (job as any).linkedQuoteId;
-      if (linkedQuoteId) {
-        try {
-          const linkedQuote = await storage.getQuoteSubmission(linkedQuoteId);
-          legalEntityId = (linkedQuote as any)?.legalEntityId ?? null;
-          legalEntityName = (linkedQuote as any)?.legalEntityName ?? null;
-        } catch { /* non-fatal — invoice can still be created without entity info */ }
+      // Prefer the entity snapshotted on the job (set at quote→job conversion),
+      // fall back to re-reading the linked quote for legacy jobs converted before
+      // this snapshot was introduced.
+      let legalEntityId: string | null = (job as any).legalEntityId ?? null;
+      let legalEntityName: string | null = (job as any).legalEntityName ?? null;
+      if (!legalEntityId) {
+        const linkedQuoteId = (job as any).linkedQuoteId;
+        if (linkedQuoteId) {
+          try {
+            const linkedQuote = await storage.getQuoteSubmission(linkedQuoteId);
+            legalEntityId = (linkedQuote as any)?.legalEntityId ?? null;
+            legalEntityName = (linkedQuote as any)?.legalEntityName ?? null;
+          } catch { /* non-fatal — invoice can still be created without entity info */ }
+        }
       }
 
       const priceNum = Number((job as any).price ?? 0);
@@ -2641,7 +2646,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recurringPattern: frequency && frequency !== "once_off" ? frequency : null,
         service: SERVICE_LABELS[quote.serviceType] ?? quote.serviceType,
         jobNumber,
-      });
+        legalEntityId: (quote as any).legalEntityId ?? null,
+        legalEntityName: (quote as any).legalEntityName ?? null,
+      } as any);
 
       await storage.updateQuoteSubmission(quote.id, { status: "converted", clientId });
       res.status(201).json({ job });

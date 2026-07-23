@@ -250,8 +250,23 @@ export default function Invoices() {
                   const client = clientMap.get(invoice.clientId);
                   const overdueStatus = isOverdue(invoice);
                   
+                  // Mismatch warning: invoice entity differs from source job/quote entity
+                  const linkedJob = invoice.linkedJobId ? jobMap.get(invoice.linkedJobId) : null;
+                  const linkedQuote = invoice.linkedQuoteId ? quoteMap.get(invoice.linkedQuoteId) : null;
+                  const sourceEntityId = (linkedJob as any)?.legalEntityId || (linkedQuote as any)?.legalEntityId || null;
+                  const invoiceEntityId = (invoice as any).legalEntityId || null;
+                  const entityMismatch = sourceEntityId && invoiceEntityId && sourceEntityId !== invoiceEntityId;
+
                   return (
                     <div key={invoice.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid={`invoice-card-${invoice.id}`}>
+                      {entityMismatch && (
+                        <div className="mb-3 flex items-center gap-2 rounded-md bg-amber-50 border border-amber-300 px-3 py-2 text-sm text-amber-800">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                          <span>
+                            Legal entity mismatch — invoice is billed under <strong>{(invoice as any).legalEntityName}</strong> but the source document uses a different entity.
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           {getStatusIcon(overdueStatus ? 'overdue' : invoice.status)}

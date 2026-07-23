@@ -256,6 +256,8 @@ export async function runStartupMigrations(): Promise<void> {
   await run("field_diaries.invoice_number",   `ALTER TABLE field_diaries   ADD COLUMN IF NOT EXISTS invoice_number text`);
   await run("invoices.linked_contract_id",    `ALTER TABLE invoices         ADD COLUMN IF NOT EXISTS linked_contract_id varchar`);
   await run("client_payments.payment_number", `ALTER TABLE client_payments  ADD COLUMN IF NOT EXISTS payment_number text`);
+  await run("jobs.legal_entity_id",           `ALTER TABLE jobs             ADD COLUMN IF NOT EXISTS legal_entity_id varchar`);
+  await run("jobs.legal_entity_name",         `ALTER TABLE jobs             ADD COLUMN IF NOT EXISTS legal_entity_name text`);
 
   // ── Document-number sequences table (idempotent) ─────────────────────────
   // This guard ensures the table exists even on deployments that haven't
