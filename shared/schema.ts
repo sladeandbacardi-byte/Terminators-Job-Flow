@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, boolean, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1638,6 +1638,8 @@ export const fieldDiaries = pgTable("field_diaries", {
   technicianSignature: text("technician_signature"),
   status: text("status").notNull().default("submitted"),
   submittedAt: timestamp("submitted_at"),
+  invoiceId: varchar("invoice_id"),
+  invoiceNumber: text("invoice_number"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 export const insertFieldDiarySchema = createInsertSchema(fieldDiaries).omit({ id: true, createdAt: true });
@@ -2001,6 +2003,17 @@ export const insertClientSiteSchema = createInsertSchema(clientSites).omit({
 });
 export type InsertClientSite = z.infer<typeof insertClientSiteSchema>;
 export type ClientSite = typeof clientSites.$inferSelect;
+
+// ── Document Number Sequences (atomic, year-scoped) ─────────────────────────
+// Each row tracks the last-used sequence number for one document type per year.
+// Use an UPSERT+increment to get the next value — safe under concurrent inserts.
+export const sequences = pgTable("sequences", {
+  type: text("type").notNull(),     // JOB | INV | QT | RC | CON | FD | PAY
+  year: integer("year").notNull(),
+  lastSeq: integer("last_seq").notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.type, t.year] }),
+}));
 
 // ── Client Payments ───────────────────────────────────────────────────────────
 // Payment records (can link to an invoice, or be a standalone receipt)

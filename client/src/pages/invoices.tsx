@@ -34,10 +34,14 @@ export default function Invoices() {
 
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
   const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({ queryKey: ['/api/quote-submissions'] });
+  const { data: serviceContracts = [] } = useQuery<any[]>({ queryKey: ['/api/service-contracts'] });
+  const { data: rentalContracts = [] } = useQuery<any[]>({ queryKey: ['/api/rental-contracts'] });
 
   const clientMap = new Map(clients.map(client => [client.id, client]));
   const jobMap = new Map(jobs.map(j => [j.id, j]));
   const quoteMap = new Map(quoteSubmissions.map(q => [q.id, q]));
+  const serviceContractMap = new Map(serviceContracts.map((c: any) => [c.id, c]));
+  const rentalContractMap = new Map(rentalContracts.map((c: any) => [c.id, c]));
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -273,25 +277,38 @@ export default function Invoices() {
                             </div>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {invoice.legalEntityName && (
-                                <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
-                                  {invoice.legalEntityName}
+                                <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title="This invoice is issued under a specific legal entity">
+                                  ⚖ {invoice.legalEntityName}
                                 </span>
                               )}
                               {invoice.linkedJobId && (
-                                <span className="text-xs font-mono text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
-                                  Job: {jobMap.get(invoice.linkedJobId)?.jobNumber ?? invoice.linkedJobId.slice(0, 8)}
-                                </span>
+                                <Link href={`/jobs`}>
+                                  <span className="text-xs font-mono text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors">
+                                    ↗ Job: {jobMap.get(invoice.linkedJobId)?.jobNumber ?? invoice.linkedJobId.slice(0, 8)}
+                                  </span>
+                                </Link>
                               )}
                               {invoice.linkedQuoteId && (
-                                <span className="text-xs font-mono text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">
-                                  Quote: {quoteMap.get(invoice.linkedQuoteId)?.quoteNumber ?? invoice.linkedQuoteId.slice(0, 8)}
-                                </span>
+                                <Link href={`/quotes`}>
+                                  <span className="text-xs font-mono text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-purple-100 transition-colors">
+                                    ↗ Quote: {quoteMap.get(invoice.linkedQuoteId)?.quoteNumber ?? invoice.linkedQuoteId.slice(0, 8)}
+                                  </span>
+                                </Link>
                               )}
-                              {(invoice as any).linkedContractId && (
-                                <span className="text-xs font-mono text-teal-600 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded">
-                                  Contract: {(invoice as any).linkedContractId.slice(0, 8)}
-                                </span>
-                              )}
+                              {(invoice as any).linkedContractId && (() => {
+                                const contractId = (invoice as any).linkedContractId;
+                                const svc = serviceContractMap.get(contractId);
+                                const rnl = rentalContractMap.get(contractId);
+                                const label = svc?.contractNumber ?? rnl?.contractNumber ?? contractId.slice(0, 8);
+                                const href = svc ? "/service-contracts" : "/contracts";
+                                return (
+                                  <Link href={href}>
+                                    <span className="text-xs font-mono text-teal-600 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-teal-100 transition-colors">
+                                      ↗ Contract: {label}
+                                    </span>
+                                  </Link>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>

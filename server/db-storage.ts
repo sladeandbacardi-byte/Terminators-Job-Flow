@@ -18,7 +18,7 @@ import {
   stockLocations, stockBalances, stockMovements, pickingLists, pickingListItems,
   stockChecks, stockCheckItems,
   unifiedContracts, contractLineItems, departmentDefaults, legalEntities,
-  contractOccurrenceExceptions, fieldDiaries, clientPayments,
+  contractOccurrenceExceptions, fieldDiaries, clientPayments, sequences,
 } from "@shared/schema";
 
 import type {
@@ -921,41 +921,29 @@ export class DbStorage implements IStorage {
 
   // ─── Number Generators ────────────────────────────────────────────────────
 
-  async generateInvoiceNumber(): Promise<string> {
+  /**
+   * Atomically claim the next sequence number for a given document type and year.
+   * Uses PostgreSQL UPSERT so two concurrent requests always get distinct values.
+   */
+  private async generateDocNumber(type: string, prefix: string): Promise<string> {
     const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(invoice_number,'-',3) AS INTEGER)),0)` }).from(invoices).where(ilike(invoices.invoiceNumber, `INV-${year}-%`));
-    return `INV-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
+    const [row] = await db
+      .insert(sequences)
+      .values({ type, year, lastSeq: 1 })
+      .onConflictDoUpdate({
+        target: [sequences.type, sequences.year],
+        set: { lastSeq: sql`${sequences.lastSeq} + 1` },
+      })
+      .returning({ lastSeq: sequences.lastSeq });
+    return `${prefix}-${year}-${String(row.lastSeq).padStart(4, "0")}`;
   }
 
-  async generateJobNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(job_number,'-',3) AS INTEGER)),0)` }).from(jobs).where(ilike(jobs.jobNumber, `JOB-${year}-%`));
-    return `JOB-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
-  }
-
-  async generateContractNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(contract_number,'-',3) AS INTEGER)),0)` }).from(rentalContracts).where(ilike(rentalContracts.contractNumber, `RC-${year}-%`));
-    return `RC-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
-  }
-
-  async generateQuoteNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(quote_number,'-',3) AS INTEGER)),0)` }).from(quoteSubmissions).where(ilike(quoteSubmissions.quoteNumber, `QT-${year}-%`));
-    return `QT-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
-  }
-
-  async generateServiceContractNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(contract_number,'-',3) AS INTEGER)),0)` }).from(serviceContracts).where(ilike(serviceContracts.contractNumber, `CON-${year}-%`));
-    return `CON-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
-  }
-
-  async generatePaymentNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(payment_number,'-',3) AS INTEGER)),0)` }).from(clientPayments).where(ilike(clientPayments.paymentNumber, `PAY-${year}-%`));
-    return `PAY-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
-  }
+  async generateInvoiceNumber(): Promise<string> { return this.generateDocNumber("INV", "INV"); }
+  async generateJobNumber():     Promise<string> { return this.generateDocNumber("JOB", "JOB"); }
+  async generateContractNumber(): Promise<string> { return this.generateDocNumber("RC",  "RC");  }
+  async generateQuoteNumber():   Promise<string> { return this.generateDocNumber("QT",  "QT");  }
+  async generateServiceContractNumber(): Promise<string> { return this.generateDocNumber("CON", "CON"); }
+  async generatePaymentNumber(): Promise<string> { return this.generateDocNumber("PAY", "PAY"); }
 
   // ─── Invoice Items ────────────────────────────────────────────────────────
 
@@ -2362,9 +2350,7 @@ export class DbStorage implements IStorage {
     return (res.rowCount ?? 0) > 0;
   }
   async generateFieldDiaryNumber() {
-    const year = new Date().getFullYear();
-    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(diary_number,'-',3) AS INTEGER)),0)` }).from(fieldDiaries).where(ilike(fieldDiaries.diaryNumber, `FD-${year}-%`));
-    return `FD-${year}-${String((r?.mx ?? 0) + 1).padStart(4, "0")}`;
+    return this.generateDocNumber("FD", "FD");
   }
 
   async getCompanySettings() {

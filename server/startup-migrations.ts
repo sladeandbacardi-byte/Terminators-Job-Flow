@@ -251,5 +251,144 @@ export async function runStartupMigrations(): Promise<void> {
        )`
   );
 
+  // ── Initialise sequences table from existing MAX values ────────────────────
+  // Run this ONCE per type+year so new numbers never collide with existing ones.
+  // Uses INSERT … ON CONFLICT DO UPDATE so it's safe to re-run on every boot.
+  await run(
+    "sequences: init from existing document numbers",
+    `INSERT INTO sequences (type, year, last_seq)
+     SELECT type, year, last_seq FROM (
+       SELECT 'JOB' AS type,
+              EXTRACT(YEAR FROM scheduled_date)::int AS year,
+              COALESCE(MAX(CAST(SPLIT_PART(job_number,'-',3) AS INTEGER)), 0) AS last_seq
+       FROM jobs
+       WHERE job_number ~ '^JOB-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM scheduled_date)::int
+       UNION ALL
+       SELECT 'INV',
+              EXTRACT(YEAR FROM created_at)::int,
+              COALESCE(MAX(CAST(SPLIT_PART(invoice_number,'-',3) AS INTEGER)), 0)
+       FROM invoices
+       WHERE invoice_number ~ '^INV-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM created_at)::int
+       UNION ALL
+       SELECT 'QT',
+              EXTRACT(YEAR FROM COALESCE(submitted_at, now()))::int,
+              COALESCE(MAX(CAST(SPLIT_PART(quote_number,'-',3) AS INTEGER)), 0)
+       FROM quote_submissions
+       WHERE quote_number ~ '^QT-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM COALESCE(submitted_at, now()))::int
+       UNION ALL
+       SELECT 'RC',
+              EXTRACT(YEAR FROM start_date)::int,
+              COALESCE(MAX(CAST(SPLIT_PART(contract_number,'-',3) AS INTEGER)), 0)
+       FROM rental_contracts
+       WHERE contract_number ~ '^RC-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM start_date)::int
+       UNION ALL
+       SELECT 'CON',
+              EXTRACT(YEAR FROM created_at)::int,
+              COALESCE(MAX(CAST(SPLIT_PART(contract_number,'-',3) AS INTEGER)), 0)
+       FROM service_contracts
+       WHERE contract_number ~ '^CON-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM created_at)::int
+       UNION ALL
+       SELECT 'FD',
+              EXTRACT(YEAR FROM created_at)::int,
+              COALESCE(MAX(CAST(SPLIT_PART(diary_number,'-',3) AS INTEGER)), 0)
+       FROM field_diaries
+       WHERE diary_number ~ '^FD-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM created_at)::int
+       UNION ALL
+       SELECT 'PAY',
+              EXTRACT(YEAR FROM created_at)::int,
+              COALESCE(MAX(CAST(SPLIT_PART(payment_number,'-',3) AS INTEGER)), 0)
+       FROM client_payments
+       WHERE payment_number ~ '^PAY-[0-9]{4}-[0-9]+'
+       GROUP BY EXTRACT(YEAR FROM created_at)::int
+     ) sub
+     WHERE last_seq > 0
+     ON CONFLICT (type, year) DO UPDATE
+       SET last_seq = GREATEST(sequences.last_seq, EXCLUDED.last_seq)`
+  );
+
+  // ── Backfill null job_number values ────────────────────────────────────────
+  // Any job missing a number gets one. We assign year-2026 CON-… safe numbers
+  // using row_number so no two rows get the same number.
+  await run(
+    "backfill: jobs missing job_number",
+    `WITH numbered AS (
+       SELECT id,
+              EXTRACT(YEAR FROM scheduled_date)::int AS yr,
+              ROW_NUMBER() OVER (PARTITION BY EXTRACT(YEAR FROM scheduled_date)::int ORDER BY created_at) AS rn
+       FROM jobs
+       WHERE job_number IS NULL OR job_number = ''
+     )
+     UPDATE jobs
+     SET job_number = 'JOB-' || n.yr || '-' || LPAD(
+       ((SELECT COALESCE(last_seq, 0) FROM sequences WHERE type='JOB' AND year = n.yr) + n.rn)::text,
+       4, '0')
+     FROM numbered n
+     WHERE jobs.id = n.id`
+  );
+
+  // ── Backfill null service_contract contract_number values ──────────────────
+  await run(
+    "backfill: service_contracts missing contract_number",
+    `WITH numbered AS (
+       SELECT id,
+              EXTRACT(YEAR FROM created_at)::int AS yr,
+              ROW_NUMBER() OVER (PARTITION BY EXTRACT(YEAR FROM created_at)::int ORDER BY created_at) AS rn
+       FROM service_contracts
+       WHERE contract_number IS NULL OR contract_number = ''
+     )
+     UPDATE service_contracts
+     SET contract_number = 'CON-' || n.yr || '-' || LPAD(
+       (COALESCE((SELECT last_seq FROM sequences WHERE type='CON' AND year = n.yr), 0) + n.rn)::text,
+       4, '0')
+     FROM numbered n
+     WHERE service_contracts.id = n.id`
+  );
+
+  // ── Backfill null rental_contract contract_number values ───────────────────
+  await run(
+    "backfill: rental_contracts missing contract_number",
+    `WITH numbered AS (
+       SELECT id,
+              EXTRACT(YEAR FROM start_date)::int AS yr,
+              ROW_NUMBER() OVER (PARTITION BY EXTRACT(YEAR FROM start_date)::int ORDER BY created_at) AS rn
+       FROM rental_contracts
+       WHERE contract_number IS NULL OR contract_number = ''
+     )
+     UPDATE rental_contracts
+     SET contract_number = 'RC-' || n.yr || '-' || LPAD(
+       (COALESCE((SELECT last_seq FROM sequences WHERE type='RC' AND year = n.yr), 0) + n.rn)::text,
+       4, '0')
+     FROM numbered n
+     WHERE rental_contracts.id = n.id`
+  );
+
+  // ── Field diaries: add invoice_id / invoice_number columns if missing ──────
+  await run(
+    "field_diaries.invoice_id",
+    `ALTER TABLE field_diaries ADD COLUMN IF NOT EXISTS invoice_id varchar`
+  );
+  await run(
+    "field_diaries.invoice_number",
+    `ALTER TABLE field_diaries ADD COLUMN IF NOT EXISTS invoice_number text`
+  );
+
+  // ── Invoices: add linked_contract_id column if missing ─────────────────────
+  await run(
+    "invoices.linked_contract_id",
+    `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS linked_contract_id varchar`
+  );
+
+  // ── Client payments: add payment_number column if missing ──────────────────
+  await run(
+    "client_payments.payment_number",
+    `ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS payment_number text`
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }
