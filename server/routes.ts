@@ -35,6 +35,7 @@ import { createSageService } from "./sage-integration";
 import { AuthService, requireAuth, logActivity, type AuthenticatedRequest } from "./auth-service";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { getDashboardRole } from "@shared/dashboardRole";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -317,11 +318,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // ── Global Search ──────────────────────────────────────────────────────────
-  app.get("/api/search", async (req, res) => {
+  app.get("/api/search", requireAuth, async (req: AuthenticatedRequest, res) => {
     const q = ((req.query.q as string) || "").trim();
     if (q.length < 2) return res.json({ results: [] });
 
     const pattern = `%${q}%`;
+    const role = getDashboardRole({
+      departmentId: (req.user as any)?.departmentId as string | undefined,
+      role: req.user?.role,
+    });
+    const canSeeLeads    = ["admin","manager","sales"].includes(role);
+    const canSeeQuotes   = ["admin","manager","sales"].includes(role);
+    const canSeeInvoices = ["admin","accounts","manager"].includes(role);
+    const canSeeContracts  = ["admin","manager","coordinator","accounts"].includes(role);
+    const canSeeFieldDiary = ["admin","manager","coordinator","service"].includes(role);
+    const canSeeStaff    = ["admin","manager","coordinator","accounts"].includes(role);
 
     try {
       const [cRows, jRows, qRows, iRows, scRows, rcRows, fdRows, wRows] = await Promise.all([
@@ -396,6 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       const results: any[] = [];
+      const QUOTE_STATUSES = new Set(["quoted", "converted", "lost"]);
 
       for (const r of cRows.rows as any[]) {
         results.push({
@@ -413,15 +425,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results.push({ type: "job", id: r.id, label: jobLabel, sublabel: jobSub, url: `/jobs?open=${r.id}` });
       }
       for (const r of qRows.rows as any[]) {
-        results.push({
-          type: "quote",
-          id: r.id,
-          label: r.quote_number || r.company_name,
-          sublabel: [r.company_name, r.contact_person, r.status].filter(Boolean).join(" · "),
-          url: `/quotes?open=${r.id}`,
-        });
+        if (QUOTE_STATUSES.has(r.status)) {
+          if (canSeeQuotes) results.push({
+            type: "quote",
+            id: r.id,
+            label: r.quote_number || r.company_name,
+            sublabel: [r.company_name, r.contact_person, r.status].filter(Boolean).join(" · "),
+            url: `/quotes?open=${r.id}`,
+          });
+        } else {
+          if (canSeeLeads) results.push({
+            type: "lead",
+            id: r.id,
+            label: r.quote_number || r.company_name,
+            sublabel: [r.company_name, r.contact_person, r.status].filter(Boolean).join(" · "),
+            url: `/leads?open=${r.id}`,
+          });
+        }
       }
-      for (const r of iRows.rows as any[]) {
+      if (canSeeInvoices) for (const r of iRows.rows as any[]) {
         const amt = r.total ? `R ${parseFloat(r.total).toFixed(2)}` : null;
         results.push({
           type: "invoice",
@@ -431,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/invoices?open=${r.id}`,
         });
       }
-      for (const r of scRows.rows as any[]) {
+      if (canSeeContracts) for (const r of scRows.rows as any[]) {
         results.push({
           type: "service_contract",
           id: r.id,
@@ -440,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/contracts?open=${r.id}`,
         });
       }
-      for (const r of rcRows.rows as any[]) {
+      if (canSeeContracts) for (const r of rcRows.rows as any[]) {
         results.push({
           type: "rental_contract",
           id: r.id,
@@ -449,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/contracts?open=${r.id}`,
         });
       }
-      for (const r of fdRows.rows as any[]) {
+      if (canSeeFieldDiary) for (const r of fdRows.rows as any[]) {
         results.push({
           type: "field_diary",
           id: r.id,
@@ -458,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/field-diaries?open=${r.id}`,
         });
       }
-      for (const r of wRows.rows as any[]) {
+      if (canSeeStaff) for (const r of wRows.rows as any[]) {
         results.push({
           type: "staff",
           id: r.id,

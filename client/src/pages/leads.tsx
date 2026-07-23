@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
   Send, Search, X, Megaphone, Download, BookOpen, Flag,
   PhoneCall, CalendarClock, ClipboardCheck, FileText, UserCheck, Link2,
 } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
 import type { QuoteSubmission, Worker, Department } from "@shared/schema";
@@ -125,6 +125,16 @@ export default function Leads() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
+  const urlSearch = useSearch();
+  const openLeadId = new URLSearchParams(urlSearch).get("open");
+  const [highlightedLeadId, setHighlightedLeadId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openLeadId || leads.length === 0) return;
+    setHighlightedLeadId(openLeadId);
+    setTimeout(() => {
+      document.getElementById(`lead-row-${openLeadId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+  }, [leads, openLeadId]);
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
@@ -475,8 +485,8 @@ export default function Leads() {
                 </div>
                 <div className="space-y-2">
                   {colLeads.map(lead => (
+                    <div key={lead.id} id={`lead-row-${lead.id}`} className={highlightedLeadId === lead.id ? "ring-2 ring-blue-400 rounded-lg transition-all" : ""}>
                     <LeadCard
-                      key={lead.id}
                       lead={lead}
                       workers={workers}
                       onMarkContacted={() => advanceLead.mutate({ id: lead.id, status: "contacted" })}
@@ -516,6 +526,7 @@ export default function Leads() {
                         try { setEditClientFlags(JSON.parse((lead as any).clientFlags ?? "[]") ?? []); } catch { setEditClientFlags([]); }
                       }}
                     />
+                    </div>
                   ))}
                   {colLeads.length === 0 && (
                     <p className="text-xs text-gray-400 text-center py-4">No leads here</p>

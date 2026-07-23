@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Search, X, Loader2,
-  Building2, Briefcase, FileText, Receipt,
+  Building2, Briefcase, FileText, Receipt, UserPlus,
   FileCheck, BookOpen, Users, ClipboardList,
 } from "lucide-react";
 
@@ -22,7 +22,8 @@ interface SearchResponse {
 const TYPE_CONFIG: Record<string, { icon: React.ComponentType<any>; color: string; label: string }> = {
   client:           { icon: Building2,     color: "text-blue-600",   label: "Clients" },
   job:              { icon: Briefcase,     color: "text-green-600",  label: "Jobs" },
-  quote:            { icon: FileText,      color: "text-purple-600", label: "Quotes / Leads" },
+  quote:            { icon: FileText,      color: "text-purple-600", label: "Quotes" },
+  lead:             { icon: UserPlus,      color: "text-cyan-600",   label: "Leads" },
   invoice:          { icon: Receipt,       color: "text-amber-600",  label: "Invoices" },
   service_contract: { icon: FileCheck,     color: "text-teal-600",   label: "Service Contracts" },
   rental_contract:  { icon: ClipboardList, color: "text-indigo-600", label: "Rental Contracts" },
