@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -24,7 +24,7 @@ import {
   MessageSquare, FlaskConical, Package, FolderOpen, Plus, Trash2,
   ChevronDown, ChevronRight, Printer, TrendingUp, Users, Landmark,
   DollarSign, AlertCircle, CheckCircle2, Clock, Activity, MapPinned,
-  Star,
+  Star, Pencil,
 } from "lucide-react";
 import { ClientForm } from "@/components/forms/client-form";
 import ContractForm from "@/components/forms/contract-form";
@@ -136,6 +136,10 @@ type FieldDiary = {
   notes?: string; customerName?: string; status: string; createdAt?: string;
 };
 
+type LeadActivity = {
+  id: string; leadId: string; type: string; description: string; createdAt?: string;
+};
+
 type AcceptedWorkflow = {
   id: string; quoteId: string; quoteNumber?: string; companyName: string;
   contactPerson?: string; serviceType?: string; quoteAmount?: string;
@@ -155,8 +159,8 @@ type FinancialSummary = {
 
 const NOTE_TYPES = ["WhatsApp", "Phone", "Email", "In Person", "Other"] as const;
 const PAYMENT_METHODS = ["Bank Transfer", "EFT", "Cash", "Cheque", "Card", "Other"] as const;
-const LEAD_STATUSES = ["new", "follow_up", "appointment_booked", "quote_required", "quoted"];
-const CONVERTED_STATUSES = ["converted", "lost"];
+const LEAD_STATUSES  = ["new", "follow_up", "appointment_booked", "quote_required", "quoted"];
+const CLOSED_STATUSES = ["converted", "lost"];
 
 const DOC_CATEGORIES = [
   { label: "ISO Pest Control File",   icon: "🏷️", desc: "ISO compliance documentation" },
@@ -238,6 +242,104 @@ function InfoPair({ label, value, className }: { label: string; value?: string; 
 function EmptyState({ message }: { message: string }) {
   return (
     <Card><CardContent className="py-10 text-center text-muted-foreground">{message}</CardContent></Card>
+  );
+}
+
+function DebtorsCreditPanel({ client, updateMutation, financialSummary }: {
+  client: Client | null | undefined;
+  updateMutation: { mutate: (data: any) => void; isPending: boolean };
+  financialSummary?: { outstanding: number; overdue: number; aging: { current: number; days30: number; days60: number; days90plus: number } };
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [limitInput, setLimitInput] = React.useState("");
+
+  const creditLimit = client?.creditLimit ? Number(client.creditLimit) : 0;
+  const outstanding = financialSummary?.outstanding ?? 0;
+  const overdue = financialSummary?.overdue ?? 0;
+  const utilisation = creditLimit > 0 ? Math.min((outstanding / creditLimit) * 100, 100) : 0;
+
+  const accountStatus = overdue > 0 && creditLimit > 0 && outstanding >= creditLimit
+    ? "OVER LIMIT"
+    : overdue > 60 * 1
+      ? "ON HOLD"
+      : outstanding > 0
+        ? "ACTIVE"
+        : "CLEAR";
+
+  const statusColor: Record<string, string> = {
+    "OVER LIMIT": "bg-red-100 text-red-700 border-red-200",
+    "ON HOLD":    "bg-orange-100 text-orange-700 border-orange-200",
+    "ACTIVE":     "bg-amber-100 text-amber-700 border-amber-200",
+    "CLEAR":      "bg-green-100 text-green-700 border-green-200",
+  };
+
+  const handleSave = () => {
+    const val = parseFloat(limitInput);
+    if (!isNaN(val) && val >= 0) {
+      updateMutation.mutate({ creditLimit: val.toFixed(2) });
+    }
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex flex-wrap gap-6 items-start">
+      {/* Account status badge */}
+      <div className="flex flex-col gap-1 min-w-[120px]">
+        <span className="text-xs text-muted-foreground">Account Status</span>
+        <span className={`text-sm font-bold px-3 py-1.5 rounded-full border w-fit ${statusColor[accountStatus] ?? ""}`}>
+          {accountStatus}
+        </span>
+      </div>
+
+      {/* Credit limit with inline edit */}
+      <div className="flex flex-col gap-1 min-w-[180px]">
+        <span className="text-xs text-muted-foreground">Credit Limit</span>
+        {editing ? (
+          <div className="flex gap-2 items-center">
+            <input
+              autoFocus
+              type="number"
+              min="0"
+              step="100"
+              className="border rounded px-2 py-1 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-primary"
+              value={limitInput}
+              onChange={e => setLimitInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditing(false); }}
+            />
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>Save</Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>✕</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">
+              {creditLimit > 0 ? `R${creditLimit.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "Not set"}
+            </span>
+            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => { setLimitInput(creditLimit > 0 ? String(creditLimit) : ""); setEditing(true); }}>
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Utilisation bar */}
+      {creditLimit > 0 && (
+        <div className="flex-1 min-w-[160px] flex flex-col gap-1.5">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Used: R{outstanding.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+            <span>{utilisation.toFixed(0)}%</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-2 rounded-full transition-all ${utilisation >= 100 ? "bg-red-500" : utilisation >= 80 ? "bg-orange-400" : "bg-green-500"}`}
+              style={{ width: `${utilisation}%` }}
+            />
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Available: R{Math.max(0, creditLimit - outstanding).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -400,6 +502,24 @@ export default function ClientProfilePage() {
     enabled: !!id,
   });
 
+  // Lead activities — fetch per client's quotes (uses allQuotes, not derived clientQuotes)
+  const { data: allLeadActivities = [] } = useQuery<LeadActivity[]>({
+    queryKey: ["/api/lead-activities/client", id, allQuotes.length],
+    queryFn: async () => {
+      const relevantQuotes = allQuotes.filter(q =>
+        q.clientId === id || (client && q.companyName?.toLowerCase() === client.name?.toLowerCase())
+      ).slice(0, 20);
+      if (!relevantQuotes.length) return [];
+      const results = await Promise.all(
+        relevantQuotes.map(q =>
+          fetch(`/api/quote-submissions/${q.id}/activities`).then(r => r.ok ? r.json() : [])
+        )
+      );
+      return results.flat();
+    },
+    enabled: !!id && allQuotes.length > 0,
+  });
+
   // ── Derived lists ─────────────────────────────────────────────────────────
 
   const clientJobs           = allJobs.filter(j => j.clientId === id);
@@ -410,8 +530,8 @@ export default function ClientProfilePage() {
     q.clientId === id ||
     (client && q.companyName?.toLowerCase() === client.name?.toLowerCase())
   );
-  const clientLeads          = clientQuotes.filter(q => LEAD_STATUSES.includes(q.status));
-  const clientConvertedQuotes = clientQuotes.filter(q => CONVERTED_STATUSES.includes(q.status));
+  const clientLeads  = clientQuotes.filter(q => LEAD_STATUSES.includes(q.status));
+  const clientClosedQuotes = clientQuotes.filter(q => CLOSED_STATUSES.includes(q.status));
 
   // Field diaries — filter by clientId or by job belonging to this client
   const clientJobIds = new Set(clientJobs.map(j => j.id));
@@ -726,7 +846,7 @@ export default function ClientProfilePage() {
               <TabsTrigger value="contacts"><Users className="mr-1 h-3.5 w-3.5" />Contacts{contacts.length > 0 && <CountBadge n={contacts.length} />}</TabsTrigger>
               <TabsTrigger value="sites"><MapPinned className="mr-1 h-3.5 w-3.5" />Sites{sites.length > 0 && <CountBadge n={sites.length} />}</TabsTrigger>
               <TabsTrigger value="leads"><Star className="mr-1 h-3.5 w-3.5" />Leads{clientLeads.length > 0 && <CountBadge n={clientLeads.length} />}</TabsTrigger>
-              <TabsTrigger value="quotes"><FileText className="mr-1 h-3.5 w-3.5" />Quotes{clientConvertedQuotes.length > 0 && <CountBadge n={clientConvertedQuotes.length} />}</TabsTrigger>
+              <TabsTrigger value="quotes"><FileText className="mr-1 h-3.5 w-3.5" />Quotes{clientQuotes.length > 0 && <CountBadge n={clientQuotes.length} />}</TabsTrigger>
               <TabsTrigger value="accepted-work"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Accepted Work{clientAcceptedWorkflows.length > 0 && <CountBadge n={clientAcceptedWorkflows.length} />}</TabsTrigger>
               <TabsTrigger value="jobs"><Briefcase className="mr-1 h-3.5 w-3.5" />Jobs{clientJobs.length > 0 && <CountBadge n={clientJobs.length} />}</TabsTrigger>
               <TabsTrigger value="contracts"><ClipboardList className="mr-1 h-3.5 w-3.5" />Contracts{clientContracts.length > 0 && <CountBadge n={clientContracts.length} />}</TabsTrigger>
@@ -735,7 +855,7 @@ export default function ClientProfilePage() {
               <TabsTrigger value="payments"><CreditCard className="mr-1 h-3.5 w-3.5" />Payments{payments.length > 0 && <CountBadge n={payments.length} />}</TabsTrigger>
               <TabsTrigger value="debtors"><DollarSign className="mr-1 h-3.5 w-3.5" />Debtors</TabsTrigger>
               <TabsTrigger value="documents"><FolderOpen className="mr-1 h-3.5 w-3.5" />Documents</TabsTrigger>
-              <TabsTrigger value="activity"><Activity className="mr-1 h-3.5 w-3.5" />Activity{commNotes.length > 0 && <CountBadge n={commNotes.length} />}</TabsTrigger>
+              <TabsTrigger value="activity"><Activity className="mr-1 h-3.5 w-3.5" />Activity{(commNotes.length + allLeadActivities.length) > 0 && <CountBadge n={commNotes.length + allLeadActivities.length} />}</TabsTrigger>
             </TabsList>
 
             {/* ═══════════════════════ 1. OVERVIEW ═══════════════════════════════ */}
@@ -1018,8 +1138,8 @@ export default function ClientProfilePage() {
 
             {/* ═══════════════════════ 5. QUOTES ════════════════════════════════ */}
             <TabsContent value="quotes" className="mt-4">
-              {clientConvertedQuotes.length === 0 ? (
-                <EmptyState message="No converted or lost quotes for this client." />
+              {clientQuotes.length === 0 ? (
+                <EmptyState message="No quotes for this client." />
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="w-full text-sm">
@@ -1035,7 +1155,7 @@ export default function ClientProfilePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {clientConvertedQuotes.map(q => (
+                      {clientQuotes.map(q => (
                         <tr key={q.id} className="border-b last:border-0 hover:bg-gray-50">
                           <td className="px-3 py-2.5 font-mono text-xs font-semibold">{q.quoteNumber ?? "—"}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground hidden sm:table-cell">
@@ -1049,7 +1169,9 @@ export default function ClientProfilePage() {
                             {q.quoteAmount ? `R${Number(q.quoteAmount).toFixed(2)}` : "—"}
                           </td>
                           <td className="px-3 py-2.5">
-                            <Badge variant="outline" className="text-xs">{q.status}</Badge>
+                            <Badge variant="outline" className={`text-xs ${CLOSED_STATUSES.includes(q.status) ? "border-green-300 text-green-700" : ""}`}>
+                              {q.status.replace(/_/g, " ")}
+                            </Badge>
                           </td>
                           <td className="px-3 py-2.5">
                             <Link href="/leads">
@@ -1061,6 +1183,17 @@ export default function ClientProfilePage() {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot className="bg-gray-50 border-t">
+                      <tr>
+                        <td colSpan={4} className="px-3 py-2 text-xs text-muted-foreground">
+                          {clientLeads.length} open · {clientClosedQuotes.length} closed
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs font-bold">
+                          R{clientQuotes.reduce((s,q) => s + (q.quoteAmount ? Number(q.quoteAmount) : 0), 0).toFixed(2)}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
@@ -1509,6 +1642,13 @@ export default function ClientProfilePage() {
 
             {/* ═══════════════════════ 12. DEBTORS ═════════════════════════════ */}
             <TabsContent value="debtors" className="mt-4 space-y-4">
+              {/* Credit limit & account status control panel */}
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <DebtorsCreditPanel client={client} updateMutation={updateMutation} financialSummary={financialSummary} />
+                </CardContent>
+              </Card>
+
               {financialSummary ? (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1606,7 +1746,7 @@ export default function ClientProfilePage() {
             <TabsContent value="activity" className="mt-4">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-sm text-muted-foreground">
-                  {commNotes.length + treatmentRpts.length} activity items
+                  {commNotes.length + treatmentRpts.length + allLeadActivities.length} activity items
                 </span>
                 <Button size="sm" className="gap-1" onClick={() => {
                   setCnForm({ type: "Phone", noteDate: format(new Date(), "yyyy-MM-dd") });
@@ -1616,18 +1756,43 @@ export default function ClientProfilePage() {
                 </Button>
               </div>
 
-              {commNotes.length === 0 && treatmentRpts.length === 0 ? (
+              {commNotes.length === 0 && treatmentRpts.length === 0 && allLeadActivities.length === 0 ? (
                 <EmptyState message="No activity recorded for this client yet." />
               ) : (
                 <div className="space-y-2">
-                  {/* Merge and sort comm notes + treatment reports by date desc */}
+                  {/* Merge and sort: comm notes + treatment reports + lead activities (timeline) */}
                   {[
-                    ...commNotes.map(n => ({ type: "note" as const, date: n.noteDate, data: n })),
-                    ...treatmentRpts.map(r => ({ type: "report" as const, date: r.reportDate, data: r })),
+                    ...commNotes.map(n => ({ type: "note" as const, date: n.noteDate, sortKey: new Date(n.noteDate).getTime(), data: n })),
+                    ...treatmentRpts.map(r => ({ type: "report" as const, date: r.reportDate, sortKey: new Date(r.reportDate).getTime(), data: r })),
+                    ...allLeadActivities.map(a => ({ type: "lead_activity" as const, date: a.createdAt ?? "", sortKey: new Date(a.createdAt ?? 0).getTime(), data: a })),
                   ]
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .sort((a, b) => b.sortKey - a.sortKey)
                     .map(item => {
-                      if (item.type === "note") {
+                      if (item.type === "lead_activity") {
+                        const a = item.data as LeadActivity;
+                        const relatedQuote = clientQuotes.find(q => q.id === a.leadId);
+                        return (
+                          <Card key={`la-${a.id}`} className="overflow-hidden border-purple-100">
+                            <CardContent className="pt-3 pb-3">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <Star className="h-4 w-4 text-purple-400 shrink-0" />
+                                <span className="font-medium text-sm">
+                                  {a.createdAt ? format(new Date(a.createdAt), "dd MMM yyyy") : "—"}
+                                </span>
+                                <Badge className="bg-purple-100 text-purple-800 text-xs capitalize">
+                                  {a.type.replace(/_/g, " ")}
+                                </Badge>
+                                {relatedQuote?.quoteNumber && (
+                                  <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
+                                    {relatedQuote.quoteNumber}
+                                  </span>
+                                )}
+                                <span className="text-sm text-gray-700">{a.description}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      } else if (item.type === "note") {
                         const n = item.data as CommunicationNote;
                         const open = expandedCn === n.id;
                         return (
@@ -1653,10 +1818,10 @@ export default function ClientProfilePage() {
                             </button>
                             {open && (
                               <div className="border-t bg-gray-50 px-4 py-3 space-y-1.5 text-sm">
-                                <Row label="Date"         value={`${n.noteDate}${n.noteTime ? " " + n.noteTime : ""}`} />
-                                <Row label="Type"         value={n.type} />
-                                <Row label="Contact"      value={n.contactPerson} />
-                                <Row label="Confirmed"    value={n.confirmationReceived ? "Yes" : "No"} />
+                                <Row label="Date"      value={`${n.noteDate}${n.noteTime ? " " + n.noteTime : ""}`} />
+                                <Row label="Type"      value={n.type} />
+                                <Row label="Contact"   value={n.contactPerson} />
+                                <Row label="Confirmed" value={n.confirmationReceived ? "Yes" : "No"} />
                                 {n.createdBy && <Row label="Logged by" value={n.createdBy} />}
                                 <div className="pt-1"><span className="text-muted-foreground">Notes: </span><span className="whitespace-pre-line">{n.notes}</span></div>
                               </div>

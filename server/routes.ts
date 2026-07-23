@@ -573,24 +573,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getInvoicesByClient(clientId),
         storage.getClientPayments(clientId),
       ]);
-      const totalBilled   = invoices.reduce((s, i) => s + Number(i.total ?? 0), 0);
-      const totalPaid     = payments.reduce((s, p) => s + Number(p.amount ?? 0), 0);
-      const outstanding   = invoices
-        .filter(i => i.status !== "paid" && i.status !== "cancelled")
-        .reduce((s, i) => s + Number(i.total ?? 0), 0);
-      const overdue       = invoices
-        .filter(i => i.status === "overdue" || (i.status !== "paid" && i.status !== "cancelled" && new Date(i.dueDate) < new Date()))
-        .reduce((s, i) => s + Number(i.total ?? 0), 0);
-      // Aging: current / 30 / 60 / 90 days
+      const totalBilled = invoices.reduce((s, i) => s + Number(i.total ?? 0), 0);
+      const totalPaid   = payments.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+
+      // Build per-invoice allocated payment map to handle partial payments
+      const invoiceAllocated = new Map<string, number>();
+      for (const p of payments) {
+        if (p.invoiceId) {
+          invoiceAllocated.set(p.invoiceId, (invoiceAllocated.get(p.invoiceId) ?? 0) + Number(p.amount ?? 0));
+        }
+      }
+
+      const unpaidInvoices = invoices.filter(i => i.status !== "paid" && i.status !== "cancelled");
+
+      // Outstanding = sum of (invoice net of allocated payments), floored at 0 per invoice
+      const outstanding = unpaidInvoices.reduce((s, i) => {
+        const allocated = invoiceAllocated.get(i.id) ?? 0;
+        return s + Math.max(0, Number(i.total ?? 0) - allocated);
+      }, 0);
+
       const now = Date.now();
+      const overdue = unpaidInvoices
+        .filter(i => i.status === "overdue" || new Date(i.dueDate) < new Date())
+        .reduce((s, i) => {
+          const allocated = invoiceAllocated.get(i.id) ?? 0;
+          return s + Math.max(0, Number(i.total ?? 0) - allocated);
+        }, 0);
+
+      // Aging buckets based on due date, using net-of-payments amounts
       const aging = { current: 0, days30: 0, days60: 0, days90plus: 0 };
-      for (const inv of invoices.filter(i => i.status !== "paid" && i.status !== "cancelled")) {
+      for (const inv of unpaidInvoices) {
         const daysOld = Math.floor((now - new Date(inv.dueDate).getTime()) / 86400000);
-        const amt = Number(inv.total ?? 0);
-        if (daysOld <= 0)  aging.current   += amt;
-        else if (daysOld <= 30) aging.days30 += amt;
-        else if (daysOld <= 60) aging.days60 += amt;
-        else                    aging.days90plus += amt;
+        const allocated = invoiceAllocated.get(inv.id) ?? 0;
+        const net = Math.max(0, Number(inv.total ?? 0) - allocated);
+        if (daysOld <= 0)       aging.current    += net;
+        else if (daysOld <= 30) aging.days30     += net;
+        else if (daysOld <= 60) aging.days60     += net;
+        else                    aging.days90plus += net;
       }
       res.json({ totalBilled, totalPaid, outstanding, overdue, aging, invoiceCount: invoices.length, paymentCount: payments.length });
     } catch (error) {
