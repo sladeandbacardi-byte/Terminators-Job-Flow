@@ -35,7 +35,7 @@ export default function Invoices() {
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
   const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({ queryKey: ['/api/quote-submissions'] });
   const { data: serviceContracts = [] } = useQuery<any[]>({ queryKey: ['/api/service-contracts'] });
-  const { data: rentalContracts = [] } = useQuery<any[]>({ queryKey: ['/api/rental-contracts'] });
+  const { data: rentalContracts = [] } = useQuery<any[]>({ queryKey: ['/api/contracts'] });
 
   const clientMap = new Map(clients.map(client => [client.id, client]));
   const jobMap = new Map(jobs.map(j => [j.id, j]));

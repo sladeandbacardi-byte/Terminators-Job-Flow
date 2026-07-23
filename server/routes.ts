@@ -1286,6 +1286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         terms: "Payment due within 30 days.",
         linkedJobId: job.id,
         linkedQuoteId: (job as any).linkedQuoteId ?? null,
+        linkedContractId: (job as any).linkedContractId ?? null,
         legalEntityId,
         legalEntityName,
       } as any);

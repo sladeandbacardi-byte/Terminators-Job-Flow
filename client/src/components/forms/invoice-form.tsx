@@ -2,9 +2,10 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AlertCircle } from "lucide-react";
 import DocumentForm from "@/components/forms/document-form";
 import { type DocumentFormValues } from "@/components/forms/document-form-schema";
-import type { Invoice, Client, InvoiceItem } from "@shared/schema";
+import type { Invoice, Client, InvoiceItem, Job, QuoteSubmission } from "@shared/schema";
 
 interface InvoiceFormProps {
   invoice?: Invoice | null;
@@ -21,6 +22,32 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
     queryKey: ["/api/invoices", invoice?.id, "items"],
     enabled: !!invoice?.id,
   });
+
+  // Fetch source job and quote to detect legal-entity mismatches when editing
+  const linkedJobId = invoice ? (invoice as any).linkedJobId : null;
+  const linkedQuoteId = invoice ? (invoice as any).linkedQuoteId : null;
+  const { data: linkedJob } = useQuery<Job>({
+    queryKey: ["/api/jobs", linkedJobId],
+    enabled: !!linkedJobId,
+  });
+  const { data: allQuotes = [] } = useQuery<QuoteSubmission[]>({
+    queryKey: ["/api/quote-submissions"],
+    enabled: !!linkedQuoteId,
+  });
+  const linkedQuote = linkedQuoteId ? allQuotes.find((q: any) => q.id === linkedQuoteId) : null;
+
+  // Mismatch: invoice entity ≠ source entity from job or quote
+  const invoiceEntityId = invoice ? (invoice as any).legalEntityId : null;
+  const sourceEntityId =
+    (linkedJob as any)?.legalEntityId ||
+    (linkedQuote as any)?.legalEntityId ||
+    null;
+  const entityMismatch =
+    !!invoice &&
+    !!invoiceEntityId &&
+    !!sourceEntityId &&
+    invoiceEntityId !== sourceEntityId;
+  const invoiceEntityName = invoice ? (invoice as any).legalEntityName : null;
 
   // Build defaultValues from existing invoice + items when editing
   const editDefaults: Partial<DocumentFormValues> | undefined = invoice
@@ -106,14 +133,26 @@ export default function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFor
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <DocumentForm
-      docType="invoice"
-      clients={clients}
-      defaultValues={editDefaults}
-      isPending={isPending}
-      submitLabel={invoice ? "Update Invoice" : "Create Invoice"}
-      onSubmit={data => invoice ? updateMutation.mutate(data) : createMutation.mutate(data)}
-      onCancel={onCancel}
-    />
+    <div className="space-y-4">
+      {entityMismatch && (
+        <div className="flex items-start gap-3 rounded-md bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-800">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600" />
+          <span>
+            <strong>Legal entity mismatch:</strong> This invoice is billed under{" "}
+            <strong>{invoiceEntityName}</strong>, but the source job or quote is linked to a
+            different legal entity. Update the Legal Entity field below if this is incorrect.
+          </span>
+        </div>
+      )}
+      <DocumentForm
+        docType="invoice"
+        clients={clients}
+        defaultValues={editDefaults}
+        isPending={isPending}
+        submitLabel={invoice ? "Update Invoice" : "Create Invoice"}
+        onSubmit={data => invoice ? updateMutation.mutate(data) : createMutation.mutate(data)}
+        onCancel={onCancel}
+      />
+    </div>
   );
 }
