@@ -112,15 +112,30 @@ export default function Contracts() {
 
   const searchParams = useSearch();
   const openContractId = new URLSearchParams(searchParams).get('open');
+  const openContractKind = new URLSearchParams(searchParams).get('kind');
   useEffect(() => {
-    if (!openContractId || unifiedContracts.length === 0) return;
-    const found = unifiedContracts.find((c: any) => c.id === openContractId);
-    if (found) {
-      setEditingUnified(found);
-      setIsNewOpen(true);
-      window.history.replaceState(null, '', window.location.pathname);
+    if (!openContractId) return;
+    if (openContractKind === 'rental') {
+      const found = rentalContracts.find((c: any) => c.id === openContractId);
+      if (found) {
+        setEditingRental(found as any);
+        setIsRentalFormOpen(true);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    } else if (openContractKind === 'service') {
+      setTimeout(() => {
+        document.getElementById(`legacy-contract-row-${openContractId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        window.history.replaceState(null, '', window.location.pathname);
+      }, 200);
+    } else {
+      const found = unifiedContracts.find((c: any) => c.id === openContractId);
+      if (found) {
+        setEditingUnified(found);
+        setIsNewOpen(true);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
-  }, [unifiedContracts, openContractId]);
+  }, [unifiedContracts, serviceContracts, rentalContracts, openContractId, openContractKind]);
 
   // ── Department defaults helpers ─────────────────────────────────────────────
   const getDraftForDept = (deptName: string) => {
@@ -605,6 +620,7 @@ export default function Contracts() {
                   const isService = contract.contractType === "service";
                   const sc = isService ? (contract as ServiceContract) : null;
                   const rc = !isService ? (contract as RentalContract) : null;
+                  const legacyRowId = `legacy-contract-row-${contract.id}`;
                   const active = isActiveLegacy(contract);
                   const price = priceDisplay(contract);
                   const nextInc = nextIncreaseDate(contract);
@@ -615,7 +631,7 @@ export default function Contracts() {
                   const endingSoon = daysLeft !== null && daysLeft <= 30 && daysLeft >= 0;
 
                   return (
-                    <div key={contract.id} className="p-5 hover:bg-gray-50 transition-colors opacity-80">
+                    <div key={contract.id} id={legacyRowId} className="p-5 hover:bg-gray-50 transition-colors opacity-80">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-2">

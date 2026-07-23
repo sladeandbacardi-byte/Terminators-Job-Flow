@@ -459,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.contract_number || "Contract",
           sublabel: [r.customer_name, r.active_status ? "Active" : "Inactive"].filter(Boolean).join(" · "),
-          url: `/contracts?open=${r.id}`,
+          url: `/contracts?open=${r.id}&kind=service`,
         });
       }
       if (canSeeContracts) for (const r of rcRows.rows as any[]) {
@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.contract_number || "Rental",
           sublabel: [r.customer_name, r.is_active ? "Active" : "Inactive"].filter(Boolean).join(" · "),
-          url: `/contracts?open=${r.id}`,
+          url: `/contracts?open=${r.id}&kind=rental`,
         });
       }
       if (canSeeFieldDiary) for (const r of fdRows.rows as any[]) {
