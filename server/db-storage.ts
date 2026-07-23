@@ -2732,4 +2732,118 @@ export class DbStorage implements IStorage {
       .returning();
     return row;
   }
+
+  // ── Client Contacts ───────────────────────────────────────────────────────────
+
+  async getClientContacts(clientId: string) {
+    const { clientContacts } = await import("@shared/schema");
+    return db.select().from(clientContacts)
+      .where(eq(clientContacts.clientId, clientId))
+      .orderBy(desc(clientContacts.isPrimary), asc(clientContacts.firstName));
+  }
+
+  async getClientContact(id: string) {
+    const { clientContacts } = await import("@shared/schema");
+    const [row] = await db.select().from(clientContacts).where(eq(clientContacts.id, id)).limit(1);
+    return row;
+  }
+
+  async createClientContact(data: import("@shared/schema").InsertClientContact) {
+    const { clientContacts } = await import("@shared/schema");
+    const [row] = await db.insert(clientContacts)
+      .values({ id: randomUUID(), ...data, createdAt: new Date() })
+      .returning();
+    return row;
+  }
+
+  async updateClientContact(id: string, data: Partial<import("@shared/schema").InsertClientContact>) {
+    const { clientContacts } = await import("@shared/schema");
+    const [row] = await db.update(clientContacts)
+      .set(data)
+      .where(eq(clientContacts.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteClientContact(id: string) {
+    const { clientContacts } = await import("@shared/schema");
+    const r = await db.delete(clientContacts).where(eq(clientContacts.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  // ── Client Sites ──────────────────────────────────────────────────────────────
+
+  async getClientSites(clientId: string) {
+    const { clientSites } = await import("@shared/schema");
+    return db.select().from(clientSites)
+      .where(eq(clientSites.clientId, clientId))
+      .orderBy(asc(clientSites.siteName));
+  }
+
+  async getClientSite(id: string) {
+    const { clientSites } = await import("@shared/schema");
+    const [row] = await db.select().from(clientSites).where(eq(clientSites.id, id)).limit(1);
+    return row;
+  }
+
+  async createClientSite(data: import("@shared/schema").InsertClientSite) {
+    const { clientSites } = await import("@shared/schema");
+    const [row] = await db.insert(clientSites)
+      .values({ id: randomUUID(), ...data, createdAt: new Date() })
+      .returning();
+    return row;
+  }
+
+  async updateClientSite(id: string, data: Partial<import("@shared/schema").InsertClientSite>) {
+    const { clientSites } = await import("@shared/schema");
+    const [row] = await db.update(clientSites)
+      .set(data)
+      .where(eq(clientSites.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteClientSite(id: string) {
+    const { clientSites } = await import("@shared/schema");
+    const r = await db.delete(clientSites).where(eq(clientSites.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  // ── Client Payments ───────────────────────────────────────────────────────────
+
+  async getClientPayments(clientId: string) {
+    const { clientPayments } = await import("@shared/schema");
+    return db.select().from(clientPayments)
+      .where(eq(clientPayments.clientId, clientId))
+      .orderBy(desc(clientPayments.paymentDate));
+  }
+
+  async getClientPayment(id: string) {
+    const { clientPayments } = await import("@shared/schema");
+    const [row] = await db.select().from(clientPayments).where(eq(clientPayments.id, id)).limit(1);
+    return row;
+  }
+
+  async createClientPayment(data: import("@shared/schema").InsertClientPayment) {
+    const { clientPayments } = await import("@shared/schema");
+    const [row] = await db.insert(clientPayments)
+      .values({ id: randomUUID(), ...data, createdAt: new Date() })
+      .returning();
+    return row;
+  }
+
+  async updateClientPayment(id: string, data: Partial<import("@shared/schema").InsertClientPayment>) {
+    const { clientPayments } = await import("@shared/schema");
+    const [row] = await db.update(clientPayments)
+      .set(data)
+      .where(eq(clientPayments.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteClientPayment(id: string) {
+    const { clientPayments } = await import("@shared/schema");
+    const r = await db.delete(clientPayments).where(eq(clientPayments.id, id));
+    return (r.rowCount ?? 0) > 0;
+  }
 }

@@ -436,6 +436,27 @@ export interface IStorage {
   getLegalEntity(id: string): Promise<import("@shared/schema").LegalEntity | undefined>;
   createLegalEntity(entity: import("@shared/schema").InsertLegalEntity): Promise<import("@shared/schema").LegalEntity>;
   updateLegalEntity(id: string, entity: Partial<import("@shared/schema").InsertLegalEntity>): Promise<import("@shared/schema").LegalEntity>;
+
+  // Client Contacts
+  getClientContacts(clientId: string): Promise<import("@shared/schema").ClientContact[]>;
+  getClientContact(id: string): Promise<import("@shared/schema").ClientContact | undefined>;
+  createClientContact(c: import("@shared/schema").InsertClientContact): Promise<import("@shared/schema").ClientContact>;
+  updateClientContact(id: string, c: Partial<import("@shared/schema").InsertClientContact>): Promise<import("@shared/schema").ClientContact>;
+  deleteClientContact(id: string): Promise<boolean>;
+
+  // Client Sites
+  getClientSites(clientId: string): Promise<import("@shared/schema").ClientSite[]>;
+  getClientSite(id: string): Promise<import("@shared/schema").ClientSite | undefined>;
+  createClientSite(s: import("@shared/schema").InsertClientSite): Promise<import("@shared/schema").ClientSite>;
+  updateClientSite(id: string, s: Partial<import("@shared/schema").InsertClientSite>): Promise<import("@shared/schema").ClientSite>;
+  deleteClientSite(id: string): Promise<boolean>;
+
+  // Client Payments
+  getClientPayments(clientId: string): Promise<import("@shared/schema").ClientPayment[]>;
+  getClientPayment(id: string): Promise<import("@shared/schema").ClientPayment | undefined>;
+  createClientPayment(p: import("@shared/schema").InsertClientPayment): Promise<import("@shared/schema").ClientPayment>;
+  updateClientPayment(id: string, p: Partial<import("@shared/schema").InsertClientPayment>): Promise<import("@shared/schema").ClientPayment>;
+  deleteClientPayment(id: string): Promise<boolean>;
 }
 
 export interface BackupLog {

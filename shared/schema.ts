@@ -1945,3 +1945,70 @@ export const insertLegalEntitySchema = createInsertSchema(legalEntities).omit({
 });
 export type InsertLegalEntity = z.infer<typeof insertLegalEntitySchema>;
 export type LegalEntity = typeof legalEntities.$inferSelect;
+
+// ── Client Contacts ───────────────────────────────────────────────────────────
+// Multiple contacts per client (key people at the account)
+export const clientContacts = pgTable("client_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name"),
+  jobTitle: text("job_title"),
+  email: text("email"),
+  phone: text("phone"),
+  mobile: text("mobile"),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertClientContactSchema = createInsertSchema(clientContacts).omit({
+  id: true, createdAt: true,
+});
+export type InsertClientContact = z.infer<typeof insertClientContactSchema>;
+export type ClientContact = typeof clientContacts.$inferSelect;
+
+// ── Client Sites ──────────────────────────────────────────────────────────────
+// Multiple service sites / locations per client
+export const clientSites = pgTable("client_sites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  siteName: text("site_name").notNull(),
+  streetNumber: text("street_number"),
+  streetName: text("street_name"),
+  suburb: text("suburb"),
+  city: text("city"),
+  province: text("province"),
+  postalCode: text("postal_code"),
+  googleMapsLink: text("google_maps_link"),
+  contactName: text("contact_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertClientSiteSchema = createInsertSchema(clientSites).omit({
+  id: true, createdAt: true,
+});
+export type InsertClientSite = z.infer<typeof insertClientSiteSchema>;
+export type ClientSite = typeof clientSites.$inferSelect;
+
+// ── Client Payments ───────────────────────────────────────────────────────────
+// Payment records (can link to an invoice, or be a standalone receipt)
+export const clientPayments = pgTable("client_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  invoiceId: varchar("invoice_id"),
+  paymentDate: text("payment_date").notNull(), // YYYY-MM-DD
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  method: text("method").notNull().default("Bank Transfer"), // Bank Transfer | Cash | EFT | Cheque | Card | Other
+  reference: text("reference"),
+  notes: text("notes"),
+  allocatedBy: text("allocated_by"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+export const insertClientPaymentSchema = createInsertSchema(clientPayments).omit({
+  id: true, createdAt: true,
+});
+export type InsertClientPayment = z.infer<typeof insertClientPaymentSchema>;
+export type ClientPayment = typeof clientPayments.$inferSelect;

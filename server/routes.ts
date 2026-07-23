@@ -463,6 +463,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // ── Client Contacts ──────────────────────────────────────────────────────────
+  app.get("/api/clients/:clientId/contacts", async (req, res) => {
+    const list = await storage.getClientContacts(req.params.clientId);
+    res.json(list);
+  });
+
+  app.post("/api/clients/:clientId/contacts", async (req, res) => {
+    try {
+      const { insertClientContactSchema } = await import("@shared/schema");
+      const data = insertClientContactSchema.parse({ ...req.body, clientId: req.params.clientId });
+      const created = await storage.createClientContact(data);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid contact data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.patch("/api/client-contacts/:id", async (req, res) => {
+    try {
+      const { insertClientContactSchema } = await import("@shared/schema");
+      const data = insertClientContactSchema.partial().parse(req.body);
+      const updated = await storage.updateClientContact(req.params.id, data);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid contact data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.delete("/api/client-contacts/:id", async (req, res) => {
+    const deleted = await storage.deleteClientContact(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Contact not found" });
+    res.status(204).send();
+  });
+
+  // ── Client Sites ─────────────────────────────────────────────────────────────
+  app.get("/api/clients/:clientId/sites", async (req, res) => {
+    const list = await storage.getClientSites(req.params.clientId);
+    res.json(list);
+  });
+
+  app.post("/api/clients/:clientId/sites", async (req, res) => {
+    try {
+      const { insertClientSiteSchema } = await import("@shared/schema");
+      const data = insertClientSiteSchema.parse({ ...req.body, clientId: req.params.clientId });
+      const created = await storage.createClientSite(data);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid site data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.patch("/api/client-sites/:id", async (req, res) => {
+    try {
+      const { insertClientSiteSchema } = await import("@shared/schema");
+      const data = insertClientSiteSchema.partial().parse(req.body);
+      const updated = await storage.updateClientSite(req.params.id, data);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid site data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.delete("/api/client-sites/:id", async (req, res) => {
+    const deleted = await storage.deleteClientSite(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Site not found" });
+    res.status(204).send();
+  });
+
+  // ── Client Payments ──────────────────────────────────────────────────────────
+  app.get("/api/clients/:clientId/payments", async (req, res) => {
+    const list = await storage.getClientPayments(req.params.clientId);
+    res.json(list);
+  });
+
+  app.post("/api/clients/:clientId/payments", async (req, res) => {
+    try {
+      const { insertClientPaymentSchema } = await import("@shared/schema");
+      const data = insertClientPaymentSchema.parse({ ...req.body, clientId: req.params.clientId });
+      const created = await storage.createClientPayment(data);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid payment data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.patch("/api/client-payments/:id", async (req, res) => {
+    try {
+      const { insertClientPaymentSchema } = await import("@shared/schema");
+      const data = insertClientPaymentSchema.partial().parse(req.body);
+      const updated = await storage.updateClientPayment(req.params.id, data);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid payment data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.delete("/api/client-payments/:id", async (req, res) => {
+    const deleted = await storage.deleteClientPayment(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Payment not found" });
+    res.status(204).send();
+  });
+
+  // ── Client Financial Summary ──────────────────────────────────────────────────
+  app.get("/api/clients/:clientId/financial-summary", async (req, res) => {
+    try {
+      const clientId = req.params.clientId;
+      const [invoices, payments] = await Promise.all([
+        storage.getInvoicesByClient(clientId),
+        storage.getClientPayments(clientId),
+      ]);
+      const totalBilled   = invoices.reduce((s, i) => s + Number(i.total ?? 0), 0);
+      const totalPaid     = payments.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      const outstanding   = invoices
+        .filter(i => i.status !== "paid" && i.status !== "cancelled")
+        .reduce((s, i) => s + Number(i.total ?? 0), 0);
+      const overdue       = invoices
+        .filter(i => i.status === "overdue" || (i.status !== "paid" && i.status !== "cancelled" && new Date(i.dueDate) < new Date()))
+        .reduce((s, i) => s + Number(i.total ?? 0), 0);
+      // Aging: current / 30 / 60 / 90 days
+      const now = Date.now();
+      const aging = { current: 0, days30: 0, days60: 0, days90plus: 0 };
+      for (const inv of invoices.filter(i => i.status !== "paid" && i.status !== "cancelled")) {
+        const daysOld = Math.floor((now - new Date(inv.dueDate).getTime()) / 86400000);
+        const amt = Number(inv.total ?? 0);
+        if (daysOld <= 0)  aging.current   += amt;
+        else if (daysOld <= 30) aging.days30 += amt;
+        else if (daysOld <= 60) aging.days60 += amt;
+        else                    aging.days90plus += amt;
+      }
+      res.json({ totalBilled, totalPaid, outstanding, overdue, aging, invoiceCount: invoices.length, paymentCount: payments.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to compute financial summary" });
+    }
+  });
+
   // Inventory Items
   app.get("/api/inventory", async (req, res) => {
     const { type, departmentId } = req.query;
