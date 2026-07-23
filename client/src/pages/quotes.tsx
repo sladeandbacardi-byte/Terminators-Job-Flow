@@ -696,11 +696,12 @@ interface QuoteCardProps {
   allWorkers: Worker[];
   clients: Client[];
   departments: Department[];
+  defaultExpanded?: boolean;
 }
 
-function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments }: QuoteCardProps) {
+function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments, defaultExpanded }: QuoteCardProps) {
   const [, navigate] = useLocation();
-  const [expanded, setExpanded]       = useState(false);
+  const [expanded, setExpanded]       = useState(defaultExpanded ?? false);
   const [notes, setNotes]             = useState(quote.notes ?? "");
   const [editingNotes, setEditingNotes] = useState(false);
 
@@ -1609,8 +1610,20 @@ export default function QuotesPage() {
   const [statusFilter, setStatusFilter]   = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [showNewQuote, setShowNewQuote]   = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
+
+  useEffect(() => {
+    const openId = new URLSearchParams(window.location.search).get('open');
+    if (!openId || quotes.length === 0) return;
+    const found = quotes.find(q => q.id === openId);
+    if (found) {
+      setHighlightedId(found.id);
+      setStatusFilter("all");
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [quotes]);
   const { data: workers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: clients = [] }     = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
@@ -1705,6 +1718,7 @@ export default function QuotesPage() {
                       allWorkers={workers}
                       clients={clients}
                       departments={departments}
+                      defaultExpanded={highlightedId === q.id}
                     />
                   ))}
               </div>

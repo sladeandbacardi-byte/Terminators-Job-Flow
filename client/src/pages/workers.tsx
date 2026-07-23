@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,17 @@ export default function Workers() {
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
   });
+
+  useEffect(() => {
+    const openId = new URLSearchParams(window.location.search).get('open');
+    if (!openId || workers.length === 0) return;
+    const found = workers.find(w => w.id === openId);
+    if (found) {
+      setSelectedWorker(found);
+      setShowWorkerForm(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [workers]);
 
   const getDeptName = (id: string | null) => {
     if (!id) return "Office / Management";

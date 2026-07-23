@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import JobForm from "@/components/forms/job-form";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,17 @@ export default function Jobs() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
 
   const { data: jobs = [], isLoading } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
+
+  useEffect(() => {
+    const openId = new URLSearchParams(window.location.search).get('open');
+    if (!openId || jobs.length === 0) return;
+    const found = jobs.find(j => j.id === openId);
+    if (found) {
+      setEditingJob(found);
+      setIsJobFormOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [jobs]);
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ['/api/workers'] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ['/api/departments'] });

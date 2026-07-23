@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -94,10 +94,26 @@ export default function FieldDiaries() {
   // Details Dialog
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
+  // ── Deep-link: ?open=<diaryId> from global search
+  const [openDiaryId] = useState(() => new URLSearchParams(window.location.search).get('open'));
+  const { data: openDiary } = useQuery<any>({
+    queryKey: [`/api/field-diaries/${openDiaryId}`],
+    enabled: !!openDiaryId,
+  });
+
   // ── Queries
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+
+  useEffect(() => {
+    if (!openDiary || jobs.length === 0) return;
+    const job = jobs.find(j => j.id === openDiary.jobId);
+    if (job) {
+      setSelectedJob(job);
+      window.history.replaceState(null, '', '/field-diaries');
+    }
+  }, [openDiary, jobs]);
 
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients]);
 

@@ -410,7 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const jobLabel = r.job_number || r.title;
         const jobSub = [r.job_number && r.title !== r.job_number ? r.title : null, r.client_name, r.status]
           .filter(Boolean).join(" · ");
-        results.push({ type: "job", id: r.id, label: jobLabel, sublabel: jobSub, url: `/jobs` });
+        results.push({ type: "job", id: r.id, label: jobLabel, sublabel: jobSub, url: `/jobs?open=${r.id}` });
       }
       for (const r of qRows.rows as any[]) {
         results.push({
@@ -418,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.quote_number || r.company_name,
           sublabel: [r.company_name, r.contact_person, r.status].filter(Boolean).join(" · "),
-          url: `/quotes`,
+          url: `/quotes?open=${r.id}`,
         });
       }
       for (const r of iRows.rows as any[]) {
@@ -428,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.invoice_number,
           sublabel: [r.client_name, r.status, amt].filter(Boolean).join(" · "),
-          url: `/invoices`,
+          url: `/invoices?open=${r.id}`,
         });
       }
       for (const r of scRows.rows as any[]) {
@@ -437,7 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.contract_number || "Contract",
           sublabel: [r.customer_name, r.active_status ? "Active" : "Inactive"].filter(Boolean).join(" · "),
-          url: `/contracts`,
+          url: `/contracts?open=${r.id}`,
         });
       }
       for (const r of rcRows.rows as any[]) {
@@ -446,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.contract_number || "Rental",
           sublabel: [r.customer_name, r.is_active ? "Active" : "Inactive"].filter(Boolean).join(" · "),
-          url: `/contracts`,
+          url: `/contracts?open=${r.id}`,
         });
       }
       for (const r of fdRows.rows as any[]) {
@@ -455,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.diary_number,
           sublabel: [r.client_name, r.job_number, r.worker_name].filter(Boolean).join(" · "),
-          url: `/field-diaries`,
+          url: `/field-diaries?open=${r.id}`,
         });
       }
       for (const r of wRows.rows as any[]) {
@@ -464,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: r.id,
           label: r.name,
           sublabel: [r.role, r.email].filter(Boolean).join(" · "),
-          url: `/workers`,
+          url: `/workers?open=${r.id}`,
         });
       }
 
