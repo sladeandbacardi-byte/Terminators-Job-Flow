@@ -316,6 +316,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // ── Global Search ──────────────────────────────────────────────────────────
+  app.get("/api/search", async (req, res) => {
+    const q = ((req.query.q as string) || "").trim();
+    if (q.length < 2) return res.json({ results: [] });
+
+    const pattern = `%${q}%`;
+
+    try {
+      const [cRows, jRows, qRows, iRows, scRows, rcRows, fdRows, wRows] = await Promise.all([
+        db.execute(sql`
+          SELECT id, name, trading_name, contact_person, phone, email
+          FROM clients
+          WHERE name ILIKE ${pattern}
+             OR trading_name ILIKE ${pattern}
+             OR contact_person ILIKE ${pattern}
+             OR phone ILIKE ${pattern}
+             OR email ILIKE ${pattern}
+          ORDER BY name LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT j.id, j.job_number, j.title, j.status, c.name AS client_name
+          FROM jobs j
+          LEFT JOIN clients c ON c.id = j.client_id
+          WHERE j.job_number ILIKE ${pattern}
+             OR j.title ILIKE ${pattern}
+             OR c.name ILIKE ${pattern}
+          ORDER BY j.created_at DESC LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT id, quote_number, company_name, contact_person, phone, email, status
+          FROM quote_submissions
+          WHERE quote_number ILIKE ${pattern}
+             OR company_name ILIKE ${pattern}
+             OR contact_person ILIKE ${pattern}
+             OR phone ILIKE ${pattern}
+             OR email ILIKE ${pattern}
+          ORDER BY submitted_at DESC LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT i.id, i.invoice_number, i.status, i.total, c.name AS client_name
+          FROM invoices i
+          LEFT JOIN clients c ON c.id = i.client_id
+          WHERE i.invoice_number ILIKE ${pattern}
+             OR c.name ILIKE ${pattern}
+          ORDER BY i.created_at DESC LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT id, contract_number, customer_name, active_status
+          FROM service_contracts
+          WHERE contract_number ILIKE ${pattern}
+             OR customer_name ILIKE ${pattern}
+          ORDER BY created_at DESC LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT id, contract_number, customer_name, is_active
+          FROM rental_contracts
+          WHERE contract_number ILIKE ${pattern}
+             OR customer_name ILIKE ${pattern}
+          ORDER BY created_at DESC LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT id, diary_number, client_name, job_number, worker_name
+          FROM field_diaries
+          WHERE diary_number ILIKE ${pattern}
+             OR client_name ILIKE ${pattern}
+             OR job_number ILIKE ${pattern}
+             OR worker_name ILIKE ${pattern}
+          ORDER BY created_at DESC LIMIT 5
+        `),
+        db.execute(sql`
+          SELECT id, name, role, email, phone
+          FROM workers
+          WHERE name ILIKE ${pattern}
+             OR email ILIKE ${pattern}
+             OR phone ILIKE ${pattern}
+          ORDER BY name LIMIT 5
+        `),
+      ]);
+
+      const results: any[] = [];
+
+      for (const r of cRows.rows as any[]) {
+        results.push({
+          type: "client",
+          id: r.id,
+          label: r.trading_name ? `${r.name} (${r.trading_name})` : r.name,
+          sublabel: [r.contact_person, r.phone].filter(Boolean).join(" · "),
+          url: `/clients/${r.id}`,
+        });
+      }
+      for (const r of jRows.rows as any[]) {
+        const jobLabel = r.job_number || r.title;
+        const jobSub = [r.job_number && r.title !== r.job_number ? r.title : null, r.client_name, r.status]
+          .filter(Boolean).join(" · ");
+        results.push({ type: "job", id: r.id, label: jobLabel, sublabel: jobSub, url: `/jobs` });
+      }
+      for (const r of qRows.rows as any[]) {
+        results.push({
+          type: "quote",
+          id: r.id,
+          label: r.quote_number || r.company_name,
+          sublabel: [r.company_name, r.contact_person, r.status].filter(Boolean).join(" · "),
+          url: `/quotes`,
+        });
+      }
+      for (const r of iRows.rows as any[]) {
+        const amt = r.total ? `R ${parseFloat(r.total).toFixed(2)}` : null;
+        results.push({
+          type: "invoice",
+          id: r.id,
+          label: r.invoice_number,
+          sublabel: [r.client_name, r.status, amt].filter(Boolean).join(" · "),
+          url: `/invoices`,
+        });
+      }
+      for (const r of scRows.rows as any[]) {
+        results.push({
+          type: "service_contract",
+          id: r.id,
+          label: r.contract_number || "Contract",
+          sublabel: [r.customer_name, r.active_status ? "Active" : "Inactive"].filter(Boolean).join(" · "),
+          url: `/contracts`,
+        });
+      }
+      for (const r of rcRows.rows as any[]) {
+        results.push({
+          type: "rental_contract",
+          id: r.id,
+          label: r.contract_number || "Rental",
+          sublabel: [r.customer_name, r.is_active ? "Active" : "Inactive"].filter(Boolean).join(" · "),
+          url: `/contracts`,
+        });
+      }
+      for (const r of fdRows.rows as any[]) {
+        results.push({
+          type: "field_diary",
+          id: r.id,
+          label: r.diary_number,
+          sublabel: [r.client_name, r.job_number, r.worker_name].filter(Boolean).join(" · "),
+          url: `/field-diaries`,
+        });
+      }
+      for (const r of wRows.rows as any[]) {
+        results.push({
+          type: "staff",
+          id: r.id,
+          label: r.name,
+          sublabel: [r.role, r.email].filter(Boolean).join(" · "),
+          url: `/workers`,
+        });
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({ error: "Search failed", results: [] });
+    }
+  });
+
   // Divisions
   app.get("/api/departments", async (req, res) => {
     const departments = await storage.getDepartments();

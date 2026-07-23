@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import GlobalSearch from "./global-search";
 
 interface HeaderProps {
   title?: string;
@@ -173,6 +174,11 @@ export default function Header({ title, subtitle, onMobileMenuToggle }: HeaderPr
               )}
             </div>
           )}
+        </div>
+
+        {/* CENTRE — global search */}
+        <div className="flex-1 flex justify-center px-2 max-w-xs sm:max-w-sm lg:max-w-md mx-auto">
+          <GlobalSearch />
         </div>
 
         {/* RIGHT — demo badge + time + notifications + user */}
