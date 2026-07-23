@@ -565,7 +565,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  // ── Client Financial Summary ──────────────────────────────────────────────────
+  // ── Nested PATCH/DELETE for contacts under /api/clients/:clientId/contacts/:id ──
+  app.patch("/api/clients/:clientId/contacts/:id", async (req, res) => {
+    try {
+      const { insertClientContactSchema } = await import("@shared/schema");
+      const data = insertClientContactSchema.partial().parse(req.body);
+      const updated = await storage.updateClientContact(req.params.id, data);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid contact data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+  app.delete("/api/clients/:clientId/contacts/:id", async (req, res) => {
+    const deleted = await storage.deleteClientContact(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Contact not found" });
+    res.status(204).send();
+  });
+
+  // ── Nested PATCH/DELETE for sites under /api/clients/:clientId/sites/:id ──────
+  app.patch("/api/clients/:clientId/sites/:id", async (req, res) => {
+    try {
+      const { insertClientSiteSchema } = await import("@shared/schema");
+      const data = insertClientSiteSchema.partial().parse(req.body);
+      const updated = await storage.updateClientSite(req.params.id, data);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid site data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+  app.delete("/api/clients/:clientId/sites/:id", async (req, res) => {
+    const deleted = await storage.deleteClientSite(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Site not found" });
+    res.status(204).send();
+  });
+
+  // ── Global /api/payments endpoint ─────────────────────────────────────────────
+  app.get("/api/payments", async (req, res) => {
+    const { clientId } = req.query;
+    if (clientId) {
+      const list = await storage.getClientPayments(clientId as string);
+      return res.json(list);
+    }
+    // Return all payments (admin view) — reuse per-client method isn't available globally
+    // so we call the storage method with a special flag; for now fall back to empty
+    res.json([]);
+  });
+  app.post("/api/payments", async (req, res) => {
+    try {
+      const { insertClientPaymentSchema } = await import("@shared/schema");
+      const data = insertClientPaymentSchema.parse(req.body);
+      const created = await storage.createClientPayment(data);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid payment data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+  app.delete("/api/payments/:id", async (req, res) => {
+    const deleted = await storage.deleteClientPayment(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Payment not found" });
+    res.status(204).send();
+  });
+
+  // ── Client activity log endpoint ───────────────────────────────────────────────
+  app.get("/api/clients/:clientId/activity", async (req, res) => {
+    try {
+      const logs = await storage.getActivityLogsByClient(req.params.clientId);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+
+  // ── Client Financial Summary (both URLs: /summary and /financial-summary) ─────
+  app.get("/api/clients/:clientId/summary", async (req, res) => {
+    req.params.clientId = req.params.clientId;
+    // forward to same handler as financial-summary
+    const clientId = req.params.clientId;
+    try {
+      const [invoices, payments] = await Promise.all([
+        storage.getInvoicesByClient(clientId),
+        storage.getClientPayments(clientId),
+      ]);
+      const totalBilled = invoices.reduce((s, i) => s + Number(i.total ?? 0), 0);
+      const totalPaid   = payments.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      const invoiceAllocated = new Map<string, number>();
+      for (const p of payments) {
+        if (p.invoiceId) invoiceAllocated.set(p.invoiceId, (invoiceAllocated.get(p.invoiceId) ?? 0) + Number(p.amount ?? 0));
+      }
+      const unpaidInvoices = invoices.filter(i => i.status !== "paid" && i.status !== "cancelled");
+      const outstanding = unpaidInvoices.reduce((s, i) => {
+        const allocated = invoiceAllocated.get(i.id) ?? 0;
+        return s + Math.max(0, Number(i.total ?? 0) - allocated);
+      }, 0);
+      const now = Date.now();
+      const overdue = unpaidInvoices.filter(i => i.status === "overdue" || new Date(i.dueDate) < new Date())
+        .reduce((s, i) => s + Math.max(0, Number(i.total ?? 0) - (invoiceAllocated.get(i.id) ?? 0)), 0);
+      const aging = { current: 0, days30: 0, days60: 0, days90plus: 0 };
+      for (const inv of unpaidInvoices) {
+        const daysOld = Math.floor((now - new Date(inv.dueDate).getTime()) / 86400000);
+        const net = Math.max(0, Number(inv.total ?? 0) - (invoiceAllocated.get(inv.id) ?? 0));
+        if (daysOld <= 0) aging.current += net;
+        else if (daysOld <= 30) aging.days30 += net;
+        else if (daysOld <= 60) aging.days60 += net;
+        else aging.days90plus += net;
+      }
+      // Per-invoice paid amounts for UI balance columns
+      const invoiceBalances: Record<string, number> = {};
+      for (const inv of invoices) {
+        invoiceBalances[inv.id] = invoiceAllocated.get(inv.id) ?? 0;
+      }
+      res.json({ totalBilled, totalPaid, outstanding, overdue, aging, invoiceCount: invoices.length, paymentCount: payments.length, invoiceBalances });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to compute financial summary" });
+    }
+  });
+
   app.get("/api/clients/:clientId/financial-summary", async (req, res) => {
     try {
       const clientId = req.params.clientId;

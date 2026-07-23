@@ -213,6 +213,7 @@ export const jobs = pgTable("jobs", {
   quantity: decimal("quantity", { precision: 10, scale: 2 }),
   vatIncluded: boolean("vat_included").default(false),
   linkedContractId: varchar("linked_contract_id"),
+  siteId: varchar("site_id"),          // optional link to client_sites
   treatmentType: text("treatment_type"),
   otherPestType: text("other_pest_type"),
   serviceCategory: text("service_category"),
@@ -615,6 +616,7 @@ export const activityLogs = pgTable("activity_logs", {
   // workers), and this column records the id of whichever one performed the
   // action, so it can't be constrained to a single table.
   userId: varchar("user_id").notNull(),
+  clientId: varchar("client_id"),     // optional — allows filtering logs by client
   action: varchar("action").notNull(), // login, logout, create_invoice, update_client, etc.
   resource: varchar("resource"), // invoices, clients, workers, etc.
   resourceId: varchar("resource_id"), // specific record ID
@@ -1176,6 +1178,7 @@ export const serviceContracts = pgTable("service_contracts", {
   estimatedDuration: integer("estimated_duration"),        // minutes
   googleMapsLink: text("google_maps_link"),
   address: text("address"),
+  siteId: varchar("site_id"),          // optional link to client_sites
   notes: text("notes"),
   // Pricing / contract admin
   contractPrice: text("contract_price"),              // stored as text to allow decimals without precision loss
@@ -1957,7 +1960,10 @@ export const clientContacts = pgTable("client_contacts", {
   email: text("email"),
   phone: text("phone"),
   mobile: text("mobile"),
+  preferredContact: text("preferred_contact").default("Email"), // Email | Phone | Mobile | WhatsApp
   isPrimary: boolean("is_primary").notNull().default(false),
+  isBilling: boolean("is_billing").notNull().default(false),
+  isSite: boolean("is_site").notNull().default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -1979,7 +1985,9 @@ export const clientSites = pgTable("client_sites", {
   city: text("city"),
   province: text("province"),
   postalCode: text("postal_code"),
-  googleMapsLink: text("google_maps_link"),
+  gpsLink: text("gps_link"),          // renamed from googleMapsLink; same concept
+  googleMapsLink: text("google_maps_link"), // kept for backward compat
+  isPrimary: boolean("is_primary").notNull().default(false),
   contactName: text("contact_name"),
   contactPhone: text("contact_phone"),
   contactEmail: text("contact_email"),

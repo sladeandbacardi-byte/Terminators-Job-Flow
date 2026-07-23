@@ -153,6 +153,12 @@ type FinancialSummary = {
   totalBilled: number; totalPaid: number; outstanding: number; overdue: number;
   aging: { current: number; days30: number; days60: number; days90plus: number };
   invoiceCount: number; paymentCount: number;
+  invoiceBalances?: Record<string, number>; // invoiceId → amount paid
+};
+
+type ActivityLogEntry = {
+  id: string; userId: string; clientId?: string; action: string;
+  resource?: string; resourceId?: string; details?: string; timestamp?: string;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -252,26 +258,30 @@ function DebtorsCreditPanel({ client, updateMutation, financialSummary }: {
 }) {
   const [editing, setEditing] = React.useState(false);
   const [limitInput, setLimitInput] = React.useState("");
+  const [statusEdit, setStatusEdit] = React.useState(false);
+  const [statusValue, setStatusValue] = React.useState(client?.status ?? "active");
 
   const creditLimit = client?.creditLimit ? Number(client.creditLimit) : 0;
   const outstanding = financialSummary?.outstanding ?? 0;
   const overdue = financialSummary?.overdue ?? 0;
   const utilisation = creditLimit > 0 ? Math.min((outstanding / creditLimit) * 100, 100) : 0;
 
-  const accountStatus = overdue > 0 && creditLimit > 0 && outstanding >= creditLimit
+  const debtorStatus = overdue > 0 && creditLimit > 0 && outstanding >= creditLimit
     ? "OVER LIMIT"
-    : overdue > 60 * 1
-      ? "ON HOLD"
+    : overdue > 0
+      ? "OVERDUE"
       : outstanding > 0
-        ? "ACTIVE"
+        ? "CURRENT"
         : "CLEAR";
 
-  const statusColor: Record<string, string> = {
+  const debtorStatusColor: Record<string, string> = {
     "OVER LIMIT": "bg-red-100 text-red-700 border-red-200",
-    "ON HOLD":    "bg-orange-100 text-orange-700 border-orange-200",
-    "ACTIVE":     "bg-amber-100 text-amber-700 border-amber-200",
+    "OVERDUE":    "bg-orange-100 text-orange-700 border-orange-200",
+    "CURRENT":    "bg-amber-100 text-amber-700 border-amber-200",
     "CLEAR":      "bg-green-100 text-green-700 border-green-200",
   };
+
+  const ACCOUNT_STATUSES = ["active", "on_hold", "suspended", "inactive", "blacklisted"];
 
   const handleSave = () => {
     const val = parseFloat(limitInput);
@@ -281,14 +291,51 @@ function DebtorsCreditPanel({ client, updateMutation, financialSummary }: {
     setEditing(false);
   };
 
+  const handleStatusSave = () => {
+    updateMutation.mutate({ status: statusValue });
+    setStatusEdit(false);
+  };
+
   return (
     <div className="flex flex-wrap gap-6 items-start">
-      {/* Account status badge */}
+      {/* Debtors status (computed) */}
       <div className="flex flex-col gap-1 min-w-[120px]">
-        <span className="text-xs text-muted-foreground">Account Status</span>
-        <span className={`text-sm font-bold px-3 py-1.5 rounded-full border w-fit ${statusColor[accountStatus] ?? ""}`}>
-          {accountStatus}
+        <span className="text-xs text-muted-foreground">Debtors Status</span>
+        <span className={`text-sm font-bold px-3 py-1.5 rounded-full border w-fit ${debtorStatusColor[debtorStatus] ?? ""}`}>
+          {debtorStatus}
         </span>
+      </div>
+
+      {/* Explicit account status (editable) */}
+      <div className="flex flex-col gap-1 min-w-[160px]">
+        <span className="text-xs text-muted-foreground">Account Status</span>
+        {statusEdit ? (
+          <div className="flex gap-2 items-center">
+            <select
+              autoFocus
+              className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={statusValue}
+              onChange={e => setStatusValue(e.target.value)}
+            >
+              {ACCOUNT_STATUSES.map(s => <option key={s} value={s}>{s.replace("_", " ").toUpperCase()}</option>)}
+            </select>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={handleStatusSave} disabled={updateMutation.isPending}>Save</Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setStatusEdit(false)}>✕</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={`text-xs font-semibold ${
+              client?.status === "suspended" || client?.status === "blacklisted" ? "border-red-300 text-red-700 bg-red-50" :
+              client?.status === "on_hold" ? "border-orange-300 text-orange-700 bg-orange-50" :
+              "border-green-300 text-green-700 bg-green-50"
+            }`}>
+              {(client?.status ?? "active").replace("_", " ").toUpperCase()}
+            </Badge>
+            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => { setStatusValue(client?.status ?? "active"); setStatusEdit(true); }}>
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Credit limit with inline edit */}
@@ -497,8 +544,14 @@ export default function ClientProfilePage() {
     queryFn: () => fetch(`/api/accepted-workflows`).then(r => r.json()),
   });
   const { data: financialSummary } = useQuery<FinancialSummary>({
-    queryKey: ["/api/clients", id, "financial-summary"],
-    queryFn: () => fetch(`/api/clients/${id}/financial-summary`).then(r => r.json()),
+    queryKey: ["/api/clients", id, "summary"],
+    queryFn: () => fetch(`/api/clients/${id}/summary`).then(r => r.json()),
+    enabled: !!id,
+  });
+
+  const { data: clientActivityLogs = [] } = useQuery<ActivityLogEntry[]>({
+    queryKey: ["/api/clients", id, "activity"],
+    queryFn: () => fetch(`/api/clients/${id}/activity`).then(r => r.ok ? r.json() : []),
     enabled: !!id,
   });
 
@@ -626,7 +679,7 @@ export default function ClientProfilePage() {
 
   const updateContact = useMutation({
     mutationFn: async ({ cid, data }: { cid: string; data: any }) =>
-      (await apiRequest("PATCH", `/api/client-contacts/${cid}`, data)).json(),
+      (await apiRequest("PATCH", `/api/clients/${id}/contacts/${cid}`, data)).json(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/clients", id, "contacts"] });
       setContactOpen(false); setContactForm({}); setEditingContact(null);
@@ -636,7 +689,7 @@ export default function ClientProfilePage() {
   });
 
   const deleteContact = useMutation({
-    mutationFn: (cid: string) => apiRequest("DELETE", `/api/client-contacts/${cid}`),
+    mutationFn: (cid: string) => apiRequest("DELETE", `/api/clients/${id}/contacts/${cid}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/clients", id, "contacts"] }); toast({ description: "Contact deleted" }); },
   });
 
@@ -653,7 +706,7 @@ export default function ClientProfilePage() {
 
   const updateSite = useMutation({
     mutationFn: async ({ sid, data }: { sid: string; data: any }) =>
-      (await apiRequest("PATCH", `/api/client-sites/${sid}`, data)).json(),
+      (await apiRequest("PATCH", `/api/clients/${id}/sites/${sid}`, data)).json(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/clients", id, "sites"] });
       setSiteOpen(false); setSiteForm({ isActive: true }); setEditingSite(null);
@@ -663,7 +716,7 @@ export default function ClientProfilePage() {
   });
 
   const deleteSite = useMutation({
-    mutationFn: (sid: string) => apiRequest("DELETE", `/api/client-sites/${sid}`),
+    mutationFn: (sid: string) => apiRequest("DELETE", `/api/clients/${id}/sites/${sid}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/clients", id, "sites"] }); toast({ description: "Site deleted" }); },
   });
 
@@ -672,7 +725,7 @@ export default function ClientProfilePage() {
       (await apiRequest("POST", `/api/clients/${id}/payments`, data)).json(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/clients", id, "payments"] });
-      qc.invalidateQueries({ queryKey: ["/api/clients", id, "financial-summary"] });
+      qc.invalidateQueries({ queryKey: ["/api/clients", id, "summary"] });
       setPaymentOpen(false);
       setPaymentForm({ method: "Bank Transfer", paymentDate: format(new Date(), "yyyy-MM-dd") });
       setEditingPayment(null);
@@ -686,7 +739,7 @@ export default function ClientProfilePage() {
       (await apiRequest("PATCH", `/api/client-payments/${pid}`, data)).json(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/clients", id, "payments"] });
-      qc.invalidateQueries({ queryKey: ["/api/clients", id, "financial-summary"] });
+      qc.invalidateQueries({ queryKey: ["/api/clients", id, "summary"] });
       setPaymentOpen(false);
       setPaymentForm({ method: "Bank Transfer", paymentDate: format(new Date(), "yyyy-MM-dd") });
       setEditingPayment(null);
@@ -699,7 +752,7 @@ export default function ClientProfilePage() {
     mutationFn: (pid: string) => apiRequest("DELETE", `/api/client-payments/${pid}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/clients", id, "payments"] });
-      qc.invalidateQueries({ queryKey: ["/api/clients", id, "financial-summary"] });
+      qc.invalidateQueries({ queryKey: ["/api/clients", id, "summary"] });
       toast({ description: "Payment deleted" });
     },
   });
@@ -976,6 +1029,34 @@ export default function ClientProfilePage() {
                     <Row label="Credit Limit"  value={client.creditLimit ? `R${Number(client.creditLimit).toFixed(2)}` : undefined} />
                   </CardContent>
                 </Card>
+              </div>
+
+              {/* Operational summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {[
+                  { label: "Active Jobs",         value: clientJobs.filter(j => !["completed","cancelled"].includes(j.status)).length, icon: "🔧", color: "text-blue-700" },
+                  { label: "Open Quotes",         value: clientLeads.length, icon: "📄", color: "text-purple-700" },
+                  { label: "Active Contracts",    value: clientContracts.filter(c => !["inactive","cancelled","expired"].includes((c as any).status ?? "")).length, icon: "📋", color: "text-teal-700" },
+                  { label: "Jobs This Year",      value: clientJobs.filter(j => new Date(j.scheduledDate ?? j.createdAt ?? "").getFullYear() === new Date().getFullYear()).length, icon: "📆", color: "text-gray-700" },
+                  { label: "Sales Rep",           value: client.salesperson ?? client.contactPerson ?? "—", icon: "👤", color: "text-gray-700" },
+                  {
+                    label: "Next Scheduled",
+                    value: (() => {
+                      const upcoming = clientJobs
+                        .filter(j => j.status === "scheduled" && j.scheduledDate && new Date(j.scheduledDate) >= new Date())
+                        .sort((a,b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
+                      return upcoming[0]?.scheduledDate ? format(new Date(upcoming[0].scheduledDate), "dd MMM yyyy") : "None";
+                    })(),
+                    icon: "🗓️", color: "text-green-700",
+                  },
+                ].map(card => (
+                  <Card key={card.label}>
+                    <CardContent className="pt-4 pb-4">
+                      <div className="text-xs text-muted-foreground mb-1">{card.icon} {card.label}</div>
+                      <div className={`text-sm font-bold ${card.color}`}>{typeof card.value === "number" ? card.value : card.value}</div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               {client.notes && (
@@ -1538,40 +1619,63 @@ export default function ClientProfilePage() {
                     <thead className="bg-gray-50 border-b">
                       <tr>
                         <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice #</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Due</th>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Date</th>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Due</th>
                         <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Paid</th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Balance</th>
                         <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                         <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {clientInvoices.map(inv => (
-                        <tr key={inv.id} className="border-b last:border-0 hover:bg-gray-50">
-                          <td className="px-3 py-2.5 font-mono text-xs font-semibold">{inv.invoiceNumber}</td>
-                          <td className="px-3 py-2.5 text-xs">{format(new Date(inv.issueDate), "dd MMM yyyy")}</td>
-                          <td className="px-3 py-2.5 text-xs">{format(new Date(inv.dueDate), "dd MMM yyyy")}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold">R{Number(inv.total).toFixed(2)}</td>
-                          <td className="px-3 py-2.5">
-                            <Badge className={`text-xs ${invStatusColor(inv.status)}`}>{inv.status}</Badge>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <Link href="/invoices">
-                              <Button variant="ghost" size="sm" className="h-7 text-xs px-2">
-                                <ExternalLink className="h-3 w-3 mr-1" />Open
-                              </Button>
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
+                      {clientInvoices.map(inv => {
+                        const paid = financialSummary?.invoiceBalances?.[inv.id] ?? 0;
+                        const balance = Math.max(0, Number(inv.total) - paid);
+                        return (
+                          <tr key={inv.id} className="border-b last:border-0 hover:bg-gray-50">
+                            <td className="px-3 py-2.5 font-mono text-xs font-semibold">{inv.invoiceNumber}</td>
+                            <td className="px-3 py-2.5 text-xs hidden sm:table-cell">{format(new Date(inv.issueDate), "dd MMM yyyy")}</td>
+                            <td className="px-3 py-2.5 text-xs hidden sm:table-cell">{format(new Date(inv.dueDate), "dd MMM yyyy")}</td>
+                            <td className="px-3 py-2.5 text-right font-semibold">R{Number(inv.total).toFixed(2)}</td>
+                            <td className="px-3 py-2.5 text-right text-green-700 hidden md:table-cell">
+                              {paid > 0 ? `R${paid.toFixed(2)}` : "—"}
+                            </td>
+                            <td className="px-3 py-2.5 text-right hidden md:table-cell">
+                              <span className={balance > 0 ? "text-amber-700 font-semibold" : "text-gray-400"}>
+                                {balance > 0 ? `R${balance.toFixed(2)}` : "✓ Paid"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Badge className={`text-xs ${invStatusColor(inv.status)}`}>{inv.status}</Badge>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Link href="/invoices">
+                                <Button variant="ghost" size="sm" className="h-7 text-xs px-2">
+                                  <ExternalLink className="h-3 w-3 mr-1" />Open
+                                </Button>
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot className="bg-gray-50 border-t">
                       <tr>
-                        <td colSpan={3} className="px-3 py-2 text-xs text-muted-foreground font-medium">
+                        <td colSpan={3} className="px-3 py-2 text-xs text-muted-foreground font-medium hidden sm:table-cell">
+                          {clientInvoices.length} invoice{clientInvoices.length !== 1 ? "s" : ""}
+                        </td>
+                        <td colSpan={3} className="px-3 py-2 text-xs sm:hidden text-muted-foreground font-medium">
                           {clientInvoices.length} invoice{clientInvoices.length !== 1 ? "s" : ""}
                         </td>
                         <td className="px-3 py-2 text-right text-xs font-bold">
                           R{clientInvoices.reduce((s, i) => s + Number(i.total), 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs font-bold text-green-700 hidden md:table-cell">
+                          R{(financialSummary?.totalPaid ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs font-bold text-amber-700 hidden md:table-cell">
+                          R{(financialSummary?.outstanding ?? 0).toFixed(2)}
                         </td>
                         <td colSpan={2} />
                       </tr>
@@ -1746,7 +1850,7 @@ export default function ClientProfilePage() {
             <TabsContent value="activity" className="mt-4">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-sm text-muted-foreground">
-                  {commNotes.length + treatmentRpts.length + allLeadActivities.length} activity items
+                  {commNotes.length + treatmentRpts.length + allLeadActivities.length + clientActivityLogs.length} activity items
                 </span>
                 <Button size="sm" className="gap-1" onClick={() => {
                   setCnForm({ type: "Phone", noteDate: format(new Date(), "yyyy-MM-dd") });
@@ -1756,15 +1860,16 @@ export default function ClientProfilePage() {
                 </Button>
               </div>
 
-              {commNotes.length === 0 && treatmentRpts.length === 0 && allLeadActivities.length === 0 ? (
+              {commNotes.length === 0 && treatmentRpts.length === 0 && allLeadActivities.length === 0 && clientActivityLogs.length === 0 ? (
                 <EmptyState message="No activity recorded for this client yet." />
               ) : (
                 <div className="space-y-2">
-                  {/* Merge and sort: comm notes + treatment reports + lead activities (timeline) */}
+                  {/* Merge and sort: comm notes + treatment reports + lead activities + system activity logs */}
                   {[
                     ...commNotes.map(n => ({ type: "note" as const, date: n.noteDate, sortKey: new Date(n.noteDate).getTime(), data: n })),
                     ...treatmentRpts.map(r => ({ type: "report" as const, date: r.reportDate, sortKey: new Date(r.reportDate).getTime(), data: r })),
                     ...allLeadActivities.map(a => ({ type: "lead_activity" as const, date: a.createdAt ?? "", sortKey: new Date(a.createdAt ?? 0).getTime(), data: a })),
+                    ...clientActivityLogs.map(l => ({ type: "system_log" as const, date: l.timestamp ?? "", sortKey: new Date(l.timestamp ?? 0).getTime(), data: l })),
                   ]
                     .sort((a, b) => b.sortKey - a.sortKey)
                     .map(item => {
@@ -1826,6 +1931,25 @@ export default function ClientProfilePage() {
                                 <div className="pt-1"><span className="text-muted-foreground">Notes: </span><span className="whitespace-pre-line">{n.notes}</span></div>
                               </div>
                             )}
+                          </Card>
+                        );
+                      } else if (item.type === "system_log") {
+                        const l = item.data as ActivityLogEntry;
+                        return (
+                          <Card key={`al-${l.id}`} className="overflow-hidden border-gray-100 bg-gray-50/50">
+                            <CardContent className="pt-3 pb-3">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-base">🔔</span>
+                                <span className="font-medium text-sm text-gray-700">{l.action}</span>
+                                {l.resource && <Badge variant="outline" className="text-xs capitalize">{l.resource}</Badge>}
+                                {l.details && <span className="text-xs text-muted-foreground">{l.details}</span>}
+                                {l.timestamp && (
+                                  <span className="text-xs text-muted-foreground ml-auto">
+                                    {format(new Date(l.timestamp), "dd MMM yyyy HH:mm")}
+                                  </span>
+                                )}
+                              </div>
+                            </CardContent>
                           </Card>
                         );
                       } else {
@@ -1906,9 +2030,27 @@ export default function ClientProfilePage() {
               <Label>Notes</Label>
               <Textarea rows={2} value={contactForm.notes ?? ""} onChange={e => setContactForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
+            <div className="col-span-2">
+              <Label>Preferred Contact Method</Label>
+              <select
+                className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                value={contactForm.preferredContact ?? "Email"}
+                onChange={e => setContactForm(f => ({ ...f, preferredContact: e.target.value }))}
+              >
+                {["Email","Phone","Mobile","WhatsApp"].map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
             <div className="flex items-center gap-2 pt-1">
               <Switch checked={!!contactForm.isPrimary} onCheckedChange={v => setContactForm(f => ({ ...f, isPrimary: v }))} />
               <Label className="font-normal cursor-pointer">Primary Contact</Label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Switch checked={!!contactForm.isBilling} onCheckedChange={v => setContactForm(f => ({ ...f, isBilling: v }))} />
+              <Label className="font-normal cursor-pointer">Billing Contact</Label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Switch checked={!!contactForm.isSite} onCheckedChange={v => setContactForm(f => ({ ...f, isSite: v }))} />
+              <Label className="font-normal cursor-pointer">Site Contact</Label>
             </div>
           </div>
           <DialogFooter>
@@ -1957,8 +2099,8 @@ export default function ClientProfilePage() {
               <Input value={siteForm.postalCode ?? ""} onChange={e => setSiteForm(f => ({ ...f, postalCode: e.target.value }))} />
             </div>
             <div className="col-span-2">
-              <Label>Google Maps Link</Label>
-              <Input value={siteForm.googleMapsLink ?? ""} onChange={e => setSiteForm(f => ({ ...f, googleMapsLink: e.target.value }))} placeholder="https://maps.google.com/..." />
+              <Label>GPS / Maps Link</Label>
+              <Input value={siteForm.gpsLink ?? siteForm.googleMapsLink ?? ""} onChange={e => setSiteForm(f => ({ ...f, gpsLink: e.target.value, googleMapsLink: e.target.value }))} placeholder="https://maps.google.com/..." />
             </div>
             <div>
               <Label>Site Contact Name</Label>
@@ -1971,6 +2113,10 @@ export default function ClientProfilePage() {
             <div className="col-span-2">
               <Label>Notes</Label>
               <Textarea rows={2} value={siteForm.notes ?? ""} onChange={e => setSiteForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Switch checked={!!siteForm.isPrimary} onCheckedChange={v => setSiteForm(f => ({ ...f, isPrimary: v }))} />
+              <Label className="font-normal cursor-pointer">Primary Site</Label>
             </div>
             <div className="flex items-center gap-2 pt-1">
               <Switch checked={siteForm.isActive !== false} onCheckedChange={v => setSiteForm(f => ({ ...f, isActive: v }))} />

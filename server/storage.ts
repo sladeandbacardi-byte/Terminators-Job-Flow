@@ -201,6 +201,7 @@ export interface IStorage {
 
   // Activity Logs (for admin audit trail)
   getActivityLogs(): Promise<any[]>;
+  getActivityLogsByClient(clientId: string): Promise<any[]>;
 
   // Calendar Events
   getCalendarEvents(): Promise<CalendarEvent[]>;
@@ -3891,6 +3892,10 @@ export class MemStorage implements IStorage {
   // Activity Logs
   async getActivityLogs(): Promise<any[]> {
     return this.activityLogs;
+  }
+
+  async getActivityLogsByClient(clientId: string): Promise<any[]> {
+    return this.activityLogs.filter((l: any) => l.clientId === clientId);
   }
 
   private initializePricingLibrary() {

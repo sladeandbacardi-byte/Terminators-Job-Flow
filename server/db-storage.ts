@@ -1184,6 +1184,13 @@ export class DbStorage implements IStorage {
     return db.select().from(activityLogs).orderBy(desc(activityLogs.timestamp)).limit(500);
   }
 
+  async getActivityLogsByClient(clientId: string): Promise<any[]> {
+    return db.select().from(activityLogs)
+      .where(eq(activityLogs.clientId, clientId))
+      .orderBy(desc(activityLogs.timestamp))
+      .limit(200);
+  }
+
   // ─── Calendar Events ─────────────────────────────────────────────────────
 
   async getCalendarEvents(): Promise<CalendarEvent[]> { return db.select().from(calendarEvents).orderBy(asc(calendarEvents.startTime)); }
