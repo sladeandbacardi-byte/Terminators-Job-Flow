@@ -245,6 +245,7 @@ export const invoices = pgTable("invoices", {
   sageStatus: varchar("sage_status"), // Store Sage invoice status
   linkedJobId: varchar("linked_job_id"),
   linkedQuoteId: varchar("linked_quote_id"),
+  linkedContractId: varchar("linked_contract_id"), // link to service or rental contract
   legalEntityId: varchar("legal_entity_id"),
   legalEntityName: text("legal_entity_name"),
 });
@@ -2007,6 +2008,7 @@ export const clientPayments = pgTable("client_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull(),
   invoiceId: varchar("invoice_id"),
+  paymentNumber: text("payment_number"), // PAY-YYYY-NNNN — auto-generated
   paymentDate: text("payment_date").notNull(), // YYYY-MM-DD
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   method: text("method").notNull().default("Bank Transfer"), // Bank Transfer | Cash | EFT | Cheque | Card | Other
@@ -2016,7 +2018,7 @@ export const clientPayments = pgTable("client_payments", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 export const insertClientPaymentSchema = createInsertSchema(clientPayments).omit({
-  id: true, createdAt: true,
+  id: true, createdAt: true, paymentNumber: true,
 });
 export type InsertClientPayment = z.infer<typeof insertClientPaymentSchema>;
 export type ClientPayment = typeof clientPayments.$inferSelect;

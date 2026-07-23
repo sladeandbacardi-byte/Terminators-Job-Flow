@@ -18,7 +18,7 @@ import {
   stockLocations, stockBalances, stockMovements, pickingLists, pickingListItems,
   stockChecks, stockCheckItems,
   unifiedContracts, contractLineItems, departmentDefaults, legalEntities,
-  contractOccurrenceExceptions,
+  contractOccurrenceExceptions, fieldDiaries, clientPayments,
 } from "@shared/schema";
 
 import type {
@@ -945,6 +945,18 @@ export class DbStorage implements IStorage {
     return `QT-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
   }
 
+  async generateServiceContractNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(contract_number,'-',3) AS INTEGER)),0)` }).from(serviceContracts).where(ilike(serviceContracts.contractNumber, `CON-${year}-%`));
+    return `CON-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
+  }
+
+  async generatePaymentNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(payment_number,'-',3) AS INTEGER)),0)` }).from(clientPayments).where(ilike(clientPayments.paymentNumber, `PAY-${year}-%`));
+    return `PAY-${year}-${String((r?.mx ?? 0) + 1).padStart(4, '0')}`;
+  }
+
   // ─── Invoice Items ────────────────────────────────────────────────────────
 
   async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
@@ -1867,7 +1879,8 @@ export class DbStorage implements IStorage {
   }
 
   async createServiceContract(data: InsertServiceContract): Promise<ServiceContract> {
-    const [row] = await db.insert(serviceContracts).values({ id: randomUUID(), ...data, createdAt: new Date(), updatedAt: new Date() }).returning();
+    const contractNumber = data.contractNumber || await this.generateServiceContractNumber();
+    const [row] = await db.insert(serviceContracts).values({ id: randomUUID(), contractNumber, ...data, createdAt: new Date(), updatedAt: new Date() }).returning();
     return row;
   }
 
@@ -2349,9 +2362,9 @@ export class DbStorage implements IStorage {
     return (res.rowCount ?? 0) > 0;
   }
   async generateFieldDiaryNumber() {
-    const diaries = await this.getFieldDiaries();
     const year = new Date().getFullYear();
-    return `FD-${year}-${String(diaries.length + 1).padStart(4, "0")}`;
+    const [r] = await db.select({ mx: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(diary_number,'-',3) AS INTEGER)),0)` }).from(fieldDiaries).where(ilike(fieldDiaries.diaryNumber, `FD-${year}-%`));
+    return `FD-${year}-${String((r?.mx ?? 0) + 1).padStart(4, "0")}`;
   }
 
   async getCompanySettings() {
@@ -2832,9 +2845,9 @@ export class DbStorage implements IStorage {
   }
 
   async createClientPayment(data: import("@shared/schema").InsertClientPayment) {
-    const { clientPayments } = await import("@shared/schema");
+    const paymentNumber = await this.generatePaymentNumber();
     const [row] = await db.insert(clientPayments)
-      .values({ id: randomUUID(), ...data, createdAt: new Date() })
+      .values({ id: randomUUID(), paymentNumber, ...data, createdAt: new Date() })
       .returning();
     return row;
   }

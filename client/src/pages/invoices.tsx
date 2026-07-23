@@ -12,7 +12,7 @@ import InvoiceForm from "@/components/forms/invoice-form";
 import EmailInvoiceForm from "@/components/forms/email-invoice-form";
 import { ExportButton } from "@/components/export-button";
 import { exportInvoices } from "@/lib/data-export";
-import type { Invoice, Client, InvoiceItem } from "@shared/schema";
+import type { Invoice, Client, InvoiceItem, Job, QuoteSubmission } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { SageIntegration } from "@/components/sage-integration";
 
@@ -32,7 +32,12 @@ export default function Invoices() {
     queryKey: ['/api/clients'],
   });
 
+  const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
+  const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({ queryKey: ['/api/quote-submissions'] });
+
   const clientMap = new Map(clients.map(client => [client.id, client]));
+  const jobMap = new Map(jobs.map(j => [j.id, j]));
+  const quoteMap = new Map(quoteSubmissions.map(q => [q.id, q]));
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -267,19 +272,24 @@ export default function Invoices() {
                               <span>Due: {formatDate(new Date(invoice.dueDate))}</span>
                             </div>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              {(invoice as any).legalEntityName && (
+                              {invoice.legalEntityName && (
                                 <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
-                                  {(invoice as any).legalEntityName}
+                                  {invoice.legalEntityName}
                                 </span>
                               )}
                               {invoice.linkedJobId && (
                                 <span className="text-xs font-mono text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
-                                  Job: {invoice.linkedJobId}
+                                  Job: {jobMap.get(invoice.linkedJobId)?.jobNumber ?? invoice.linkedJobId.slice(0, 8)}
                                 </span>
                               )}
                               {invoice.linkedQuoteId && (
                                 <span className="text-xs font-mono text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">
-                                  Quote: {invoice.linkedQuoteId}
+                                  Quote: {quoteMap.get(invoice.linkedQuoteId)?.quoteNumber ?? invoice.linkedQuoteId.slice(0, 8)}
+                                </span>
+                              )}
+                              {(invoice as any).linkedContractId && (
+                                <span className="text-xs font-mono text-teal-600 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded">
+                                  Contract: {(invoice as any).linkedContractId.slice(0, 8)}
                                 </span>
                               )}
                             </div>

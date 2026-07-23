@@ -109,8 +109,10 @@ export default function Jobs() {
   const { data: teams = [] } = useQuery<Team[]>({ queryKey: ['/api/teams'] });
   const { data: teamMembers = [] } = useQuery<TeamMember[]>({ queryKey: ['/api/team-members'] });
   const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({ queryKey: ['/api/quote-submissions'] });
+  const { data: serviceContracts = [] } = useQuery<any[]>({ queryKey: ['/api/service-contracts'] });
 
   const quoteMap = useMemo(() => new Map(quoteSubmissions.map(q => [q.id, q])), [quoteSubmissions]);
+  const contractMap = useMemo(() => new Map(serviceContracts.map((c: any) => [c.id, c])), [serviceContracts]);
   const workerMap = useMemo(() => new Map(workers.map(w => [w.id, w])), [workers]);
   const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
   const departmentMap = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments]);
@@ -624,8 +626,8 @@ export default function Jobs() {
                       <div key={job.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid={`job-item-${job.id}`}>
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            {(job.jobNumber || (job.linkedQuoteId && quoteMap.get(job.linkedQuoteId)?.quoteNumber)) && (
-                              <div className="flex items-center gap-1.5 mb-1">
+                            {(job.jobNumber || job.linkedQuoteId || job.linkedContractId || dept) && (
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                 {job.jobNumber && (
                                   <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
                                     {job.jobNumber}
@@ -633,7 +635,12 @@ export default function Jobs() {
                                 )}
                                 {job.linkedQuoteId && quoteMap.get(job.linkedQuoteId)?.quoteNumber && (
                                   <span className="text-xs font-mono text-purple-700 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded">
-                                    Linked Quote: {quoteMap.get(job.linkedQuoteId)!.quoteNumber}
+                                    Quote: {quoteMap.get(job.linkedQuoteId)!.quoteNumber}
+                                  </span>
+                                )}
+                                {job.linkedContractId && contractMap.get(job.linkedContractId)?.contractNumber && (
+                                  <span className="text-xs font-mono text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded">
+                                    Contract: {contractMap.get(job.linkedContractId)!.contractNumber}
                                   </span>
                                 )}
                                 {dept && (
