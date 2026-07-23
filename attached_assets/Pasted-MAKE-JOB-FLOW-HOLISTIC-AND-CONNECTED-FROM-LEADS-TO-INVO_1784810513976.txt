@@ -1,0 +1,615 @@
+MAKE JOB FLOW HOLISTIC AND CONNECTED FROM LEADS TO INVOICES
+
+I want Job Flow to work as one connected business system.
+
+Everything must flow into each other:
+
+Lead → Quote → Accepted Work → Job / Contract → Schedule → Field Diary → Invoice → Payment → Reports
+
+The client must be the centre of the system.
+
+If I open a client information panel, I must be able to see the full history of that client in one place.
+
+CLIENT MASTER RECORD
+
+Create one central client master record.
+
+Every client must have one main client profile.
+
+Client details must include:
+
+* Client ID
+* Company name
+* Trading name, optional
+* Contact person
+* Phone
+* Email
+* VAT number, optional
+* Company registration number, optional
+* Billing address
+* Site address or multiple site addresses
+* Preferred contact method
+* Account status
+* Credit limit, optional
+* Payment terms
+* Assigned sales rep
+* Notes
+* Active / inactive status
+
+Avoid duplicate clients.
+
+If a lead, quote, job, contract or invoice is created for an existing client, it must link to the existing client record.
+
+CLIENT PROFILE / CLIENT INFO PANEL
+
+When opening a client, show a full client profile with tabs.
+
+Tabs required:
+
+1. Overview
+2. Contacts
+3. Sites / Addresses
+4. Leads
+5. Quotes
+6. Accepted Work
+7. Jobs
+8. Contracts
+9. Field Diaries
+10. Invoices
+11. Payments
+12. Debtors / Account Status
+13. Documents / Attachments
+14. Notes / Activity Timeline
+
+CLIENT OVERVIEW TAB
+
+The Overview tab must show a quick summary:
+
+* Client name
+* Contact person
+* Phone
+* Email
+* Billing address
+* Main site address
+* Account status
+* Payment terms
+* Current outstanding balance
+* Total invoiced
+* Total paid
+* Last invoice date
+* Last payment date
+* Active jobs
+* Active contracts
+* Open quotes
+* Last service date
+* Next scheduled service
+* Assigned sales rep
+* Assigned service coordinator if applicable
+
+CONTACTS TAB
+
+Allow multiple contacts per client.
+
+Each contact should have:
+
+* Name
+* Role / position
+* Phone
+* Email
+* Preferred contact method
+* Notes
+* Primary contact yes/no
+* Billing contact yes/no
+* Site contact yes/no
+
+SITES / ADDRESSES TAB
+
+Allow multiple site addresses per client.
+
+Each site should have:
+
+* Site name
+* Street number
+* Street name
+* Suburb
+* City
+* Province
+* Postal code
+* GPS / map link if available
+* Site contact
+* Notes
+* Active / inactive
+
+Jobs and contracts must be linked to the correct site.
+
+LEADS TAB
+
+Show all leads linked to the client.
+
+Each lead row must show:
+
+* Lead number
+* Date created
+* Lead source
+* Service required
+* Assigned sales rep
+* Status
+* Follow-up date
+* Last activity
+* Linked quote number if converted
+
+Clicking a lead opens the lead details.
+
+QUOTES TAB
+
+Show all quotes linked to the client.
+
+Each quote row must show:
+
+* Quote number
+* Date created
+* Issuing legal entity
+* Quote status
+* Sales rep
+* Quote total
+* Recurring monthly total if applicable
+* Follow-up date
+* Linked job / contract if accepted
+
+Clicking a quote opens the quote details.
+
+ACCEPTED WORK TAB
+
+Show quotes that have been accepted but are not fully handed over or completed yet.
+
+Each item should show:
+
+* Quote number
+* Accepted date
+* Client site
+* Department
+* Service/product type
+* Next step required
+* Converted to job yes/no
+* Converted to contract yes/no
+* Assigned service coordinator
+
+JOBS TAB
+
+Show all jobs linked to the client.
+
+Each job row must show:
+
+* Job number
+* Date scheduled
+* Time scheduled
+* Department
+* Service type
+* Site
+* Assigned worker/team
+* Status
+* Linked quote number
+* Linked field diary number
+* Linked invoice number
+
+Job statuses:
+
+* Draft
+* Scheduled
+* In Progress
+* Completed
+* Awaiting Field Diary
+* Ready to Invoice
+* Invoiced
+* Cancelled
+
+Clicking a job opens the job detail page.
+
+CONTRACTS TAB
+
+Show all recurring contracts linked to the client.
+
+Each contract row must show:
+
+* Contract number
+* Contract type
+* Issuing legal entity
+* Start date
+* End date
+* Billing frequency
+* Service frequency
+* Monthly amount
+* Linked quote number
+* Status
+* Next service date
+* Next price increase date
+
+Contract types:
+
+* Recurring Service
+* Rental Contract
+* Product Rental
+* Mixed Contract
+
+FIELD DIARIES TAB
+
+Show all field diaries linked to the client.
+
+Each field diary row must show:
+
+* Field diary number
+* Job number
+* Date
+* Technician
+* Department
+* Work completed
+* Customer signature yes/no
+* Photos yes/no
+* Status
+
+Clicking a field diary opens the full diary.
+
+INVOICES TAB
+
+Show all invoices linked to the client.
+
+Each invoice row must show:
+
+* Invoice number
+* Date
+* Due date
+* Issuing legal entity
+* Linked job number
+* Linked quote number
+* Invoice amount
+* Amount paid
+* Balance outstanding
+* Status
+* Sage export status
+
+Invoice statuses:
+
+* Draft
+* Sent
+* Part Paid
+* Paid
+* Overdue
+* Cancelled
+* Credit Note Issued
+
+PAYMENTS TAB
+
+Show all payments linked to the client.
+
+Each payment row must show:
+
+* Payment date
+* Amount
+* Payment method
+* Reference
+* Linked invoice number
+* Captured by
+* Notes
+
+DEBTORS / ACCOUNT STATUS TAB
+
+Show the client’s account position:
+
+* Total outstanding
+* Current balance
+* 30 days
+* 60 days
+* 90+ days
+* Overdue invoices
+* Credit limit
+* Account status
+* Suspended yes/no
+* Last payment date
+* Payment terms
+
+Allow Finance/Admin to update:
+
+* Account status
+* Credit limit
+* Suspension status
+* Payment notes
+
+DOCUMENTS / ATTACHMENTS TAB
+
+Show uploaded/generated documents linked to the client:
+
+* Quotes
+* Signed quotes
+* Contracts
+* Invoices
+* Field diaries
+* Photos
+* Certificates
+* Treatment reports
+* Compliance documents
+
+Each document must store:
+
+* Document type
+* Document number
+* Upload date
+* Linked client
+* Linked job/quote/invoice if applicable
+* Uploaded by
+
+NOTES / ACTIVITY TIMELINE TAB
+
+Show a full chronological history of activity.
+
+Examples:
+
+* Lead created
+* Lead assigned to sales rep
+* Quote created
+* Quote sent
+* Quote accepted
+* Job created
+* Job scheduled
+* Job started
+* Job completed
+* Field diary submitted
+* Invoice created
+* Invoice sent
+* Payment received
+* Client note added
+* Contract renewed
+* Price increase applied
+
+Each timeline item must show:
+
+* Date/time
+* User
+* Action
+* Linked document number
+* Notes
+
+DOCUMENT LINKING RULES
+
+Every major document must store linked IDs and document numbers.
+
+Lead:
+
+* clientId
+* assignedSalesRepId
+* quoteId if converted
+
+Quote:
+
+* clientId
+* leadId if created from lead
+* legalEntityId
+* acceptedWorkId if accepted
+* jobId or contractId if converted
+
+Accepted Work:
+
+* clientId
+* quoteId
+* nextStep
+* jobId or contractId
+
+Job:
+
+* clientId
+* siteId
+* quoteId if created from quote
+* contractId if recurring
+* assignedWorkerId
+* assignedTeamId
+* fieldDiaryId if completed
+* invoiceId if invoiced
+* legalEntityId inherited from quote/contract
+
+Field Diary:
+
+* clientId
+* jobId
+* technicianId
+* invoiceReady yes/no
+
+Invoice:
+
+* clientId
+* quoteId if applicable
+* jobId if applicable
+* contractId if applicable
+* legalEntityId
+* paymentIds
+* sageExportId if exported
+
+Payment:
+
+* clientId
+* invoiceId
+* amount
+* reference
+
+LEGAL ENTITY FLOW
+
+Quotes and invoices must both have an Issuing Entity.
+
+The legal entity selected on the quote must carry forward to:
+
+* Accepted Work
+* Job
+* Contract
+* Invoice
+
+If Finance changes the invoice legal entity, show warning:
+
+This invoice entity differs from the original quote entity. Continue?
+
+Default legal entities:
+
+* Terminators CC
+* Terminators Pty Ltd
+
+DOCUMENT NUMBERS
+
+Use consistent document numbers:
+
+Lead:
+LEAD-YYYY-0001
+
+Quote:
+QT-YYYY-0001
+
+Job:
+JOB-YYYY-0001
+
+Contract:
+CON-YYYY-0001
+
+Rental Contract:
+RC-YYYY-0001
+
+Field Diary:
+FD-YYYY-0001
+
+Invoice:
+INV-YYYY-0001
+
+Payment:
+PAY-YYYY-0001
+
+If possible later, allow separate numbering by legal entity.
+
+GLOBAL SEARCH
+
+Add a global search that can find:
+
+* Client name
+* Contact person
+* Phone number
+* Email address
+* Lead number
+* Quote number
+* Job number
+* Invoice number
+* Contract number
+* Field diary number
+* Vehicle registration
+* Staff name
+
+Search results should show the record type and allow opening the linked record.
+
+Example:
+QT-2026-0004 — Quote — Baywest Mall
+JOB-2026-0012 — Job — Baywest Mall
+INV-2026-0009 — Invoice — Baywest Mall
+
+WORKFLOW BUTTONS
+
+Add clear conversion buttons.
+
+On Lead:
+
+* Create Quote
+
+On Quote:
+
+* Mark as Sent
+* Mark as Accepted
+* Convert to Job
+* Convert to Contract
+
+On Accepted Work:
+
+* Create Job
+* Create Contract
+* Assign to Service Coordinator
+
+On Job:
+
+* Schedule Job
+* Start Job
+* Complete Job
+* Submit Field Diary
+* Mark Ready to Invoice
+
+On Invoice:
+
+* Send Invoice
+* Mark Paid
+* Export to Sage
+
+CONNECTED EMPTY STATES
+
+If a client has no records in a tab, show helpful empty states.
+
+Examples:
+No quotes for this client yet.
+Create quote
+
+No jobs for this client yet.
+Create job
+
+No invoices for this client yet.
+Create invoice
+
+REPORTING
+
+All reports must use the same linked data.
+
+Reports should be able to filter by:
+
+* Client
+* Legal entity
+* Department
+* Sales rep
+* Technician
+* Date range
+* Job status
+* Invoice status
+* Contract status
+
+BACKUPS
+
+JSON backup must preserve all links between:
+clients, leads, quotes, jobs, contracts, field diaries, invoices and payments.
+
+Excel backup must include document numbers and linked document numbers so the history is readable in Excel.
+
+PERMISSION RULES
+
+Managing Member:
+Can view full client history.
+
+Sales:
+Can view client leads, quotes, contacts and sales notes.
+Can see job/invoice status summary but not sensitive finance details unless permitted.
+
+Service:
+Can view client service history, jobs, field diaries and site details.
+Can see invoice status summary if needed.
+
+Finance:
+Can view invoices, payments, debtors and legal entity data.
+Can view linked quote/job details needed for billing.
+
+Technician:
+Can only view assigned jobs, site details and relevant field diary history.
+No finance access.
+
+DESIGN GOAL
+
+The app must feel like one connected workflow, not separate disconnected pages.
+
+The client profile must answer:
+
+* Who is this client?
+* What have we quoted them?
+* What work have we done for them?
+* What contracts do they have?
+* What invoices have we sent?
+* What have they paid?
+* What do they still owe?
+* What is scheduled next?
+* What happened historically?
+
+END
