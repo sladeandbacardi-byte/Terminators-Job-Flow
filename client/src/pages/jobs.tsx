@@ -18,7 +18,7 @@ import { ExportButton } from "@/components/export-button";
 import { exportJobs } from "@/lib/data-export";
 import { formatClientAddress } from "@shared/schema";
 import type { Job, QuoteSubmission, Worker, Client, Department, Team, TeamMember } from "@shared/schema";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, canMoveCalendarEvent } from "@/lib/dashboardRole";
 import { useMutation } from "@tanstack/react-query";
@@ -104,16 +104,17 @@ export default function Jobs() {
 
   const { data: jobs = [], isLoading } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
 
+  const search = useSearch();
+  const openJobId = new URLSearchParams(search).get('open');
   useEffect(() => {
-    const openId = new URLSearchParams(window.location.search).get('open');
-    if (!openId || jobs.length === 0) return;
-    const found = jobs.find(j => j.id === openId);
+    if (!openJobId || jobs.length === 0) return;
+    const found = jobs.find(j => j.id === openJobId);
     if (found) {
       setEditingJob(found);
       setIsJobFormOpen(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [jobs]);
+  }, [jobs, openJobId]);
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ['/api/workers'] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ['/api/departments'] });

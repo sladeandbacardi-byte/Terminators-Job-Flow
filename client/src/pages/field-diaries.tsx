@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -95,7 +95,8 @@ export default function FieldDiaries() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   // ── Deep-link: ?open=<diaryId> from global search
-  const [openDiaryId] = useState(() => new URLSearchParams(window.location.search).get('open'));
+  const search = useSearch();
+  const openDiaryId = new URLSearchParams(search).get('open');
   const { data: openDiary } = useQuery<any>({
     queryKey: [`/api/field-diaries/${openDiaryId}`],
     enabled: !!openDiaryId,

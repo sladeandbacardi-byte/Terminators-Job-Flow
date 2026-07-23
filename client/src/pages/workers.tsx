@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,16 +47,17 @@ export default function Workers() {
     queryKey: ["/api/departments"],
   });
 
+  const search = useSearch();
+  const openWorkerId = new URLSearchParams(search).get('open');
   useEffect(() => {
-    const openId = new URLSearchParams(window.location.search).get('open');
-    if (!openId || workers.length === 0) return;
-    const found = workers.find(w => w.id === openId);
+    if (!openWorkerId || workers.length === 0) return;
+    const found = workers.find(w => w.id === openWorkerId);
     if (found) {
       setSelectedWorker(found);
       setShowWorkerForm(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [workers]);
+  }, [workers, openWorkerId]);
 
   const getDeptName = (id: string | null) => {
     if (!id) return "Office / Management";

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, FileText, Eye, Edit, Trash2, DollarSign, AlertCircle, CheckCircle, Mail, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,15 +28,16 @@ export default function Invoices() {
     queryKey: ['/api/invoices'],
   });
 
+  const search = useSearch();
+  const openId = new URLSearchParams(search).get('open');
   useEffect(() => {
-    const openId = new URLSearchParams(window.location.search).get('open');
     if (!openId || invoices.length === 0) return;
     const found = invoices.find(i => i.id === openId);
     if (found) {
       setSelectedInvoice(found);
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [invoices]);
+  }, [invoices, openId]);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -702,6 +702,7 @@ interface QuoteCardProps {
 function QuoteCard({ quote, salesWorkers, allWorkers, clients, departments, defaultExpanded }: QuoteCardProps) {
   const [, navigate] = useLocation();
   const [expanded, setExpanded]       = useState(defaultExpanded ?? false);
+  useEffect(() => { if (defaultExpanded) setExpanded(true); }, [defaultExpanded]);
   const [notes, setNotes]             = useState(quote.notes ?? "");
   const [editingNotes, setEditingNotes] = useState(false);
 
@@ -1614,16 +1615,17 @@ export default function QuotesPage() {
 
   const { data: quotes = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
 
+  const search = useSearch();
+  const openQuoteId = new URLSearchParams(search).get('open');
   useEffect(() => {
-    const openId = new URLSearchParams(window.location.search).get('open');
-    if (!openId || quotes.length === 0) return;
-    const found = quotes.find(q => q.id === openId);
+    if (!openQuoteId || quotes.length === 0) return;
+    const found = quotes.find(q => q.id === openQuoteId);
     if (found) {
       setHighlightedId(found.id);
       setStatusFilter("all");
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [quotes]);
+  }, [quotes, openQuoteId]);
   const { data: workers = [] }     = useQuery<Worker[]>({ queryKey: ["/api/workers"] });
   const { data: clients = [] }     = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });

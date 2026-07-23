@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import UnifiedContractForm from "@/components/forms/unified-contract-form";
 import ContractForm from "@/components/forms/contract-form";
@@ -110,16 +110,17 @@ export default function Contracts() {
   const isLoading = ucLoading || scLoading || rcLoading;
   const getClientName = (clientId: string) => clients.find(c => c.id === clientId)?.name ?? "Unknown";
 
+  const search = useSearch();
+  const openContractId = new URLSearchParams(search).get('open');
   useEffect(() => {
-    const openId = new URLSearchParams(window.location.search).get('open');
-    if (!openId || unifiedContracts.length === 0) return;
-    const found = unifiedContracts.find((c: any) => c.id === openId);
+    if (!openContractId || unifiedContracts.length === 0) return;
+    const found = unifiedContracts.find((c: any) => c.id === openContractId);
     if (found) {
       setEditingUnified(found);
       setIsNewOpen(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [unifiedContracts]);
+  }, [unifiedContracts, openContractId]);
 
   // ── Department defaults helpers ─────────────────────────────────────────────
   const getDraftForDept = (deptName: string) => {
