@@ -28,13 +28,14 @@ export default function Invoices() {
     queryKey: ['/api/invoices'],
   });
 
-  const search = useSearch();
-  const openId = new URLSearchParams(search).get('open');
+  const searchParams = useSearch();
+  const openId = new URLSearchParams(searchParams).get('open');
   useEffect(() => {
     if (!openId || invoices.length === 0) return;
     const found = invoices.find(i => i.id === openId);
     if (found) {
       setSelectedInvoice(found);
+      setShowInvoiceForm(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, [invoices, openId]);

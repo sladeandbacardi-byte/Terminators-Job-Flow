@@ -110,8 +110,8 @@ export default function Contracts() {
   const isLoading = ucLoading || scLoading || rcLoading;
   const getClientName = (clientId: string) => clients.find(c => c.id === clientId)?.name ?? "Unknown";
 
-  const search = useSearch();
-  const openContractId = new URLSearchParams(search).get('open');
+  const searchParams = useSearch();
+  const openContractId = new URLSearchParams(searchParams).get('open');
   useEffect(() => {
     if (!openContractId || unifiedContracts.length === 0) return;
     const found = unifiedContracts.find((c: any) => c.id === openContractId);
