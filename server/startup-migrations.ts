@@ -484,5 +484,49 @@ export async function runStartupMigrations(): Promise<void> {
        SET last_seq = GREATEST(sequences.last_seq, EXCLUDED.last_seq)`
   );
 
+  // ── Overtime ──────────────────────────────────────────────────────────────
+  await run(
+    "overtime_entries table",
+    `CREATE TABLE IF NOT EXISTS overtime_entries (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      employee_id varchar NOT NULL,
+      work_date text NOT NULL,
+      client_id varchar NOT NULL,
+      job_id varchar,
+      start_time text NOT NULL,
+      finish_time text NOT NULL,
+      notes text NOT NULL,
+      overtime_minutes integer NOT NULL,
+      status text NOT NULL DEFAULT 'pending',
+      approved_by_id varchar,
+      approved_by_name text,
+      approval_timestamp timestamp,
+      rejection_reason text,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run(
+    "overtime_audit_entries table",
+    `CREATE TABLE IF NOT EXISTS overtime_audit_entries (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      overtime_entry_id varchar NOT NULL,
+      actor_id varchar NOT NULL,
+      actor_name text NOT NULL,
+      action text NOT NULL,
+      details text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run(
+    "overtime entries lookup indexes",
+    `CREATE INDEX IF NOT EXISTS overtime_entries_employee_work_date_idx
+       ON overtime_entries (employee_id, work_date DESC);
+     CREATE INDEX IF NOT EXISTS overtime_entries_status_work_date_idx
+       ON overtime_entries (status, work_date DESC);
+     CREATE INDEX IF NOT EXISTS overtime_audit_entries_entry_created_idx
+       ON overtime_audit_entries (overtime_entry_id, created_at DESC)`
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

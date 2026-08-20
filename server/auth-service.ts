@@ -8,27 +8,33 @@ import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/sche
 import { getDashboardRole } from '@shared/dashboardRole';
 import { storage } from './storage';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'terminators_default_secret_key_2024';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET or SESSION_SECRET must be configured for authenticated sessions.");
+}
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
-// Tokens issued by the app's real sign-in flow (the "choose your profile"
-// screen at POST /api/auth/login) look like `token_<workerId>_<issuedAtMs>`.
-// They are NOT JWTs and have no row in `user_sessions`, so they must be
-// validated separately from the (currently unused in the UI) admin
-// username/password login handled by AuthService.authenticateUser below.
-const WORKER_TOKEN_RE = /^token_(.+)_(\d{10,})$/;
-const WORKER_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours, mirrors SESSION_DURATION
+export type AuthenticatedUser = AdminUser & {
+  sourceWorkerRole?: string | null;
+  sourceWorkerDepartmentId?: string | null;
+};
 
-async function resolveWorkerToken(token: string): Promise<AdminUser | null> {
-  const match = token.match(WORKER_TOKEN_RE);
-  if (!match) return null;
+type WorkerSessionClaims = {
+  workerId: string;
+  tokenType: "worker";
+};
 
-  const [, workerId, issuedAtStr] = match;
-  const issuedAt = Number(issuedAtStr);
-  if (!issuedAt || Date.now() - issuedAt > WORKER_TOKEN_MAX_AGE) return null;
+async function resolveWorkerToken(token: string): Promise<AuthenticatedUser | null> {
+  let claims: WorkerSessionClaims;
+  try {
+    claims = jwt.verify(token, JWT_SECRET) as WorkerSessionClaims;
+  } catch {
+    return null;
+  }
+  if (claims.tokenType !== "worker" || !claims.workerId) return null;
 
   try {
-    const worker = await storage.getWorker(workerId);
+    const worker = await storage.getWorker(claims.workerId);
     if (!worker || worker.isActive === false) return null;
 
     const effectiveRole = getDashboardRole({ departmentId: worker.departmentId, role: worker.role });
@@ -42,11 +48,15 @@ async function resolveWorkerToken(token: string): Promise<AdminUser | null> {
       firstName: firstName || worker.name,
       lastName: rest.join(' '),
       role: effectiveRole,
+      // Some server-side permission checks must distinguish an explicitly
+      // privileged worker role from getDashboardRole's legacy admin fallback.
+      sourceWorkerRole: worker.role,
+      sourceWorkerDepartmentId: worker.departmentId,
       isActive: true,
       lastLoginAt: null,
       createdAt: worker.createdAt ?? new Date(),
       updatedAt: new Date(),
-    } as AdminUser;
+    } as AuthenticatedUser;
   } catch (error) {
     console.error('Worker token resolution error:', error);
     return null;
@@ -54,7 +64,7 @@ async function resolveWorkerToken(token: string): Promise<AdminUser | null> {
 }
 
 export interface AuthenticatedRequest extends Request {
-  user?: AdminUser;
+  user?: AuthenticatedUser;
 }
 
 export class AuthService {
@@ -72,6 +82,10 @@ export class AuthService {
   // Generate JWT token
   static generateToken(userId: string): string {
     return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '24h' });
+  }
+
+  static generateWorkerToken(workerId: string): string {
+    return jwt.sign({ workerId, tokenType: "worker" }, JWT_SECRET, { expiresIn: "24h" });
   }
 
   // Verify JWT token

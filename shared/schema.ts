@@ -227,6 +227,35 @@ export const jobs = pgTable("jobs", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const overtimeEntries = pgTable("overtime_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  workDate: text("work_date").notNull(), // YYYY-MM-DD
+  clientId: varchar("client_id").notNull(),
+  jobId: varchar("job_id"),
+  startTime: text("start_time").notNull(), // HH:mm
+  finishTime: text("finish_time").notNull(), // HH:mm
+  notes: text("notes").notNull(),
+  overtimeMinutes: integer("overtime_minutes").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  approvedById: varchar("approved_by_id"),
+  approvedByName: text("approved_by_name"),
+  approvalTimestamp: timestamp("approval_timestamp"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const overtimeAuditEntries = pgTable("overtime_audit_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  overtimeEntryId: varchar("overtime_entry_id").notNull(),
+  actorId: varchar("actor_id").notNull(),
+  actorName: text("actor_name").notNull(),
+  action: text("action").notNull(), // submitted | edited | approved | rejected | reopened
+  details: text("details"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export const invoices = pgTable("invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceNumber: text("invoice_number").notNull().unique(),
@@ -400,6 +429,23 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   jobNumber: true,
 });
 
+export const insertOvertimeEntrySchema = createInsertSchema(overtimeEntries).omit({
+  id: true,
+  overtimeMinutes: true,
+  status: true,
+  approvedById: true,
+  approvedByName: true,
+  approvalTimestamp: true,
+  rejectionReason: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOvertimeAuditEntrySchema = createInsertSchema(overtimeAuditEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true,
   createdAt: true,
@@ -495,6 +541,11 @@ export type InventoryItem = typeof inventoryItems.$inferSelect;
 
 export type InsertRentalContract = z.infer<typeof insertRentalContractSchema>;
 export type RentalContract = typeof rentalContracts.$inferSelect;
+
+export type InsertOvertimeEntry = z.infer<typeof insertOvertimeEntrySchema>;
+export type OvertimeEntry = typeof overtimeEntries.$inferSelect;
+export type InsertOvertimeAuditEntry = z.infer<typeof insertOvertimeAuditEntrySchema>;
+export type OvertimeAuditEntry = typeof overtimeAuditEntries.$inferSelect;
 
 export type ContractDeletionHistory = typeof contractDeletionHistory.$inferSelect;
 

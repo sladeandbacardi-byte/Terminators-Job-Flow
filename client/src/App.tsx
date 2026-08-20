@@ -65,6 +65,8 @@ const CommissionReports   = lazy(() => import("@/pages/commission-reports"));
 const AcceptedWork        = lazy(() => import("@/pages/accepted-work"));
 const SalesReports        = lazy(() => import("@/pages/sales-reports"));
 const EquipmentChecklists = lazy(() => import("@/pages/equipment-checklists"));
+const MyOvertime          = lazy(() => import("@/pages/my-overtime"));
+const OvertimeApproval    = lazy(() => import("@/pages/overtime-approval"));
 
 function PageLoader() {
   return (
@@ -215,6 +217,8 @@ function AuthenticatedApp() {
                 <Route path="/hr-dashboard" component={HRDashboard} />
                 <Route path="/service-scheduling" component={ServiceScheduling} />
                 <Route path="/equipment-checklists" component={EquipmentChecklists} />
+                 <Route path="/my-overtime" component={MyOvertime} />
+                 <Route path="/overtime-approval">{() => <ProtectedRoute component={OvertimeApproval} roles={["admin","manager"]} />}</Route>
                 <Route component={NotFound} />
               </Switch>
             </Suspense>

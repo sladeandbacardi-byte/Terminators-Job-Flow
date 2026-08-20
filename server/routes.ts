@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, and, desc, eq, inArray, ne } from "drizzle-orm";
 import { runDailyBackupEmail, getBackupEmailConfig, sendBackupFailureAlert } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
 import { 
@@ -28,6 +28,8 @@ import {
   insertLegalEntitySchema,
   normalizeLeadStatus,
   LEAD_STATUS_LABELS,
+  overtimeEntries,
+  overtimeAuditEntries,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -36,6 +38,7 @@ import { AuthService, requireAuth, logActivity, type AuthenticatedRequest } from
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
+import { calculateOvertimeMinutes } from "@shared/overtime";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -53,13 +56,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { id: "worker-6", name: "Sales 2",             role: "Sales Rep",                      departmentId: "div-5" },
   ];
 
+  const overtimeEntryInput = z.object({
+    workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid work date"),
+    clientId: z.string().min(1, "Select a client"),
+    jobId: z.string().trim().min(1).optional().nullable(),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
+    finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
+    notes: z.string().trim().min(1, "Enter an overtime reason"),
+  });
+
+  const isOvertimeApprover = (req: AuthenticatedRequest) => {
+    const sourceRole = req.user?.sourceWorkerRole;
+    if (sourceRole !== undefined) {
+      const rawRole = sourceRole.trim().toLowerCase();
+      // Worker profiles carry source role data. Do not use getDashboardRole
+      // here: it deliberately defaults unknown roles to admin for UI routing.
+      const approvedWorkerRoles = new Set([
+        "managing member",
+        "managing director",
+        "operations manager",
+        "service manager",
+        "pest control services manager",
+        "hygiene services manager",
+        "owner",
+        "director",
+        "md",
+        "ceo",
+        "coo",
+      ]);
+      return approvedWorkerRoles.has(rawRole);
+    }
+
+    // Password/JWT admin accounts use their stored role directly.
+    const storedRole = String(req.user?.role ?? "").trim().toLowerCase();
+    return storedRole === "admin" || storedRole === "manager" || storedRole === "superadmin";
+  };
+
+  const overtimeActorName = (req: AuthenticatedRequest) =>
+    req.user?.username || [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || "Unknown user";
+
+  const logOvertimeAudit = async (
+    overtimeEntryId: string,
+    req: AuthenticatedRequest,
+    action: "submitted" | "edited" | "approved" | "rejected" | "reopened",
+    details?: Record<string, unknown>,
+    executor: any = db,
+  ) => {
+    await executor.insert(overtimeAuditEntries).values({
+      overtimeEntryId,
+      actorId: req.user!.id,
+      actorName: overtimeActorName(req),
+      action,
+      details: details ? JSON.stringify(details) : null,
+    });
+  };
+
+  const enrichOvertimeEntries = async (entries: (typeof overtimeEntries.$inferSelect)[]) => {
+    const [workers, clients, jobs] = await Promise.all([
+      storage.getWorkers(),
+      storage.getClients(),
+      storage.getJobs(),
+    ]);
+    const workersById = new Map(workers.map(worker => [worker.id, worker]));
+    const clientsById = new Map(clients.map(client => [client.id, client]));
+    const jobsById = new Map(jobs.map(job => [job.id, job]));
+
+    return entries.map(entry => {
+      const employee = workersById.get(entry.employeeId);
+      const client = clientsById.get(entry.clientId);
+      const job = entry.jobId ? jobsById.get(entry.jobId) : undefined;
+      return {
+        ...entry,
+        employeeName: employee?.name ?? "Unknown employee",
+        clientName: client?.name ?? "Unknown client",
+        jobLabel: job ? (job.jobNumber || job.title) : null,
+      };
+    });
+  };
+
+  const ensureOvertimeRelations = async (clientId: string, jobId?: string | null) => {
+    const client = await storage.getClient(clientId);
+    if (!client) throw new Error("Selected client was not found");
+    if (jobId) {
+      const job = await storage.getJob(jobId);
+      if (!job) throw new Error("Selected job was not found");
+      if (job.clientId !== clientId) throw new Error("The selected job does not belong to this client");
+    }
+  };
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { userId } = req.body;
+      const { userId, pin } = req.body;
       
-      if (!userId) {
-        return res.status(400).json({ message: "User ID is required" });
+      if (!userId || typeof pin !== "string" || pin.trim().length < 4) {
+        return res.status(400).json({ message: "Select a profile and enter your PIN" });
       }
 
       // Get the worker/user by ID — fall back to hardcoded list if DB is empty or throws
@@ -80,9 +171,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!worker) {
         return res.status(401).json({ message: "User not found" });
       }
+      if (worker.isActive === false) {
+        return res.status(403).json({ message: "This profile is inactive" });
+      }
+      if (!worker.pin) {
+        return res.status(403).json({ message: "A PIN has not been set for this profile. Ask a manager to enroll it." });
+      }
+      const validPin = await AuthService.verifyPassword(pin.trim(), worker.pin);
+      if (!validPin) {
+        return res.status(401).json({ message: "Incorrect PIN" });
+      }
 
-      // Generate a simple token (for now just use the user ID)
-      const token = `token_${worker.id}_${Date.now()}`;
+      const token = AuthService.generateWorkerToken(worker.id);
 
       // Log successful login using worker info
       const activityLog = {
@@ -316,6 +416,303 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Session cleanup failed" });
     }
   });
+
+  // ── Overtime ────────────────────────────────────────────────────────────────
+  app.get("/api/overtime/my", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const entries = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.employeeId, req.user!.id))
+        .orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt));
+      const enriched = await enrichOvertimeEntries(entries);
+      const pendingMinutes = entries
+        .filter(entry => entry.status === "pending")
+        .reduce((total, entry) => total + entry.overtimeMinutes, 0);
+      const approvedMinutes = entries
+        .filter(entry => entry.status === "approved")
+        .reduce((total, entry) => total + entry.overtimeMinutes, 0);
+      res.json({ entries: enriched, summary: { pendingMinutes, approvedMinutes } });
+    } catch (error) {
+      console.error("Could not load employee overtime:", error);
+      res.status(500).json({ error: "Could not load overtime entries" });
+    }
+  });
+
+  app.get("/api/overtime", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can review overtime" });
+    try {
+      const { employeeId, status, from, to } = req.query as Record<string, string | undefined>;
+      const entries = await db.select().from(overtimeEntries)
+        .orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt));
+      const filtered = entries.filter(entry =>
+        (!employeeId || entry.employeeId === employeeId) &&
+        (!status || status === "all" || entry.status === status) &&
+        (!from || entry.workDate >= from) &&
+        (!to || entry.workDate <= to),
+      );
+      const enriched = await enrichOvertimeEntries(filtered);
+      const pendingMinutes = filtered
+        .filter(entry => entry.status === "pending")
+        .reduce((total, entry) => total + entry.overtimeMinutes, 0);
+      const approvedMinutes = filtered
+        .filter(entry => entry.status === "approved")
+        .reduce((total, entry) => total + entry.overtimeMinutes, 0);
+      res.json({ entries: enriched, summary: { pendingMinutes, approvedMinutes } });
+    } catch (error) {
+      console.error("Could not load overtime approvals:", error);
+      res.status(500).json({ error: "Could not load overtime entries" });
+    }
+  });
+
+  app.get("/api/overtime/prefill/:jobId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const job = await storage.getJob(req.params.jobId);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+      res.json({
+        clientId: job.clientId,
+        jobId: job.id,
+        workDate: new Date(job.scheduledDate).toISOString().slice(0, 10),
+      });
+    } catch (error) {
+      console.error("Could not prepare overtime entry:", error);
+      res.status(500).json({ error: "Could not prepare overtime entry" });
+    }
+  });
+
+  app.post("/api/overtime", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const parsed = overtimeEntryInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
+    const data = parsed.data;
+    const overtimeMinutes = calculateOvertimeMinutes(data.startTime, data.finishTime);
+    if (overtimeMinutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (overtimeMinutes === 0) {
+      return res.status(400).json({ error: "No overtime detected. Normal working hours are 08:00 to 16:00." });
+    }
+
+    try {
+      await ensureOvertimeRelations(data.clientId, data.jobId);
+      const entry = await db.transaction(async (tx) => {
+        const [created] = await tx.insert(overtimeEntries).values({
+          employeeId: req.user!.id,
+          workDate: data.workDate,
+          clientId: data.clientId,
+          jobId: data.jobId || null,
+          startTime: data.startTime,
+          finishTime: data.finishTime,
+          notes: data.notes,
+          overtimeMinutes,
+          status: "pending",
+          updatedAt: new Date(),
+        }).returning();
+        await logOvertimeAudit(created.id, req, "submitted", {
+          workDate: created.workDate,
+          overtimeMinutes: created.overtimeMinutes,
+        }, tx);
+        return created;
+      });
+      res.status(201).json((await enrichOvertimeEntries([entry]))[0]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not submit overtime";
+      console.error("Could not submit overtime:", error);
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.patch("/api/overtime/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const parsed = overtimeEntryInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
+    const data = parsed.data;
+    const overtimeMinutes = calculateOvertimeMinutes(data.startTime, data.finishTime);
+    if (overtimeMinutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (overtimeMinutes === 0) {
+      return res.status(400).json({ error: "No overtime detected. Normal working hours are 08:00 to 16:00." });
+    }
+
+    try {
+      const [existing] = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.id, req.params.id))
+        .limit(1);
+      if (!existing) return res.status(404).json({ error: "Overtime entry not found" });
+      if (existing.employeeId !== req.user!.id) return res.status(403).json({ error: "You can only edit your own overtime" });
+      if (existing.status !== "pending") return res.status(409).json({ error: "Only pending overtime entries can be edited" });
+
+      await ensureOvertimeRelations(data.clientId, data.jobId);
+      const entry = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(overtimeEntries).set({
+          workDate: data.workDate,
+          clientId: data.clientId,
+          jobId: data.jobId || null,
+          startTime: data.startTime,
+          finishTime: data.finishTime,
+          notes: data.notes,
+          overtimeMinutes,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(overtimeEntries.id, existing.id),
+          eq(overtimeEntries.employeeId, req.user!.id),
+          eq(overtimeEntries.status, "pending"),
+        )).returning();
+        if (!updated) return null;
+        await logOvertimeAudit(updated.id, req, "edited", {
+          workDate: updated.workDate,
+          overtimeMinutes: updated.overtimeMinutes,
+        }, tx);
+        return updated;
+      });
+      if (!entry) return res.status(409).json({ error: "Only pending overtime entries can be edited" });
+      res.json((await enrichOvertimeEntries([entry]))[0]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not update overtime";
+      console.error("Could not update overtime:", error);
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.get("/api/overtime/:id/audit", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const [entry] = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.id, req.params.id))
+        .limit(1);
+      if (!entry) return res.status(404).json({ error: "Overtime entry not found" });
+      if (entry.employeeId !== req.user!.id && !isOvertimeApprover(req)) {
+        return res.status(403).json({ error: "You cannot view this audit history" });
+      }
+      const audit = await db.select().from(overtimeAuditEntries)
+        .where(eq(overtimeAuditEntries.overtimeEntryId, entry.id))
+        .orderBy(desc(overtimeAuditEntries.createdAt));
+      res.json(audit);
+    } catch (error) {
+      console.error("Could not load overtime audit history:", error);
+      res.status(500).json({ error: "Could not load audit history" });
+    }
+  });
+
+  app.post("/api/overtime/:id/approve", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can approve overtime" });
+    try {
+      const [target] = await db.select({ employeeId: overtimeEntries.employeeId })
+        .from(overtimeEntries)
+        .where(eq(overtimeEntries.id, req.params.id))
+        .limit(1);
+      if (target?.employeeId === req.user!.id) {
+        return res.status(403).json({ error: "You cannot approve your own overtime entry" });
+      }
+      const entry = await db.transaction(async (tx) => {
+        const approvedAt = new Date();
+        const [updated] = await tx.update(overtimeEntries).set({
+          status: "approved",
+          approvedById: req.user!.id,
+          approvedByName: overtimeActorName(req),
+          approvalTimestamp: approvedAt,
+          rejectionReason: null,
+          updatedAt: approvedAt,
+        }).where(and(
+          eq(overtimeEntries.id, req.params.id),
+          eq(overtimeEntries.status, "pending"),
+          ne(overtimeEntries.employeeId, req.user!.id),
+        )).returning();
+        if (!updated) return null;
+        await logOvertimeAudit(updated.id, req, "approved", { overtimeMinutes: updated.overtimeMinutes }, tx);
+        return updated;
+      });
+      if (!entry) return res.status(409).json({ error: "Only pending overtime entries can be approved" });
+      res.json((await enrichOvertimeEntries([entry]))[0]);
+    } catch (error) {
+      console.error("Could not approve overtime:", error);
+      res.status(500).json({ error: "Could not approve overtime" });
+    }
+  });
+
+  app.post("/api/overtime/:id/reject", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can reject overtime" });
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    try {
+      const entry = await db.transaction(async (tx) => {
+        const rejectedAt = new Date();
+        const [updated] = await tx.update(overtimeEntries).set({
+          status: "rejected",
+          approvedById: req.user!.id,
+          approvedByName: overtimeActorName(req),
+          approvalTimestamp: rejectedAt,
+          rejectionReason: reason || null,
+          updatedAt: rejectedAt,
+        }).where(and(eq(overtimeEntries.id, req.params.id), eq(overtimeEntries.status, "pending"))).returning();
+        if (!updated) return null;
+        await logOvertimeAudit(updated.id, req, "rejected", reason ? { reason } : undefined, tx);
+        return updated;
+      });
+      if (!entry) return res.status(409).json({ error: "Only pending overtime entries can be rejected" });
+      res.json((await enrichOvertimeEntries([entry]))[0]);
+    } catch (error) {
+      console.error("Could not reject overtime:", error);
+      res.status(500).json({ error: "Could not reject overtime" });
+    }
+  });
+
+  app.post("/api/overtime/:id/reopen", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can reopen overtime" });
+    try {
+      const entry = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(overtimeEntries).set({
+          status: "pending",
+          approvedById: null,
+          approvedByName: null,
+          approvalTimestamp: null,
+          rejectionReason: null,
+          updatedAt: new Date(),
+        }).where(and(eq(overtimeEntries.id, req.params.id), inArray(overtimeEntries.status, ["approved", "rejected"]))).returning();
+        if (!updated) return null;
+        await logOvertimeAudit(updated.id, req, "reopened", undefined, tx);
+        return updated;
+      });
+      if (!entry) return res.status(409).json({ error: "Only approved or rejected overtime entries can be reopened" });
+      res.json((await enrichOvertimeEntries([entry]))[0]);
+    } catch (error) {
+      console.error("Could not reopen overtime:", error);
+      res.status(500).json({ error: "Could not reopen overtime" });
+    }
+  });
+
+  app.post("/api/overtime/bulk-approve", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can approve overtime" });
+    const ids = Array.isArray(req.body?.ids)
+      ? [...new Set(req.body.ids.filter((id: unknown) => typeof id === "string" && id.length > 0))]
+      : [];
+    if (ids.length === 0) return res.status(400).json({ error: "Select at least one pending overtime entry" });
+    try {
+      const selectedEntries = await db.select({ employeeId: overtimeEntries.employeeId })
+        .from(overtimeEntries)
+        .where(inArray(overtimeEntries.id, ids));
+      if (selectedEntries.some(entry => entry.employeeId === req.user!.id)) {
+        return res.status(403).json({ error: "Remove your own overtime entries before bulk approval" });
+      }
+      const approved = await db.transaction(async (tx) => {
+        const approvedAt = new Date();
+        const updated = await tx.update(overtimeEntries).set({
+          status: "approved",
+          approvedById: req.user!.id,
+          approvedByName: overtimeActorName(req),
+          approvalTimestamp: approvedAt,
+          rejectionReason: null,
+          updatedAt: approvedAt,
+        }).where(and(
+          inArray(overtimeEntries.id, ids),
+          eq(overtimeEntries.status, "pending"),
+          ne(overtimeEntries.employeeId, req.user!.id),
+        )).returning();
+        for (const entry of updated) {
+          await logOvertimeAudit(entry.id, req, "approved", {
+            overtimeMinutes: entry.overtimeMinutes,
+            bulk: true,
+          }, tx);
+        }
+        return updated;
+      });
+      res.json({ approvedCount: approved.length, entries: await enrichOvertimeEntries(approved) });
+    } catch (error) {
+      console.error("Could not bulk approve overtime:", error);
+      res.status(500).json({ error: "Could not bulk approve overtime" });
+    }
+  });
   
   // ── Global Search ──────────────────────────────────────────────────────────
   app.get("/api/search", requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -526,10 +923,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { departmentId } = req.query;
     if (departmentId) {
       const workers = await storage.getWorkersByDepartment(departmentId as string);
-      res.json(workers);
+      res.json(workers.map(({ pin: _pin, ...worker }) => worker));
     } else {
       const workers = await storage.getWorkers();
-      res.json(workers);
+      res.json(workers.map(({ pin: _pin, ...worker }) => worker));
     }
   });
 
@@ -538,12 +935,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!worker) {
       return res.status(404).json({ error: "Worker not found" });
     }
-    res.json(worker);
+    const { pin: _pin, ...safeWorker } = worker;
+    res.json(safeWorker);
   });
 
-  app.post("/api/workers", async (req, res) => {
+  app.post("/api/workers", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can create staff profiles" });
     try {
       const worker = insertWorkerSchema.parse(req.body);
+      if (worker.pin) worker.pin = await AuthService.hashPassword(worker.pin);
       const created = await storage.createWorker(worker);
       res.status(201).json(created);
     } catch (error) {
@@ -551,9 +951,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/workers/:id", async (req, res) => {
+  app.put("/api/workers/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can update staff profiles" });
     try {
       const updateData = insertWorkerSchema.partial().parse(req.body);
+      if (updateData.pin) updateData.pin = await AuthService.hashPassword(updateData.pin);
       const updated = await storage.updateWorker(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
@@ -561,7 +963,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/workers/:id", async (req, res) => {
+  app.delete("/api/workers/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can delete staff profiles" });
     const deleted = await storage.deleteWorker(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Worker not found" });

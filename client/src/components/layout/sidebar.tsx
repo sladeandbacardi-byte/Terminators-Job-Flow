@@ -84,7 +84,7 @@ const ALL_SECTIONS: NavSection[] = [
     key: "operations",
     name: "Operations",
     icon: Users,
-    roles: ["admin", "manager", "coordinator", "accounts", "service"],
+    roles: ["admin", "manager", "coordinator", "accounts", "service", "sales"],
     items: [
       { name: "HR Dashboard",       href: "/hr-dashboard",       icon: Heart,          roles: ["admin", "manager", "accounts"] },
       { name: "Staff",              href: "/workers",            icon: Users,          roles: ["admin", "manager", "coordinator", "accounts"] },
@@ -97,6 +97,8 @@ const ALL_SECTIONS: NavSection[] = [
       { name: "Vehicle Inspection", href: "/fleet/inspection",   icon: ClipboardCheck, roles: ["admin", "manager", "coordinator", "service"] },
       { name: "Fuel Fill-up",       href: "/fleet/fuel",         icon: Fuel,           roles: ["admin", "manager", "coordinator", "service"] },
       { name: "Testing Checklist",  href: "/testing-checklist",  icon: CheckSquare,    roles: ["admin", "manager", "coordinator"] },
+      { name: "My Overtime",        href: "/my-overtime",        icon: Clock,          roles: ["admin", "manager", "coordinator", "accounts", "service", "sales"] },
+      { name: "Overtime Approval",  href: "/overtime-approval",  icon: CheckSquare,    roles: ["admin", "manager"] },
     ],
   },
   {
