@@ -54,6 +54,9 @@ app.use((req, res, next) => {
   // Run schema migrations before anything else — adds missing columns/tables
   // automatically on every deploy so Railway's production DB stays in sync.
   await runStartupMigrations();
+  // DbStorage is constructed during module loading, before migrations run. Provision
+  // mobile technicians here so the new worker columns are guaranteed to exist.
+  await (storage as any).ensureMobileTechnicians?.();
 
   const server = await registerRoutes(app);
 

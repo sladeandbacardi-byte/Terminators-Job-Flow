@@ -121,7 +121,17 @@ function RoleDashboard() {
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, login, user } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+
+  // The technician app owns its own employee-ID/PIN session and must be
+  // reachable without first signing into the desktop profile-picker flow.
+  if (location === "/mobile") {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Mobile />
+      </Suspense>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -252,6 +252,8 @@ export async function runStartupMigrations(): Promise<void> {
   );
 
   // ── New schema columns (idempotent ADD COLUMN guards) ────────────────────
+  await run("workers.user_type", `ALTER TABLE workers ADD COLUMN IF NOT EXISTS user_type text NOT NULL DEFAULT 'Staff'`);
+  await run("workers.mobile_access_enabled", `ALTER TABLE workers ADD COLUMN IF NOT EXISTS mobile_access_enabled boolean NOT NULL DEFAULT false`);
   await run("field_diaries.invoice_id",       `ALTER TABLE field_diaries   ADD COLUMN IF NOT EXISTS invoice_id varchar`);
   await run("field_diaries.invoice_number",   `ALTER TABLE field_diaries   ADD COLUMN IF NOT EXISTS invoice_number text`);
   await run("invoices.linked_contract_id",    `ALTER TABLE invoices         ADD COLUMN IF NOT EXISTS linked_contract_id varchar`);

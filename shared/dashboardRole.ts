@@ -1,8 +1,16 @@
 export type DashboardRole = "admin" | "manager" | "sales" | "service" | "accounts" | "coordinator";
 
-export function getDashboardRole(user: { departmentId?: string | null; role?: string | null }): DashboardRole {
+export function getDashboardRole(user: { departmentId?: string | null; role?: string | null; authenticationMethod?: string | null }): DashboardRole {
   const dept = user.departmentId ?? "";
   const role = (user.role ?? "").toLowerCase();
+
+  // Profile-picker sign-in intentionally grants staff-level access only. Its
+  // display role must not expose management dashboards based on a selected name.
+  if (user.authenticationMethod === "profile_picker") {
+    if (dept === "div-5") return "sales";
+    if (dept === "div-7") return "accounts";
+    return "service";
+  }
 
   // Owner/director keywords take priority over department
   if (
@@ -60,7 +68,7 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
  * Returns the URL the user should land on after login / clicking Dashboard.
  * Never returns "/" to avoid a redirect loop with the RoleDashboard guard.
  */
-export function getDefaultDashboardRoute(user: { departmentId?: string | null; role?: string | null }): string {
+export function getDefaultDashboardRoute(user: { departmentId?: string | null; role?: string | null; authenticationMethod?: string | null }): string {
   const role = getDashboardRole(user);
   switch (role) {
     case "sales":    return "/sales-dashboard";

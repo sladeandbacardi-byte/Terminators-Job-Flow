@@ -1,6 +1,6 @@
 import { MobileAuthProvider, useMobileAuth } from "@/hooks/useMobileAuth";
 import { MobileLogin } from "@/components/mobile/mobile-login";
-import { MobileWorkOrders } from "@/components/mobile/mobile-work-orders";
+import { MobileTechnicianDashboard } from "@/components/mobile/mobile-technician-dashboard";
 
 function MobileApp() {
   const { worker, isAuthenticated, isLoading, login, logout } = useMobileAuth();
@@ -22,7 +22,7 @@ function MobileApp() {
     return <MobileLogin onSuccess={login} />;
   }
 
-  return <MobileWorkOrders worker={worker} onLogout={logout} />;
+  return <MobileTechnicianDashboard worker={worker} onLogout={logout} />;
 }
 
 export default function Mobile() {

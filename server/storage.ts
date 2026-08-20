@@ -111,6 +111,7 @@ export interface IStorage {
   getJob(id: string): Promise<Job | undefined>;
   getJobsByWorker(workerId: string): Promise<Job[]>;
   getJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]>;
+  getMobileJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]>;
   getJobsByDepartment(departmentId: string): Promise<Job[]>;
   getJobsByStatus(status: string): Promise<Job[]>;
   getJobsByDateRange(startDate: Date, endDate: Date): Promise<Job[]>;
@@ -2958,6 +2959,18 @@ export class MemStorage implements IStorage {
     }
     
     return result;
+  }
+
+  async getMobileJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]> {
+    const teams = await this.getTeamsForWorker(workerId);
+    const memberIds = new Set<string>([workerId]);
+    for (const team of teams) {
+      for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+    }
+    const workerJobs = Array.from(this.jobs.values()).filter(job => job.workerId && memberIds.has(job.workerId));
+    return workerJobs
+      .map(job => ({ ...job, client: this.clients.get(job.clientId)! }))
+      .filter(job => !!job.client);
   }
 
   async updateJobStatus(jobId: string, status: string): Promise<Job> {

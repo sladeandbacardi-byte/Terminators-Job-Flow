@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AlertCircle, LogIn, Loader2 } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
 
@@ -27,7 +28,10 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
+  const [signInMode, setSignInMode] = useState<"staff" | "admin">("staff");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
@@ -49,11 +53,15 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   }, []);
 
   const loginMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const response = await fetch("/api/auth/login", {
+    mutationFn: async (credentials: { mode: "staff"; userId: string } | { mode: "admin"; username: string; password: string }) => {
+      const response = await fetch(credentials.mode === "staff" ? "/api/auth/login" : "/api/auth/admin-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify(
+          credentials.mode === "staff"
+            ? { userId: credentials.userId }
+            : { username: credentials.username, password: credentials.password },
+        ),
       });
       if (!response.ok) throw new Error("Login failed");
       return response.json();
@@ -79,7 +87,30 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-          <p className="text-sm text-gray-500">Select your profile to sign in.</p>
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+            <Button
+              type="button"
+              variant={signInMode === "staff" ? "default" : "ghost"}
+              className="w-full"
+              onClick={() => setSignInMode("staff")}
+            >
+              Staff sign in
+            </Button>
+            <Button
+              type="button"
+              variant={signInMode === "admin" ? "default" : "ghost"}
+              className="w-full"
+              onClick={() => setSignInMode("admin")}
+            >
+              Admin sign in
+            </Button>
+          </div>
+
+          <p className="text-sm text-gray-500">
+            {signInMode === "staff"
+              ? "Select your profile to sign in."
+              : "Use your administrator username and password."}
+          </p>
 
           {loginError && (
             <Alert variant="destructive">
@@ -92,12 +123,15 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             className="space-y-4"
             onSubmit={event => {
               event.preventDefault();
-              if (selectedUserId) {
-                loginMutation.mutate(selectedUserId);
+              if (signInMode === "staff" && selectedUserId) {
+                loginMutation.mutate({ mode: "staff", userId: selectedUserId });
+              }
+              if (signInMode === "admin" && username.trim() && password) {
+                loginMutation.mutate({ mode: "admin", username: username.trim(), password });
               }
             }}
           >
-          {staffLoading ? (
+          {signInMode === "staff" && (staffLoading ? (
             <div className="flex items-center gap-2 py-2 text-sm text-gray-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading…
@@ -118,11 +152,37 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 })}
               </SelectContent>
             </Select>
+          ))}
+
+          {signInMode === "admin" && (
+            <div className="space-y-3">
+              <Input
+                name="username"
+                autoComplete="username"
+                placeholder="Administrator username"
+                value={username}
+                onChange={event => setUsername(event.target.value)}
+                required
+              />
+              <Input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="Password"
+                value={password}
+                onChange={event => setPassword(event.target.value)}
+                required
+              />
+            </div>
           )}
 
           <Button
             type="submit"
-            disabled={loginMutation.isPending || !selectedUserId || staffLoading}
+            disabled={
+              loginMutation.isPending ||
+              (signInMode === "staff" && (!selectedUserId || staffLoading)) ||
+              (signInMode === "admin" && (!username.trim() || !password))
+            }
             className="w-full"
           >
             <LogIn className="h-4 w-4 mr-2" />

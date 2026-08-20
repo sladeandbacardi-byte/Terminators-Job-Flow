@@ -14,3 +14,4 @@
 - [Shared quote/lead status field](shared-quote-lead-status-field.md) — quote_submissions.status is one field driving both the lead board and the quote list; any UI that sets it must only ever use the 7 canonical LEAD_STATUSES values.
 - [Calendar permission enforcement](calendar-permission-enforcement.md) — shared drag-permission policy (canMoveCalendarEvent) must be re-checked server-side on every write route, not just used to hide the UI drag handle.
 - [Calendar list view sorting](calendar-list-view-sorting.md) — calendar libraries only sort list/agenda views by start time; supply an explicit comparator when the spec needs tie-break fields like route sequence.
+- [Startup provisioning order](startup-provisioning-order.md) — DbStorage initializes before startup migrations; any provisioning that depends on newly added columns must run after migrations in server startup.

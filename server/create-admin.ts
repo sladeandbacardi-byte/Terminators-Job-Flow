@@ -2,20 +2,24 @@ import { AuthService } from './auth-service';
 
 async function createDefaultAdmin() {
   try {
-    console.log('Creating default admin user...');
+    const { ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
+    if (!ADMIN_USERNAME || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
+      throw new Error('ADMIN_USERNAME, ADMIN_EMAIL, and ADMIN_PASSWORD must be set to create an administrator.');
+    }
+
+    console.log('Creating administrator user...');
     
     const adminUser = await AuthService.createAdminUser({
-      username: 'admin',
-      email: 'admin@terminators.co.za',
+      username: ADMIN_USERNAME,
+      email: ADMIN_EMAIL,
       firstName: 'System',
       lastName: 'Administrator',
       role: 'superadmin',
-      password: 'TerminatorsAdmin2024!',
+      password: ADMIN_PASSWORD,
     });
 
-    console.log('✅ Default admin user created successfully!');
-    console.log('Username: admin');
-    console.log('Password: TerminatorsAdmin2024!');
+    console.log('Administrator user created successfully.');
+    console.log('Username:', ADMIN_USERNAME);
     console.log('Email:', adminUser.email);
     
   } catch (error) {

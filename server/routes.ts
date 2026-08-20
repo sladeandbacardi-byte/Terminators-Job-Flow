@@ -20,6 +20,7 @@ import {
   insertFuelFillupSchema,
   insertVehicleInspectionSchema,
   insertVehicleIssueSchema,
+  insertFieldDiarySchema,
   insertServiceRecordSchema,
   insertWorkshopJobSchema,
   insertServiceScheduleEntrySchema,
@@ -34,7 +35,7 @@ import {
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
 import { createSageService } from "./sage-integration";
-import { AuthService, requireAuth, logActivity, type AuthenticatedRequest } from "./auth-service";
+import { AuthService, requireAuth, requireMobileTechnician, logActivity, type AuthenticatedRequest, type MobileAuthenticatedRequest } from "./auth-service";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
@@ -45,6 +46,47 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  const publicApiRoutes = new Set([
+    "POST /api/auth/login",
+    "POST /api/auth/admin-login",
+    "POST /api/auth/mobile-login",
+    "GET /api/auth/staff",
+    "POST /api/public/quote-request",
+  ]);
+
+  const profilePickerSelfService = (method: string, path: string) => {
+    if (["GET /api/auth/me", "POST /api/auth/logout", "GET /api/overtime/my", "POST /api/overtime"].includes(`${method} ${path}`)) {
+      return true;
+    }
+    return (
+      (method === "PATCH" && /^\/api\/overtime\/[^/]+$/.test(path)) ||
+      (method === "GET" && /^\/api\/overtime\/[^/]+\/audit$/.test(path)) ||
+      (method === "GET" && /^\/api\/overtime\/prefill\/[^/]+$/.test(path))
+    );
+  };
+
+  // Default deny for all business APIs. Exact public routes are intentionally
+  // listed above; every other request needs a verified session before a route
+  // handler sees it. Mobile routes are separately verified by their own signed
+  // technician-token middleware and must never accept a profile/admin token.
+  app.use("/api", (req, res, next) => {
+    const pathname = req.originalUrl.split("?")[0];
+    const signature = `${req.method} ${pathname}`;
+    if (req.method === "OPTIONS" || publicApiRoutes.has(signature)) return next();
+    if (pathname.startsWith("/api/mobile/")) return next();
+
+    return requireAuth(req as AuthenticatedRequest, res, () => {
+      const authenticated = req as AuthenticatedRequest;
+      if (
+        authenticated.user?.authenticationMethod === "profile_picker" &&
+        !profilePickerSelfService(req.method, pathname)
+      ) {
+        return res.status(403).json({ error: "Profile sign-in can only access personal staff functions" });
+      }
+      next();
+    });
+  });
 
   // Hardcoded staff list — used as fallback when DB is empty (e.g. fresh Railway deploy)
   const HARDCODED_STAFF = [
@@ -66,34 +108,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
-    if (req.user?.authenticationMethod === "profile_picker") {
+    if (req.user?.authenticationMethod === "profile_picker" || req.user?.sourceWorkerRole !== undefined) {
       return false;
     }
 
-    const sourceRole = req.user?.sourceWorkerRole;
-    if (sourceRole !== undefined) {
-      const rawRole = sourceRole.trim().toLowerCase();
-      // Worker profiles carry source role data. Do not use getDashboardRole
-      // here: it deliberately defaults unknown roles to admin for UI routing.
-      const approvedWorkerRoles = new Set([
-        "managing member",
-        "managing director",
-        "operations manager",
-        "service manager",
-        "pest control services manager",
-        "hygiene services manager",
-        "owner",
-        "director",
-        "md",
-        "ceo",
-        "coo",
-      ]);
-      return approvedWorkerRoles.has(rawRole);
-    }
-
-    // Password/JWT admin accounts use their stored role directly.
+    // Only separately authenticated administrator accounts can approve overtime.
     const storedRole = String(req.user?.role ?? "").trim().toLowerCase();
     return storedRole === "admin" || storedRole === "manager" || storedRole === "superadmin";
+  };
+
+  const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
+    const role = String(req.user?.role ?? "").trim().toLowerCase();
+    if (
+      req.user?.authenticationMethod === "profile_picker" ||
+      req.user?.sourceWorkerRole !== undefined ||
+      !["admin", "superadmin"].includes(role)
+    ) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
   };
 
   const overtimeActorName = (req: AuthenticatedRequest) =>
@@ -204,11 +237,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: worker.name.split(' ').slice(1).join(' '),
           role: worker.role || 'worker',
           departmentId: worker.departmentId,
+          authenticationMethod: "profile_picker",
         }
       });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/admin-login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (typeof username !== "string" || typeof password !== "string" || !username.trim() || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const result = await AuthService.authenticateUser(username.trim(), password);
+      if (!result) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      const { passwordHash: _passwordHash, ...safeUser } = result.user;
+      res.json({ token: result.token, user: safeUser });
+    } catch (error) {
+      console.error("Administrator login error:", error);
+      res.status(500).json({ message: "Unable to sign in" });
     }
   });
 
@@ -227,17 +281,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid employee ID or PIN" });
       }
 
-      // For demo purposes, check PIN directly (in production, should be hashed)
-      if (worker.pin !== pin.trim()) {
+      const submittedPin = pin.trim();
+      const storedPinIsHashed = /^\$2[aby]\$\d{2}\$/.test(worker.pin);
+      const pinMatches = storedPinIsHashed
+        ? await AuthService.verifyPassword(submittedPin, worker.pin)
+        : worker.pin === submittedPin;
+
+      if (!pinMatches) {
         return res.status(401).json({ message: "Invalid employee ID or PIN" });
+      }
+      // Preserve access for legacy records while upgrading their PIN on first
+      // successful mobile login. New and updated records are already hashed.
+      if (!storedPinIsHashed) {
+        await storage.updateWorker(worker.id, { pin: await AuthService.hashPassword(submittedPin) });
       }
 
       if (!worker.isActive) {
         return res.status(401).json({ message: "Account is inactive" });
       }
 
-      // Generate simple token for mobile session
-      const token = `mobile_${worker.id}_${Date.now()}`;
+      if (
+        worker.mobileAccessEnabled !== true ||
+        String(worker.role ?? "").trim().toLowerCase() !== "technician"
+      ) {
+        return res.status(403).json({ message: "This account is not enabled for mobile technician access" });
+      }
+
+      const token = AuthService.generateMobileWorkerToken(worker.id);
 
       res.json({
         token,
@@ -257,16 +327,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/mobile/work-orders/:workerId", async (req, res) => {
+  const getMobileJob = async (workerId: string, jobId: string) => {
+    const jobs = await storage.getMobileJobsForWorker(workerId);
+    return jobs.find(job => job.id === jobId);
+  };
+
+  const getMobileVehicle = async (workerId: string, requestedVehicleId?: string) => {
+    const assignment = await storage.getActiveAssignmentForWorker(workerId);
+    if (!assignment) return null;
+    if (requestedVehicleId && assignment.vehicleId !== requestedVehicleId) return null;
+    return assignment.vehicleId;
+  };
+
+  app.get("/api/mobile/dashboard", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
-      const { workerId } = req.params;
-      console.log("Fetching work orders for worker:", workerId);
-      
-      // Get today's and upcoming jobs for the worker
-      const jobs = await storage.getJobsForWorker(workerId);
-      console.log("Found jobs:", jobs.length);
-      
-      res.json(jobs);
+      const worker = req.mobileWorker!;
+      const jobs = await storage.getMobileJobsForWorker(worker.id);
+      const today = new Date().toISOString().slice(0, 10);
+      const dateOf = (value: Date | string | null) => value ? new Date(value).toISOString().slice(0, 10) : "";
+      const todayJobs = jobs.filter(job => dateOf(job.scheduledDate) === today);
+      const diaries = await storage.getFieldDiariesByWorker(worker.id);
+      const todayJobIds = new Set(todayJobs.map(job => job.id));
+      const diaryJobIds = new Set(diaries.filter(diary => diary.serviceDate === today).map(diary => diary.jobId));
+      const weekEnd = new Date();
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const assignment = await storage.getActiveAssignmentForWorker(worker.id);
+      const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : undefined;
+
+      res.json({
+        jobs,
+        todayJobs,
+        metrics: {
+          jobsToday: todayJobs.length,
+          completedToday: todayJobs.filter(job => job.status === "completed").length,
+          inProgress: jobs.filter(job => job.status === "in_progress").length,
+          fieldDiariesDue: todayJobs.filter(job => !diaryJobIds.has(job.id)).length,
+          currentJob: jobs.find(job => job.status === "in_progress") ?? null,
+          weekJobs: jobs.filter(job => {
+            const date = new Date(job.scheduledDate);
+            return date >= new Date(`${today}T00:00:00`) && date <= weekEnd;
+          }),
+        },
+        vehicle: vehicle ?? null,
+      });
+    } catch (error) {
+      console.error("Mobile dashboard error:", error);
+      res.status(500).json({ message: "Failed to load mobile dashboard" });
+    }
+  });
+
+  app.get("/api/mobile/work-orders/:workerId", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      if (req.params.workerId !== req.mobileWorker!.id) {
+        return res.status(403).json({ message: "You can only view your own work orders" });
+      }
+      res.json(await storage.getMobileJobsForWorker(req.mobileWorker!.id));
     } catch (error) {
       console.error("Error fetching work orders:", error);
       res.status(500).json({ message: "Failed to fetch work orders" });
@@ -319,24 +434,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(items);
   });
 
-  app.patch("/api/mobile/jobs/:jobId/status", async (req, res) => {
+  app.patch("/api/mobile/jobs/:jobId/status", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
       const { jobId } = req.params;
       const { status } = req.body;
-      console.log("Updating job status:", jobId, "to", status);
       
-      if (!status) {
-        return res.status(400).json({ message: "Status is required" });
+      if (!["scheduled", "in_progress", "completed"].includes(status)) {
+        return res.status(400).json({ message: "Choose a valid mobile job status" });
       }
-      
+      if (!await getMobileJob(req.mobileWorker!.id, jobId)) {
+        return res.status(403).json({ message: "This job is not assigned to you or your team" });
+      }
       const updatedJob = await storage.updateJobStatus(jobId, status);
-      console.log("Job status updated successfully");
-      
       res.json(updatedJob);
     } catch (error) {
       console.error("Error updating job status:", error);
       res.status(500).json({ message: "Failed to update job status" });
     }
+  });
+
+  app.get("/api/mobile/field-diaries", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      res.json(await storage.getFieldDiariesByWorker(req.mobileWorker!.id));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message ?? "Failed to load field diaries" });
+    }
+  });
+
+  app.post("/api/mobile/field-diaries", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const worker = req.mobileWorker!;
+      const job = req.body.jobId ? await getMobileJob(worker.id, req.body.jobId) : undefined;
+      if (!job) return res.status(403).json({ message: "Select a job assigned to you or your team" });
+      const diaryNumber = await storage.generateFieldDiaryNumber();
+      const parsed = insertFieldDiarySchema.parse({
+        diaryNumber,
+        jobId: job.id,
+        jobNumber: job.jobNumber,
+        clientId: job.clientId,
+        clientName: job.client.name,
+        workerId: worker.id,
+        workerName: worker.name,
+        departmentId: worker.departmentId || null,
+        serviceDate: req.body.serviceDate || new Date().toISOString().slice(0, 10),
+        arrivalTime: req.body.arrivalTime || null,
+        departureTime: req.body.departureTime || null,
+        workCompleted: req.body.workCompleted || null,
+        productsUsed: req.body.productsUsed || null,
+        notes: req.body.notes || null,
+        status: "submitted",
+        submittedAt: new Date(),
+      });
+      res.status(201).json(await storage.createFieldDiary(parsed));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message ?? "Unable to submit field diary" });
+    }
+  });
+
+  app.delete("/api/mobile/field-diaries/:id", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const diary = await storage.getFieldDiary(req.params.id);
+    if (!diary) return res.status(404).json({ message: "Field diary not found" });
+    if (diary.workerId !== req.mobileWorker!.id) {
+      return res.status(403).json({ message: "You can only remove your own field diaries" });
+    }
+    await storage.deleteFieldDiary(diary.id);
+    res.status(204).send();
+  });
+
+  app.get("/api/mobile/fleet/assignment", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const assignment = await storage.getActiveAssignmentForWorker(req.mobileWorker!.id);
+    const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : undefined;
+    res.json({ assignment: assignment ?? null, vehicle: vehicle ?? null });
+  });
+
+  app.post("/api/mobile/fleet/km-logs", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
+      if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to log kilometres" });
+      const startOdometer = Number(req.body.startOdometer);
+      const endOdometer = Number(req.body.endOdometer);
+      if (!Number.isInteger(startOdometer) || !Number.isInteger(endOdometer) || endOdometer < startOdometer) {
+        return res.status(400).json({ message: "Enter valid start and end odometer readings" });
+      }
+      const data = insertKmLogSchema.parse({
+        vehicleId, workerId: req.mobileWorker!.id, logDate: new Date(),
+        startOdometer, endOdometer, totalKm: endOdometer - startOdometer,
+        businessKm: Number(req.body.businessKm ?? 0), privateKm: Number(req.body.privateKm ?? 0),
+        notes: req.body.notes || null,
+      });
+      res.status(201).json(await storage.createKmLog(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message ?? "Unable to log kilometres" });
+    }
+  });
+
+  app.post("/api/mobile/fleet/fuel-fillups", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
+      if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to log fuel" });
+      const data = insertFuelFillupSchema.parse({
+        vehicleId, workerId: req.mobileWorker!.id, fillDate: new Date(),
+        odometer: req.body.odometer ? Number(req.body.odometer) : null,
+        litres: String(req.body.litres), cost: String(req.body.cost),
+        fuelStation: req.body.fuelStation || null, notes: req.body.notes || null,
+      });
+      res.status(201).json(await storage.createFuelFillup(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message ?? "Unable to log fuel fill-up" });
+    }
+  });
+
+  app.post("/api/mobile/fleet/inspections", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
+      if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required for an inspection" });
+      const data = insertVehicleInspectionSchema.parse({
+        vehicleId, workerId: req.mobileWorker!.id, inspectionDate: new Date(),
+        overallResult: req.body.overallResult === "fail" ? "fail" : "pass",
+        itemsJson: JSON.stringify(req.body.items ?? []), comments: req.body.comments || null,
+      });
+      res.status(201).json(await storage.createVehicleInspection(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message ?? "Unable to submit vehicle inspection" });
+    }
+  });
+
+  app.post("/api/mobile/fleet/issues", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
+      if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to report an issue" });
+      const data = insertVehicleIssueSchema.parse({
+        vehicleId, workerId: req.mobileWorker!.id, reportedAt: new Date(),
+        category: req.body.category || "other", description: req.body.description,
+        urgency: req.body.urgency || "medium", status: "open",
+      });
+      res.status(201).json(await storage.createVehicleIssue(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message ?? "Unable to report vehicle issue" });
+    }
+  });
+
+  app.delete("/api/mobile/fleet/issues/:id", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const issue = await storage.getVehicleIssue(req.params.id);
+    if (!issue) return res.status(404).json({ message: "Vehicle issue not found" });
+    if (issue.workerId !== req.mobileWorker!.id) {
+      return res.status(403).json({ message: "You can only remove your own vehicle issues" });
+    }
+    await storage.deleteVehicleIssue(issue.id);
+    res.status(204).send();
   });
 
   // Public endpoint — lists staff for login screen (no auth required).
@@ -393,7 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Activity logs - admin only access
-  app.get("/api/auth/activity-logs", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/auth/activity-logs", requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const logs = await storage.getActivityLogs();
       res.json(logs);
@@ -404,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Clean expired sessions (can be called by a scheduled job)
-  app.post("/api/auth/cleanup-sessions", async (req, res) => {
+  app.post("/api/auth/cleanup-sessions", requireAuth, requireAdmin, async (req, res) => {
     try {
       await AuthService.cleanExpiredSessions();
       res.json({ message: "Session cleanup completed" });
@@ -942,7 +1187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const worker = insertWorkerSchema.parse(req.body);
       if (worker.pin) worker.pin = await AuthService.hashPassword(worker.pin);
       const created = await storage.createWorker(worker);
-      res.status(201).json(created);
+      const { pin: _pin, ...safeWorker } = created;
+      res.status(201).json(safeWorker);
     } catch (error) {
       res.status(400).json({ error: "Invalid worker data" });
     }
@@ -954,7 +1200,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertWorkerSchema.partial().parse(req.body);
       if (updateData.pin) updateData.pin = await AuthService.hashPassword(updateData.pin);
       const updated = await storage.updateWorker(req.params.id, updateData);
-      res.json(updated);
+      const { pin: _pin, ...safeWorker } = updated;
+      res.json(safeWorker);
     } catch (error) {
       res.status(400).json({ error: "Invalid worker data" });
     }
@@ -1181,7 +1428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── Global /api/payments endpoint ─────────────────────────────────────────────
-  app.get("/api/payments", async (req, res) => {
+  app.get("/api/payments", requireAuth, requireAdmin, async (req, res) => {
     const { clientId } = req.query;
     if (clientId) {
       const list = await storage.getClientPayments(clientId as string);
@@ -1191,7 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // so we call the storage method with a special flag; for now fall back to empty
     res.json([]);
   });
-  app.post("/api/payments", async (req, res) => {
+  app.post("/api/payments", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { insertClientPaymentSchema } = await import("@shared/schema");
       const data = insertClientPaymentSchema.parse(req.body);
@@ -1201,14 +1448,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: "Invalid payment data", details: error instanceof Error ? error.message : String(error) });
     }
   });
-  app.delete("/api/payments/:id", async (req, res) => {
+  app.delete("/api/payments/:id", requireAuth, requireAdmin, async (req, res) => {
     const deleted = await storage.deleteClientPayment(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Payment not found" });
     res.status(204).send();
   });
 
   // ── Client activity log endpoint ───────────────────────────────────────────────
-  app.get("/api/clients/:clientId/activity", async (req, res) => {
+  app.get("/api/clients/:clientId/activity", requireAuth, requireAdmin, async (req, res) => {
     try {
       const logs = await storage.getActivityLogsByClient(req.params.clientId);
       res.json(logs);
@@ -3795,17 +4042,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Inline admin-role guard (used by backup schedule and data-integrity endpoints)
-  const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
-    const role = (req.user as any)?.role ?? "";
-    if (req.user?.authenticationMethod === "profile_picker" || !["admin", "superadmin"].includes(role)) {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-    next();
-  };
-
   // Backup & Restore
-  app.get("/api/backup/export", async (req, res) => {
+  app.get("/api/backup/export", requireAuth, requireAdmin, async (req, res) => {
     try {
       const data = await storage.exportBackup();
       const filename = `job-flow-restore-backup-${new Date().toISOString().split("T")[0]}.json`;
@@ -3817,7 +4055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/backup/export-excel", async (req, res) => {
+  app.get("/api/backup/export-excel", requireAuth, requireAdmin, async (req, res) => {
     try {
       const XLSX = await import("xlsx");
       const dateStr = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "";
@@ -4133,7 +4371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/backup/restore", async (req, res) => {
+  app.post("/api/backup/restore", requireAuth, requireAdmin, async (req, res) => {
     try {
       const data = req.body;
       if (!data || typeof data !== "object") {
@@ -4146,7 +4384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/backup/logs", async (_req, res) => {
+  app.get("/api/backup/logs", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const logs = await storage.getBackupLogs();
       res.json(logs);
@@ -4155,11 +4393,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/backup/email-config", async (_req, res) => {
+  app.get("/api/backup/email-config", requireAuth, requireAdmin, async (_req, res) => {
     res.json(getBackupEmailConfig());
   });
 
-  app.post("/api/backup/email-send", async (_req, res) => {
+  app.post("/api/backup/email-send", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const result = await runDailyBackupEmail("manual");
       const logs = await storage.getBackupLogs();
@@ -4174,7 +4412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/backup/smtp-test", async (_req, res) => {
+  app.post("/api/backup/smtp-test", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const result = await sendBrevoTestEmail();
       if (!result.success) return res.status(500).json(result);
@@ -4184,7 +4422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/backup/email-test", async (_req, res) => {
+  app.post("/api/backup/email-test", requireAuth, requireAdmin, async (_req, res) => {
     try {
       // Recipient override is intentionally not supported here to prevent
       // backup data exfiltration to arbitrary addresses. Test always sends
@@ -5316,7 +5554,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // ── Save/Search Workflow Test ─────────────────────────────────────────────
   // Creates test records, verifies each appears in its real list/filter
   // queries, reports per-screen pass/fail, then cleans up.
-  app.get("/api/admin/data-integrity/save-search-test", async (_req, res) => {
+  app.get("/api/admin/data-integrity/save-search-test", requireAuth, requireAdmin, async (_req, res) => {
     type ScreenResult = { screen: string; found: boolean };
     type RecordResult = {
       recordType: string;

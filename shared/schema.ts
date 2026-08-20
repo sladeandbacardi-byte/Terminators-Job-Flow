@@ -23,6 +23,8 @@ export const workers = pgTable("workers", {
   phone: text("phone").notNull(),
   departmentId: varchar("department_id").notNull(),
   role: text("role"),
+  userType: text("user_type").notNull().default("Staff"),
+  mobileAccessEnabled: boolean("mobile_access_enabled").notNull().default(false),
   employeeId: text("employee_id").unique(), // For mobile login
   pin: text("pin"), // 4-digit PIN for mobile login (hashed)
   isActive: boolean("is_active").notNull().default(true),

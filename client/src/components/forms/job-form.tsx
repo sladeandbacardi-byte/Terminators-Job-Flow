@@ -164,7 +164,10 @@ export default function JobForm({ job, onSuccess, onCancel }: JobFormProps) {
   );
 
   const availableWorkers = useMemo(
-    () => workers.filter(w => w.isActive !== false && (!watchDeptId || w.departmentId === watchDeptId)),
+    () => workers.filter(w =>
+      w.isActive !== false &&
+      (w.mobileAccessEnabled === true || !watchDeptId || w.departmentId === watchDeptId)
+    ),
     [workers, watchDeptId],
   );
 

@@ -246,6 +246,33 @@ export class DbStorage implements IStorage {
     await this.runDataMigrations();
   }
 
+  async ensureMobileTechnicians(): Promise<void> {
+    const technicianRows = [
+      { id: "mobile-tech-01", name: "Re-Althon", email: "mobile.realthon@terminators.co.za", employeeId: "MT-001", pin: "$2b$12$1OFA70tI7BqBlRIQaProT.aKmJTJzFPuJETb2Cml75h2hxxpyq0q." },
+      { id: "mobile-tech-02", name: "Leon", email: "mobile.leon@terminators.co.za", employeeId: "MT-002", pin: "$2b$12$wnQJbkTzwJonlfVzb/aSAuzOAML/Grpg.DW2yODvrYz8jQ4jNBM3q" },
+      { id: "mobile-tech-03", name: "Garth", email: "mobile.garth@terminators.co.za", employeeId: "MT-003", pin: "$2b$12$0ZnfJTlA1M5to9JDFq/ovO5W9993GsdqDN9mO3yAafqnLXeyPgE8m" },
+      { id: "mobile-tech-04", name: "Jackie", email: "mobile.jackie@terminators.co.za", employeeId: "MT-004", pin: "$2b$12$qOmXf99GMgwHnrpuhm4.kez2lipdbe95QuaeOoK/0DH/LsEOcVwCW" },
+      { id: "mobile-tech-05", name: "Sheryl", email: "mobile.sheryl@terminators.co.za", employeeId: "MT-005", pin: "$2b$12$ukCS.SJispVSmnEJAL39vO.4uvZM4x5nMMc.LR.DzLam45RzO4Dj." },
+      { id: "mobile-tech-06", name: "Zain", email: "mobile.zain@terminators.co.za", employeeId: "MT-006", pin: "$2b$12$2rRU67ArfS57wCRynAH0b.QIM2IH3StpB4mOx426D6Qs5iUGOQYx6" },
+      { id: "mobile-tech-07", name: "Mike", email: "mobile.mike@terminators.co.za", employeeId: "MT-007", pin: "$2b$12$NsFt8roiFgggruppux.pU.47RBM.2wcqgcwccGy1euAEv7ur3moMm" },
+      { id: "mobile-tech-08", name: "X", email: "mobile.x@terminators.co.za", employeeId: "MT-008", pin: "$2b$12$/jWWeI5FnoOXHxfF4eFFU.ltklj6INnBjU15cZEH76K10DmKR/s/S" },
+      { id: "mobile-tech-09", name: "Reece", email: "mobile.reece@terminators.co.za", employeeId: "MT-009", pin: "$2b$12$LsXLFAybBFD2sUNd8k1bPOGnTe8kGVkAd.i6nzigR2iEn06r4N3d2" },
+    ];
+
+    for (const technician of technicianRows) {
+      await db.insert(workers).values({
+        ...technician,
+        phone: "",
+        departmentId: "",
+        role: "Technician",
+        userType: "Mobile Technician",
+        mobileAccessEnabled: true,
+        isActive: true,
+        createdAt: new Date(),
+      }).onConflictDoNothing();
+    }
+  }
+
   private async ensureLegalEntitiesSeeded(): Promise<void> {
     // Only seed when the table is genuinely empty — some databases already
     // have legal entities (created via the Settings UI or an earlier seed),
@@ -795,6 +822,20 @@ export class DbStorage implements IStorage {
       .where(eq(jobs.workerId, workerId))
       .orderBy(desc(jobs.scheduledDate));
     return rows.map(r => ({ ...r.job, client: r.client! }));
+  }
+
+  async getMobileJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]> {
+    const technicianTeams = await this.getTeamsForWorker(workerId);
+    const memberIds = new Set<string>([workerId]);
+    for (const team of technicianTeams) {
+      for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+    }
+    const rows = await db.select({ job: jobs, client: clients })
+      .from(jobs)
+      .leftJoin(clients, eq(jobs.clientId, clients.id))
+      .where(inArray(jobs.workerId, Array.from(memberIds)))
+      .orderBy(desc(jobs.scheduledDate));
+    return rows.filter(row => row.client).map(row => ({ ...row.job, client: row.client! }));
   }
 
   async getJobsByDepartment(departmentId: string): Promise<Job[]> {

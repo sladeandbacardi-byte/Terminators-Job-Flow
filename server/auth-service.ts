@@ -25,6 +25,15 @@ type WorkerSessionClaims = {
   tokenType: "worker";
 };
 
+type MobileWorkerSessionClaims = {
+  workerId: string;
+  tokenType: "mobile_worker";
+};
+
+export type MobileAuthenticatedRequest = Request & {
+  mobileWorker?: Awaited<ReturnType<typeof storage.getWorker>>;
+};
+
 async function resolveWorkerToken(token: string): Promise<AuthenticatedUser | null> {
   let claims: WorkerSessionClaims;
   try {
@@ -88,6 +97,10 @@ export class AuthService {
 
   static generateWorkerToken(workerId: string): string {
     return jwt.sign({ workerId, tokenType: "worker" }, JWT_SECRET, { expiresIn: "24h" });
+  }
+
+  static generateMobileWorkerToken(workerId: string): string {
+    return jwt.sign({ workerId, tokenType: "mobile_worker" }, JWT_SECRET, { expiresIn: "12h" });
   }
 
   // Verify JWT token
@@ -266,6 +279,34 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   } catch (error) {
     console.error('Auth middleware error:', error);
     res.status(500).json({ message: 'Authentication error' });
+  }
+};
+
+export const requireMobileTechnician = async (req: MobileAuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ message: "Mobile session token required" });
+
+    const claims = jwt.verify(token, JWT_SECRET) as MobileWorkerSessionClaims;
+    if (claims.tokenType !== "mobile_worker" || !claims.workerId) {
+      return res.status(401).json({ message: "Invalid mobile session" });
+    }
+
+    const worker = await storage.getWorker(claims.workerId);
+    if (
+      !worker ||
+      worker.isActive === false ||
+      worker.mobileAccessEnabled !== true ||
+      String(worker.role ?? "").trim().toLowerCase() !== "technician"
+    ) {
+      return res.status(403).json({ message: "Mobile technician access required" });
+    }
+
+    req.mobileWorker = worker;
+    next();
+  } catch {
+    return res.status(401).json({ message: "Invalid or expired mobile session" });
   }
 };
 

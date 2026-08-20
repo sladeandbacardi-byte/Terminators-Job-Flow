@@ -73,7 +73,7 @@ export default function Workers() {
   // Group workers by department; null → "none"
   const grouped: Record<string, Worker[]> = {};
   for (const w of filtered) {
-    const key = w.departmentId ?? "none";
+    const key = w.departmentId || "none";
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(w);
   }
@@ -144,7 +144,7 @@ export default function Workers() {
                 const deptWorkers = grouped[deptId];
                 const headerClass = DEPT_HEADER[deptId] ?? DEPT_HEADER["none"];
                 const badgeClass  = DEPT_BADGE[deptId]  ?? "bg-gray-100 text-gray-800";
-                const deptName = deptId === "none" ? "Office / Management" : getDeptName(deptId);
+                const deptName = deptId === "none" ? "Unassigned / Mobile Staff" : getDeptName(deptId);
 
                 return (
                   <div key={deptId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -177,6 +177,9 @@ export default function Workers() {
                               {worker.role && (
                                 <p className="text-xs text-gray-500 truncate">{worker.role}</p>
                               )}
+                               {worker.mobileAccessEnabled && (
+                                 <Badge className="mt-1 ml-1 bg-emerald-100 text-emerald-800 text-xs">Mobile access</Badge>
+                               )}
                               <Badge className={`mt-1 text-xs ${badgeClass}`} data-testid={`worker-department-${worker.id}`}>
                                 {deptName}
                               </Badge>
