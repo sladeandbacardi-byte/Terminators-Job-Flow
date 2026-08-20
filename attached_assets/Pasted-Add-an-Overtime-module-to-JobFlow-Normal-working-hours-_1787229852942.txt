@@ -1,0 +1,54 @@
+Add an Overtime module to JobFlow.
+
+Normal working hours are 08:00 to 16:00. Only time worked before 08:00 and after 16:00 qualifies as overtime.
+
+Create a My Overtime page for employees and an Overtime Approval page for Admin/Management.
+
+Each overtime entry must contain:
+
+Employee, automatically set to the logged-in user
+Date worked
+Client
+Job/job card where applicable
+Start time
+Finish time
+Notes/reason
+Automatically calculated overtime minutes
+Status: Pending, Approved or Rejected
+Approved By
+Approval timestamp
+
+Use proper mobile-friendly time input controls. Users must not manually enter the overtime total.
+
+Calculation logic:
+
+Any time between 08:00 and 16:00 is normal working time and must NOT count as overtime.
+Time before 08:00 counts as overtime.
+Time after 16:00 counts as overtime.
+If a shift spans both periods, add the before-08:00 portion and the after-16:00 portion.
+
+Examples:
+
+06:30–08:00 = 1 hr 30 min overtime
+07:00–09:00 = 1 hr overtime
+15:00–17:30 = 1 hr 30 min overtime
+07:30–17:00 = 1 hr 30 min overtime
+08:00–16:00 = 0 overtime
+09:00–15:00 = 0 overtime
+06:30–17:30 = 3 hrs overtime
+
+If the calculated overtime is zero, prevent submission and show: “No overtime detected. Normal working hours are 08:00 to 16:00.”
+
+Store overtime internally in minutes, not decimal hours, but display totals as hours and minutes.
+
+Add a Log Overtime action from a Job Card. When opened from a Job Card, automatically populate the employee, client, job and date.
+
+Employees can view their own overtime history and totals but cannot approve overtime.
+
+Admin/Management can view all overtime, filter by employee/date/status, approve or reject individual entries, select multiple entries and approve them together, and see total pending/approved overtime hours.
+
+Record an audit trail showing who submitted, approved, rejected or edited each entry.
+
+Once approved, an employee cannot edit the entry unless an administrator reopens it.
+
+Make the entire interface responsive and easy to use on a mobile phone.
