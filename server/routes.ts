@@ -66,15 +66,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   };
 
+  const isMobileProtectedRoute = (method: string, path: string) => {
+    const signature = `${method} ${path}`;
+    if ([
+      "GET /api/mobile/dashboard",
+      "GET /api/mobile/field-diaries",
+      "POST /api/mobile/field-diaries",
+      "GET /api/mobile/fleet/assignment",
+      "POST /api/mobile/fleet/km-logs",
+      "POST /api/mobile/fleet/fuel-fillups",
+      "POST /api/mobile/fleet/inspections",
+      "POST /api/mobile/fleet/issues",
+    ].includes(signature)) {
+      return true;
+    }
+    return (
+      (method === "GET" && /^\/api\/mobile\/work-orders\/[^/]+$/.test(path)) ||
+      (method === "PATCH" && /^\/api\/mobile\/jobs\/[^/]+\/status$/.test(path)) ||
+      (method === "DELETE" && /^\/api\/mobile\/field-diaries\/[^/]+$/.test(path)) ||
+      (method === "DELETE" && /^\/api\/mobile\/fleet\/issues\/[^/]+$/.test(path))
+    );
+  };
+
   // Default deny for all business APIs. Exact public routes are intentionally
   // listed above; every other request needs a verified session before a route
-  // handler sees it. Mobile routes are separately verified by their own signed
-  // technician-token middleware and must never accept a profile/admin token.
+  // handler sees it. The explicit mobile route list is separately verified by
+  // its own signed technician-token middleware and must never accept a
+  // profile/admin token.
   app.use("/api", (req, res, next) => {
     const pathname = req.originalUrl.split("?")[0];
     const signature = `${req.method} ${pathname}`;
     if (req.method === "OPTIONS" || publicApiRoutes.has(signature)) return next();
-    if (pathname.startsWith("/api/mobile/")) return next();
+    if (isMobileProtectedRoute(req.method, pathname)) return next();
 
     return requireAuth(req as AuthenticatedRequest, res, () => {
       const authenticated = req as AuthenticatedRequest;
