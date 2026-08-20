@@ -1,0 +1,230 @@
+UPDATE LOGIN SCREEN WITH STAFF LOGIN AND ADMIN LOGIN
+
+The login screen must separate mobile staff users from admin/office users.
+
+Create two login sections:
+
+1. Staff Login
+2. Admin Login
+
+STAFF LOGIN
+
+Staff Login is for mobile field staff / technicians only.
+
+Show these mobile users under Staff Login:
+
+- Re-Althon
+- Leon
+- Garth
+- Jackie
+- Sheryl
+- Zain
+- Mike
+- X
+- Reece
+
+These users should log into the mobile technician experience.
+
+When a staff/mobile user logs in, route them to:
+
+Technician Dashboard / My Jobs Dashboard
+
+Staff/mobile users must only see the simplified mobile menu:
+
+SERVICE
+- Dashboard
+- My Jobs
+- Field Diaries
+- Calendar, optional read-only
+
+FLEET
+- Report Issue
+- Log KMs
+- Vehicle Inspection
+- Fuel Fill-up
+
+Staff/mobile users must not see:
+- Sales
+- Leads
+- Quotes
+- Accepted Work
+- Finance
+- Invoices
+- Debtors
+- Creditors
+- Admin
+- Users & Roles
+- Backup & Restore
+- Suppliers
+- Purchase Orders
+- Stock Manager Pro
+- Reports
+- Custom Reports
+
+ADMIN LOGIN
+
+Admin Login is for office, admin, managers and supervisors.
+
+Show admin/office users under Admin Login.
+
+Admin Login should include users such as:
+
+- Julien Botha
+- Mariette Koekemoer
+- Maryka Venter
+- Sheryl-Lyn Lee
+- Chané du Toit
+- Finance user
+- Admin user
+- Service Manager
+- Managing Member
+
+Use the existing admin/office users from the database.
+
+Admin users must route according to their role:
+
+Managing Member:
+Business Overview Dashboard
+
+Sales user:
+Sales Dashboard
+
+Service Manager / Service Coordinator:
+Service Dashboard
+
+Finance user:
+Finance Dashboard
+
+Admin:
+Admin / Business Overview Dashboard
+
+LOGIN SCREEN DESIGN
+
+The login screen should show:
+
+Job Flow logo at the top.
+
+Heading:
+Select Login Type
+
+Two large buttons/cards:
+
+1. Staff Login
+Subtitle:
+For technicians and mobile field staff
+
+2. Admin Login
+Subtitle:
+For office, sales, service, finance and management users
+
+When Staff Login is clicked:
+Show only the mobile technician users.
+
+When Admin Login is clicked:
+Show only the admin/office users.
+
+Each user should appear as a large button/card with:
+- Name
+- Role
+- Department if available
+
+Example Staff card:
+Re-Althon
+Mobile Technician
+
+Example Admin card:
+Julien Botha
+Managing Member
+
+After clicking a user:
+Immediately log in as that user and route to the correct dashboard.
+
+Also include:
+- Back button to return to Select Login Type
+- Switch User button after login
+
+DATA RULES
+
+Each user must have a user type:
+
+userType:
+- staff
+- admin
+
+or similar.
+
+Mobile technician users:
+userType = staff
+role = Technician
+mobileAccess = true
+
+Office/admin users:
+userType = admin
+mobileAccess = false unless specifically needed
+
+Filtering rules:
+
+Staff Login:
+Only show users where:
+userType = staff
+or
+mobileAccess = true
+or
+role is Technician / Field Technician / Worker
+
+Admin Login:
+Only show users where:
+userType = admin
+or
+role is Managing Member / Admin / Sales / Finance / Service Manager / Service Coordinator / Operations / HR
+
+Do not show the same user in both sections unless explicitly allowed.
+
+FALLBACK RULES
+
+If database users fail to load, show fallback login users.
+
+Fallback Staff Login:
+- Re-Althon
+- Leon
+- Garth
+- Jackie
+- Sheryl
+- Zain
+- Mike
+- X
+- Reece
+
+Fallback Admin Login:
+- Managing Member
+- Sales
+- Service Manager
+- Finance
+- Admin
+
+PERMISSIONS
+
+Staff users must have restricted mobile permissions.
+
+Admin users must have role-based permissions.
+
+Technician/staff users should only see jobs assigned to them or their team.
+
+TESTING
+
+After implementation, test:
+
+1. Login screen opens.
+2. Staff Login shows only mobile users.
+3. Admin Login shows only office/admin users.
+4. Re-Althon logs into Technician Dashboard.
+5. Zain logs into Technician Dashboard.
+6. Julien logs into Business Overview Dashboard.
+7. Sales user logs into Sales Dashboard.
+8. Service Manager logs into Service Dashboard.
+9. Finance user logs into Finance Dashboard.
+10. Staff users cannot access Sales, Finance or Admin by URL.
+11. Admin users can access the correct sections based on their role.
+12. Switch User works.
+
+END
