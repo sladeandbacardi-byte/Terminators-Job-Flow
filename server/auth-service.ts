@@ -17,6 +17,7 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export type AuthenticatedUser = AdminUser & {
   sourceWorkerRole?: string | null;
   sourceWorkerDepartmentId?: string | null;
+  authenticationMethod?: "profile_picker";
 };
 
 type WorkerSessionClaims = {
@@ -52,6 +53,7 @@ async function resolveWorkerToken(token: string): Promise<AuthenticatedUser | nu
       // privileged worker role from getDashboardRole's legacy admin fallback.
       sourceWorkerRole: worker.role,
       sourceWorkerDepartmentId: worker.departmentId,
+      authenticationMethod: "profile_picker",
       isActive: true,
       lastLoginAt: null,
       createdAt: worker.createdAt ?? new Date(),

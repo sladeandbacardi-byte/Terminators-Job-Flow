@@ -3,7 +3,6 @@ import { useMutation } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { AlertCircle, LogIn, Loader2 } from "lucide-react";
 import { getDashboardRole, dashboardRoleLabels } from "@/lib/dashboardRole";
 
@@ -29,7 +28,6 @@ interface LoginFormProps {
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [pin, setPin] = useState("");
   const [loginError, setLoginError] = useState("");
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
@@ -51,11 +49,11 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   }, []);
 
   const loginMutation = useMutation({
-    mutationFn: async ({ userId, pin }: { userId: string; pin: string }) => {
+    mutationFn: async (userId: string) => {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, pin }),
+        body: JSON.stringify({ userId }),
       });
       if (!response.ok) throw new Error("Login failed");
       return response.json();
@@ -81,7 +79,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-          <p className="text-sm text-gray-500">Select your profile and enter your PIN to sign in.</p>
+          <p className="text-sm text-gray-500">Select your profile to sign in.</p>
 
           {loginError && (
             <Alert variant="destructive">
@@ -94,8 +92,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             className="space-y-4"
             onSubmit={event => {
               event.preventDefault();
-              if (selectedUserId && pin.length >= 4) {
-                loginMutation.mutate({ userId: selectedUserId, pin });
+              if (selectedUserId) {
+                loginMutation.mutate(selectedUserId);
               }
             }}
           >
@@ -122,31 +120,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             </Select>
           )}
 
-          <Input
-            type="text"
-            name="username"
-            autoComplete="username"
-            value={selectedUserId}
-            readOnly
-            tabIndex={-1}
-            aria-hidden="true"
-            className="sr-only"
-          />
-          <Input
-            type="password"
-            name="pin"
-            inputMode="numeric"
-            autoComplete="current-password"
-            placeholder="Enter your PIN"
-            value={pin}
-            onChange={event => setPin(event.target.value)}
-            minLength={4}
-            required
-          />
-
           <Button
             type="submit"
-            disabled={loginMutation.isPending || !selectedUserId || pin.length < 4 || staffLoading}
+            disabled={loginMutation.isPending || !selectedUserId || staffLoading}
             className="w-full"
           >
             <LogIn className="h-4 w-4 mr-2" />

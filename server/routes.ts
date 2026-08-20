@@ -66,6 +66,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
+    if (req.user?.authenticationMethod === "profile_picker") {
+      return false;
+    }
+
     const sourceRole = req.user?.sourceWorkerRole;
     if (sourceRole !== undefined) {
       const rawRole = sourceRole.trim().toLowerCase();
@@ -147,10 +151,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { userId, pin } = req.body;
+      const { userId } = req.body;
       
-      if (!userId || typeof pin !== "string" || pin.trim().length < 4) {
-        return res.status(400).json({ message: "Select a profile and enter your PIN" });
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
       }
 
       // Get the worker/user by ID — fall back to hardcoded list if DB is empty or throws
@@ -164,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!worker) {
         const fallback = HARDCODED_STAFF.find(s => s.id === userId);
         if (fallback) {
-          worker = { ...fallback, email: null, phone: null, isActive: true, createdAt: new Date(), employeeId: null, pin: null };
+          worker = { ...fallback, email: null, phone: null, isActive: true, createdAt: new Date(), employeeId: null };
         }
       }
 
@@ -173,13 +177,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (worker.isActive === false) {
         return res.status(403).json({ message: "This profile is inactive" });
-      }
-      if (!worker.pin) {
-        return res.status(403).json({ message: "A PIN has not been set for this profile. Ask a manager to enroll it." });
-      }
-      const validPin = await AuthService.verifyPassword(pin.trim(), worker.pin);
-      if (!validPin) {
-        return res.status(401).json({ message: "Incorrect PIN" });
       }
 
       const token = AuthService.generateWorkerToken(worker.id);
@@ -3801,7 +3798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Inline admin-role guard (used by backup schedule and data-integrity endpoints)
   const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
     const role = (req.user as any)?.role ?? "";
-    if (!["admin", "superadmin"].includes(role)) {
+    if (req.user?.authenticationMethod === "profile_picker" || !["admin", "superadmin"].includes(role)) {
       return res.status(403).json({ error: "Admin access required" });
     }
     next();

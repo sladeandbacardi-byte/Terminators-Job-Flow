@@ -9,4 +9,4 @@ The app supports both worker-profile sessions and admin-account sessions. Worker
 
 **Why:** The display-role mapper intentionally treats unknown titles as an administrator so the UI has a usable default. Applying that mapper to a security decision silently turns a malformed or newly added title into elevated access.
 
-**How to apply:** Preserve source worker identity and title throughout session resolution. Use the normalized dashboard role only for UI presentation; deny unknown source roles for privileged server actions. Worker sessions must be signed with a configured secret and issued only after a stored, bcrypt-verified worker PIN; do not reintroduce profile-selection-only authentication.
+**How to apply:** Preserve source worker identity and title throughout session resolution. Use the normalized dashboard role only for UI presentation; deny unknown source roles for privileged server actions. Worker sessions must be signed with a configured secret. The profile-picker login intentionally has no PIN and must never authorize management/admin actions; any mobile employee-ID PIN flow is separate.
