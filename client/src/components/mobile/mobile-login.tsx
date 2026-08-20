@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, Smartphone, User } from "lucide-react";
+import { Smartphone, User } from "lucide-react";
 import type { Worker } from '@shared/schema';
 
 interface MobileLoginProps {
@@ -13,8 +13,6 @@ interface MobileLoginProps {
 
 export function MobileLogin({ onSuccess }: MobileLoginProps) {
   const [employeeId, setEmployeeId] = useState('');
-  const [pin, setPin] = useState('');
-  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,7 +29,6 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
         },
         body: JSON.stringify({
           employeeId: employeeId.trim(),
-          pin: pin.trim(),
         }),
       });
 
@@ -70,7 +67,7 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-xl">Staff Login</CardTitle>
             <CardDescription>
-              Enter your employee ID and PIN to access your work orders
+              Enter your employee ID to access your work orders
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -98,37 +95,14 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="pin">PIN</Label>
-                <div className="relative">
-                  <Input
-                    id="pin"
-                    type={showPin ? "text" : "password"}
-                    placeholder="Enter your 4-digit PIN"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    className="pr-10 text-lg h-12 text-center tracking-widest"
-                    maxLength={4}
-                    pattern="[0-9]{4}"
-                    required
-                    data-testid="input-pin"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-1 top-1 h-10 w-10"
-                    onClick={() => setShowPin(!showPin)}
-                  >
-                    {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                PIN verification is temporarily disabled. Keep your employee ID private.
               </div>
 
               <Button 
                 type="submit" 
                 className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-                disabled={isLoading || !employeeId || !pin}
+                disabled={isLoading || !employeeId}
                 data-testid="button-login"
               >
                 {isLoading ? (

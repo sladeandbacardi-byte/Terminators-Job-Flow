@@ -5,8 +5,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  AlertCircle, ArrowLeft, BriefcaseBusiness, Eye, EyeOff, KeyRound,
-  Loader2, ShieldCheck, Smartphone, UserRound,
+  AlertCircle, ArrowLeft, BriefcaseBusiness, Eye, EyeOff, Loader2,
+  ShieldCheck, Smartphone, UserRound,
 } from "lucide-react";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
@@ -63,9 +63,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [selectedTechnician, setSelectedTechnician] = useState<Technician | null>(null);
   const [selectedAdmin, setSelectedAdmin] = useState<Administrator | null>(null);
-  const [pin, setPin] = useState("");
   const [password, setPassword] = useState("");
-  const [showPin, setShowPin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
 
@@ -89,7 +87,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const loginMutation = useMutation({
     mutationFn: async (
       credentials:
-        | { mode: "mobile"; employeeId: string; pin: string }
+        | { mode: "mobile"; employeeId: string }
         | { mode: "admin"; username: string; password: string }
         | { mode: "profile"; userId: string },
     ) => {
@@ -104,7 +102,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             credentials.mode === "mobile"
-              ? { employeeId: credentials.employeeId, pin: credentials.pin }
+              ? { employeeId: credentials.employeeId }
               : credentials.mode === "admin"
                 ? { username: credentials.username, password: credentials.password }
                 : { userId: credentials.userId },
@@ -130,9 +128,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   });
 
   const resetCredentials = () => {
-    setPin("");
     setPassword("");
-    setShowPin(false);
     setShowPassword(false);
     setLoginError("");
   };
@@ -244,7 +240,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">{step === "staff-list" ? "Staff Login" : "Admin Login"}</h1>
                   <p className="mt-1 text-sm text-gray-600">
-                    {step === "staff-list" ? "Select your profile, then enter your PIN." : "Select an office profile or protected administrator account."}
+                    {step === "staff-list" ? "Select your profile to open the technician dashboard." : "Select an office profile or protected administrator account."}
                   </p>
                 </div>
               </div>
@@ -268,7 +264,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               className="space-y-5"
               onSubmit={event => {
                 event.preventDefault();
-                loginMutation.mutate({ mode: "mobile", employeeId: selectedTechnician.employeeId, pin });
+                loginMutation.mutate({ mode: "mobile", employeeId: selectedTechnician.employeeId });
               }}
             >
               <div className="flex items-start gap-3">
@@ -277,7 +273,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 </Button>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Welcome, {selectedTechnician.name}</h1>
-                  <p className="mt-1 text-sm text-gray-600">Enter your PIN to open the technician dashboard.</p>
+                  <p className="mt-1 text-sm text-gray-600">Confirm your employee ID to open the technician dashboard.</p>
                 </div>
               </div>
 
@@ -291,30 +287,11 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                   <AlertDescription>{loginError}</AlertDescription>
                 </Alert>
               )}
-              <div className="space-y-2">
-                <label htmlFor="staff-pin" className="text-sm font-medium text-gray-700">PIN</label>
-                <div className="relative">
-                  <Input
-                    id="staff-pin"
-                    type={showPin ? "text" : "password"}
-                    autoComplete="current-password"
-                    inputMode="numeric"
-                    placeholder="Enter your 4-digit PIN"
-                    value={pin}
-                    onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-                    className="h-12 pr-11 text-center text-lg tracking-[0.35em]"
-                    maxLength={4}
-                    pattern="[0-9]{4}"
-                    required
-                    autoFocus
-                  />
-                  <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-12 w-11" onClick={() => setShowPin(current => !current)} aria-label={showPin ? "Hide PIN" : "Show PIN"}>
-                    {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                PIN verification is temporarily disabled. Keep your employee ID private.
               </div>
-              <Button type="submit" className="h-12 w-full bg-emerald-600 text-base hover:bg-emerald-700" disabled={loginMutation.isPending || pin.length !== 4}>
-                {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><KeyRound className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
+              <Button type="submit" className="h-12 w-full bg-emerald-600 text-base hover:bg-emerald-700" disabled={loginMutation.isPending}>
+                {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><Smartphone className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
               </Button>
               <Button type="button" variant="link" className="w-full" onClick={() => { resetCredentials(); setStep("staff-list"); }}>
                 Switch user

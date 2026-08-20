@@ -316,31 +316,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mobile authentication routes
   app.post("/api/auth/mobile-login", async (req, res) => {
     try {
-      const { employeeId, pin } = req.body;
+      const { employeeId } = req.body;
       
-      if (!employeeId || !pin) {
-        return res.status(400).json({ message: "Employee ID and PIN are required" });
+      if (!employeeId) {
+        return res.status(400).json({ message: "Employee ID is required" });
       }
 
       const worker = await storage.getWorkerByEmployeeId(employeeId.trim());
       
-      if (!worker || !worker.pin) {
-        return res.status(401).json({ message: "Invalid employee ID or PIN" });
-      }
-
-      const submittedPin = pin.trim();
-      const storedPinIsHashed = /^\$2[aby]\$\d{2}\$/.test(worker.pin);
-      const pinMatches = storedPinIsHashed
-        ? await AuthService.verifyPassword(submittedPin, worker.pin)
-        : worker.pin === submittedPin;
-
-      if (!pinMatches) {
-        return res.status(401).json({ message: "Invalid employee ID or PIN" });
-      }
-      // Preserve access for legacy records while upgrading their PIN on first
-      // successful mobile login. New and updated records are already hashed.
-      if (!storedPinIsHashed) {
-        await storage.updateWorker(worker.id, { pin: await AuthService.hashPassword(submittedPin) });
+      if (!worker) {
+        return res.status(401).json({ message: "Invalid employee ID" });
       }
 
       if (!worker.isActive) {
@@ -354,6 +339,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "This account is not enabled for mobile technician access" });
       }
 
+      // Temporary mode: PIN verification is intentionally disabled while
+      // technician PINs are being reset. Access still requires an active
+      // technician with mobile access enabled and receives a signed,
+      // expiring mobile session.
       const token = AuthService.generateMobileWorkerToken(worker.id);
 
       res.json({

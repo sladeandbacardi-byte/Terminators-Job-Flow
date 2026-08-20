@@ -15,4 +15,4 @@
 - [Calendar permission enforcement](calendar-permission-enforcement.md) — shared drag-permission policy (canMoveCalendarEvent) must be re-checked server-side on every write route, not just used to hide the UI drag handle.
 - [Calendar list view sorting](calendar-list-view-sorting.md) — calendar libraries only sort list/agenda views by start time; supply an explicit comparator when the spec needs tie-break fields like route sequence.
 - [Startup provisioning order](startup-provisioning-order.md) — DbStorage initializes before startup migrations; any provisioning that depends on newly added columns must run after migrations in server startup.
-- [Login card credential boundary](login-card-credential-boundary.md) — identity cards are a selection aid, never a credential bypass; technician and administrator access still require their respective secrets.
+- [Login card credential boundary](login-card-credential-boundary.md) — cards never authenticate by themselves; admin passwords remain required, while technician PIN verification is temporarily disabled pending a reset.
