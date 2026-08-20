@@ -31,6 +31,7 @@ import {
   LEAD_STATUS_LABELS,
   overtimeEntries,
   overtimeAuditEntries,
+  adminUsers,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -119,6 +120,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { id: "worker-4", name: "Juli Holtshausen",   role: "Finance & HR Manager",           departmentId: "div-7" },
     { id: "worker-5", name: "Sheryl-Lyn Lee",     role: "Existing Clients Sales & Admin", departmentId: "div-5" },
     { id: "worker-6", name: "Sales 2",             role: "Sales Rep",                      departmentId: "div-5" },
+  ];
+
+  // These values are only used to keep the login chooser useful while a
+  // development database is being created. They do not grant access: the
+  // mobile-login route still verifies the selected employee's PIN.
+  const FALLBACK_MOBILE_STAFF = [
+    { id: "mobile-tech-01", name: "Re-Althon", role: "Technician", department: "Field Service", employeeId: "MT-001" },
+    { id: "mobile-tech-02", name: "Leon", role: "Technician", department: "Field Service", employeeId: "MT-002" },
+    { id: "mobile-tech-03", name: "Garth", role: "Technician", department: "Field Service", employeeId: "MT-003" },
+    { id: "mobile-tech-04", name: "Jackie", role: "Technician", department: "Field Service", employeeId: "MT-004" },
+    { id: "mobile-tech-06", name: "Zain", role: "Technician", department: "Field Service", employeeId: "MT-006" },
+    { id: "mobile-tech-07", name: "Mike", role: "Technician", department: "Field Service", employeeId: "MT-007" },
+    { id: "mobile-tech-08", name: "X", role: "Technician", department: "Field Service", employeeId: "MT-008" },
+    { id: "mobile-tech-09", name: "Reece", role: "Technician", department: "Field Service", employeeId: "MT-009" },
+  ];
+  const FALLBACK_ADMINS = [
+    { id: "fallback-admin", name: "Administrator", username: "admin", role: "Administrator", department: "Administration", authMethod: "password" as const },
+    { id: "worker-1", name: "Julien Botha", role: "Operations Manager", department: "Admin", authMethod: "profile_picker" as const },
+    { id: "worker-2", name: "Maryka Venter", role: "Pest Control Services Manager", department: "Admin", authMethod: "profile_picker" as const },
+    { id: "worker-3", name: "Mariette Koekemoer", role: "Hygiene Services Manager", department: "Admin", authMethod: "profile_picker" as const },
+    { id: "worker-4", name: "Juli Holtshausen", role: "Finance & HR Manager", department: "Accounts", authMethod: "profile_picker" as const },
+    { id: "worker-5", name: "Sheryl-Lyn Lee", role: "Existing Clients Sales & Admin", department: "Sales", authMethod: "profile_picker" as const },
+    { id: "worker-6", name: "Sales 2", role: "Sales Rep", department: "Sales", authMethod: "profile_picker" as const },
   ];
 
   const overtimeEntryInput = z.object({
@@ -607,18 +631,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  // Public endpoint — lists staff for login screen (no auth required).
-  // Falls back to hardcoded list if DB is empty or unavailable (e.g. fresh Railway deploy).
+  // Public endpoint for the login chooser. It intentionally returns only
+  // non-sensitive display data; no PINs, password hashes, email addresses, or
+  // session details are exposed.
   app.get("/api/auth/staff", async (_req, res) => {
     try {
-      const allWorkers = await storage.getWorkers();
-      const dbStaff = allWorkers
-        .filter(w => HARDCODED_STAFF.some(h => h.id === w.id))
-        .map(w => ({ id: w.id, name: w.name, role: w.role, departmentId: w.departmentId }));
-      res.json(dbStaff.length > 0 ? dbStaff : HARDCODED_STAFF);
+      const [allWorkers, departments, activeAdmins] = await Promise.all([
+        storage.getWorkers(),
+        storage.getDepartments(),
+        db
+          .select({
+            id: adminUsers.id,
+            username: adminUsers.username,
+            firstName: adminUsers.firstName,
+            lastName: adminUsers.lastName,
+            role: adminUsers.role,
+          })
+          .from(adminUsers)
+          .where(eq(adminUsers.isActive, true)),
+      ]);
+      const departmentNames = new Map(departments.map(department => [department.id, department.name]));
+      const staff = allWorkers
+        .filter(worker =>
+          worker.isActive &&
+          worker.mobileAccessEnabled === true &&
+          String(worker.role ?? "").trim().toLowerCase() === "technician" &&
+          !!worker.employeeId,
+        )
+        .map(worker => ({
+          id: worker.id,
+          name: worker.name,
+          role: "Technician",
+          department: departmentNames.get(worker.departmentId) || "Field Service",
+          employeeId: worker.employeeId!,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const admins = activeAdmins
+        .map(admin => ({
+          id: admin.id,
+          name: `${admin.firstName} ${admin.lastName}`.trim(),
+          username: admin.username,
+          role: admin.role === "superadmin" ? "Super Administrator" : "Administrator",
+          department: "Administration",
+          authMethod: "password" as const,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const officeUsers = allWorkers
+        .filter(worker =>
+          worker.isActive &&
+          (["div-5", "div-6", "div-7"].includes(worker.departmentId) ||
+            /manager|admin|finance|accounts|sales|hr/i.test(worker.role ?? "")),
+        )
+        .map(worker => ({
+          id: worker.id,
+          name: worker.name,
+          role: worker.role || "Office Staff",
+          department: departmentNames.get(worker.departmentId) || "Office",
+          authMethod: "profile_picker" as const,
+        }))
+        .filter(worker => !admins.some(admin => admin.name === worker.name));
+
+      res.json({
+        staff: staff.length > 0 ? staff : FALLBACK_MOBILE_STAFF,
+        admins: admins.length > 0
+          ? [...admins, ...officeUsers].sort((a, b) => a.name.localeCompare(b.name))
+          : FALLBACK_ADMINS,
+      });
     } catch (err) {
-      console.error("[auth/staff] DB error, using hardcoded fallback:", err);
-      res.json(HARDCODED_STAFF);
+      console.error("[auth/staff] DB error, using login chooser fallback:", err);
+      res.json({ staff: FALLBACK_MOBILE_STAFF, admins: FALLBACK_ADMINS });
     }
   });
 

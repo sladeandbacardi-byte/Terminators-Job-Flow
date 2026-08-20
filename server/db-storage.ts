@@ -252,7 +252,6 @@ export class DbStorage implements IStorage {
       { id: "mobile-tech-02", name: "Leon", email: "mobile.leon@terminators.co.za", employeeId: "MT-002", pin: "$2b$12$wnQJbkTzwJonlfVzb/aSAuzOAML/Grpg.DW2yODvrYz8jQ4jNBM3q" },
       { id: "mobile-tech-03", name: "Garth", email: "mobile.garth@terminators.co.za", employeeId: "MT-003", pin: "$2b$12$0ZnfJTlA1M5to9JDFq/ovO5W9993GsdqDN9mO3yAafqnLXeyPgE8m" },
       { id: "mobile-tech-04", name: "Jackie", email: "mobile.jackie@terminators.co.za", employeeId: "MT-004", pin: "$2b$12$qOmXf99GMgwHnrpuhm4.kez2lipdbe95QuaeOoK/0DH/LsEOcVwCW" },
-      { id: "mobile-tech-05", name: "Sheryl", email: "mobile.sheryl@terminators.co.za", employeeId: "MT-005", pin: "$2b$12$ukCS.SJispVSmnEJAL39vO.4uvZM4x5nMMc.LR.DzLam45RzO4Dj." },
       { id: "mobile-tech-06", name: "Zain", email: "mobile.zain@terminators.co.za", employeeId: "MT-006", pin: "$2b$12$2rRU67ArfS57wCRynAH0b.QIM2IH3StpB4mOx426D6Qs5iUGOQYx6" },
       { id: "mobile-tech-07", name: "Mike", email: "mobile.mike@terminators.co.za", employeeId: "MT-007", pin: "$2b$12$NsFt8roiFgggruppux.pU.47RBM.2wcqgcwccGy1euAEv7ur3moMm" },
       { id: "mobile-tech-08", name: "X", email: "mobile.x@terminators.co.za", employeeId: "MT-008", pin: "$2b$12$/jWWeI5FnoOXHxfF4eFFU.ltklj6INnBjU15cZEH76K10DmKR/s/S" },
@@ -271,6 +270,16 @@ export class DbStorage implements IStorage {
         createdAt: new Date(),
       }).onConflictDoNothing();
     }
+
+    // Sheryl-Lyn's Sales profile already exists. Keep the accidentally
+    // provisioned mobile-only Sheryl row for historical references, but remove
+    // it from all active login lists on existing databases.
+    await db.update(workers)
+      .set({
+        isActive: false,
+        mobileAccessEnabled: false,
+      })
+      .where(eq(workers.id, "mobile-tech-05"));
   }
 
   private async ensureLegalEntitiesSeeded(): Promise<void> {
