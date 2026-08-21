@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,11 @@ interface LoginFormProps {
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [, navigate] = useLocation();
-  const [step, setStep] = useState<LoginStep>("choose-type");
+  const search = useSearch();
+  const [step, setStep] = useState<LoginStep>(() => {
+    if (new URLSearchParams(search).get("login") === "admin") return "admin-list";
+    return "choose-type";
+  });
   const [directory, setDirectory] = useState<LoginDirectory>(FALLBACK_DIRECTORY);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [selectedTechnician, setSelectedTechnician] = useState<Technician | null>(null);
@@ -157,19 +161,19 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     description: string,
     icon: React.ReactNode,
     onClick: () => void,
-    color: "emerald" | "indigo",
+    color: "red" | "indigo",
   ) => (
     <button
       type="button"
       onClick={onClick}
       className={`group w-full rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-        color === "emerald"
-          ? "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 focus:ring-emerald-600"
+        color === "red"
+          ? "border-red-200 bg-red-50 hover:border-red-400 hover:bg-red-100 focus:ring-red-600"
           : "border-indigo-200 bg-indigo-50 hover:border-indigo-400 hover:bg-indigo-100 focus:ring-indigo-600"
       }`}
     >
       <div className="flex items-center gap-4">
-        <div className={`rounded-xl p-3 text-white ${color === "emerald" ? "bg-emerald-600" : "bg-indigo-600"}`}>
+        <div className={`rounded-xl p-3 text-white ${color === "red" ? "bg-red-600" : "bg-indigo-600"}`}>
           {icon}
         </div>
         <div>
@@ -192,7 +196,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
     >
       <div className="flex items-start gap-3">
-        <div className={`rounded-full p-2.5 ${type === "staff" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700"}`}>
+        <div className={`rounded-full p-2.5 ${type === "staff" ? "bg-red-100 text-red-700" : "bg-indigo-100 text-indigo-700"}`}>
           {type === "staff" ? <UserRound className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
         </div>
         <div className="min-w-0">
@@ -226,7 +230,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 <h1 className="text-2xl font-bold text-gray-900">Select Login Type</h1>
                 <p className="mt-2 text-sm text-gray-600">Choose the workspace you need to access.</p>
               </div>
-              {selectionCard("Staff Login", "Technician work orders, field diaries and fleet updates.", <Smartphone className="h-6 w-6" />, () => setStep("staff-list"), "emerald")}
+              {selectionCard("Staff Login", "Technician work orders, field diaries and fleet updates.", <Smartphone className="h-6 w-6" />, () => setStep("staff-list"), "red")}
               {selectionCard("Admin Login", "Office, management and administrator access.", <BriefcaseBusiness className="h-6 w-6" />, () => setStep("admin-list"), "indigo")}
             </div>
           )}
@@ -277,9 +281,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 </div>
               </div>
 
-              <div className="rounded-xl bg-emerald-50 p-4 text-sm">
-                <p className="font-medium text-emerald-900">{selectedTechnician.role} · {selectedTechnician.department}</p>
-                <p className="mt-1 text-emerald-700">Employee ID: {selectedTechnician.employeeId}</p>
+              <div className="rounded-xl bg-red-50 p-4 text-sm">
+                <p className="font-medium text-red-900">{selectedTechnician.role} · {selectedTechnician.department}</p>
+                <p className="mt-1 text-red-700">Employee ID: {selectedTechnician.employeeId}</p>
               </div>
               {loginError && (
                 <Alert variant="destructive">
@@ -287,10 +291,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                   <AlertDescription>{loginError}</AlertDescription>
                 </Alert>
               )}
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                PIN verification is temporarily disabled. Keep your employee ID private.
-              </div>
-              <Button type="submit" className="h-12 w-full bg-emerald-600 text-base hover:bg-emerald-700" disabled={loginMutation.isPending}>
+              <p className="text-xs text-gray-500">Keep your employee ID private.</p>
+              <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending}>
                 {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><Smartphone className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
               </Button>
               <Button type="button" variant="link" className="w-full" onClick={() => { resetCredentials(); setStep("staff-list"); }}>

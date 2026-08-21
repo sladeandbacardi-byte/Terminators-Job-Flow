@@ -530,5 +530,28 @@ export async function runStartupMigrations(): Promise<void> {
        ON overtime_audit_entries (overtime_entry_id, created_at DESC)`
   );
 
+  // ── Overtime: additional columns added in later revision ───────────────────
+  await run(
+    "overtime_entries.work_type",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS work_type text NOT NULL DEFAULT 'client_job'`
+  );
+  await run(
+    "overtime_entries.other_description",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS other_description text`
+  );
+  await run(
+    "overtime_entries.before_hours_minutes",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS before_hours_minutes integer NOT NULL DEFAULT 0`
+  );
+  await run(
+    "overtime_entries.after_hours_minutes",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS after_hours_minutes integer NOT NULL DEFAULT 0`
+  );
+  // client_id is now optional (for internal/workshop overtime)
+  await run(
+    "overtime_entries.client_id nullable",
+    `ALTER TABLE overtime_entries ALTER COLUMN client_id DROP NOT NULL`
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

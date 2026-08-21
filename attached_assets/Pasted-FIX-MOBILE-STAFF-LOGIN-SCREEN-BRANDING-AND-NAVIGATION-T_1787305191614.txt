@@ -1,0 +1,189 @@
+FIX MOBILE STAFF LOGIN SCREEN BRANDING AND NAVIGATION
+
+The mobile staff login screen currently looks separate from the rest of Job Flow.
+
+Problems:
+- There is no option to go back to the main login screen.
+- Admin users cannot easily return to the main login.
+- Mobile users cannot switch back if they are on the wrong screen.
+- The colour scheme is green and does not match Job Flow or The Terminators branding.
+- The screen does not show the proper business/app logo.
+- It says “The Terminators Mobile Field Service” but should feel part of Job Flow.
+
+Please update the mobile login screen.
+
+BRANDING
+
+Use the Job Flow / Terminators theme.
+
+Colours:
+- Primary red: use the same red as the new Job Flow logo
+- Black/dark navy text
+- White cards
+- Light grey background
+- Subtle red accents
+- Avoid green as the main theme colour
+
+Use the proper logo at the top.
+
+Preferred logo:
+Use Job Flow full logo:
+public/images/job-flow-full-logo.png
+
+If space is limited on mobile:
+Use:
+public/images/job-flow-header-logo.png
+
+If using a company logo area, also allow Terminators logo if already available in assets.
+
+The login screen should show:
+
+Job Flow logo
+Subtitle:
+Field Service Management
+
+Then show:
+The Terminators
+Mobile Staff Access
+
+NAVIGATION
+
+Add a clear button/link at the top left or bottom of the card:
+
+← Back to Main Login
+
+This must return the user to the main login screen where they can choose:
+
+- Staff Login
+- Admin Login
+
+Also add a secondary option:
+
+Admin / Office Login
+
+This should take the user to the Admin Login section of the main login screen.
+
+LOGIN FLOW
+
+Main Login Screen:
+Show two cards:
+
+1. Staff Login
+For technicians and mobile field staff
+
+2. Admin Login
+For office, sales, service, finance and management users
+
+If user clicks Staff Login:
+Open the mobile staff login screen.
+
+If user clicks Admin Login:
+Open the admin user selection screen.
+
+On the Staff Login screen:
+Show:
+- Job Flow logo
+- Staff Login heading
+- Employee ID field OR list of staff users, depending on current setup
+- Sign In button
+- Back to Main Login button
+- Admin / Office Login link
+
+MOBILE STAFF LOGIN SCREEN TEXT
+
+Replace current text with:
+
+Heading:
+Staff Login
+
+Subtitle:
+Mobile access for field staff and technicians
+
+Employee ID label:
+Employee ID
+
+Placeholder:
+Enter your employee ID
+
+Warning text:
+Keep your employee ID private.
+
+Remove:
+PIN verification is temporarily disabled.
+
+Unless PINs will be added soon, do not show “temporarily disabled” because it looks unfinished.
+
+Sign In button:
+Sign In
+
+Footer:
+Job Flow - Field Service Management
+
+BACK BUTTON RULES
+
+Back to Main Login must:
+- Clear any temporary staff login state
+- Return to the main login selection screen
+- Allow user to choose Staff Login or Admin Login
+
+Admin / Office Login must:
+- Return to main login
+- Open or highlight Admin Login
+
+DESIGN
+
+Use the same styling as the main Job Flow app:
+- Red accents
+- White card
+- Rounded corners
+- Subtle shadow
+- Clean spacing
+- Logo centred at the top
+- No green header/theme
+
+Button styling:
+Primary button should be red or Job Flow theme colour.
+Secondary button should be white with red border or simple text link.
+
+Example layout:
+
+[Job Flow Logo]
+
+Staff Login
+Mobile access for field staff and technicians
+
+Employee ID
+[ Enter your employee ID ]
+
+[ Sign In ]
+
+← Back to Main Login
+Admin / Office Login
+
+Job Flow - Field Service Management
+
+MOBILE RESPONSIVENESS
+
+The screen must work well on mobile:
+- Card centred
+- Full width with padding on small screens
+- Buttons easy to tap
+- No horizontal scrolling
+- Logo must not be stretched
+
+TESTING
+
+Test:
+
+1. Open main login screen.
+2. Click Staff Login.
+3. Staff Login screen opens.
+4. Staff Login screen shows Job Flow logo.
+5. Colour scheme matches Job Flow / Terminators red theme.
+6. Back to Main Login returns correctly.
+7. Admin / Office Login returns to admin login.
+8. Staff user can still log in.
+9. Admin user can still access admin login.
+10. Refreshing the page does not trap the user on the wrong login screen.
+
+END

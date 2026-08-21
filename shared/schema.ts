@@ -229,14 +229,30 @@ export const jobs = pgTable("jobs", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const OVERTIME_WORK_TYPES = ["client_job", "internal", "workshop", "stock_warehouse", "travel", "other"] as const;
+export type OvertimeWorkType = typeof OVERTIME_WORK_TYPES[number];
+
+export const OVERTIME_WORK_TYPE_LABELS: Record<OvertimeWorkType, string> = {
+  client_job:      "Client Job",
+  internal:        "Internal",
+  workshop:        "Workshop",
+  stock_warehouse: "Stock / Warehouse",
+  travel:          "Travel",
+  other:           "Other",
+};
+
 export const overtimeEntries = pgTable("overtime_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   employeeId: varchar("employee_id").notNull(),
   workDate: text("work_date").notNull(), // YYYY-MM-DD
-  clientId: varchar("client_id").notNull(),
+  clientId: varchar("client_id"),        // nullable — internal overtime has no client
   jobId: varchar("job_id"),
+  workType: text("work_type").notNull().default("client_job"), // OvertimeWorkType
+  otherDescription: text("other_description"),
   startTime: text("start_time").notNull(), // HH:mm
   finishTime: text("finish_time").notNull(), // HH:mm
+  beforeHoursMinutes: integer("before_hours_minutes").notNull().default(0),
+  afterHoursMinutes: integer("after_hours_minutes").notNull().default(0),
   notes: text("notes").notNull(),
   overtimeMinutes: integer("overtime_minutes").notNull(),
   status: text("status").notNull().default("pending"), // pending | approved | rejected

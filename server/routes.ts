@@ -40,7 +40,7 @@ import { AuthService, requireAuth, requireMobileTechnician, logActivity, type Au
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
-import { calculateOvertimeMinutes } from "@shared/overtime";
+import { calculateOvertimeMinutes, calculateOvertimeBreakdown } from "@shared/overtime";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -145,13 +145,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { id: "worker-6", name: "Sales 2", role: "Sales Rep", department: "Sales", authMethod: "profile_picker" as const },
   ];
 
+  const OVERTIME_WORK_TYPES = ["client_job", "internal", "workshop", "stock_warehouse", "travel", "other"] as const;
+
   const overtimeEntryInput = z.object({
     workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid work date"),
-    clientId: z.string().min(1, "Select a client"),
+    clientId: z.string().optional().nullable(),
     jobId: z.string().trim().min(1).optional().nullable(),
+    workType: z.enum(OVERTIME_WORK_TYPES).default("client_job"),
+    otherDescription: z.string().trim().optional().nullable(),
     startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
     finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
     notes: z.string().trim().min(1, "Enter an overtime reason"),
+    employeeId: z.string().optional(), // admin-only override; ignored for normal users
+  }).superRefine((data, ctx) => {
+    if (data.workType === "other" && !data.otherDescription?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherDescription"], message: 'Enter a description for "Other" work type' });
+    }
+    if (data.workType === "client_job" && !data.clientId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["clientId"], message: "Select a client for a client job" });
+    }
   });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
@@ -218,13 +230,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
-  const ensureOvertimeRelations = async (clientId: string, jobId?: string | null) => {
-    const client = await storage.getClient(clientId);
-    if (!client) throw new Error("Selected client was not found");
+  const ensureOvertimeRelations = async (clientId?: string | null, jobId?: string | null) => {
+    if (clientId) {
+      const client = await storage.getClient(clientId);
+      if (!client) throw new Error("Selected client was not found");
+    }
     if (jobId) {
       const job = await storage.getJob(jobId);
       if (!job) throw new Error("Selected job was not found");
-      if (job.clientId !== clientId) throw new Error("The selected job does not belong to this client");
+      if (clientId && job.clientId !== clientId) throw new Error("The selected job does not belong to this client");
     }
   };
 
@@ -765,7 +779,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const approvedMinutes = entries
         .filter(entry => entry.status === "approved")
         .reduce((total, entry) => total + entry.overtimeMinutes, 0);
-      res.json({ entries: enriched, summary: { pendingMinutes, approvedMinutes } });
+      const rejectedMinutes = entries.filter(e => e.status === "rejected").reduce((t, e) => t + e.overtimeMinutes, 0);
+      res.json({ entries: enriched, summary: { pendingMinutes, approvedMinutes, rejectedMinutes } });
     } catch (error) {
       console.error("Could not load employee overtime:", error);
       res.status(500).json({ error: "Could not load overtime entries" });
@@ -817,24 +832,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const parsed = overtimeEntryInput.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
     const data = parsed.data;
-    const overtimeMinutes = calculateOvertimeMinutes(data.startTime, data.finishTime);
-    if (overtimeMinutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
-    if (overtimeMinutes === 0) {
+    const breakdown = calculateOvertimeBreakdown(data.startTime, data.finishTime);
+    if (breakdown === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (breakdown.totalMinutes === 0) {
       return res.status(400).json({ error: "No overtime detected. Normal working hours are 08:00 to 16:00." });
     }
+
+    // Admins may create on behalf of another employee
+    const targetEmployeeId = (isOvertimeApprover(req) && data.employeeId) ? data.employeeId : req.user!.id;
 
     try {
       await ensureOvertimeRelations(data.clientId, data.jobId);
       const entry = await db.transaction(async (tx) => {
         const [created] = await tx.insert(overtimeEntries).values({
-          employeeId: req.user!.id,
+          employeeId: targetEmployeeId,
           workDate: data.workDate,
-          clientId: data.clientId,
+          clientId: data.clientId || null,
           jobId: data.jobId || null,
+          workType: data.workType,
+          otherDescription: data.otherDescription || null,
           startTime: data.startTime,
           finishTime: data.finishTime,
+          beforeHoursMinutes: breakdown.beforeMinutes,
+          afterHoursMinutes: breakdown.afterMinutes,
           notes: data.notes,
-          overtimeMinutes,
+          overtimeMinutes: breakdown.totalMinutes,
           status: "pending",
           updatedAt: new Date(),
         }).returning();
@@ -856,9 +878,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const parsed = overtimeEntryInput.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
     const data = parsed.data;
-    const overtimeMinutes = calculateOvertimeMinutes(data.startTime, data.finishTime);
-    if (overtimeMinutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
-    if (overtimeMinutes === 0) {
+    const breakdown = calculateOvertimeBreakdown(data.startTime, data.finishTime);
+    if (breakdown === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (breakdown.totalMinutes === 0) {
       return res.status(400).json({ error: "No overtime detected. Normal working hours are 08:00 to 16:00." });
     }
 
@@ -867,23 +889,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(overtimeEntries.id, req.params.id))
         .limit(1);
       if (!existing) return res.status(404).json({ error: "Overtime entry not found" });
-      if (existing.employeeId !== req.user!.id) return res.status(403).json({ error: "You can only edit your own overtime" });
+      // Admins can edit any pending entry; employees only their own
+      if (!isOvertimeApprover(req) && existing.employeeId !== req.user!.id) {
+        return res.status(403).json({ error: "You can only edit your own overtime" });
+      }
       if (existing.status !== "pending") return res.status(409).json({ error: "Only pending overtime entries can be edited" });
 
       await ensureOvertimeRelations(data.clientId, data.jobId);
       const entry = await db.transaction(async (tx) => {
         const [updated] = await tx.update(overtimeEntries).set({
           workDate: data.workDate,
-          clientId: data.clientId,
+          clientId: data.clientId || null,
           jobId: data.jobId || null,
+          workType: data.workType,
+          otherDescription: data.otherDescription || null,
           startTime: data.startTime,
           finishTime: data.finishTime,
+          beforeHoursMinutes: breakdown.beforeMinutes,
+          afterHoursMinutes: breakdown.afterMinutes,
           notes: data.notes,
-          overtimeMinutes,
+          overtimeMinutes: breakdown.totalMinutes,
           updatedAt: new Date(),
         }).where(and(
           eq(overtimeEntries.id, existing.id),
-          eq(overtimeEntries.employeeId, req.user!.id),
           eq(overtimeEntries.status, "pending"),
         )).returning();
         if (!updated) return null;
@@ -1004,6 +1032,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Could not reopen overtime:", error);
       res.status(500).json({ error: "Could not reopen overtime" });
+    }
+  });
+
+  // ── Overtime: worker profile summary ──────────────────────────────────────
+  app.get("/api/overtime/worker/:workerId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req) && req.user!.id !== req.params.workerId) {
+      return res.status(403).json({ error: "You can only view your own overtime summary" });
+    }
+    try {
+      const entries = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.employeeId, req.params.workerId))
+        .orderBy(desc(overtimeEntries.workDate));
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const thisMonthEntries = entries.filter(e => e.workDate.slice(0, 7) === thisMonth);
+      res.json({
+        totalEntries: entries.length,
+        approvedMinutes: entries.filter(e => e.status === "approved").reduce((s, e) => s + e.overtimeMinutes, 0),
+        pendingMinutes: entries.filter(e => e.status === "pending").reduce((s, e) => s + e.overtimeMinutes, 0),
+        rejectedMinutes: entries.filter(e => e.status === "rejected").reduce((s, e) => s + e.overtimeMinutes, 0),
+        thisMonth: {
+          label: now.toLocaleString("en-ZA", { month: "long", year: "numeric" }),
+          approvedMinutes: thisMonthEntries.filter(e => e.status === "approved").reduce((s, e) => s + e.overtimeMinutes, 0),
+          pendingMinutes: thisMonthEntries.filter(e => e.status === "pending").reduce((s, e) => s + e.overtimeMinutes, 0),
+          rejectedMinutes: thisMonthEntries.filter(e => e.status === "rejected").reduce((s, e) => s + e.overtimeMinutes, 0),
+          totalRequests: thisMonthEntries.length,
+        },
+        recentEntries: (await enrichOvertimeEntries(entries.slice(0, 10))),
+      });
+    } catch (error) {
+      console.error("Could not load worker overtime summary:", error);
+      res.status(500).json({ error: "Could not load overtime summary" });
+    }
+  });
+
+  // ── Overtime: export CSV ───────────────────────────────────────────────────
+  app.get("/api/overtime/export", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can export overtime" });
+    try {
+      const { from, to, employeeId, statusFilter } = req.query as Record<string, string>;
+      const allEntries = await db.select().from(overtimeEntries)
+        .orderBy(desc(overtimeEntries.workDate));
+
+      const filtered = allEntries.filter(entry => {
+        if (statusFilter && statusFilter !== "all") { if (entry.status !== statusFilter) return false; }
+        else if (!statusFilter) { if (entry.status !== "approved") return false; } // default: approved only
+        if (employeeId && employeeId !== "all" && entry.employeeId !== employeeId) return false;
+        if (from && entry.workDate < from) return false;
+        if (to && entry.workDate > to) return false;
+        return true;
+      });
+
+      const enriched = await enrichOvertimeEntries(filtered);
+      const rows = enriched.map(entry => ({
+        Employee: entry.employeeName,
+        Date: entry.workDate,
+        Client: entry.clientName || "",
+        "Job Number": entry.jobLabel || "",
+        "Work Type": entry.workType,
+        "Start Time": entry.startTime,
+        "Finish Time": entry.finishTime,
+        "Before 08:00 Minutes": entry.beforeHoursMinutes ?? 0,
+        "After 16:00 Minutes": entry.afterHoursMinutes ?? 0,
+        "Total Overtime Minutes": entry.overtimeMinutes,
+        "Total Overtime": (() => {
+          const h = Math.floor(entry.overtimeMinutes / 60);
+          const m = entry.overtimeMinutes % 60;
+          return h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m}min`;
+        })(),
+        Status: entry.status,
+        "Approved By": entry.approvedByName || "",
+        "Approved Date": entry.approvalTimestamp ? new Date(entry.approvalTimestamp).toISOString().slice(0, 10) : "",
+        Notes: entry.notes,
+      }));
+
+      // Build CSV
+      const headers = Object.keys(rows[0] ?? {});
+      const csv = [
+        headers.join(","),
+        ...rows.map(row => headers.map(h => `"${String((row as any)[h] ?? "").replace(/"/g, '""')}"`).join(",")),
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="overtime-export-${new Date().toISOString().slice(0, 10)}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Could not export overtime:", error);
+      res.status(500).json({ error: "Could not export overtime" });
+    }
+  });
+
+  // ── Overtime: report summary ───────────────────────────────────────────────
+  app.get("/api/overtime/report", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can view overtime reports" });
+    try {
+      const { from, to, employeeId } = req.query as Record<string, string>;
+      const allEntries = await db.select().from(overtimeEntries).orderBy(desc(overtimeEntries.workDate));
+      const filtered = allEntries.filter(entry => {
+        if (employeeId && employeeId !== "all" && entry.employeeId !== employeeId) return false;
+        if (from && entry.workDate < from) return false;
+        if (to && entry.workDate > to) return false;
+        return true;
+      });
+
+      const workers = await storage.getWorkers();
+      const workerMap = new Map(workers.map(w => [w.id, w]));
+
+      const byEmployee: Record<string, { name: string; department: string; approvedMinutes: number; pendingMinutes: number; rejectedMinutes: number; entryCount: number }> = {};
+      for (const entry of filtered) {
+        if (!byEmployee[entry.employeeId]) {
+          const w = workerMap.get(entry.employeeId);
+          byEmployee[entry.employeeId] = { name: w?.name ?? "Unknown", department: w?.departmentId ?? "", approvedMinutes: 0, pendingMinutes: 0, rejectedMinutes: 0, entryCount: 0 };
+        }
+        const row = byEmployee[entry.employeeId];
+        row.entryCount++;
+        if (entry.status === "approved") row.approvedMinutes += entry.overtimeMinutes;
+        else if (entry.status === "pending") row.pendingMinutes += entry.overtimeMinutes;
+        else if (entry.status === "rejected") row.rejectedMinutes += entry.overtimeMinutes;
+      }
+
+      const rows = Object.entries(byEmployee).map(([id, data]) => ({ employeeId: id, ...data }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      res.json({
+        rows,
+        totals: {
+          approvedMinutes: rows.reduce((s, r) => s + r.approvedMinutes, 0),
+          pendingMinutes: rows.reduce((s, r) => s + r.pendingMinutes, 0),
+          rejectedMinutes: rows.reduce((s, r) => s + r.rejectedMinutes, 0),
+          entryCount: rows.reduce((s, r) => s + r.entryCount, 0),
+        },
+      });
+    } catch (error) {
+      console.error("Could not load overtime report:", error);
+      res.status(500).json({ error: "Could not load overtime report" });
     }
   });
 

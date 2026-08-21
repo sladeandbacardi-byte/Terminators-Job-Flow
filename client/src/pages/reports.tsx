@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import type { Job, RentalContract, Worker, Department } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
+import { formatOvertimeMinutes } from "@shared/overtime";
 
 // ─── Quick-preset helpers ─────────────────────────────────────────────────────
 type Preset = '7d' | '30d' | '90d' | '6m' | 'ytd' | '1y' | 'custom';
@@ -292,6 +293,7 @@ export default function Reports() {
               <TabsTrigger value="workers"    className="flex-none px-5 py-2">Workers</TabsTrigger>
               <TabsTrigger value="staff"      className="flex-none px-5 py-2">Staff</TabsTrigger>
               <TabsTrigger value="contracts"  className="flex-none px-5 py-2">Contracts</TabsTrigger>
+              <TabsTrigger value="overtime"   className="flex-none px-5 py-2">🕐 Overtime</TabsTrigger>
             </TabsList>
 
             {/* ═══════════════════════════════════════════════════════════════════
@@ -824,7 +826,156 @@ export default function Reports() {
               </div>
             </TabsContent>
 
+            {/* ═══════════════════════════════════════════════════════════════════
+                OVERTIME REPORT TAB
+            ═══════════════════════════════════════════════════════════════════ */}
+            <TabsContent value="overtime" className="space-y-5">
+              <OvertimeReportTab workers={workers} />
+            </TabsContent>
+
           </Tabs>
         </div>
+  );
+}
+
+// ─── Overtime Report Component ────────────────────────────────────────────────
+function OvertimeReportTab({ workers }: { workers: Worker[] }) {
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedEmployee, setSelectedEmployee] = useState("all");
+
+  const reportUrl = (() => {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
+    if (selectedEmployee !== "all") params.set("employeeId", selectedEmployee);
+    return `/api/overtime/report?${params.toString()}`;
+  })();
+
+  const exportUrl = (() => {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
+    if (selectedEmployee !== "all") params.set("employeeId", selectedEmployee);
+    params.set("statusFilter", "all");
+    return `/api/overtime/export?${params.toString()}`;
+  })();
+
+  type ReportRow = { employeeId: string; name: string; department: string; approvedMinutes: number; pendingMinutes: number; rejectedMinutes: number; entryCount: number };
+  type ReportData = { rows: ReportRow[]; totals: { approvedMinutes: number; pendingMinutes: number; rejectedMinutes: number; entryCount: number } };
+
+  const { data: report, isLoading } = useQuery<ReportData>({ queryKey: [reportUrl] });
+
+  const handleExport = () => {
+    window.open(exportUrl, "_blank");
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-500 mb-1 block">From</label>
+              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 mb-1 block">To</label>
+              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            </div>
+            <div className="min-w-[180px]">
+              <label className="text-xs font-medium text-gray-500 mb-1 block">Employee</label>
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="All employees" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All employees</SelectItem>
+                  {workers.filter(w => w.isActive !== false).map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" className="h-9" onClick={handleExport}>
+              <FileText className="h-4 w-4 mr-2" />Export CSV (approved)
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary totals */}
+      {report && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Employees</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">{report.rows.length}</p>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Approved</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-900">{formatOvertimeMinutes(report.totals.approvedMinutes)}</p>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pending</p>
+            <p className="mt-1 text-2xl font-bold text-amber-900">{formatOvertimeMinutes(report.totals.pendingMinutes)}</p>
+          </div>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Rejected</p>
+            <p className="mt-1 text-2xl font-bold text-red-900">{formatOvertimeMinutes(report.totals.rejectedMinutes)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Per-employee breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-gray-500" />
+            Overtime by employee
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center text-sm text-gray-500">Loading overtime report…</div>
+          ) : !report?.rows.length ? (
+            <div className="p-8 text-center text-sm text-gray-500">No overtime entries for the selected period.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-5 py-3">Employee</th>
+                    <th className="px-5 py-3 text-right">Entries</th>
+                    <th className="px-5 py-3 text-right">Approved</th>
+                    <th className="px-5 py-3 text-right">Pending</th>
+                    <th className="px-5 py-3 text-right">Rejected</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {report.rows.map(row => (
+                    <tr key={row.employeeId} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{row.name}</td>
+                      <td className="px-5 py-3 text-right text-gray-600">{row.entryCount}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-emerald-700">{row.approvedMinutes > 0 ? formatOvertimeMinutes(row.approvedMinutes) : "—"}</td>
+                      <td className="px-5 py-3 text-right text-amber-700">{row.pendingMinutes > 0 ? formatOvertimeMinutes(row.pendingMinutes) : "—"}</td>
+                      <td className="px-5 py-3 text-right text-red-700">{row.rejectedMinutes > 0 ? formatOvertimeMinutes(row.rejectedMinutes) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
+                    <td className="px-5 py-3 text-gray-900">Grand Total</td>
+                    <td className="px-5 py-3 text-right text-gray-600">{report.totals.entryCount}</td>
+                    <td className="px-5 py-3 text-right text-emerald-700">{formatOvertimeMinutes(report.totals.approvedMinutes)}</td>
+                    <td className="px-5 py-3 text-right text-amber-700">{formatOvertimeMinutes(report.totals.pendingMinutes)}</td>
+                    <td className="px-5 py-3 text-right text-red-700">{formatOvertimeMinutes(report.totals.rejectedMinutes)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

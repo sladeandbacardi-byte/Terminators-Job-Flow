@@ -1,0 +1,651 @@
+Add an OVERTIME module to Terminators JobFlow.
+
+PURPOSE
+Allow employees to log overtime worked against a client/job, automatically calculate valid overtime hours, submit it for approval, and allow Admin/Management to approve or reject it.
+
+NORMAL WORKING HOURS
+Normal working hours are:
+
+08:00 to 16:00
+
+Only time worked:
+- BEFORE 08:00
+- AFTER 16:00
+
+counts as overtime.
+
+Time worked between 08:00 and 16:00 must NEVER count as overtime.
+
+--------------------------------------------------
+1. NAVIGATION
+--------------------------------------------------
+
+Add:
+
+Staff
+  - Attendance
+  - Overtime
+
+Normal/mobile users must see:
+- My Overtime
+
+Admin/Management must see:
+- Overtime
+- Overtime Approval
+
+--------------------------------------------------
+2. NEW OVERTIME ENTRY
+--------------------------------------------------
+
+Create a mobile-friendly "Log Overtime" form.
+
+Fields:
+
+Employee
+- Automatically populate from the logged-in user.
+- Normal users cannot change employee.
+- Admin can select another employee if creating an entry on their behalf.
+
+Date Worked
+- Required.
+- Date picker.
+
+Client
+- Search/select existing JobFlow client.
+- Optional if entry is internal.
+
+Job
+- Search/select existing JobFlow job.
+- If client is selected, only show jobs belonging to that client.
+- Optional for internal/non-client overtime.
+
+Work Type
+Dropdown:
+- Client Job
+- Internal
+- Workshop
+- Stock / Warehouse
+- Travel
+- Other
+
+If "Other" is selected, require a description.
+
+Start Time
+- Required.
+- Use a proper mobile-friendly time picker.
+- 24-hour format.
+
+Finish Time
+- Required.
+- Use a proper mobile-friendly time picker.
+- 24-hour format.
+
+Reason / Notes
+- Text field.
+
+Calculated Overtime
+- Read-only.
+- User must NOT be able to manually enter or change this value.
+
+Status
+Automatically:
+Pending
+
+--------------------------------------------------
+3. OVERTIME CALCULATION
+--------------------------------------------------
+
+Calculate overtime automatically.
+
+Normal working period:
+08:00 up to 16:00
+
+OVERTIME BEFORE WORK:
+Any portion of the work period before 08:00.
+
+OVERTIME AFTER WORK:
+Any portion of the work period after 16:00.
+
+TOTAL OVERTIME:
+before-08:00 overtime + after-16:00 overtime
+
+DO NOT calculate the entire shift as overtime if the shift overlaps normal working hours.
+
+Examples:
+
+06:30 - 08:00
+= 1 hour 30 minutes overtime
+
+07:00 - 09:00
+= 1 hour overtime
+
+07:30 - 08:30
+= 30 minutes overtime
+
+08:00 - 16:00
+= 0 overtime
+
+09:00 - 15:00
+= 0 overtime
+
+15:00 - 17:30
+= 1 hour 30 minutes overtime
+
+16:00 - 17:00
+= 1 hour overtime
+
+07:30 - 17:00
+= 1 hour 30 minutes overtime
+
+06:30 - 17:30
+= 3 hours overtime:
+06:30-08:00 = 1 hour 30 minutes
+16:00-17:30 = 1 hour 30 minutes
+
+--------------------------------------------------
+4. IMPORTANT STORAGE RULE
+--------------------------------------------------
+
+Store overtime internally as MINUTES.
+
+Examples:
+
+30 minutes = 30
+1 hour = 60
+1 hour 30 minutes = 90
+2 hours 15 minutes = 135
+
+Do NOT store overtime as values such as:
+1.30
+1.5
+1.75
+
+Display overtime to users as:
+
+30 min
+1 hr
+1 hr 30 min
+2 hrs 15 min
+
+This is important for accurate payroll calculations.
+
+--------------------------------------------------
+5. VALIDATION
+--------------------------------------------------
+
+Only allow valid times.
+
+Reject invalid values such as:
+25:00
+12:75
+letters/text
+blank start time
+blank finish time
+
+Finish time must logically follow start time.
+
+If calculated overtime = 0, do not allow the employee to submit the overtime request.
+
+Show:
+
+"No overtime detected. Normal working hours are 08:00 to 16:00."
+
+Prevent duplicate entries where the same employee has the same:
+- Date
+- Start time
+- Finish time
+- Job
+
+Warn the user before saving a possible duplicate.
+
+--------------------------------------------------
+6. LIVE CALCULATION
+--------------------------------------------------
+
+As soon as the user chooses Start Time and Finish Time, show:
+
+Overtime Calculation
+
+Before 08:00: 1 hr 30 min
+After 16:00: 1 hr
+TOTAL OVERTIME: 2 hrs 30 min
+
+Only show sections that apply.
+
+Example:
+
+Start: 07:00
+Finish: 17:00
+
+Show:
+
+Before 08:00
+1 hr
+
+After 16:00
+1 hr
+
+TOTAL OVERTIME
+2 hrs
+
+--------------------------------------------------
+7. JOBFLOW JOB INTEGRATION
+--------------------------------------------------
+
+Add a button/action to Job Cards:
+
+LOG OVERTIME
+
+When a user opens Log Overtime from a Job Card automatically populate:
+
+- Employee = logged-in user
+- Client = job client
+- Job = current job
+- Date = current date
+
+The employee then only needs to enter:
+- Start Time
+- Finish Time
+- Notes if needed
+
+--------------------------------------------------
+8. MY OVERTIME
+--------------------------------------------------
+
+Create a mobile-friendly My Overtime page.
+
+At the top display monthly totals:
+
+THIS MONTH
+
+Approved:
+12 hrs 30 min
+
+Pending:
+2 hrs 15 min
+
+Rejected:
+1 hr
+
+Then show overtime entries.
+
+Example:
+
+21 Aug 2026
+Summerbreeze
+Job #JB-1045
+06:30 - 08:00
+1 hr 30 min
+PENDING
+
+20 Aug 2026
+Roman Pizza
+16:00 - 18:00
+2 hrs
+APPROVED
+
+Use status badges:
+
+Pending
+Approved
+Rejected
+
+Users can filter by:
+- This week
+- This month
+- Custom date range
+- Pending
+- Approved
+- Rejected
+
+--------------------------------------------------
+9. EDITING RULES
+--------------------------------------------------
+
+PENDING:
+Employee may edit or delete their own pending request.
+
+APPROVED:
+Employee cannot edit or delete it.
+
+REJECTED:
+Employee can view the rejection reason.
+
+Admin can reopen an approved/rejected entry if necessary.
+
+Any reopening/editing must be recorded in the audit trail.
+
+--------------------------------------------------
+10. ADMIN OVERTIME APPROVAL
+--------------------------------------------------
+
+Create an Admin/Management page:
+
+OVERTIME APPROVAL
+
+Show summary cards:
+
+Pending Requests
+Pending Hours
+Approved This Month
+Approved Hours This Month
+
+Then display a table:
+
+Employee | Date | Client / Job | Start | Finish | Overtime | Status | Actions
+
+Example:
+
+Garth | 03/07/26 | Summerbreeze | 16:00 | 17:00 | 1 hr | Pending
+Garth | 01/07/26 | Beechwood | 06:30 | 08:00 | 1 hr 30 min | Pending
+Garth | 23/07/26 | Roman Pizza | 07:30 | 08:00 | 30 min | Approved
+
+Allow filtering by:
+- Employee
+- Date range
+- Client
+- Job
+- Status
+
+--------------------------------------------------
+11. APPROVAL
+--------------------------------------------------
+
+Admin/Management can:
+
+APPROVE
+REJECT
+
+Reject must require a reason.
+
+Allow multi-select.
+
+Buttons:
+
+Approve Selected
+Reject Selected
+
+Also add:
+
+Approve All Visible
+
+but require a confirmation modal before bulk approval.
+
+Example:
+
+"Approve 8 overtime entries totalling 12 hrs 30 min?"
+
+Cancel
+Approve
+
+--------------------------------------------------
+12. APPROVAL INFORMATION
+--------------------------------------------------
+
+When approved save:
+
+- Approved By
+- Approved At
+- Approved overtime minutes
+
+When rejected save:
+
+- Rejected By
+- Rejected At
+- Rejection Reason
+
+--------------------------------------------------
+13. AUDIT TRAIL
+--------------------------------------------------
+
+Every overtime entry must have an audit trail.
+
+Record:
+
+Created
+Edited
+Submitted
+Approved
+Rejected
+Reopened
+Deleted
+
+For every action save:
+- User
+- Date/time
+- Action
+- Previous values where applicable
+- New values where applicable
+
+--------------------------------------------------
+14. MONTHLY EMPLOYEE SUMMARY
+--------------------------------------------------
+
+On every Employee Profile add:
+
+OVERTIME
+
+Show:
+
+August 2026
+
+Approved: 12 hrs 30 min
+Pending: 2 hrs
+Rejected: 30 min
+Total Requests: 11
+
+Allow Admin to click and see the underlying entries.
+
+--------------------------------------------------
+15. REPORT
+--------------------------------------------------
+
+Add an Overtime Report under Reports.
+
+Filters:
+- Date from
+- Date to
+- Employee
+- Department
+- Status
+- Client
+- Job
+
+Show:
+
+Employee
+Number of Entries
+Approved Hours
+Pending Hours
+Rejected Hours
+
+Example:
+
+Garth
+Approved: 14 hrs 30 min
+Pending: 2 hrs
+Rejected: 1 hr
+
+Leon
+Approved: 9 hrs
+Pending: 30 min
+Rejected: 0
+
+Show GRAND TOTAL at the bottom.
+
+--------------------------------------------------
+16. PAYROLL / EXPORT
+--------------------------------------------------
+
+Add:
+
+EXPORT OVERTIME
+
+Allow Admin to export approved overtime for a selected date range to Excel/CSV.
+
+Include:
+
+Employee
+Date
+Client
+Job Number
+Start Time
+Finish Time
+Before 08:00 Minutes
+After 16:00 Minutes
+Total Overtime Minutes
+Total Overtime Display
+Approved By
+Approved Date
+
+Only APPROVED overtime should be included by default.
+
+--------------------------------------------------
+17. DATABASE
+--------------------------------------------------
+
+Create proper PostgreSQL tables for overtime.
+
+Suggested structure:
+
+overtime_entries
+
+id
+employee_id
+date_worked
+client_id nullable
+job_id nullable
+work_type
+other_description nullable
+start_time
+finish_time
+before_hours_minutes
+after_hours_minutes
+total_overtime_minutes
+notes
+status
+submitted_at
+approved_by nullable
+approved_at nullable
+rejected_by nullable
+rejected_at nullable
+rejection_reason nullable
+created_at
+updated_at
+
+Also create:
+
+overtime_audit_log
+
+id
+overtime_entry_id
+user_id
+action
+old_values JSONB nullable
+new_values JSONB nullable
+created_at
+
+Use foreign keys to the existing JobFlow:
+- users/employees
+- clients
+- jobs
+
+Do not create duplicate client, job or employee databases.
+
+--------------------------------------------------
+18. PERMISSIONS
+--------------------------------------------------
+
+Mobile/normal employee:
+- Create own overtime
+- View own overtime
+- Edit own Pending overtime
+- Delete own Pending overtime
+- Cannot approve
+- Cannot view other employees' overtime
+
+Admin/Management:
+- View all overtime
+- Create overtime for staff
+- Edit
+- Approve
+- Reject
+- Reopen
+- Delete where authorised
+- Export reports
+
+--------------------------------------------------
+19. MODALS
+--------------------------------------------------
+
+Follow the existing JobFlow modal rule:
+
+A modal must NOT close by clicking outside it.
+
+It may only close by:
+- X button
+- Cancel button
+- Save/Submit action
+
+--------------------------------------------------
+20. MOBILE DESIGN
+--------------------------------------------------
+
+The employee overtime screen must be designed mobile-first.
+
+Large buttons.
+Large time fields.
+Minimal typing.
+No wide desktop tables on mobile.
+
+Primary mobile action:
+
++ LOG OVERTIME
+
+The process should take less than 30 seconds.
+
+--------------------------------------------------
+21. DESKTOP DESIGN
+--------------------------------------------------
+
+Admin desktop screens should match the existing Terminators JobFlow design and colour scheme.
+
+Do not create a visually separate application.
+
+Use the same:
+- Navigation
+- Cards
+- Buttons
+- Fonts
+- Colours
+- Tables
+- Modal styles
+
+as the rest of JobFlow.
+
+--------------------------------------------------
+22. IMPORTANT
+--------------------------------------------------
+
+Do not build Overtime as a standalone disconnected feature.
+
+It must use the existing JobFlow database and link overtime records to:
+
+EMPLOYEE
+   ↓
+CLIENT
+   ↓
+JOB
+   ↓
+OVERTIME
+   ↓
+APPROVAL
+   ↓
+REPORT / PAYROLL
+
+An employee's overtime must therefore also be visible from:
+- Employee Profile
+- Job history where linked to a job
+- Client history where linked to a client
+
+Keep all information interconnected with the existing JobFlow system.

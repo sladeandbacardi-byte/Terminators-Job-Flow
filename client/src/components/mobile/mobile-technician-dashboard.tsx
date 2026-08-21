@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, CalendarDays, Car, CheckCircle2, ClipboardPenLine, Droplets,
-  Gauge, LayoutDashboard, ListChecks, LogOut, Menu, RefreshCw, Wrench, X,
+  CalendarDays, ClipboardPenLine, ExternalLink,
+  LayoutDashboard, ListChecks, LogOut, Menu, RefreshCw, Truck, X,
 } from "lucide-react";
 import type { Client, Job, Worker } from "@shared/schema";
 
@@ -108,12 +108,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     { screen: "diaries", label: "Field Diaries", icon: ClipboardPenLine },
     { screen: "calendar", label: "Calendar", icon: CalendarDays },
   ];
-  const fleetItems: Array<{ screen: Screen; label: string; icon: typeof LayoutDashboard }> = [
-    { screen: "issue", label: "Report Issue", icon: AlertTriangle },
-    { screen: "km", label: "Log KMs", icon: Gauge },
-    { screen: "inspection", label: "Vehicle Inspection", icon: CheckCircle2 },
-    { screen: "fuel", label: "Fuel Fill-up", icon: Droplets },
-  ];
+  const openFleetGuard = () => { window.location.href = "/fleet"; };
 
   const jobRows = (list: MobileJob[]) => (
     <div className="space-y-3">
@@ -181,7 +176,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Current Job</h2>{metrics.currentJob ? jobRows([metrics.currentJob]) : <p className="rounded-xl bg-slate-100 p-4 text-sm text-slate-600">No job is currently in progress.</p>}</section>
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My Jobs Today</h2>{jobRows(data.todayJobs)}</section>
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My Week</h2><p className="rounded-xl bg-white p-4 text-sm text-slate-600">{metrics.weekJobs.length} jobs scheduled for the next seven days.</p></section>
-      <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Fleet Actions</h2><div className="grid grid-cols-2 gap-2">{fleetItems.map(item => { const Icon = item.icon; return <button key={item.screen} onClick={() => nav(item.screen)} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left text-sm font-semibold text-slate-700"><Icon className="h-4 w-4 text-emerald-600" />{item.label}</button>; })}</div></section>
+      <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Fleet</h2><button onClick={openFleetGuard} className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left font-semibold text-slate-700 shadow-sm hover:bg-emerald-50"><Truck className="h-5 w-5 text-emerald-600" /><span className="flex-1">FleetGuard</span><ExternalLink className="h-4 w-4 text-slate-400" /></button></section>
     </div>;
   }, [data, form, screen]);
 
@@ -190,7 +185,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
       <div className="flex items-center gap-3"><button aria-label="Open menu" onClick={() => setMenuOpen(true)} className="rounded-lg p-2 hover:bg-emerald-800"><Menu className="h-5 w-5" /></button><div><h1 className="font-bold">{screenTitle[screen]}</h1><p className="text-xs text-emerald-100">{worker.name} · Technician</p></div></div>
       <button aria-label="Refresh dashboard" onClick={load} className="rounded-lg p-2 hover:bg-emerald-800"><RefreshCw className="h-5 w-5" /></button>
     </header>
-    {menuOpen && <div className="fixed inset-0 z-30"><button aria-label="Close menu" className="absolute inset-0 bg-slate-950/40" onClick={() => setMenuOpen(false)} /><aside className="absolute inset-y-0 left-0 w-80 overflow-y-auto bg-white p-5 shadow-2xl"><div className="mb-6 flex items-center justify-between"><div><p className="font-bold">{worker.name}</p><p className="text-xs text-slate-500">Mobile Technician</p></div><button aria-label="Close menu" onClick={() => setMenuOpen(false)}><X /></button></div><p className="mb-2 text-xs font-bold tracking-widest text-slate-400">SERVICE</p>{menuItems.map(item => { const Icon = item.icon; return <button key={item.screen} onClick={() => nav(item.screen)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50"><Icon className="h-4 w-4 text-emerald-700" />{item.label}</button>; })}<p className="mb-2 mt-6 text-xs font-bold tracking-widest text-slate-400">FLEET</p>{fleetItems.map(item => { const Icon = item.icon; return <button key={item.screen} onClick={() => nav(item.screen)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50"><Icon className="h-4 w-4 text-emerald-700" />{item.label}</button>; })}<button onClick={onLogout} className="mt-8 flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-700"><LogOut className="h-4 w-4" />Sign out</button></aside></div>}
+    {menuOpen && <div className="fixed inset-0 z-30"><button aria-label="Close menu" className="absolute inset-0 bg-slate-950/40" onClick={() => setMenuOpen(false)} /><aside className="absolute inset-y-0 left-0 w-80 overflow-y-auto bg-white p-5 shadow-2xl"><div className="mb-6 flex items-center justify-between"><div><p className="font-bold">{worker.name}</p><p className="text-xs text-slate-500">Mobile Technician</p></div><button aria-label="Close menu" onClick={() => setMenuOpen(false)}><X /></button></div><p className="mb-2 text-xs font-bold tracking-widest text-slate-400">SERVICE</p>{menuItems.map(item => { const Icon = item.icon; return <button key={item.screen} onClick={() => nav(item.screen)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50"><Icon className="h-4 w-4 text-emerald-700" />{item.label}</button>; })}<p className="mb-2 mt-6 text-xs font-bold tracking-widest text-slate-400">FLEET</p><button onClick={openFleetGuard} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50"><Truck className="h-4 w-4 text-emerald-700" />FleetGuard<ExternalLink className="ml-auto h-3.5 w-3.5 text-slate-400" /></button><button onClick={onLogout} className="mt-8 flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-700"><LogOut className="h-4 w-4" />Sign out</button></aside></div>}
     <div className="mx-auto max-w-lg p-4">{error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}{notice && <div className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}{loading ? <div className="py-20 text-center text-sm text-slate-500">Loading your technician dashboard…</div> : content}</div>
   </main>;
 }

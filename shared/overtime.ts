@@ -23,6 +23,21 @@ export function calculateOvertimeMinutes(startTime: string, finishTime: string):
   return beforeNormalHours + afterNormalHours;
 }
 
+/**
+ * Returns the before/after breakdown plus total, or null if times are invalid.
+ */
+export function calculateOvertimeBreakdown(
+  startTime: string,
+  finishTime: string,
+): { beforeMinutes: number; afterMinutes: number; totalMinutes: number } | null {
+  const start = timeToMinutes(startTime);
+  const finish = timeToMinutes(finishTime);
+  if (start === null || finish === null || finish <= start) return null;
+  const beforeMinutes = Math.max(0, Math.min(finish, NORMAL_WORK_START_MINUTES) - start);
+  const afterMinutes = Math.max(0, finish - Math.max(start, NORMAL_WORK_END_MINUTES));
+  return { beforeMinutes, afterMinutes, totalMinutes: beforeMinutes + afterMinutes };
+}
+
 export function formatOvertimeMinutes(minutes: number): string {
   const safeMinutes = Math.max(0, Math.round(minutes || 0));
   const hours = Math.floor(safeMinutes / 60);

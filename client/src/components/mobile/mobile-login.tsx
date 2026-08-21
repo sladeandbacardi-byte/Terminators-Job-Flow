@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Smartphone, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, BriefcaseBusiness, Loader2, UserRound } from "lucide-react";
 import type { Worker } from '@shared/schema';
 
 interface MobileLoginProps {
@@ -16,6 +15,15 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const goToMainLogin = () => {
+    window.location.href = '/';
+  };
+
+  const goToAdminLogin = () => {
+    // Return to root login; admin can select "Admin Login" from there
+    window.location.href = '/?login=admin';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -24,12 +32,8 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
     try {
       const response = await fetch('/api/auth/mobile-login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          employeeId: employeeId.trim(),
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: employeeId.trim() }),
       });
 
       const data = await response.json();
@@ -38,7 +42,6 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Store mobile session
       localStorage.setItem('mobile_worker_id', data.worker.id);
       localStorage.setItem('mobile_session_token', data.token);
       localStorage.setItem('mobile_worker_data', JSON.stringify(data.worker));
@@ -52,76 +55,99 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
-            <Smartphone className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">The Terminators</h1>
-          <p className="text-gray-600 mt-2">Mobile Field Service</p>
+
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <img
+            src="/images/job-flow-full-logo.png"
+            alt="Job Flow Field Service Management"
+            className="h-auto w-[220px] object-contain sm:w-[260px]"
+            onError={event => {
+              const img = event.target as HTMLImageElement;
+              img.src = '/images/job-flow-header-logo.png';
+              img.onerror = () => { img.style.display = 'none'; };
+            }}
+          />
         </div>
 
-        <Card className="shadow-lg">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl">Staff Login</CardTitle>
-            <CardDescription>
-              Enter your employee ID to access your work orders
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+        {/* Card */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
 
-              <div className="space-y-2">
-                <Label htmlFor="employeeId">Employee ID</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="employeeId"
-                    type="text"
-                    placeholder="Enter your employee ID"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    className="pl-10 text-lg h-12"
-                    required
-                    data-testid="input-employee-id"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                PIN verification is temporarily disabled. Keep your employee ID private.
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-                disabled={isLoading || !employeeId}
-                data-testid="button-login"
-              >
-                {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Signing in...</span>
-                  </div>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center text-sm text-gray-500">
-              <p>Need help? Contact your supervisor</p>
-              <p className="mt-1">The Terminators - Field Service Management</p>
+          {/* Heading */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Staff Login</h1>
+            <p className="mt-1.5 text-sm text-gray-500">Mobile access for field staff and technicians</p>
+            <div className="mt-2 text-xs font-semibold uppercase tracking-widest text-red-600">
+              The Terminators · Mobile Staff Access
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="employeeId" className="text-sm font-medium text-gray-700">Employee ID</Label>
+              <Input
+                id="employeeId"
+                type="text"
+                placeholder="Enter your employee ID"
+                value={employeeId}
+                onChange={e => setEmployeeId(e.target.value)}
+                className="h-12 text-base"
+                required
+                autoComplete="username"
+                data-testid="input-employee-id"
+              />
+              <p className="text-xs text-gray-500">Keep your employee ID private.</p>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 text-base bg-red-600 hover:bg-red-700 text-white"
+              disabled={isLoading || !employeeId.trim()}
+              data-testid="button-login"
+            >
+              {isLoading
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</>
+                : 'Sign In'}
+            </Button>
+          </form>
+
+          {/* Navigation links */}
+          <div className="mt-6 flex flex-col items-center gap-3 border-t border-gray-100 pt-5">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-11 border-gray-300 text-gray-700 hover:bg-gray-50"
+              onClick={goToMainLogin}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Main Login
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 text-gray-600 hover:text-gray-900"
+              onClick={goToAdminLogin}
+            >
+              <BriefcaseBusiness className="mr-2 h-4 w-4" />
+              Admin / Office Login
+            </Button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs text-gray-400">
+          Job Flow · Field Service Management
+        </p>
       </div>
     </div>
   );

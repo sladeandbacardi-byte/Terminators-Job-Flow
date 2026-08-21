@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Plus, Phone, Mail } from "lucide-react";
+import { Search, Plus, Phone, Mail, Clock3, ChevronRight } from "lucide-react";
+import { format } from "date-fns";
 import { getInitials } from "@/lib/utils";
 import WorkerForm from "@/components/forms/worker-form";
 import { ExportButton } from "@/components/export-button";
 import { exportWorkers } from "@/lib/data-export";
+import { formatOvertimeMinutes } from "@shared/overtime";
 import type { Worker, Department } from "@shared/schema";
 
 const DEPT_BADGE: Record<string, string> = {
@@ -34,10 +36,35 @@ const DEPT_HEADER: Record<string, string> = {
   "none":  "border-gray-200 bg-gray-50",
 };
 
+type WorkerOvertimeSummary = {
+  totalEntries: number;
+  approvedMinutes: number;
+  pendingMinutes: number;
+  rejectedMinutes: number;
+  thisMonth: {
+    label: string;
+    approvedMinutes: number;
+    pendingMinutes: number;
+    rejectedMinutes: number;
+    totalRequests: number;
+  };
+  recentEntries: Array<{
+    id: string;
+    workDate: string;
+    clientName: string;
+    jobLabel: string | null;
+    startTime: string;
+    finishTime: string;
+    overtimeMinutes: number;
+    status: string;
+  }>;
+};
+
 export default function Workers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
+  const [overtimeWorker, setOvertimeWorker] = useState<Worker | null>(null);
 
   const { data: workers = [], isLoading } = useQuery<Worker[]>({
     queryKey: ["/api/workers"],
@@ -45,6 +72,11 @@ export default function Workers() {
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
+  });
+
+  const { data: workerOvertime, isLoading: loadingOvertime } = useQuery<WorkerOvertimeSummary>({
+    queryKey: [`/api/overtime/worker/${overtimeWorker?.id}`],
+    enabled: Boolean(overtimeWorker),
   });
 
   const search = useSearch();
@@ -197,17 +229,22 @@ export default function Workers() {
                             </div>
                           </div>
 
-                          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               worker.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                             }`} data-testid={`worker-status-${worker.id}`}>
                               {worker.isActive ? "Active" : "Inactive"}
                             </span>
-                            <Button variant="outline" size="sm"
-                              onClick={() => handleEditWorker(worker)}
-                              data-testid={`button-edit-worker-${worker.id}`}>
-                              Edit
-                            </Button>
+                            <div className="flex gap-1.5">
+                              <Button variant="ghost" size="sm" onClick={() => setOvertimeWorker(worker)} title="View overtime">
+                                <Clock3 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="outline" size="sm"
+                                onClick={() => handleEditWorker(worker)}
+                                data-testid={`button-edit-worker-${worker.id}`}>
+                                Edit
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -233,6 +270,92 @@ export default function Workers() {
             onSuccess={handleFormSuccess}
             onCancel={handleFormCancel}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Worker overtime summary dialog */}
+      <Dialog open={Boolean(overtimeWorker)} onOpenChange={open => !open && setOvertimeWorker(null)}>
+        <DialogContent className="max-w-lg" onInteractOutside={e => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock3 className="h-5 w-5 text-red-600" />
+              {overtimeWorker?.name} — Overtime
+            </DialogTitle>
+            <DialogDescription>
+              All-time and monthly overtime summary.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingOvertime ? (
+            <div className="py-8 text-center text-sm text-gray-500">Loading overtime summary…</div>
+          ) : workerOvertime ? (
+            <div className="space-y-4">
+              {/* This month */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">{workerOvertime.thisMonth.label}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">Approved</p>
+                    <p className="text-lg font-bold text-emerald-900">{formatOvertimeMinutes(workerOvertime.thisMonth.approvedMinutes)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-amber-700 font-semibold uppercase tracking-wide">Pending</p>
+                    <p className="text-lg font-bold text-amber-900">{formatOvertimeMinutes(workerOvertime.thisMonth.pendingMinutes)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-red-700 font-semibold uppercase tracking-wide">Rejected</p>
+                    <p className="text-lg font-bold text-red-900">{formatOvertimeMinutes(workerOvertime.thisMonth.rejectedMinutes)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Total requests</p>
+                    <p className="text-lg font-bold text-gray-900">{workerOvertime.thisMonth.totalRequests}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* All-time totals */}
+              <div className="flex gap-4 text-sm">
+                <div><span className="text-gray-500">All-time approved:</span> <span className="font-semibold text-emerald-700">{formatOvertimeMinutes(workerOvertime.approvedMinutes)}</span></div>
+                <div><span className="text-gray-500">Total entries:</span> <span className="font-semibold text-gray-900">{workerOvertime.totalEntries}</span></div>
+              </div>
+
+              {/* Recent entries */}
+              {workerOvertime.recentEntries.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Recent entries</p>
+                  <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white overflow-hidden">
+                    {workerOvertime.recentEntries.slice(0, 5).map(entry => (
+                      <div key={entry.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{format(new Date(`${entry.workDate}T12:00:00`), "dd MMM yyyy")}</p>
+                          <p className="text-xs text-gray-500">{entry.clientName || "No client"}{entry.jobLabel ? ` · ${entry.jobLabel}` : ""} · {entry.startTime}–{entry.finishTime}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-bold text-gray-900">{formatOvertimeMinutes(entry.overtimeMinutes)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            entry.status === "approved" ? "bg-emerald-100 text-emerald-800" :
+                            entry.status === "rejected" ? "bg-red-100 text-red-800" :
+                            "bg-amber-100 text-amber-800"
+                          }`}>{entry.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {workerOvertime.recentEntries.length > 5 && (
+                    <p className="mt-1.5 text-xs text-gray-500 text-right">{workerOvertime.totalEntries - 5} more entries in Overtime Approval</p>
+                  )}
+                </div>
+              )}
+
+              {workerOvertime.totalEntries === 0 && (
+                <p className="py-4 text-center text-sm text-gray-500">No overtime entries recorded yet.</p>
+              )}
+            </div>
+          ) : null}
+
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setOvertimeWorker(null)}>Close</Button>
+          </div>
         </DialogContent>
       </Dialog>
       </>
