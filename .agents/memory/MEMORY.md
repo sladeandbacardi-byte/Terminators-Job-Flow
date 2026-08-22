@@ -16,3 +16,4 @@
 - [Calendar list view sorting](calendar-list-view-sorting.md) — calendar libraries only sort list/agenda views by start time; supply an explicit comparator when the spec needs tie-break fields like route sequence.
 - [Startup provisioning order](startup-provisioning-order.md) — DbStorage initializes before startup migrations; any provisioning that depends on newly added columns must run after migrations in server startup.
 - [Login card credential boundary](login-card-credential-boundary.md) — cards never authenticate by themselves; admin passwords remain required, while technician PIN verification is temporarily disabled pending a reset.
+- [Opportunity lifecycle integrity](opportunity-lifecycle-integrity.md) — mobile reports must derive client from an authorized source job; quote links need row locking plus the canonical document sequence.

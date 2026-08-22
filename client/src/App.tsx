@@ -67,6 +67,7 @@ const SalesReports        = lazy(() => import("@/pages/sales-reports"));
 const EquipmentChecklists = lazy(() => import("@/pages/equipment-checklists"));
 const MyOvertime          = lazy(() => import("@/pages/my-overtime"));
 const OvertimeApproval    = lazy(() => import("@/pages/overtime-approval"));
+const Opportunities       = lazy(() => import("@/pages/opportunities"));
 
 function PageLoader() {
   return (
@@ -183,6 +184,7 @@ function AuthenticatedApp() {
                 <Route path="/accepted-work">{() => <ProtectedRoute component={AcceptedWork} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/sales-diary">{() => <ProtectedRoute component={SalesDiary} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/sales-dashboard">{() => <ProtectedRoute component={SalesDashboard} roles={["admin","manager","sales"]} />}</Route>
+                <Route path="/opportunities">{() => <ProtectedRoute component={Opportunities} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/follow-ups">{() => <ProtectedRoute component={FollowUpsPage} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/sales-reports">{() => <ProtectedRoute component={SalesReports} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/commission-reports">{() => <ProtectedRoute component={CommissionReports} roles={["admin","manager","sales"]} />}</Route>

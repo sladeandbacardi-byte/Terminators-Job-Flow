@@ -553,5 +553,66 @@ export async function runStartupMigrations(): Promise<void> {
     `ALTER TABLE overtime_entries ALTER COLUMN client_id DROP NOT NULL`
   );
 
+  // ── Additional opportunities ─────────────────────────────────────────────
+  // These tables deliberately link to the existing client, worker, lead, job,
+  // and invoice records instead of copying their information into a new sales
+  // subsystem. Foreign keys are omitted here because older production databases
+  // can contain legacy row IDs; application routes still verify referenced rows.
+  await run(
+    "opportunities table",
+    `CREATE TABLE IF NOT EXISTS opportunities (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id varchar NOT NULL,
+      site_id varchar,
+      source_job_id varchar,
+      reported_by_worker_id varchar NOT NULL,
+      assigned_to_worker_id varchar,
+      opportunity_type text NOT NULL,
+      custom_type text,
+      description text NOT NULL,
+      urgency text NOT NULL DEFAULT 'normal',
+      status text NOT NULL DEFAULT 'new',
+      estimated_value numeric(12,2),
+      quote_id varchar,
+      job_id varchar,
+      invoice_id varchar,
+      won_at timestamp,
+      lost_reason text,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run(
+    "opportunity_photos table",
+    `CREATE TABLE IF NOT EXISTS opportunity_photos (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      opportunity_id varchar NOT NULL,
+      file_url text NOT NULL,
+      file_name text,
+      uploaded_by_worker_id varchar NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run(
+    "service_wallet_overrides table",
+    `CREATE TABLE IF NOT EXISTS service_wallet_overrides (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id varchar NOT NULL,
+      service_type text NOT NULL,
+      state text NOT NULL,
+      updated_by_user_id varchar,
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run(
+    "opportunity lookup indexes",
+    `CREATE INDEX IF NOT EXISTS opportunities_client_created_idx ON opportunities (client_id, created_at DESC);
+     CREATE INDEX IF NOT EXISTS opportunities_reporter_created_idx ON opportunities (reported_by_worker_id, created_at DESC);
+     CREATE INDEX IF NOT EXISTS opportunities_status_created_idx ON opportunities (status, created_at DESC);
+     CREATE INDEX IF NOT EXISTS opportunities_job_idx ON opportunities (source_job_id);
+     CREATE INDEX IF NOT EXISTS opportunity_photos_opportunity_idx ON opportunity_photos (opportunity_id, created_at);
+     CREATE UNIQUE INDEX IF NOT EXISTS service_wallet_overrides_client_service_idx ON service_wallet_overrides (client_id, service_type)`
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

@@ -17,7 +17,10 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const app = express();
-app.use(express.json());
+// Opportunity photos are submitted from the technician camera/gallery as
+// compact data URLs. Keep the API limit explicit so photo uploads work without
+// opening the server to unbounded request bodies.
+app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {

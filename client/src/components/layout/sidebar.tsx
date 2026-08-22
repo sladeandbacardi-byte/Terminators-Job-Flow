@@ -9,7 +9,7 @@ import {
   Truck, Gauge, Fuel, ClipboardCheck, AlertCircle, UserCheck, FileSpreadsheet,
   ChevronDown, ChevronRight, ChevronLeft, UserCog, Lock, ScrollText, HandCoins,
   Wallet, CheckSquare, Cog, ListOrdered, BookOpen, LayoutDashboard, Heart,
-  Bell, Tag, Clock, PieChart,
+  Bell, Tag, Clock, PieChart, Lightbulb,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, getDefaultDashboardRoute } from "@/lib/dashboardRole";
@@ -45,6 +45,7 @@ const ALL_SECTIONS: NavSection[] = [
       { name: "Diary",         href: "/sales-diary",   icon: BookOpen,    roles: ["admin", "manager", "sales"] },
       { name: "Clients",       href: "/clients",       icon: Shield,      roles: ["admin", "manager", "sales"] },
       { name: "Follow-ups",    href: "/follow-ups",    icon: Bell,        roles: ["admin", "manager", "sales"] },
+      { name: "Opportunities", href: "/opportunities", icon: Lightbulb,   roles: ["admin", "manager", "sales"] },
       { name: "Reports",       href: "/sales-reports", icon: BarChart3,   roles: ["admin", "manager", "sales"] },
       { name: "Email Center",  href: "/emails",        icon: Mail,        roles: ["admin", "manager", "sales"] },
     ],

@@ -1,6 +1,6 @@
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, Clock3 } from "lucide-react";
+import { Printer, ArrowLeft, Clock3, Lightbulb } from "lucide-react";
 import { Link } from "wouter";
 import { PrintableJobCard } from "@/components/job-card";
 
@@ -45,6 +45,12 @@ export default function JobCardPage() {
               <Button variant="outline" data-testid="button-log-overtime">
                 <Clock3 className="h-4 w-4 mr-2" />
                 Log Overtime
+              </Button>
+            </Link>
+            <Link href={`/opportunities?job=${encodeURIComponent(id)}`}>
+              <Button variant="outline" data-testid="button-job-opportunities">
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Opportunities
               </Button>
             </Link>
             <Button onClick={handlePrint} data-testid="button-print-card">

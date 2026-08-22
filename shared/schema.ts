@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, decimal, integer, boolean, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { OPPORTUNITY_TYPES, OPPORTUNITY_STATUSES, OPPORTUNITY_URGENCIES } from "./opportunities";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -345,6 +346,51 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// ── Additional opportunities ────────────────────────────────────────────────
+// A technician-reported customer need that can progress through the existing
+// lead/quote, job, and invoice workflow without duplicating those entities.
+export const opportunities = pgTable("opportunities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  siteId: varchar("site_id"),
+  sourceJobId: varchar("source_job_id"),
+  reportedByWorkerId: varchar("reported_by_worker_id").notNull(),
+  assignedToWorkerId: varchar("assigned_to_worker_id"),
+  opportunityType: text("opportunity_type").notNull(),
+  customType: text("custom_type"),
+  description: text("description").notNull(),
+  urgency: text("urgency").notNull().default("normal"),
+  status: text("status").notNull().default("new"),
+  estimatedValue: decimal("estimated_value", { precision: 12, scale: 2 }),
+  quoteId: varchar("quote_id"),
+  jobId: varchar("job_id"),
+  invoiceId: varchar("invoice_id"),
+  wonAt: timestamp("won_at"),
+  lostReason: text("lost_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const opportunityPhotos = pgTable("opportunity_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  opportunityId: varchar("opportunity_id").notNull().references(() => opportunities.id),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name"),
+  uploadedByWorkerId: varchar("uploaded_by_worker_id").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Admin-set corrections supplement automatically derived service usage. The
+// historical contracts/jobs remain the source of truth whenever no override exists.
+export const serviceWalletOverrides = pgTable("service_wallet_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  serviceType: text("service_type").notNull(),
+  state: text("state").notNull(),
+  updatedByUserId: varchar("updated_by_user_id"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 export const emailTemplates = pgTable("email_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -487,6 +533,27 @@ export const insertEmailLogSchema = createInsertSchema(emailLogs).omit({
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertOpportunitySchema = createInsertSchema(opportunities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  wonAt: true,
+}).extend({
+  opportunityType: z.enum(OPPORTUNITY_TYPES),
+  urgency: z.enum(OPPORTUNITY_URGENCIES).default("normal"),
+  status: z.enum(OPPORTUNITY_STATUSES).default("new"),
+});
+
+export const insertOpportunityPhotoSchema = createInsertSchema(opportunityPhotos).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertServiceWalletOverrideSchema = createInsertSchema(serviceWalletOverrides).omit({
+  id: true,
+  updatedAt: true,
 });
 
 export const insertJobInventoryItemSchema = createInsertSchema(jobInventoryItems).omit({

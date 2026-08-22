@@ -29,6 +29,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+type CrossSellMetric = {
+  type: string;
+  label: string;
+  count: number;
+  active: number;
+  won: number;
+  estimatedValue: number;
+};
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STALE_DAYS: Record<string, number> = { high: 2, medium: 5, low: 7 };
@@ -106,6 +115,7 @@ export default function SalesDashboard() {
   const { data: appointments = [] }     = useQuery<SalesAppointment[]>({ queryKey: ["/api/sales-appointments"] });
   const { data: acceptedWFs = [] }      = useQuery<AcceptedWorkflow[]>({ queryKey: ["/api/accepted-workflows"] });
   const { data: serviceContracts = [] } = useQuery<any[]>({ queryKey: ["/api/service-contracts"] });
+  const { data: crossSell = [] }        = useQuery<CrossSellMetric[]>({ queryKey: ["/api/opportunities/cross-sell"] });
 
   const salesWorkers = workers.filter(w => w.departmentId === "div-5" && w.isActive !== false);
 
@@ -398,6 +408,7 @@ export default function SalesDashboard() {
                   { label: "Quotes",     href: "/quotes",             icon: FileText },
                   { label: "Follow-ups", href: "/follow-ups",         icon: Bell },
                   { label: "Diary",      href: "/sales-diary",        icon: Calendar },
+                  { label: "Opportunities", href: "/opportunities",   icon: Target },
                   { label: "Commission", href: "/commission-reports",  icon: BarChart3 },
                 ].map(item => (
                   <Button key={item.href} size="sm" variant="outline" onClick={() => navigate(item.href)} className="gap-1 text-xs">
@@ -408,13 +419,14 @@ export default function SalesDashboard() {
             </div>
 
             {/* ── 1. KPI cards (all clickable) ──────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
                 { label: "Total Leads",          value: leads.length,                    sub: `+${newLeadsThisMonth.length} this month`, icon: TrendingUp,  border: "border-blue-100",   num: "text-blue-700",   hover: "hover:bg-blue-50",   onClick: () => navigate("/leads") },
                 { label: "Active Pipeline",       value: activePipeline.length,           sub: `${staleLeads.length} stale`,              icon: Target,       border: "border-orange-100", num: "text-orange-600", hover: "hover:bg-orange-50", onClick: () => navigate("/leads") },
                 { label: "Won / Converted",       value: totalWon.length,                 sub: `${winsThisMonth.length} this month`,      icon: CheckCircle,  border: "border-green-100",  num: "text-green-700",  hover: "hover:bg-green-50",  onClick: () => navigate("/accepted-work") },
                 { label: "Follow-ups Due",        value: todayFU.length + overdueFU.length, sub: `${todayFU.length} today · ${overdueFU.length} overdue`, icon: Bell, border: "border-purple-100", num: "text-purple-700", hover: "hover:bg-purple-50", onClick: () => navigate("/follow-ups") },
                 { label: "Accepted Work Pending", value: acceptedWorkPending.length,      sub: "Steps outstanding",                      icon: ClipboardList, border: "border-rose-100",  num: "text-rose-600",   hover: "hover:bg-rose-50",   onClick: () => navigate("/accepted-work") },
+                { label: "Additional Opportunities", value: crossSell.reduce((total, item) => total + item.active, 0), sub: `${crossSell.reduce((total, item) => total + item.count, 0)} reported`, icon: Target, border: "border-amber-100", num: "text-amber-600", hover: "hover:bg-amber-50", onClick: () => navigate("/opportunities") },
               ].map(kpi => (
                 <Card
                   key={kpi.label}
@@ -434,6 +446,29 @@ export default function SalesDashboard() {
                 </Card>
               ))}
             </div>
+
+            {/* ── Cross-sell opportunity signal ─────────────────────────── */}
+            <Card>
+              <CardHeader className="pb-2 pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <SectionTitle icon={Target} label="Cross-sell Opportunities" color="text-amber-500" />
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate("/opportunities")}>Open inbox <ArrowRight className="ml-1 h-3 w-3" /></Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {crossSell.length === 0 ? <p className="rounded-lg bg-gray-50 px-3 py-4 text-sm text-gray-500">No additional opportunities have been reported yet.</p> : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                    {crossSell.slice(0, 10).map(item => (
+                      <button key={item.type} onClick={() => navigate(`/opportunities?type=${encodeURIComponent(item.type)}`)} className="rounded-lg border border-amber-100 bg-amber-50/40 p-3 text-left transition-colors hover:bg-amber-50">
+                        <p className="truncate text-xs font-medium text-gray-700">{item.label}</p>
+                        <p className="mt-1 text-xl font-bold text-amber-700">{item.count}</p>
+                        <p className="text-[11px] text-gray-500">{item.active} active · {item.won} won</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* ── 2. Needs Action Today ─────────────────────────────────── */}
             <Card>

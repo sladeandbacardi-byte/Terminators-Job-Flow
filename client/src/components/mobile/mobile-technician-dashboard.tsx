@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, ClipboardPenLine, ExternalLink,
-  LayoutDashboard, ListChecks, LogOut, Menu, RefreshCw, Truck, X,
+  LayoutDashboard, ListChecks, LogOut, Menu, RefreshCw, Truck, X, Lightbulb, Camera,
 } from "lucide-react";
 import type { Client, Job, Worker } from "@shared/schema";
+import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "@shared/opportunities";
 
-type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "km" | "fuel" | "inspection" | "issue";
+type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "km" | "fuel" | "inspection" | "issue" | "opportunities";
 type MobileJob = Job & { client: Client };
+type Opportunity = {
+  id: string; clientName: string; description: string; opportunityType: string; typeLabel: string;
+  urgency: string; status: string; statusLabel: string; createdAt: string; photos: Array<{ id: string; fileUrl: string }>;
+};
 
 type DashboardData = {
   jobs: MobileJob[];
@@ -35,6 +40,8 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [opportunityPhotos, setOpportunityPhotos] = useState<Array<{ fileUrl: string; fileName: string }>>([]);
 
   const load = async () => {
     setLoading(true);
@@ -51,6 +58,12 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   };
 
   useEffect(() => { load(); }, []);
+
+  const loadOpportunities = async () => {
+    const response = await fetch("/api/mobile/opportunities", { headers: authHeaders() });
+    if (!response.ok) throw new Error("Unable to load your submitted opportunities.");
+    setOpportunities(await response.json());
+  };
 
   const jobs = data?.jobs ?? [];
   const vehicleLabel = data?.vehicle ? `${data.vehicle.name} · ${data.vehicle.registration}` : "No vehicle assigned";
@@ -90,16 +103,47 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     }
   };
 
+  const chooseOpportunityJob = (jobId: string) => {
+    const job = jobs.find(item => item.id === jobId);
+    setForm(current => ({ ...current, sourceJobId: jobId, clientId: job?.clientId ?? "" }));
+  };
+
+  const chooseOpportunityPhotos = async (files: FileList | null) => {
+    if (!files) return;
+    const selected = Array.from(files).slice(0, 4 - opportunityPhotos.length);
+    const images = await Promise.all(selected.map(file => new Promise<{ fileUrl: string; fileName: string }>((resolve, reject) => {
+      if (!file.type.startsWith("image/") || file.size > 2_000_000) return reject(new Error("Use JPG/PNG images smaller than 2 MB."));
+      const reader = new FileReader();
+      reader.onload = () => resolve({ fileUrl: String(reader.result), fileName: file.name });
+      reader.onerror = () => reject(new Error("Unable to read photo."));
+      reader.readAsDataURL(file);
+    })));
+    setOpportunityPhotos(current => [...current, ...images].slice(0, 4));
+  };
+
+  const submitOpportunity = async () => {
+    await submit("/api/mobile/opportunities", {
+      ...form,
+      estimatedValue: form.estimatedValue || undefined,
+      photos: opportunityPhotos,
+    }, "Opportunity submitted. The office team has been notified.");
+    setOpportunityPhotos([]);
+    await loadOpportunities();
+  };
+
   const nav = (target: Screen) => {
     setScreen(target);
     setMenuOpen(false);
     setNotice("");
     setError("");
+    if (target === "opportunities") {
+      loadOpportunities().catch(err => setError(err instanceof Error ? err.message : "Unable to load your opportunities."));
+    }
   };
 
   const screenTitle: Record<Screen, string> = {
     dashboard: "Dashboard", jobs: "My Jobs", diaries: "Field Diaries", calendar: "Calendar",
-    km: "Log KMs", fuel: "Fuel Fill-up", inspection: "Vehicle Inspection", issue: "Report Issue",
+    km: "Log KMs", fuel: "Fuel Fill-up", inspection: "Vehicle Inspection", issue: "Report Issue", opportunities: "Additional Opportunities",
   };
 
   const menuItems: Array<{ screen: Screen; label: string; icon: typeof LayoutDashboard }> = [
@@ -107,6 +151,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     { screen: "jobs", label: "My Jobs", icon: ListChecks },
     { screen: "diaries", label: "Field Diaries", icon: ClipboardPenLine },
     { screen: "calendar", label: "Calendar", icon: CalendarDays },
+    { screen: "opportunities", label: "Additional Opportunities", icon: Lightbulb },
   ];
   const openFleetGuard = () => { window.location.href = "/fleet"; };
 
@@ -128,6 +173,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
             <div className="mt-3 flex gap-2">
               {job.status === "scheduled" && <button onClick={() => updateStatus(job.id, "in_progress")} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Start job</button>}
               {job.status === "in_progress" && <button onClick={() => updateStatus(job.id, "completed")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Mark complete</button>}
+              <button onClick={() => { chooseOpportunityJob(job.id); nav("opportunities"); }} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Report opportunity</button>
             </div>
           </article>
         ))}
@@ -156,6 +202,30 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
         <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Submit field diary</button>
       </form>
     );
+    if (screen === "opportunities") return (
+      <div className="space-y-4">
+        <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submitOpportunity(); }}>
+          <div><h2 className="font-semibold text-slate-900">Report an additional opportunity</h2><p className="mt-1 text-xs text-slate-500">Share a service need you notice at a client. The sales team will review it.</p></div>
+          <select required value={form.sourceJobId ?? ""} onChange={event => chooseOpportunityJob(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+            <option value="">Select the job where you noticed it</option>
+            {jobs.map(job => <option key={job.id} value={job.id}>{job.client?.name ?? job.title}</option>)}
+          </select>
+          <input readOnly value={jobs.find(job => job.id === form.sourceJobId)?.client?.name ?? ""} placeholder="Client is filled in from the selected job" className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600" />
+          <select required value={form.opportunityType ?? ""} onChange={event => setForm(current => ({ ...current, opportunityType: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+            <option value="">What additional service is needed?</option>
+            {OPPORTUNITY_TYPES.map(type => <option key={type} value={type}>{OPPORTUNITY_TYPE_LABELS[type]}</option>)}
+          </select>
+          {form.opportunityType === "other" && input("customType", "Name the service", "text", true)}
+          <select value={form.urgency ?? "normal"} onChange={event => setForm(current => ({ ...current, urgency: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select>
+          {input("estimatedValue", "Estimated value (optional)", "number")}
+          <textarea required placeholder="What did you notice? Include the client need, location, and useful details." value={form.description ?? ""} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"><Camera className="h-4 w-4" />Add up to 4 photos<input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={event => chooseOpportunityPhotos(event.target.files).catch(err => setError(err.message))} /></label>
+          {opportunityPhotos.length > 0 && <div className="grid grid-cols-4 gap-2">{opportunityPhotos.map((photo, index) => <div key={photo.fileUrl} className="relative"><img src={photo.fileUrl} alt="" className="h-16 w-full rounded object-cover" /><button type="button" onClick={() => setOpportunityPhotos(current => current.filter((_, itemIndex) => itemIndex !== index))} className="absolute -right-1 -top-1 rounded-full bg-slate-900 px-1.5 text-xs text-white">×</button></div>)}</div>}
+          <button className="w-full rounded-lg bg-amber-600 px-4 py-3 font-semibold text-white">Send opportunity to sales</button>
+        </form>
+        <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My submissions</h2>{opportunities.length === 0 ? <p className="rounded-xl bg-white p-4 text-sm text-slate-500">You have not submitted an opportunity yet.</p> : <div className="space-y-2">{opportunities.map(item => <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold text-slate-900">{item.typeLabel}</p><p className="text-xs text-slate-500">{item.clientName}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{item.statusLabel}</span></div><p className="mt-2 text-sm text-slate-600 line-clamp-2">{item.description}</p></article>)}</div>}</section>
+      </div>
+    );
     if (screen === "km") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/km-logs", form, "Kilometres logged."); }}>
       <p className="text-sm text-slate-600">{vehicleLabel}</p>{input("startOdometer", "Start odometer", "number", true)}{input("endOdometer", "End odometer", "number", true)}{input("businessKm", "Business KMs", "number")}{input("privateKm", "Private KMs", "number")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log KMs</button>
     </form>;
@@ -178,7 +248,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My Week</h2><p className="rounded-xl bg-white p-4 text-sm text-slate-600">{metrics.weekJobs.length} jobs scheduled for the next seven days.</p></section>
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Fleet</h2><button onClick={openFleetGuard} className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left font-semibold text-slate-700 shadow-sm hover:bg-emerald-50"><Truck className="h-5 w-5 text-emerald-600" /><span className="flex-1">FleetGuard</span><ExternalLink className="h-4 w-4 text-slate-400" /></button></section>
     </div>;
-  }, [data, form, screen]);
+  }, [data, form, screen, opportunities, opportunityPhotos]);
 
   return <main className="min-h-screen bg-slate-50">
     <header className="sticky top-0 z-20 flex items-center justify-between bg-emerald-700 px-4 py-3 text-white shadow">

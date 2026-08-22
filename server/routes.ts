@@ -32,6 +32,11 @@ import {
   overtimeEntries,
   overtimeAuditEntries,
   adminUsers,
+  opportunities,
+  opportunityPhotos,
+  serviceWalletOverrides,
+  quoteSubmissions,
+  sequences,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -41,6 +46,10 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown } from "@shared/overtime";
+import {
+  OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
+  OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
+} from "@shared/opportunities";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -78,6 +87,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "POST /api/mobile/fleet/fuel-fillups",
       "POST /api/mobile/fleet/inspections",
       "POST /api/mobile/fleet/issues",
+      "GET /api/mobile/opportunities",
+      "POST /api/mobile/opportunities",
     ].includes(signature)) {
       return true;
     }
@@ -88,6 +99,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (method === "DELETE" && /^\/api\/mobile\/fleet\/issues\/[^/]+$/.test(path))
     );
   };
+
+  const officeOpportunityManager = (req: AuthenticatedRequest) =>
+    req.user?.authenticationMethod !== "profile_picker" &&
+    ["admin", "superadmin", "manager", "sales"].includes(req.user?.role ?? "");
+
+  const opportunityInput = z.object({
+    siteId: z.string().optional().nullable(),
+    sourceJobId: z.string().min(1, "Select the job where you identified this opportunity"),
+    opportunityType: z.enum(OPPORTUNITY_TYPES),
+    customType: z.string().trim().max(100).optional().nullable(),
+    description: z.string().trim().min(5, "Describe the opportunity").max(5000),
+    urgency: z.enum(OPPORTUNITY_URGENCIES).default("normal"),
+    estimatedValue: z.coerce.number().min(0).max(999999999).optional().nullable(),
+    photos: z.array(z.object({
+      fileUrl: z.string().startsWith("data:image/").max(3_000_000),
+      fileName: z.string().max(255).optional(),
+    })).max(4).default([]),
+  }).superRefine((value, ctx) => {
+    if (value.opportunityType === "other" && !value.customType?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customType"], message: "Name the additional service" });
+    }
+  });
+
+  async function opportunityRows(filter: { reporterId?: string; clientId?: string; jobId?: string; status?: string } = {}) {
+    let rows = await db.select().from(opportunities).orderBy(desc(opportunities.createdAt));
+    if (filter.reporterId) rows = rows.filter(row => row.reportedByWorkerId === filter.reporterId);
+    if (filter.clientId) rows = rows.filter(row => row.clientId === filter.clientId);
+    if (filter.jobId) rows = rows.filter(row => row.sourceJobId === filter.jobId || row.jobId === filter.jobId);
+    if (filter.status) rows = rows.filter(row => row.status === filter.status);
+    const [clients, workers, photos] = await Promise.all([
+      storage.getClients(), storage.getWorkers(),
+      db.select().from(opportunityPhotos).orderBy(desc(opportunityPhotos.createdAt)),
+    ]);
+    return rows.map(row => ({
+      ...row,
+      clientName: clients.find(c => c.id === row.clientId)?.name ?? "Unknown client",
+      reporterName: workers.find(w => w.id === row.reportedByWorkerId)?.name ?? "Unknown staff member",
+      assigneeName: row.assignedToWorkerId ? workers.find(w => w.id === row.assignedToWorkerId)?.name ?? "Unassigned" : "Unassigned",
+      typeLabel: OPPORTUNITY_TYPE_LABELS[row.opportunityType as keyof typeof OPPORTUNITY_TYPE_LABELS] ?? row.opportunityType,
+      statusLabel: OPPORTUNITY_STATUS_LABELS[row.status as keyof typeof OPPORTUNITY_STATUS_LABELS] ?? row.status,
+      photos: photos.filter(photo => photo.opportunityId === row.id),
+    }));
+  }
 
   // Default deny for all business APIs. Exact public routes are intentionally
   // listed above; every other request needs a verified session before a route
@@ -388,6 +442,291 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (requestedVehicleId && assignment.vehicleId !== requestedVehicleId) return null;
     return assignment.vehicleId;
   };
+
+  // ── Additional opportunities: technician mobile workflow ──────────────────
+  app.get("/api/mobile/opportunities", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      if (!req.mobileWorker) return res.status(401).json({ message: "Technician session required" });
+      res.json(await opportunityRows({ reporterId: req.mobileWorker.id }));
+    } catch (error) {
+      console.error("Failed to load technician opportunities", error);
+      res.status(500).json({ message: "Unable to load your opportunities" });
+    }
+  });
+
+  app.post("/api/mobile/opportunities", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      if (!req.mobileWorker) return res.status(401).json({ message: "Technician session required" });
+      const input = opportunityInput.parse(req.body);
+      // The job is the authorization boundary for a mobile report. Derive the
+      // client from the technician's own/team-assigned work rather than
+      // trusting a client ID supplied by the handset.
+      const job = await getMobileJob(req.mobileWorker.id, input.sourceJobId);
+      if (!job) return res.status(403).json({ message: "This job is not assigned to you or your team" });
+      const client = await storage.getClient(job.clientId);
+      if (!client) return res.status(400).json({ message: "Selected client no longer exists" });
+
+      const [created] = await db.insert(opportunities).values({
+        clientId: job.clientId,
+        siteId: input.siteId || null,
+        sourceJobId: job.id,
+        reportedByWorkerId: req.mobileWorker.id,
+        opportunityType: input.opportunityType,
+        customType: input.customType?.trim() || null,
+        description: input.description.trim(),
+        urgency: input.urgency,
+        estimatedValue: input.estimatedValue == null ? null : String(input.estimatedValue),
+        status: "new",
+      }).returning();
+      if (input.photos.length) {
+        await db.insert(opportunityPhotos).values(input.photos.map(photo => ({
+          opportunityId: created.id,
+          fileUrl: photo.fileUrl,
+          fileName: photo.fileName || null,
+          uploadedByWorkerId: req.mobileWorker!.id,
+        })));
+      }
+      await storage.createNotification({
+        title: "New additional opportunity",
+        message: `${req.mobileWorker.name} reported ${OPPORTUNITY_TYPE_LABELS[input.opportunityType]} for ${client.name}.`,
+        type: "info",
+        priority: input.urgency === "urgent" ? "urgent" : input.urgency === "important" ? "high" : "medium",
+        relatedEntityType: "opportunity",
+        relatedEntityId: created.id,
+      } as any);
+      const [row] = await opportunityRows({ reporterId: req.mobileWorker.id }).then(rows => rows.filter(item => item.id === created.id));
+      res.status(201).json(row ?? created);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message ?? "Invalid opportunity" });
+      console.error("Failed to create opportunity", error);
+      res.status(500).json({ message: "Unable to submit the opportunity" });
+    }
+  });
+
+  // ── Additional opportunities: shared office workflow ──────────────────────
+  app.get("/api/opportunities/report/staff", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    try {
+      const [rows, workers] = await Promise.all([db.select().from(opportunities), storage.getWorkers()]);
+      const report = new Map<string, { workerId: string; workerName: string; generated: number; active: number; won: number; estimatedValue: number }>();
+      for (const row of rows) {
+        const current = report.get(row.reportedByWorkerId) ?? {
+          workerId: row.reportedByWorkerId,
+          workerName: workers.find(w => w.id === row.reportedByWorkerId)?.name ?? "Unknown staff member",
+          generated: 0, active: 0, won: 0, estimatedValue: 0,
+        };
+        current.generated++;
+        if (!["won", "lost", "not_applicable"].includes(row.status)) current.active++;
+        if (["won", "accepted", "job_created"].includes(row.status)) current.won++;
+        current.estimatedValue += Number(row.estimatedValue ?? 0);
+        report.set(row.reportedByWorkerId, current);
+      }
+      res.json([...report.values()].sort((a, b) => b.generated - a.generated || b.won - a.won));
+    } catch (error) {
+      console.error("Failed to build opportunity staff report", error);
+      res.status(500).json({ message: "Unable to load staff opportunity report" });
+    }
+  });
+
+  app.get("/api/opportunities/cross-sell", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    try {
+      const rows = await db.select().from(opportunities);
+      const byType = OPPORTUNITY_TYPES.map(type => {
+        const items = rows.filter(row => row.opportunityType === type);
+        return {
+          type,
+          label: OPPORTUNITY_TYPE_LABELS[type],
+          count: items.length,
+          active: items.filter(row => !["won", "lost", "not_applicable"].includes(row.status)).length,
+          won: items.filter(row => ["won", "accepted", "job_created"].includes(row.status)).length,
+          estimatedValue: items.reduce((total, row) => total + Number(row.estimatedValue ?? 0), 0),
+        };
+      }).filter(row => row.count > 0).sort((a, b) => b.count - a.count);
+      res.json(byType);
+    } catch (error) {
+      res.status(500).json({ message: "Unable to load cross-sell metrics" });
+    }
+  });
+
+  app.get("/api/opportunities", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    try {
+      res.json(await opportunityRows({
+        clientId: typeof req.query.clientId === "string" ? req.query.clientId : undefined,
+        jobId: typeof req.query.jobId === "string" ? req.query.jobId : undefined,
+        status: typeof req.query.status === "string" ? req.query.status : undefined,
+      }));
+    } catch (error) {
+      console.error("Failed to load opportunities", error);
+      res.status(500).json({ message: "Unable to load opportunities" });
+    }
+  });
+
+  app.get("/api/opportunities/:id", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    const row = (await opportunityRows()).find(item => item.id === req.params.id);
+    if (!row) return res.status(404).json({ message: "Opportunity not found" });
+    res.json(row);
+  });
+
+  app.patch("/api/opportunities/:id", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    try {
+      const [existing] = await db.select().from(opportunities).where(eq(opportunities.id, req.params.id));
+      if (!existing) return res.status(404).json({ message: "Opportunity not found" });
+      const update = z.object({
+        status: z.enum(OPPORTUNITY_STATUSES).optional(),
+        assignedToWorkerId: z.string().nullable().optional(),
+        estimatedValue: z.coerce.number().min(0).max(999999999).nullable().optional(),
+        lostReason: z.string().trim().max(1000).nullable().optional(),
+      }).parse(req.body);
+      if (update.assignedToWorkerId) {
+        const assignee = await storage.getWorker(update.assignedToWorkerId);
+        if (!assignee) return res.status(400).json({ message: "Assigned staff member was not found" });
+      }
+      if (update.status === "lost" && !update.lostReason?.trim() && !existing.lostReason) {
+        return res.status(400).json({ message: "Record a reason when marking an opportunity lost" });
+      }
+      const values: Record<string, any> = { updatedAt: new Date() };
+      if (update.status) values.status = update.status;
+      if ("assignedToWorkerId" in update) values.assignedToWorkerId = update.assignedToWorkerId || null;
+      if ("estimatedValue" in update) values.estimatedValue = update.estimatedValue == null ? null : String(update.estimatedValue);
+      if ("lostReason" in update) values.lostReason = update.lostReason?.trim() || null;
+      if (update.status === "won") values.wonAt = new Date();
+      const [updated] = await db.update(opportunities).set(values).where(eq(opportunities.id, existing.id)).returning();
+      res.json((await opportunityRows()).find(row => row.id === updated.id) ?? updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message ?? "Invalid update" });
+      console.error("Failed to update opportunity", error);
+      res.status(500).json({ message: "Unable to update opportunity" });
+    }
+  });
+
+  app.post("/api/opportunities/:id/create-quote", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Lock the opportunity so concurrent sales users cannot create two
+        // quotes before either request writes the quote relationship.
+        const [opportunity] = await tx.select().from(opportunities)
+          .where(eq(opportunities.id, req.params.id))
+          .for("update");
+        if (!opportunity) throw Object.assign(new Error("Opportunity not found"), { status: 404 });
+        if (opportunity.quoteId) throw Object.assign(new Error("This opportunity already has a linked quote"), { status: 409, quoteId: opportunity.quoteId });
+        if (!["new", "reviewing", "contact_client", "site_inspection_required", "quote_required"].includes(opportunity.status)) {
+          throw Object.assign(new Error("A quote can only be created from an active pre-quote opportunity"), { status: 409 });
+        }
+        const client = await storage.getClient(opportunity.clientId);
+        if (!client) throw Object.assign(new Error("Client no longer exists"), { status: 400 });
+        const serviceType = opportunity.opportunityType === "other" ? "other" : opportunity.opportunityType;
+        const year = new Date().getFullYear();
+        const [sequence] = await tx.insert(sequences)
+          .values({ type: "QT", year, lastSeq: 1 })
+          .onConflictDoUpdate({
+            target: [sequences.type, sequences.year],
+            set: { lastSeq: sql`${sequences.lastSeq} + 1` },
+          })
+          .returning({ lastSeq: sequences.lastSeq });
+        const quoteNumber = `QT-${year}-${String(sequence.lastSeq).padStart(4, "0")}`;
+        const [createdQuote] = await tx.insert(quoteSubmissions).values({
+          quoteNumber,
+          companyName: client.name,
+          contactPerson: client.contactPerson || "",
+          email: client.email || "",
+          phone: client.phone || "",
+          serviceType,
+          description: opportunity.description,
+          address: client.address || null,
+          preferredContactMethod: "either",
+          status: "quote_required",
+          assignedTo: opportunity.assignedToWorkerId || null,
+          quoteAmount: opportunity.estimatedValue ? String(opportunity.estimatedValue) : null,
+          clientId: client.id,
+          origination: "existing_client",
+          internalNotes: `Created from Additional Opportunity ${opportunity.id}`,
+        } as any).returning();
+        await tx.update(opportunities)
+          .set({ quoteId: createdQuote.id, status: "quote_required", updatedAt: new Date() })
+          .where(eq(opportunities.id, opportunity.id));
+        return { quote: createdQuote, opportunityId: opportunity.id };
+      });
+      res.status(201).json({ quoteId: result.quote.id, opportunityId: result.opportunityId });
+    } catch (error) {
+      if (error instanceof Error && (error as any).status) {
+        return res.status((error as any).status).json({ message: error.message, quoteId: (error as any).quoteId });
+      }
+      console.error("Failed to create quote from opportunity", error);
+      res.status(500).json({ message: "Unable to create a quote from this opportunity" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/opportunities", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    res.json(await opportunityRows({ clientId: req.params.clientId }));
+  });
+
+  app.get("/api/clients/:clientId/service-wallet", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    try {
+      const [rows, overrides, jobs, serviceContracts, rentalContracts] = await Promise.all([
+        db.select().from(opportunities).where(eq(opportunities.clientId, req.params.clientId)),
+        db.select().from(serviceWalletOverrides).where(eq(serviceWalletOverrides.clientId, req.params.clientId)),
+        storage.getJobs(),
+        storage.getServiceContracts(),
+        storage.getRentalContracts(),
+      ]);
+      const relatedJobs = jobs.filter(job => job.clientId === req.params.clientId && job.status !== "cancelled");
+      const relatedServiceContracts = serviceContracts.filter(contract => contract.clientId === req.params.clientId);
+      const relatedRentalContracts = rentalContracts.filter(contract => contract.clientId === req.params.clientId);
+      const matchesService = (rawType: string | null | undefined, walletType: string) => {
+        const value = String(rawType ?? "").toLowerCase().replace(/[\s-]+/g, "_");
+        if (!value) return false;
+        if (walletType === "washroom_hygiene") return value.includes("washroom") || value.includes("hygiene");
+        if (walletType === "water_pumps_tanks") return value.includes("water") || value.includes("pump") || value.includes("tank");
+        if (walletType === "general_maintenance") return value.includes("maintenance") || value.includes("repair");
+        if (walletType === "contract_cleaning") return value.includes("contract_clean") || value === "cleaning";
+        return value === walletType || value.includes(walletType.replace(/_/g, ""));
+      };
+      const wallet = OPPORTUNITY_TYPES.filter(type => type !== "other").map(type => {
+        const override = overrides.find(row => row.serviceType === type);
+        const opportunityHistory = rows.filter(row => row.opportunityType === type);
+        const matchingJobs = relatedJobs.filter(job => matchesService(job.serviceType, type) || matchesService((job as any).service, type));
+        const matchingServiceContracts = relatedServiceContracts.filter(contract => matchesService(contract.serviceType, type));
+        const matchingRentalContracts = relatedRentalContracts.filter(contract => matchesService(contract.serviceType, type));
+        const hasActiveExistingService =
+          matchingJobs.some(job => ["scheduled", "in_progress"].includes(job.status)) ||
+          matchingServiceContracts.some(contract => contract.activeStatus !== false) ||
+          matchingRentalContracts.some(contract => (contract as any).activeStatus !== false && (contract as any).isActive !== false);
+        const hasHistoricalService =
+          matchingJobs.length > 0 || matchingServiceContracts.length > 0 || matchingRentalContracts.length > 0;
+        const hasActiveOpportunity = opportunityHistory.some(row => ["accepted", "job_created", "won"].includes(row.status));
+        const state = override?.state ?? (
+          hasActiveExistingService || hasActiveOpportunity ? "active" :
+          hasHistoricalService || opportunityHistory.length ? "previously_used" : "never_used"
+        );
+        return { serviceType: type, label: OPPORTUNITY_TYPE_LABELS[type], state, source: override ? "manual" : "history" };
+      });
+      res.json(wallet);
+    } catch (error) {
+      res.status(500).json({ message: "Unable to load Service Wallet" });
+    }
+  });
+
+  app.patch("/api/clients/:clientId/service-wallet/:serviceType", async (req: AuthenticatedRequest, res) => {
+    if (!officeOpportunityManager(req)) return res.status(403).json({ message: "Sales or management access required" });
+    const state = z.enum(["active", "previously_used", "never_used"]).parse(req.body?.state);
+    if (!OPPORTUNITY_TYPES.includes(req.params.serviceType as any) || req.params.serviceType === "other") {
+      return res.status(400).json({ message: "Unknown Service Wallet service" });
+    }
+    await db.insert(serviceWalletOverrides).values({
+      clientId: req.params.clientId, serviceType: req.params.serviceType, state, updatedByUserId: req.user!.id,
+    }).onConflictDoUpdate({
+      target: [serviceWalletOverrides.clientId, serviceWalletOverrides.serviceType],
+      set: { state, updatedByUserId: req.user!.id, updatedAt: new Date() },
+    });
+    res.json({ serviceType: req.params.serviceType, state });
+  });
 
   app.get("/api/mobile/dashboard", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
@@ -2388,6 +2727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (e) { /* item failure shouldn't block invoice */ }
 
       await storage.updateJob(job.id, { invoiceStatus: "invoiced" } as any);
+      // An opportunity can either have created this job through its linked quote
+      // or have been reported directly while the job was being done. Mark both
+      // relationship paths as won when the job becomes an invoice.
+      await db.update(opportunities)
+        .set({ invoiceId: created.id, status: "won", wonAt: new Date(), updatedAt: new Date() })
+        .where(eq(opportunities.jobId, job.id));
 
       res.status(201).json(created);
     } catch (error) {
@@ -2416,9 +2761,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
         paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : undefined,
       };
+      if (invoiceData.linkedJobId) {
+        const linkedJob = await storage.getJob(invoiceData.linkedJobId);
+        if (!linkedJob || linkedJob.clientId !== invoiceData.clientId) {
+          return res.status(400).json({ error: "The linked job must belong to the invoice client" });
+        }
+      }
       
       const invoice = insertInvoiceSchema.parse(invoiceData);
       const created = await storage.createInvoice(invoice);
+      if ((created as any).linkedJobId) {
+        await db.update(opportunities)
+          .set({ invoiceId: created.id, status: "won", wonAt: new Date(), updatedAt: new Date() })
+          .where(eq(opportunities.jobId, (created as any).linkedJobId));
+      }
       res.status(201).json(created);
     } catch (error) {
       console.error("Invoice creation error:", error);
@@ -3587,6 +3943,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } as any);
           }
         }
+
+          // Keep the technician's original opportunity visible as it advances
+          // through the existing quote workflow. The quote remains the sales
+          // record of truth; this is a lightweight relationship/status mirror.
+          const opportunityStatusByLeadStatus: Record<string, string> = {
+            quote_required: "quote_required",
+            quoted: "quote_sent",
+            converted: "accepted",
+            lost: "lost",
+          };
+          const linkedStatus = opportunityStatusByLeadStatus[updateData.status];
+          if (linkedStatus) {
+            await db.update(opportunities)
+              .set({
+                status: linkedStatus,
+                lostReason: linkedStatus === "lost" ? ((updateData as any).lostReason ?? null) : undefined,
+                updatedAt: new Date(),
+              })
+              .where(eq(opportunities.quoteId, updated.id));
+          }
       }
 
       res.json(updated);
@@ -3736,6 +4112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } as any);
 
       await storage.updateQuoteSubmission(quote.id, { status: "converted", clientId });
+      await db.update(opportunities)
+        .set({ jobId: job.id, status: "job_created", updatedAt: new Date() })
+        .where(eq(opportunities.quoteId, quote.id));
       res.status(201).json({ job });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to convert quote to job", details: error.message });

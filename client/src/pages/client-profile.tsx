@@ -24,7 +24,7 @@ import {
   MessageSquare, FlaskConical, Package, FolderOpen, Plus, Trash2,
   ChevronDown, ChevronRight, Printer, TrendingUp, Users, Landmark,
   DollarSign, AlertCircle, CheckCircle2, Clock, Activity, MapPinned,
-  Star, Pencil,
+  Star, Pencil, Lightbulb,
 } from "lucide-react";
 import { ClientForm } from "@/components/forms/client-form";
 import ContractForm from "@/components/forms/contract-form";
@@ -59,6 +59,27 @@ type ExtendedClient = Client & {
 type Worker = {
   id: string; name: string; email?: string;
   role?: string; departmentId?: string;
+};
+
+type ClientOpportunity = {
+  id: string;
+  opportunityType: string;
+  typeLabel: string;
+  description: string;
+  urgency: string;
+  status: string;
+  statusLabel: string;
+  estimatedValue?: string | null;
+  reporterName: string;
+  createdAt: string;
+  photos: Array<{ id: string; fileUrl: string }>;
+};
+
+type ServiceWalletItem = {
+  serviceType: string;
+  label: string;
+  state: "active" | "previously_used" | "never_used";
+  source: "manual" | "history";
 };
 
 type ServiceContract = {
@@ -548,6 +569,16 @@ export default function ClientProfilePage() {
     queryFn: () => fetch(`/api/clients/${id}/summary`).then(r => r.json()),
     enabled: !!id,
   });
+  const { data: clientOpportunities = [] } = useQuery<ClientOpportunity[]>({
+    queryKey: ["/api/clients", id, "opportunities"],
+    queryFn: () => fetch(`/api/clients/${id}/opportunities`).then(r => r.ok ? r.json() : []),
+    enabled: !!id,
+  });
+  const { data: serviceWallet = [] } = useQuery<ServiceWalletItem[]>({
+    queryKey: ["/api/clients", id, "service-wallet"],
+    queryFn: () => fetch(`/api/clients/${id}/service-wallet`).then(r => r.ok ? r.json() : []),
+    enabled: !!id,
+  });
 
   const { data: clientActivityLogs = [] } = useQuery<ActivityLogEntry[]>({
     queryKey: ["/api/clients", id, "activity"],
@@ -908,6 +939,7 @@ export default function ClientProfilePage() {
               <TabsTrigger value="payments"><CreditCard className="mr-1 h-3.5 w-3.5" />Payments{payments.length > 0 && <CountBadge n={payments.length} />}</TabsTrigger>
               <TabsTrigger value="debtors"><DollarSign className="mr-1 h-3.5 w-3.5" />Debtors</TabsTrigger>
               <TabsTrigger value="documents"><FolderOpen className="mr-1 h-3.5 w-3.5" />Documents</TabsTrigger>
+              <TabsTrigger value="opportunities"><Lightbulb className="mr-1 h-3.5 w-3.5" />Opportunities{clientOpportunities.length > 0 && <CountBadge n={clientOpportunities.length} />}</TabsTrigger>
               <TabsTrigger value="activity"><Activity className="mr-1 h-3.5 w-3.5" />Activity{(commNotes.length + allLeadActivities.length) > 0 && <CountBadge n={commNotes.length + allLeadActivities.length} />}</TabsTrigger>
             </TabsList>
 
@@ -1069,6 +1101,49 @@ export default function ClientProfilePage() {
                   </CardContent>
                 </Card>
               )}
+            </TabsContent>
+
+            {/* ═══════════════════════ ADDITIONAL OPPORTUNITIES ═══════════════════════ */}
+            <TabsContent value="opportunities" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" />Service Wallet</CardTitle>
+                  <p className="text-xs text-muted-foreground">Services currently active or historically discussed for this client.</p>
+                </CardHeader>
+                <CardContent>
+                  {serviceWallet.length === 0 ? <p className="text-sm text-muted-foreground">No Service Wallet history yet.</p> : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {serviceWallet.map(item => (
+                        <div key={item.serviceType} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                          <span className="text-sm font-medium">{item.label}</span>
+                          <Badge className={item.state === "active" ? "bg-green-100 text-green-800 hover:bg-green-100" : item.state === "previously_used" ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : "bg-gray-100 text-gray-600 hover:bg-gray-100"}>
+                            {item.state === "active" ? "Active" : item.state === "previously_used" ? "Previously used" : "Not used"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" />Opportunity history</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {clientOpportunities.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">No additional opportunities have been reported for this client.</p> :
+                    clientOpportunities.map(item => (
+                      <article key={item.id} className="rounded-lg border p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div><p className="font-semibold text-sm">{item.typeLabel}</p><p className="text-xs text-muted-foreground">Reported by {item.reporterName} · {format(new Date(item.createdAt), "dd MMM yyyy")}</p></div>
+                          <div className="flex gap-1"><Badge variant="outline">{item.statusLabel}</Badge>{item.urgency !== "normal" && <Badge className={item.urgency === "urgent" ? "bg-red-100 text-red-700 hover:bg-red-100" : "bg-amber-100 text-amber-700 hover:bg-amber-100"}>{item.urgency}</Badge>}</div>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{item.description}</p>
+                        {item.estimatedValue && <p className="mt-2 text-xs font-medium text-green-700">Estimated value: R {Number(item.estimatedValue).toLocaleString("en-ZA")}</p>}
+                        {item.photos.length > 0 && <div className="mt-3 flex gap-2 overflow-x-auto">{item.photos.map(photo => <img key={photo.id} src={photo.fileUrl} alt="Opportunity evidence" className="h-16 w-20 rounded object-cover" />)}</div>}
+                      </article>
+                    ))}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* ═══════════════════════ 2. CONTACTS ══════════════════════════════ */}
