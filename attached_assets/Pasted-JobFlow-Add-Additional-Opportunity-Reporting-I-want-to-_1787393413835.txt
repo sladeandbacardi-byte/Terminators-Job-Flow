@@ -1,0 +1,613 @@
+JobFlow – Add “Additional Opportunity” Reporting
+
+I want to add a new feature to JobFlow called Additional Opportunities.
+
+The purpose is to allow a mobile technician or staff member who is already at a client's premises to quickly report another potential service, maintenance issue, or sales opportunity that they notice while doing their normal work.
+
+This must connect into the existing JobFlow structure and use the existing:
+
+- Clients
+- Jobs
+- Users
+- Leads / Sales
+- Quotes
+- Photos / attachments where available
+- Diary / scheduling
+- Notifications
+
+Do not create a completely separate standalone system.
+
+1. Mobile technician button
+
+On the mobile JobFlow screen, add a prominent button:
+
++ Report Opportunity
+
+Also add this button inside an active job:
+
++ Additional Opportunity
+
+When opened from an existing job, automatically populate:
+
+- Client
+- Client site/address
+- Current job
+- Technician/user
+- Date
+- Time
+
+Do not make the technician enter information JobFlow already knows.
+
+---
+
+2. Opportunity form
+
+Keep the mobile form extremely simple.
+
+Fields:
+
+Client
+
+Auto-populated when opened from a job.
+
+If opened from the main mobile screen, allow the user to search/select a client.
+
+Site
+
+Auto-populate from the client/job if available.
+
+Opportunity Type
+
+Dropdown:
+
+- Pest Control
+- Washroom Hygiene
+- Sanitary Bins
+- Deep Cleaning
+- Contract Cleaning
+- Plumbing
+- Electrical
+- Hand Dryer
+- Fly Machine
+- General Maintenance
+- Water / Pumps / Tanks
+- Waste
+- Access Control
+- CCTV / Security
+- Solar / Energy
+- Other
+
+If Other is selected, allow the user to type the service required.
+
+Description
+
+Simple text box:
+
+What did you notice?
+
+Example:
+
+«Ladies bathroom toilet continuously running and leaking into bowl.»
+
+Photo
+
+Allow the technician to:
+
+- Take a photo using phone camera
+- Upload an existing photo
+- Add multiple photos if necessary
+
+Photos must remain attached to the opportunity and later be visible from the quote/job/client history.
+
+Urgency
+
+Simple options:
+
+- Normal
+- Important
+- Urgent
+
+Submit
+
+Large button:
+
+Submit Opportunity
+
+The technician must be able to complete this form in less than approximately 30 seconds.
+
+---
+
+3. Automatic information
+
+When submitted automatically record:
+
+- Opportunity ID
+- Client ID
+- Client name
+- Site
+- Related Job ID if applicable
+- Reporting employee/user
+- Date reported
+- Time reported
+- Opportunity type
+- Description
+- Photos
+- Urgency
+- Status
+
+Initial status:
+
+New
+
+---
+
+4. Opportunity workflow
+
+Use the following statuses:
+
+New
+→ Reviewing
+→ Contact Client
+→ Site Inspection Required
+→ Quote Required
+→ Quote Sent
+→ Accepted
+→ Job Created
+→ Won
+→ Lost
+→ Not Applicable
+
+The admin/sales team must be able to change status.
+
+Use existing JobFlow quote and job functionality instead of creating duplicate systems.
+
+---
+
+5. Admin Opportunity Inbox
+
+Add an Opportunities page for admins and sales users.
+
+This should show cards or a clean table containing:
+
+- Date
+- Client
+- Site
+- Opportunity type
+- Description
+- Photo thumbnail
+- Reported by
+- Urgency
+- Status
+- Assigned salesperson
+- Quote number if converted
+- Potential value if known
+
+Filters:
+
+- New
+- Needs Action
+- Quoted
+- Won
+- Lost
+- Opportunity Type
+- Client
+- Reporting User
+- Salesperson
+- Date Range
+
+Default view should prioritise:
+
+1. Urgent opportunities
+2. New opportunities
+3. Opportunities waiting longest for action
+
+---
+
+6. Convert opportunity to quote
+
+Inside an opportunity add:
+
+Create Quote
+
+When clicked:
+
+Use the existing JobFlow quote system.
+
+Automatically transfer:
+
+- Client
+- Site
+- Description
+- Opportunity category
+- Photos
+- Original employee who reported it
+- Opportunity ID
+
+Do not require this information to be entered again.
+
+Once the quote is created:
+
+Opportunity status becomes:
+
+Quote Required or Quote Sent, depending on the existing quote workflow.
+
+Display:
+
+Quote #XXXX
+
+as a clickable link on the opportunity.
+
+---
+
+7. Convert accepted quote into job
+
+Use the existing JobFlow quote-to-job process.
+
+When the quote is accepted:
+
+Opportunity status should automatically update to:
+
+Accepted
+
+Once a job is generated:
+
+Job Created
+
+When the job is completed and/or invoiced:
+
+Won
+
+The opportunity should permanently retain links to:
+
+Opportunity
+→ Quote
+→ Job
+→ Invoice
+
+---
+
+8. Client profile integration
+
+Add an Opportunities section/tab to the existing Client Profile.
+
+Show:
+
+- Date
+- Opportunity
+- Reported by
+- Status
+- Quote
+- Job
+- Value
+- Outcome
+
+This becomes part of the client's permanent history.
+
+---
+
+9. Service Wallet
+
+Add a new section to the Client Profile called:
+
+Service Wallet
+
+This shows which Terminators services the customer currently buys and which services may still be opportunities.
+
+Example:
+
+Service| Current Customer| Opportunity
+Pest Control| Yes| 
+Washroom Hygiene| Yes| 
+Sanitary Bins| No| Add Opportunity
+Deep Cleaning| No| Add Opportunity
+Plumbing| No| Add Opportunity
+Electrical| No| Add Opportunity
+Maintenance| No| Add Opportunity
+Waste| No| Add Opportunity
+CCTV / Security| No| Add Opportunity
+Solar / Energy| No| Add Opportunity
+
+Where possible determine Current Customer = Yes automatically from active contracts, recurring jobs or services already linked to the client.
+
+Allow admin users to manually correct the setting if required.
+
+Do not delete historical services if a contract ends. Instead distinguish between:
+
+- Active
+- Previously Used
+- Never Used
+
+---
+
+10. Cross-sell dashboard
+
+On the Sales dashboard add a section:
+
+Cross-Sell Opportunities
+
+Examples:
+
+Pest clients without hygiene
+184 clients
+
+Hygiene clients without sanitary bins
+72 clients
+
+Commercial clients without deep cleaning
+97 clients
+
+Clients without plumbing
+215 clients
+
+Clients without electrical
+230 clients
+
+Each number must be clickable and open the relevant client list.
+
+This data should come from the Service Wallet and existing client contracts/jobs.
+
+---
+
+11. Technician recognition
+
+Track which employee originally identified every opportunity.
+
+Example:
+
+Reported by: Re-Althon
+
+If the opportunity results in a completed sale, record:
+
+- Reporter
+- Quote value
+- Sale value
+- Date won
+
+Add a simple report:
+
+Opportunities Generated by Staff
+
+Columns:
+
+- Employee
+- Opportunities reported
+- Quotes generated
+- Opportunities won
+- Sales value generated
+- Conversion %
+
+Do not create any automatic commission or financial payment at this stage.
+
+This is initially for recognition and performance measurement.
+
+---
+
+12. Notifications
+
+When a technician submits an opportunity:
+
+Send an in-app notification to the relevant admin/sales users:
+
+New Opportunity
+
+Example:
+
+«Re-Althon reported a Plumbing opportunity at ABC Engineering.»
+
+Include:
+
+- Client
+- Description
+- Photo
+- Open Opportunity button
+
+Urgent opportunities must display clearly as urgent.
+
+---
+
+13. Opportunity indicator on jobs
+
+When viewing a completed job, show:
+
+Additional Opportunities Identified: 2
+
+Allow admin to open them.
+
+This helps us see whether technicians are actively identifying additional customer needs.
+
+---
+
+14. Database
+
+Create proper database tables/relationships rather than storing this only in the frontend.
+
+Suggested structure:
+
+opportunities
+
+- id
+- client_id
+- site_id if applicable
+- source_job_id nullable
+- reported_by_user_id
+- assigned_to_user_id nullable
+- opportunity_type
+- custom_type nullable
+- description
+- urgency
+- status
+- estimated_value nullable
+- quote_id nullable
+- job_id nullable
+- invoice_id nullable
+- created_at
+- updated_at
+- won_at nullable
+- lost_reason nullable
+
+opportunity_photos
+
+- id
+- opportunity_id
+- file_url
+- uploaded_by
+- created_at
+
+Use existing users, clients, quotes, jobs and invoices tables wherever possible.
+
+Do not duplicate those entities.
+
+---
+
+15. Permissions
+
+Mobile technicians
+
+Can:
+
+- Create opportunity
+- Add photos
+- View opportunities they reported
+- View status
+
+Cannot:
+
+- Delete opportunity
+- Alter financial values
+- Mark opportunity Won
+- Create invoices
+
+Sales/Admin
+
+Can:
+
+- View all opportunities
+- Assign opportunities
+- Change status
+- Contact client
+- Create quote
+- Convert through normal workflow
+- Add estimated value
+- Record lost reason
+
+Managers
+
+Full access.
+
+---
+
+16. Mobile design
+
+This feature must work properly on Android mobile screens.
+
+The technician interface should be extremely simple.
+
+Preferred flow:
+
+Open Job
+→ Report Opportunity
+→ Select Type
+→ Take Photo
+→ Add short description
+→ Submit
+
+Avoid large modal windows that extend beyond the mobile viewport.
+
+Use a full-screen mobile form if necessary.
+
+Buttons must be large enough for easy touch use.
+
+---
+
+17. Example
+
+Technician Re-Althon is servicing pest control at:
+
+ABC Engineering
+
+While walking through the bathrooms he notices a leaking toilet.
+
+He opens:
+
++ Additional Opportunity
+
+Selects:
+
+Plumbing
+
+Takes photo.
+
+Types:
+
+«Ladies toilet cistern continuously running.»
+
+Presses:
+
+Submit Opportunity
+
+Admin sees:
+
+New Opportunity
+
+ABC Engineering
+
+Plumbing
+
+Reported by: Re-Althon
+
+«Ladies toilet cistern continuously running.»
+
+[Photo]
+
+Admin contacts customer.
+
+Customer requests quote.
+
+Admin presses:
+
+Create Quote
+
+Quote is accepted.
+
+Existing JobFlow flow creates plumbing job.
+
+Completed job is invoiced.
+
+Opportunity becomes:
+
+WON
+
+The client profile now permanently shows:
+
+Pest Control ✅
+Plumbing ✅ / Previously Used
+
+and the system records that Re-Althon generated the additional sale.
+
+---
+
+IMPORTANT DEVELOPMENT REQUIREMENTS
+
+Before changing the code:
+
+1. Inspect the existing JobFlow database schema.
+2. Reuse existing client, job, quote, invoice, user and attachment systems.
+3. Do not break existing functionality.
+4. Do not create duplicate client or quote systems.
+5. Add database migrations safely.
+6. Make this work with the existing PostgreSQL database.
+7. Ensure desktop and mobile layouts both work.
+8. Preserve the existing Terminators/JobFlow colour scheme and UI design.
+9. Keep the technician workflow extremely simple.
+10. After implementation, test the complete flow:
+
+Technician reports opportunity
+→ Admin receives it
+→ Admin opens it
+→ Quote created
+→ Quote accepted
+→ Job created
+→ Job completed
+→ Invoice linked
+→ Opportunity marked Won
+→ Client Service Wallet updated.
