@@ -1,0 +1,226 @@
+SIMPLIFY MOBILE OVERTIME LOGGING
+
+The mobile overtime screen is too complicated.
+
+Technicians must not need to select overtime type or calculate anything manually.
+
+Simplify the overtime form.
+
+MOBILE OVERTIME FORM
+
+The technician must only enter:
+
+1. Date
+2. Customer name
+3. Start time at customer site
+4. End time at customer site
+5. Notes, optional
+
+Remove or hide:
+- Client job dropdown
+- Overtime type dropdown
+- Related job dropdown as a required field
+- Any confusing extra fields
+
+Optional:
+If the technician opened overtime from a specific job, prefill:
+- Customer name
+- Job number
+- Site address
+
+But the technician must still be able to type the customer name manually if no job is selected.
+
+FORM LABELS
+
+Use these labels:
+
+Date
+
+Customer Name
+
+Start Time at Customer
+
+End Time at Customer
+
+Notes, optional
+
+Button:
+Submit Overtime
+
+OVERTIME CALCULATION
+
+Normal working hours are:
+
+08:00 to 16:00
+
+The app must calculate overtime automatically.
+
+Only time before 08:00 and after 16:00 counts as overtime.
+
+Examples:
+
+06:30 to 08:00
+= 1 hour 30 minutes overtime
+
+16:00 to 18:30
+= 2 hours 30 minutes overtime
+
+07:00 to 17:00
+= 2 hours overtime
+because:
+07:00 to 08:00 = 1 hour
+16:00 to 17:00 = 1 hour
+
+08:00 to 16:00
+= 0 overtime
+
+09:00 to 15:00
+= 0 overtime
+
+07:30 to 15:00
+= 30 minutes overtime
+
+15:00 to 17:30
+= 1 hour 30 minutes overtime
+
+VALIDATION
+
+Start time and end time are required.
+
+End time must be after start time.
+
+If calculated overtime is 0, allow the user to submit but show a warning:
+
+No overtime hours were calculated because the selected time falls within normal working hours.
+
+Then allow:
+- Cancel
+- Submit Anyway
+
+If the time is valid and overtime is calculated, show:
+
+Calculated overtime:
+X hours Y minutes
+
+SUBMISSION RECORD
+
+Each overtime entry must save:
+
+- Technician user ID
+- Technician name
+- Date
+- Customer name
+- Start time
+- End time
+- Calculated overtime minutes
+- Calculated overtime display, for example 1 hr 30 min
+- Notes
+- Linked job ID, optional
+- Linked job number, optional
+- Status: Submitted
+- Created at
+
+MY OVERTIME LIST
+
+Under My Overtime, show entries like this:
+
+Customer Name
+Date
+Start time - End time
+Overtime: X hr Y min
+Status: Submitted / Approved / Declined
+
+Example:
+
+Mutual Heights Office Park
+24 Aug 2026
+06:30 - 08:00
+Overtime: 1 hr 30 min
+Status: Submitted
+
+MANAGER APPROVAL VIEW
+
+In the manager/admin overtime approval page, show:
+
+- Technician
+- Date
+- Customer name
+- Start time
+- End time
+- Calculated overtime
+- Notes
+- Status
+- Approve button
+- Decline button
+
+Managers must not need to recalculate overtime manually.
+
+DESIGN
+
+Make the mobile overtime screen simple and clean.
+
+Layout:
+
+Overtime
+
+Total Overtime This Month
+X hr Y min
+
+Log Overtime
+
+Date
+[ date picker ]
+
+Customer Name
+[ text input ]
+
+Start Time at Customer
+[ time picker ]
+
+End Time at Customer
+[ time picker ]
+
+Calculated Overtime
+[ automatically calculated ]
+
+Notes
+[ optional text area ]
+
+[ Submit Overtime ]
+
+My Overtime
+
+Use the Job Flow / Terminators theme.
+Do not use green as the main theme colour unless it is a success state.
+Use the same red/black/white theme as the rest of the app.
+
+TESTING
+
+Test as mobile technician:
+
+1. Login as Reece.
+2. Open My Jobs > Overtime.
+3. Enter:
+Date: today
+Customer Name: Test Customer
+Start Time: 06:30
+End Time: 08:00
+
+Expected:
+Calculated overtime = 1 hr 30 min
+
+4. Submit.
+5. Confirm entry appears under My Overtime.
+6. Login as manager/admin.
+7. Confirm the submitted overtime appears in Overtime Approval.
+8. Approve it.
+9. Login as Reece again.
+10. Confirm status shows Approved.
+
+Also test:
+
+07:00 to 17:00 = 2 hr overtime
+08:00 to 16:00 = 0 overtime warning
+16:00 to 18:30 = 2 hr 30 min overtime
+
+END

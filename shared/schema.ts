@@ -246,8 +246,10 @@ export const overtimeEntries = pgTable("overtime_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   employeeId: varchar("employee_id").notNull(),
   workDate: text("work_date").notNull(), // YYYY-MM-DD
+  customerName: text("customer_name"),
   clientId: varchar("client_id"),        // nullable — internal overtime has no client
   jobId: varchar("job_id"),
+  jobNumber: text("job_number"),
   workType: text("work_type").notNull().default("client_job"), // OvertimeWorkType
   otherDescription: text("other_description"),
   startTime: text("start_time").notNull(), // HH:mm

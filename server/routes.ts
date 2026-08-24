@@ -280,8 +280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return {
         ...entry,
         employeeName: employee?.name ?? "Unknown employee",
-        clientName: client?.name ?? "Unknown client",
-        jobLabel: job ? (job.jobNumber || job.title) : null,
+        clientName: entry.customerName ?? client?.name ?? "",
+        jobLabel: entry.jobNumber ?? (job ? (job.jobNumber || job.title) : null),
       };
     });
   };
@@ -1146,49 +1146,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/mobile/overtime", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     const parsed = z.object({
       workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid work date"),
+      customerName: z.string().trim().min(1, "Enter a customer name").max(200),
       jobId: z.string().trim().min(1).optional().nullable(),
-      workType: z.enum(OVERTIME_WORK_TYPES).default("client_job"),
-      otherDescription: z.string().trim().optional().nullable(),
       startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
       finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
-      notes: z.string().trim().min(1, "Enter an overtime reason"),
-    }).superRefine((data, ctx) => {
-      if (data.workType === "other" && !data.otherDescription?.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherDescription"], message: 'Enter a description for "Other" work type' });
-      }
-      if (data.workType === "client_job" && !data.jobId) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["jobId"], message: "Select the related job for client overtime" });
-      }
+      notes: z.string().trim().optional().default(""),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
 
     const data = parsed.data;
     const breakdown = calculateOvertimeBreakdown(data.startTime, data.finishTime);
     if (breakdown === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
-    if (breakdown.totalMinutes === 0) {
-      return res.status(400).json({ error: "Overtime must be before 08:00 or after 16:00." });
-    }
-
     try {
       const job = data.jobId ? await getMobileJob(req.mobileWorker!.id, data.jobId) : null;
       if (data.jobId && !job) return res.status(403).json({ error: "This job is not assigned to you or your team" });
-      if (data.workType === "client_job" && !job) {
-        return res.status(400).json({ error: "Select the related job for client overtime" });
-      }
       await ensureOvertimeRelations(job?.clientId ?? null, job?.id ?? null);
       const [created] = await db.insert(overtimeEntries).values({
         employeeId: req.mobileWorker!.id,
         workDate: data.workDate,
+        customerName: data.customerName,
         clientId: job?.clientId ?? null,
         jobId: job?.id ?? null,
-        workType: data.workType,
-        otherDescription: data.otherDescription || null,
+        jobNumber: job?.jobNumber ?? null,
+        workType: "client_job",
         startTime: data.startTime,
         finishTime: data.finishTime,
         beforeHoursMinutes: breakdown.beforeMinutes,
         afterHoursMinutes: breakdown.afterMinutes,
         overtimeMinutes: breakdown.totalMinutes,
-        notes: data.notes,
+        notes: data.notes || "",
         status: "pending",
       }).returning();
       res.status(201).json((await enrichOvertimeEntries([created]))[0]);
@@ -1255,11 +1241,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await ensureOvertimeRelations(data.clientId, data.jobId);
       const entry = await db.transaction(async (tx) => {
+        const [client, job] = await Promise.all([
+          data.clientId ? storage.getClient(data.clientId) : null,
+          data.jobId ? storage.getJob(data.jobId) : null,
+        ]);
         const [created] = await tx.insert(overtimeEntries).values({
           employeeId: targetEmployeeId,
           workDate: data.workDate,
+          customerName: client?.name ?? null,
           clientId: data.clientId || null,
           jobId: data.jobId || null,
+          jobNumber: job?.jobNumber ?? null,
           workType: data.workType,
           otherDescription: data.otherDescription || null,
           startTime: data.startTime,

@@ -552,6 +552,14 @@ export async function runStartupMigrations(): Promise<void> {
     "overtime_entries.client_id nullable",
     `ALTER TABLE overtime_entries ALTER COLUMN client_id DROP NOT NULL`
   );
+  await run(
+    "overtime_entries.customer_name",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS customer_name text`
+  );
+  await run(
+    "overtime_entries.job_number",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS job_number text`
+  );
 
   // ── Additional opportunities ─────────────────────────────────────────────
   // These tables deliberately link to the existing client, worker, lead, job,
