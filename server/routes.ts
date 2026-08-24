@@ -89,6 +89,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "POST /api/mobile/fleet/issues",
       "GET /api/mobile/opportunities",
       "POST /api/mobile/opportunities",
+      "GET /api/mobile/overtime",
+      "POST /api/mobile/overtime",
     ].includes(signature)) {
       return true;
     }
@@ -1123,6 +1125,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Could not load employee overtime:", error);
       res.status(500).json({ error: "Could not load overtime entries" });
+    }
+  });
+
+  app.get("/api/mobile/overtime", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const entries = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.employeeId, req.mobileWorker!.id))
+        .orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt));
+      const enriched = await enrichOvertimeEntries(entries);
+      const pendingMinutes = entries.filter(entry => entry.status === "pending").reduce((total, entry) => total + entry.overtimeMinutes, 0);
+      const approvedMinutes = entries.filter(entry => entry.status === "approved").reduce((total, entry) => total + entry.overtimeMinutes, 0);
+      res.json({ entries: enriched, summary: { pendingMinutes, approvedMinutes } });
+    } catch (error) {
+      console.error("Could not load mobile overtime:", error);
+      res.status(500).json({ error: "Could not load overtime entries" });
+    }
+  });
+
+  app.post("/api/mobile/overtime", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const parsed = z.object({
+      workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid work date"),
+      jobId: z.string().trim().min(1).optional().nullable(),
+      workType: z.enum(OVERTIME_WORK_TYPES).default("client_job"),
+      otherDescription: z.string().trim().optional().nullable(),
+      startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
+      finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
+      notes: z.string().trim().min(1, "Enter an overtime reason"),
+    }).superRefine((data, ctx) => {
+      if (data.workType === "other" && !data.otherDescription?.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherDescription"], message: 'Enter a description for "Other" work type' });
+      }
+      if (data.workType === "client_job" && !data.jobId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["jobId"], message: "Select the related job for client overtime" });
+      }
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
+
+    const data = parsed.data;
+    const breakdown = calculateOvertimeBreakdown(data.startTime, data.finishTime);
+    if (breakdown === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (breakdown.totalMinutes === 0) {
+      return res.status(400).json({ error: "Overtime must be before 08:00 or after 16:00." });
+    }
+
+    try {
+      const job = data.jobId ? await getMobileJob(req.mobileWorker!.id, data.jobId) : null;
+      if (data.jobId && !job) return res.status(403).json({ error: "This job is not assigned to you or your team" });
+      if (data.workType === "client_job" && !job) {
+        return res.status(400).json({ error: "Select the related job for client overtime" });
+      }
+      await ensureOvertimeRelations(job?.clientId ?? null, job?.id ?? null);
+      const [created] = await db.insert(overtimeEntries).values({
+        employeeId: req.mobileWorker!.id,
+        workDate: data.workDate,
+        clientId: job?.clientId ?? null,
+        jobId: job?.id ?? null,
+        workType: data.workType,
+        otherDescription: data.otherDescription || null,
+        startTime: data.startTime,
+        finishTime: data.finishTime,
+        beforeHoursMinutes: breakdown.beforeMinutes,
+        afterHoursMinutes: breakdown.afterMinutes,
+        overtimeMinutes: breakdown.totalMinutes,
+        notes: data.notes,
+        status: "pending",
+      }).returning();
+      res.status(201).json((await enrichOvertimeEntries([created]))[0]);
+    } catch (error) {
+      console.error("Could not submit mobile overtime:", error);
+      res.status(500).json({ error: "Could not submit overtime" });
     }
   });
 

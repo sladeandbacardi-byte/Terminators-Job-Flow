@@ -1,0 +1,175 @@
+ADD OVERTIME TO MOBILE TECHNICIAN MENU
+
+The overtime feature exists but is not visible in the mobile technician navigation.
+
+Current routes:
+- My Overtime: /my-overtime
+- Overtime Approval: /overtime-approval
+
+Please add Overtime to the mobile technician menu.
+
+MOBILE TECHNICIAN MENU STRUCTURE
+
+For mobile users / technicians, show:
+
+SERVICE
+- Dashboard
+- My Jobs
+  - Today’s Jobs
+  - My Week
+  - Overtime
+- Field Diaries
+- Calendar, optional read-only
+
+FLEET GUARD
+- Report Issue
+- Log KMs
+- Vehicle Inspection
+- Fuel Fill-up
+
+OVERTIME MENU ITEM
+
+Add a nested menu item under My Jobs:
+
+Overtime
+
+This must link to:
+
+/my-overtime
+
+Label:
+Overtime
+
+Optional helper text:
+View and log overtime
+
+MOBILE OVERTIME PAGE
+
+The /my-overtime page must allow the logged-in technician to:
+
+1. View their overtime entries
+2. Add a new overtime entry
+3. See approval status
+4. See total overtime hours for selected period
+
+Fields for new overtime entry:
+
+- Date
+- Start time
+- End time
+- Job, optional but preferred
+- Reason / notes
+- Calculated overtime hours
+- Status
+
+Status options:
+- Submitted
+- Approved
+- Declined
+
+OVERTIME VALIDATION RULES
+
+Only allow valid overtime:
+
+Normal working hours:
+08:00 to 16:00
+
+Overtime is only valid:
+- before 08:00
+- after 16:00
+
+If the user enters time inside normal working hours, show:
+
+Overtime must be before 08:00 or after 16:00.
+
+Allow split calculation if needed.
+
+Examples:
+
+06:30 to 08:00 = 1.5 hours overtime
+16:00 to 18:30 = 2.5 hours overtime
+07:00 to 17:00 = 3 hours overtime
+because 07:00-08:00 and 16:00-17:00 are overtime
+
+Do not count 08:00 to 16:00 as overtime.
+
+JOB LINKING
+
+From a job detail page, keep the button:
+
+Log Overtime
+
+When clicked, open /my-overtime or overtime form with the job preselected.
+
+The overtime record should store:
+- technician/user ID
+- technician name
+- job ID if selected
+- job number if selected
+- client name if linked to job
+- date
+- start time
+- end time
+- calculated overtime hours
+- reason/notes
+- approval status
+
+MANAGER / ADMIN VIEW
+
+Managers/admins should still use:
+
+/overtime-approval
+
+This should show submitted overtime entries for approval.
+
+Managers/admins can:
+- View overtime by technician
+- View overtime by date range
+- View overtime by job/client
+- Approve overtime
+- Decline overtime
+- Add approval notes
+
+DASHBOARD SUMMARY
+
+On the mobile technician dashboard, optionally add a small Overtime summary card:
+
+Overtime This Month
+X hours
+Y pending approval
+
+This card should link to /my-overtime.
+
+PERMISSIONS
+
+Technicians:
+Can view and submit their own overtime only.
+
+Service Manager / Operations / HR / Admin:
+Can view and approve overtime.
+
+Finance:
+Can view approved overtime if needed for payroll.
+
+TESTING
+
+Test as mobile technician:
+
+1. Login as Reece.
+2. Open mobile menu.
+3. Expand My Jobs.
+4. Confirm Overtime is visible.
+5. Click Overtime.
+6. Confirm /my-overtime opens.
+7. Add overtime before 08:00.
+8. Add overtime after 16:00.
+9. Try adding overtime inside 08:00 to 16:00 and confirm it is rejected.
+10. Open a job and click Log Overtime.
+11. Confirm the job is preselected.
+12. Submit overtime.
+13. Login as Service Manager/Admin.
+14. Open /overtime-approval.
+15. Approve or decline the overtime.
+16. Confirm technician sees updated status.
+
+END

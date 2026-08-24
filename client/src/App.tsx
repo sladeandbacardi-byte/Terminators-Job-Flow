@@ -66,6 +66,7 @@ const AcceptedWork        = lazy(() => import("@/pages/accepted-work"));
 const SalesReports        = lazy(() => import("@/pages/sales-reports"));
 const EquipmentChecklists = lazy(() => import("@/pages/equipment-checklists"));
 const MyOvertime          = lazy(() => import("@/pages/my-overtime"));
+const MobileOvertime      = lazy(() => import("@/components/mobile/mobile-overtime"));
 const OvertimeApproval    = lazy(() => import("@/pages/overtime-approval"));
 const Opportunities       = lazy(() => import("@/pages/opportunities"));
 
@@ -130,6 +131,16 @@ function AuthenticatedApp() {
     return (
       <Suspense fallback={<PageLoader />}>
         <Mobile />
+      </Suspense>
+    );
+  }
+
+  // Mobile technicians use a separate signed token and must be able to follow
+  // the shared overtime URL without being sent through the office login flow.
+  if (location === "/my-overtime" && localStorage.getItem("mobile_session_token") && !isAuthenticated) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <MobileOvertime />
       </Suspense>
     );
   }
