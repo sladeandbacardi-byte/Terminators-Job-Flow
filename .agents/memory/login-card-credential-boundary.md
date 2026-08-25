@@ -3,8 +3,8 @@ name: Login card credential boundary
 description: Keeps the card-based login experience compatible with the project's separate mobile and administrator authentication policies.
 ---
 
-Login identity cards may help a person select the correct account, but selecting a card must never itself create an authenticated session. Administrators must still supply their password. Technician PIN verification is temporarily disabled at the user's request because the original PINs are unavailable; active mobile technicians currently sign in with their employee ID and receive the short-lived mobile token.
+The login chooser runs in `quickLogin` mode: selecting an active mobile technician or office profile immediately creates the appropriate signed session. The protected administrator account remains password-gated. Sheryl-Lyn Lee is intentionally an office/sales profile, not a separate mobile technician login.
 
-**Why:** The product wants a fast, visual role-and-user selector, while privileged office access needs auditable credential verification. The temporary technician exception keeps field work moving until a PIN reset process is available.
+**Why:** The product wants one-click access for day-to-day staff and office profiles, while the protected administrator account still needs credential verification. Keeping Sheryl-Lyn out of the technician list avoids a duplicate identity with the wrong dashboard.
 
-**How to apply:** When changing login discovery, routing, or card UI, expose only non-sensitive display data. Keep administrator token issuance behind password verification. Restore technician PIN verification once replacement PINs have been issued.
+**How to apply:** When changing login discovery, routing, or card UI, expose only non-sensitive display data and preserve the `authMode` switch for future PIN/password screens. Keep protected administrator token issuance behind password verification. Do not add Sheryl-Lyn to the mobile technician directory without an explicit role change.
