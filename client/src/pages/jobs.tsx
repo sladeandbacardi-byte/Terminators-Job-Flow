@@ -122,12 +122,17 @@ export default function Jobs() {
   const { data: teamMembers = [] } = useQuery<TeamMember[]>({ queryKey: ['/api/team-members'] });
   const { data: quoteSubmissions = [] } = useQuery<QuoteSubmission[]>({ queryKey: ['/api/quote-submissions'] });
   const { data: serviceContracts = [] } = useQuery<any[]>({ queryKey: ['/api/service-contracts'] });
+  const { data: treatmentReports = [] } = useQuery<any[]>({
+    queryKey: ['/api/treatment-reports'],
+    enabled: role === "admin" || role === "manager" || role === "coordinator",
+  });
 
   const quoteMap = useMemo(() => new Map(quoteSubmissions.map(q => [q.id, q])), [quoteSubmissions]);
   const contractMap = useMemo(() => new Map(serviceContracts.map((c: any) => [c.id, c])), [serviceContracts]);
   const workerMap = useMemo(() => new Map(workers.map(w => [w.id, w])), [workers]);
   const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
   const departmentMap = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments]);
+  const treatmentReportByJob = useMemo(() => new Map(treatmentReports.filter(report => report.jobId).map(report => [report.jobId, report])), [treatmentReports]);
 
   // worker -> set of team ids (workers can be in multiple teams)
   const workerTeamsMap = useMemo(() => {
@@ -689,6 +694,13 @@ export default function Jobs() {
                               </Badge>
                             )}
                             <div className="flex gap-1">
+                              {job.status === "completed" && treatmentReportByJob.get(job.id) && (
+                                <Link href={`/treatment-reports/${treatmentReportByJob.get(job.id).id}/print`} target="_blank">
+                                  <Button size="sm" variant="outline" title="Open completed treatment report">
+                                    <FileSignature className="h-3 w-3 mr-1" />Treatment Report
+                                  </Button>
+                                </Link>
+                              )}
                               {/* Conversion actions on completed jobs — only for invoicing roles */}
                               {canInvoice && job.status === 'completed' && (job.invoiceStatus ?? 'not_invoiced') === 'not_invoiced' && (
                                 <Button

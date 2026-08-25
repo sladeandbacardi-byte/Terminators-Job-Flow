@@ -622,5 +622,146 @@ export async function runStartupMigrations(): Promise<void> {
      CREATE UNIQUE INDEX IF NOT EXISTS service_wallet_overrides_client_service_idx ON service_wallet_overrides (client_id, service_type)`
   );
 
+  // ── Digital Pest Control Treatment Reports ────────────────────────────────
+  // Keep the long-standing treatment_reports table intact while ensuring a
+  // fresh database gets a safe baseline before the structured child records.
+  await run(
+    "treatment_reports table",
+    `CREATE TABLE IF NOT EXISTS treatment_reports (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id varchar NOT NULL,
+      job_id varchar,
+      contract_id varchar,
+      technician_id varchar,
+      technician_name text,
+      report_date text NOT NULL,
+      report_number text,
+      service_type text,
+      pest_type text,
+      treatment_type text,
+      site_area text,
+      chemicals_used text,
+      quantity_used text,
+      batch_number text,
+      active_ingredient text,
+      treatment_notes text,
+      recommendations text,
+      follow_up_required boolean DEFAULT false,
+      follow_up_date text,
+      customer_name text,
+      customer_signature text,
+      technician_signature text,
+      status text DEFAULT 'completed',
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run("workers.pco_registration_number", `ALTER TABLE workers ADD COLUMN IF NOT EXISTS pco_registration_number text`);
+  await run(
+    "treatment_reports digital columns",
+    `ALTER TABLE treatment_reports
+      ADD COLUMN IF NOT EXISTS trading_name text,
+      ADD COLUMN IF NOT EXISTS site_address text,
+      ADD COLUMN IF NOT EXISTS job_number text,
+      ADD COLUMN IF NOT EXISTS contract_number text,
+      ADD COLUMN IF NOT EXISTS salesperson_name text,
+      ADD COLUMN IF NOT EXISTS pco_registration_number text,
+      ADD COLUMN IF NOT EXISTS start_time timestamp,
+      ADD COLUMN IF NOT EXISTS finish_time timestamp,
+      ADD COLUMN IF NOT EXISTS time_on_site_minutes integer,
+      ADD COLUMN IF NOT EXISTS cleanliness_assessment text,
+      ADD COLUMN IF NOT EXISTS cleanliness_comments text,
+      ADD COLUMN IF NOT EXISTS no_product_used boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS recommendation_choices text,
+      ADD COLUMN IF NOT EXISTS other_recommendation_details text,
+      ADD COLUMN IF NOT EXISTS signature_unavailable boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS signature_unavailable_reason text,
+      ADD COLUMN IF NOT EXISTS action_required boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS action_reason text,
+      ADD COLUMN IF NOT EXISTS pdf_url text,
+      ADD COLUMN IF NOT EXISTS pdf_generated_at timestamp,
+      ADD COLUMN IF NOT EXISTS completed_at timestamp,
+      ADD COLUMN IF NOT EXISTS completed_by_worker_id varchar`
+  );
+  await run(
+    "pest_control_products table",
+    `CREATE TABLE IF NOT EXISTS pest_control_products (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text NOT NULL,
+      formulation text NOT NULL,
+      registration_number text,
+      default_unit text NOT NULL,
+      is_active boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`
+  );
+  await run(
+    "treatment report child tables",
+    `CREATE TABLE IF NOT EXISTS treatment_report_areas (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, area text NOT NULL, other_description text
+     );
+     CREATE TABLE IF NOT EXISTS treatment_report_pests (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, pest_type text NOT NULL, infestation_level text NOT NULL, other_description text
+     );
+     CREATE TABLE IF NOT EXISTS treatment_report_equipment (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, equipment_type text NOT NULL, quantity integer NOT NULL DEFAULT 1, product_type text, notes text
+     );
+     CREATE TABLE IF NOT EXISTS treatment_report_products (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, product_id varchar, product_name text NOT NULL, formulation text, registration_number text, unit text NOT NULL, quantity_used text NOT NULL, mixture_dilution text
+     );
+     CREATE TABLE IF NOT EXISTS treatment_report_photos (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, file_url text NOT NULL, file_name text, uploaded_by_worker_id varchar, created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS treatment_report_audits (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, actor_id varchar, actor_name text NOT NULL, action text NOT NULL, field_name text, previous_value text, next_value text, created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS treatment_report_follow_ups (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), report_id varchar NOT NULL, client_id varchar NOT NULL, job_id varchar, reason text NOT NULL, recommendation text, identified_date text NOT NULL, assigned_worker_id varchar, status text NOT NULL DEFAULT 'open', created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now()
+     )`
+  );
+  await run(
+    "treatment report lookup indexes",
+    `CREATE UNIQUE INDEX IF NOT EXISTS pest_control_products_name_key ON pest_control_products (name);
+     CREATE INDEX IF NOT EXISTS treatment_reports_client_date_idx ON treatment_reports (client_id, report_date DESC);
+     CREATE INDEX IF NOT EXISTS treatment_reports_job_idx ON treatment_reports (job_id);
+     CREATE INDEX IF NOT EXISTS treatment_report_areas_report_idx ON treatment_report_areas (report_id);
+     CREATE INDEX IF NOT EXISTS treatment_report_pests_report_idx ON treatment_report_pests (report_id);
+     CREATE INDEX IF NOT EXISTS treatment_report_equipment_report_idx ON treatment_report_equipment (report_id);
+     CREATE INDEX IF NOT EXISTS treatment_report_products_report_idx ON treatment_report_products (report_id);
+     CREATE INDEX IF NOT EXISTS treatment_report_photos_report_idx ON treatment_report_photos (report_id);
+     CREATE INDEX IF NOT EXISTS treatment_report_audits_report_idx ON treatment_report_audits (report_id, created_at DESC);
+     CREATE INDEX IF NOT EXISTS treatment_report_followups_report_idx ON treatment_report_follow_ups (report_id, status)`
+  );
+  await run(
+    "seed pest control product library",
+    `INSERT INTO pest_control_products (name, formulation, registration_number, default_unit) VALUES
+      ('Ultrakill Crack & Crevice', 'Aerosol', 'L4598', 'ml'),
+      ('Nuvan Profi', 'Aerosol', 'L1301', 'ml'),
+      ('Avistelspuit', 'Aerosol', 'L4003', 'ml'),
+      ('Maxforce Quantum Ant', 'Gel', 'L8460', 'g'),
+      ('Ultrakill RoachForce', 'Gel', 'L8652', 'ml'),
+      ('Proroach Gel', 'Gel', NULL, 'g'),
+      ('Maxforce Ant', 'Granules', 'L5658', 'g'),
+      ('Snail Bait', 'Granules', 'L70096', 'g'),
+      ('Deltakill CS', 'Liquid', 'L9528', 'ml'),
+      ('Dorine EC', 'Liquid', 'L4913', 'ml'),
+      ('Fendona', 'Liquid', 'L5678', 'ml'),
+      ('Thermidor 25 EC', 'Liquid', 'L6616', 'ml'),
+      ('Rodex Liquid Concentrate', 'Liquid', 'L9290', 'ml'),
+      ('Rossi 200 Super', 'Liquid', 'L8376', 'ml'),
+      ('Tobaccoguard', 'Liquid', 'L4619', 'ml'),
+      ('Promethrin', 'Liquid', 'L10291', 'ml'),
+      ('Racumin Tracking', 'Powder', 'L2800', 'ml'),
+      ('Roach Dust', 'Powder', 'L4567', 'ml'),
+      ('Tomcat Blox', 'Wax Blocks', 'L5524', 'blocks'),
+      ('Ultrakill Blox', 'Wax Blocks', 'L9739', 'blocks'),
+      ('Non Toxic Blocks', 'Wax Blocks', '-', 'blocks'),
+      ('Jaguar Blox', 'Wax Blocks', 'L8259', 'blocks'),
+      ('Racumin Wax Blocks', 'Wax Blocks', 'L8465', 'blocks'),
+      ('Delta 7 WP', 'WP', 'L8605', 'ml')
+     ON CONFLICT (name) DO NOTHING`
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

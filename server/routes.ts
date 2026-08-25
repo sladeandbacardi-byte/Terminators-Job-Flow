@@ -37,6 +37,19 @@ import {
   serviceWalletOverrides,
   quoteSubmissions,
   sequences,
+   jobs,
+   workers,
+   emailLogs,
+   treatmentReports,
+   pestControlProducts,
+   treatmentReportAreas,
+   treatmentReportPests,
+   treatmentReportEquipment,
+   treatmentReportProducts,
+   treatmentReportPhotos,
+   treatmentReportAudits,
+   treatmentReportFollowUps,
+   insertPestControlProductSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -89,6 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "POST /api/mobile/fleet/issues",
       "GET /api/mobile/opportunities",
       "POST /api/mobile/opportunities",
+      "GET /api/mobile/pest-control-products",
       "GET /api/mobile/overtime",
       "POST /api/mobile/overtime",
     ].includes(signature)) {
@@ -97,6 +111,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return (
       (method === "GET" && /^\/api\/mobile\/work-orders\/[^/]+$/.test(path)) ||
       (method === "PATCH" && /^\/api\/mobile\/jobs\/[^/]+\/status$/.test(path)) ||
+      (method === "GET" && /^\/api\/mobile\/treatment-reports\/[^/]+$/.test(path)) ||
+      (method === "PATCH" && /^\/api\/mobile\/treatment-reports\/[^/]+\/draft$/.test(path)) ||
+      (method === "POST" && /^\/api\/mobile\/treatment-reports\/[^/]+\/complete$/.test(path)) ||
       (method === "DELETE" && /^\/api\/mobile\/field-diaries\/[^/]+$/.test(path)) ||
       (method === "DELETE" && /^\/api\/mobile\/fleet\/issues\/[^/]+$/.test(path))
     );
@@ -144,6 +161,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
       photos: photos.filter(photo => photo.opportunityId === row.id),
     }));
   }
+
+  const TREATMENT_TYPES = ["once_off", "contract", "service", "follow_up"] as const;
+  const CLEANLINESS_LEVELS = ["all_ok", "good", "fair", "needs_attention", "major_problem"] as const;
+  const INFESTATION_LEVELS = ["none", "light", "medium", "heavy"] as const;
+  const ACTION_RECOMMENDATIONS = new Set([
+    "follow_up_treatment", "proofing", "additional_bait_stations",
+    "additional_treatment", "customer_quotation", "sales_follow_up",
+  ]);
+  const treatmentReportInput = z.object({
+    treatmentType: z.enum(TREATMENT_TYPES).optional(),
+    areas: z.array(z.object({
+      area: z.enum(["total_area", "offices", "warehouse", "perimeter", "other"]),
+      otherDescription: z.string().trim().max(500).optional().nullable(),
+    })).max(8).default([]),
+    pests: z.array(z.object({
+      pestType: z.enum(["cockroaches", "rodents", "ants", "fleas", "bird_lice", "thatch_beetle", "borer_beetle", "fishmoths", "flies", "other"]),
+      infestationLevel: z.enum(INFESTATION_LEVELS).optional(),
+      otherDescription: z.string().trim().max(300).optional().nullable(),
+    })).max(12).default([]),
+    cleanlinessAssessment: z.enum(CLEANLINESS_LEVELS).optional(),
+    cleanlinessComments: z.string().trim().max(5000).optional().nullable(),
+    equipment: z.array(z.object({
+      equipmentType: z.string().trim().min(1).max(200),
+      quantity: z.coerce.number().int().min(1).max(9999).default(1),
+      productType: z.string().trim().max(300).optional().nullable(),
+      notes: z.string().trim().max(2000).optional().nullable(),
+    })).max(50).default([]),
+    products: z.array(z.object({
+      productId: z.string().min(1),
+      quantityUsed: z.string().trim().min(1).max(100),
+      mixtureDilution: z.string().trim().max(500).optional().nullable(),
+    })).max(50).default([]),
+    noProductUsed: z.boolean().default(false),
+    recommendationChoices: z.array(z.string().trim().min(1).max(100)).max(15).default([]),
+    otherRecommendationDetails: z.string().trim().max(3000).optional().nullable(),
+    treatmentNotes: z.string().trim().max(5000).optional().nullable(),
+    customerName: z.string().trim().max(200).optional().nullable(),
+    customerSignature: z.string().startsWith("data:image/").max(2_500_000).optional().nullable(),
+    signatureUnavailable: z.boolean().default(false),
+    signatureUnavailableReason: z.string().trim().max(500).optional().nullable(),
+    photos: z.array(z.object({
+      fileUrl: z.string().startsWith("data:image/").max(3_000_000),
+      fileName: z.string().trim().max(255).optional().nullable(),
+    })).max(6).default([]),
+  });
+
+  const isPestControlJob = (job: any) =>
+    String(job?.departmentId ?? "") === "div-1" ||
+    /pest|fumig|rodent|cockroach/i.test(`${job?.serviceType ?? ""} ${job?.service ?? ""}`);
+
+  const officeTreatmentManager = (req: AuthenticatedRequest) =>
+    req.user?.authenticationMethod !== "profile_picker" &&
+    ["admin", "superadmin", "manager", "coordinator"].includes(String(req.user?.role ?? "").toLowerCase());
+
+  const reportCompletionErrors = (input: z.infer<typeof treatmentReportInput>) => {
+    const errors: string[] = [];
+    if (!input.treatmentType) errors.push("Select a treatment type");
+    if (!input.areas.length) errors.push("Select at least one area treated");
+    if (input.areas.some(area => area.area === "other" && !area.otherDescription?.trim())) errors.push("Describe the other treated area");
+    if (!input.pests.length) errors.push("Select at least one pest type");
+    if (input.pests.some(pest => !pest.infestationLevel)) errors.push("Record an infestation level for every pest");
+    if (input.pests.some(pest => pest.pestType === "other" && !pest.otherDescription?.trim())) errors.push("Name the other pest type");
+    if (!input.cleanlinessAssessment) errors.push("Select a cleanliness assessment");
+    if (["fair", "needs_attention", "major_problem"].includes(input.cleanlinessAssessment ?? "") && !input.cleanlinessComments?.trim()) {
+      errors.push("Add cleanliness details for this assessment");
+    }
+    if (!input.noProductUsed && !input.products.length) errors.push("Add a product used or confirm that no product was used");
+    if (input.noProductUsed && input.products.length) errors.push("Choose either products used or no product used");
+    if (!input.customerSignature && !(input.signatureUnavailable && input.signatureUnavailableReason?.trim())) {
+      errors.push("Capture a client signature or record why it could not be obtained");
+    }
+    return errors;
+  };
+
+  const actionReasonFor = (input: z.infer<typeof treatmentReportInput>) => {
+    const reasons: string[] = [];
+    if (["needs_attention", "major_problem"].includes(input.cleanlinessAssessment ?? "")) reasons.push("Premises cleanliness requires attention");
+    for (const choice of input.recommendationChoices) {
+      if (ACTION_RECOMMENDATIONS.has(choice)) reasons.push(choice.replaceAll("_", " "));
+    }
+    return reasons;
+  };
+
+  const treatmentReportDetail = async (id: string) => {
+    const [report] = await db.select().from(treatmentReports).where(eq(treatmentReports.id, id));
+    if (!report) return undefined;
+    const [areas, pests, equipment, products, photos, followUps, audits] = await Promise.all([
+      db.select().from(treatmentReportAreas).where(eq(treatmentReportAreas.reportId, id)),
+      db.select().from(treatmentReportPests).where(eq(treatmentReportPests.reportId, id)),
+      db.select().from(treatmentReportEquipment).where(eq(treatmentReportEquipment.reportId, id)),
+      db.select().from(treatmentReportProducts).where(eq(treatmentReportProducts.reportId, id)),
+      db.select().from(treatmentReportPhotos).where(eq(treatmentReportPhotos.reportId, id)),
+      db.select().from(treatmentReportFollowUps).where(eq(treatmentReportFollowUps.reportId, id)),
+      db.select().from(treatmentReportAudits).where(eq(treatmentReportAudits.reportId, id)).orderBy(desc(treatmentReportAudits.createdAt)),
+    ]);
+    return { ...report, areas, pests, equipment, products, photos, followUps, audits };
+  };
+
+  const replaceTreatmentReportChildren = async (
+    executor: any,
+    reportId: string,
+    input: z.infer<typeof treatmentReportInput>,
+    workerId: string,
+  ) => {
+    const products = input.products.length
+      ? await executor.select().from(pestControlProducts)
+      : [];
+    const selectedProducts = new Map(products.filter((product: any) => product.isActive).map((product: any) => [product.id, product]));
+    for (const product of input.products) {
+      if (!selectedProducts.get(product.productId)) throw Object.assign(new Error("A selected product is no longer available"), { status: 400 });
+    }
+    await Promise.all([
+      executor.delete(treatmentReportAreas).where(eq(treatmentReportAreas.reportId, reportId)),
+      executor.delete(treatmentReportPests).where(eq(treatmentReportPests.reportId, reportId)),
+      executor.delete(treatmentReportEquipment).where(eq(treatmentReportEquipment.reportId, reportId)),
+      executor.delete(treatmentReportProducts).where(eq(treatmentReportProducts.reportId, reportId)),
+      executor.delete(treatmentReportPhotos).where(eq(treatmentReportPhotos.reportId, reportId)),
+    ]);
+    if (input.areas.length) await executor.insert(treatmentReportAreas).values(input.areas.map(area => ({
+      reportId, area: area.area, otherDescription: area.otherDescription?.trim() || null,
+    })));
+    if (input.pests.length) await executor.insert(treatmentReportPests).values(input.pests.map(pest => ({
+      reportId, pestType: pest.pestType, infestationLevel: pest.infestationLevel || "none",
+      otherDescription: pest.otherDescription?.trim() || null,
+    })));
+    if (input.equipment.length) await executor.insert(treatmentReportEquipment).values(input.equipment.map(item => ({
+      reportId, equipmentType: item.equipmentType, quantity: item.quantity,
+      productType: item.productType?.trim() || null, notes: item.notes?.trim() || null,
+    })));
+    if (input.products.length) await executor.insert(treatmentReportProducts).values(input.products.map(item => {
+      const product: any = selectedProducts.get(item.productId);
+      return {
+        reportId, productId: product.id, productName: product.name, formulation: product.formulation,
+        registrationNumber: product.registrationNumber, unit: product.defaultUnit,
+        quantityUsed: item.quantityUsed, mixtureDilution: item.mixtureDilution?.trim() || null,
+      };
+    }));
+    if (input.photos.length) await executor.insert(treatmentReportPhotos).values(input.photos.map(photo => ({
+      reportId, fileUrl: photo.fileUrl, fileName: photo.fileName?.trim() || null, uploadedByWorkerId: workerId,
+    })));
+  };
 
   // Default deny for all business APIs. Exact public routes are intentionally
   // listed above; every other request needs a verified session before a route
@@ -826,6 +984,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(items);
   });
 
+  app.get("/api/mobile/pest-control-products", requireMobileTechnician, async (_req: MobileAuthenticatedRequest, res) => {
+    try {
+      res.json(await db.select().from(pestControlProducts).where(eq(pestControlProducts.isActive, true)).orderBy(pestControlProducts.name));
+    } catch (error) {
+      console.error("Unable to load Pest Control products", error);
+      res.status(500).json({ message: "Unable to load the product library" });
+    }
+  });
+
+  app.get("/api/mobile/treatment-reports/:jobId", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const job = await getMobileJob(req.mobileWorker!.id, req.params.jobId);
+    if (!job) return res.status(403).json({ message: "This job is not assigned to you or your team" });
+    if (!isPestControlJob(job)) return res.status(400).json({ message: "Treatment reports are only required for Pest Control jobs" });
+    const reports = await db.select().from(treatmentReports)
+      .where(eq(treatmentReports.jobId, job.id))
+      .orderBy(desc(treatmentReports.updatedAt));
+    const report = reports[0] ? await treatmentReportDetail(reports[0].id) : null;
+    res.json({
+      job: {
+        id: job.id, jobNumber: job.jobNumber, clientName: job.client?.name, tradingName: job.client?.tradingName,
+        siteAddress: job.location || job.client?.address, contractNumber: job.contractNo,
+        serviceType: job.serviceType, treatmentType: job.treatmentType, status: job.status,
+        startTime: job.startTime, technicianName: req.mobileWorker!.name,
+        pcoRegistrationNumber: (req.mobileWorker as any).pcoRegistrationNumber ?? null,
+        salespersonName: job.salesperson ?? null,
+      },
+      report,
+    });
+  });
+
+  app.patch("/api/mobile/treatment-reports/:jobId/draft", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const worker = req.mobileWorker!;
+      const job = await getMobileJob(worker.id, req.params.jobId);
+      if (!job) return res.status(403).json({ message: "This job is not assigned to you or your team" });
+      if (!isPestControlJob(job)) return res.status(400).json({ message: "Treatment reports are only required for Pest Control jobs" });
+      const input = treatmentReportInput.parse(req.body);
+      const existing = (await db.select().from(treatmentReports)
+        .where(eq(treatmentReports.jobId, job.id))
+        .orderBy(desc(treatmentReports.updatedAt)))[0];
+      if (existing?.status === "completed") return res.status(409).json({ message: "This treatment report is complete and can no longer be edited by a technician" });
+      const reportValues = {
+        clientId: job.clientId,
+        jobId: job.id,
+        contractId: job.linkedContractId || null,
+        technicianId: worker.id,
+        technicianName: worker.name,
+        reportDate: new Date().toISOString().slice(0, 10),
+        serviceType: job.serviceType,
+        treatmentType: input.treatmentType || job.treatmentType || null,
+        pestType: input.pests.map(pest => pest.pestType).join(", ") || null,
+        siteArea: input.areas.map(area => area.area).join(", ") || null,
+        treatmentNotes: input.treatmentNotes?.trim() || null,
+        recommendations: input.recommendationChoices.join(", ") || null,
+        customerName: input.customerName?.trim() || null,
+        customerSignature: input.customerSignature || null,
+        status: "draft",
+        tradingName: job.client?.tradingName || null,
+        siteAddress: job.location || job.client?.address || null,
+        jobNumber: job.jobNumber || null,
+        contractNumber: job.contractNo || null,
+        salespersonName: job.salesperson || null,
+        pcoRegistrationNumber: (worker as any).pcoRegistrationNumber || null,
+        startTime: job.startTime || null,
+        cleanlinessAssessment: input.cleanlinessAssessment || null,
+        cleanlinessComments: input.cleanlinessComments?.trim() || null,
+        noProductUsed: input.noProductUsed,
+        recommendationChoices: JSON.stringify(input.recommendationChoices),
+        otherRecommendationDetails: input.otherRecommendationDetails?.trim() || null,
+        signatureUnavailable: input.signatureUnavailable,
+        signatureUnavailableReason: input.signatureUnavailableReason?.trim() || null,
+        updatedAt: new Date(),
+      };
+      const report = existing
+        ? (await db.update(treatmentReports).set(reportValues as any).where(eq(treatmentReports.id, existing.id)).returning())[0]
+        : (await db.insert(treatmentReports).values(reportValues as any).returning())[0];
+      await replaceTreatmentReportChildren(db, report.id, input, worker.id);
+      res.json(await treatmentReportDetail(report.id));
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message ?? "Invalid report draft" });
+      console.error("Unable to save treatment report draft", error);
+      res.status(error?.status ?? 500).json({ message: error?.message ?? "Unable to save the treatment report draft" });
+    }
+  });
+
+  app.post("/api/mobile/treatment-reports/:jobId/complete", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const worker = req.mobileWorker!;
+      const job = await getMobileJob(worker.id, req.params.jobId);
+      if (!job) return res.status(403).json({ message: "This job is not assigned to you or your team" });
+      if (!isPestControlJob(job)) return res.status(400).json({ message: "Treatment reports are only required for Pest Control jobs" });
+      if (job.status !== "in_progress") return res.status(409).json({ message: "Start this job before completing the treatment report" });
+      const input = treatmentReportInput.parse(req.body);
+      const errors = reportCompletionErrors(input);
+      if (errors.length) return res.status(400).json({ message: "Complete the required treatment report fields", errors });
+
+      const allWorkers = await storage.getWorkers();
+      const coordinator = allWorkers.find(item =>
+        item.isActive && /pest/i.test(String(item.role ?? "")) && /(coordinator|manager)/i.test(String(item.role ?? ""))
+      );
+      const salesperson = job.salesperson
+        ? allWorkers.find(item => item.isActive && item.name.toLowerCase() === String(job.salesperson).toLowerCase())
+        : undefined;
+      const actionReasons = actionReasonFor(input);
+      const actionRequired = actionReasons.length > 0;
+      const finishTime = new Date();
+      const startTime = job.startTime ? new Date(job.startTime) : finishTime;
+      const timeOnSiteMinutes = Math.max(0, Math.round((finishTime.getTime() - startTime.getTime()) / 60_000));
+
+      const reportId = await db.transaction(async (tx) => {
+        const existing = (await tx.select().from(treatmentReports)
+          .where(eq(treatmentReports.jobId, job.id))
+          .orderBy(desc(treatmentReports.updatedAt)))[0];
+        if (existing?.status === "completed") throw Object.assign(new Error("This job already has a completed treatment report"), { status: 409 });
+        const year = new Date().getFullYear();
+        const [sequence] = await tx.insert(sequences)
+          .values({ type: "TR", year, lastSeq: 1 })
+          .onConflictDoUpdate({ target: [sequences.type, sequences.year], set: { lastSeq: sql`${sequences.lastSeq} + 1` } })
+          .returning({ lastSeq: sequences.lastSeq });
+        const reportNumber = `TR-${year}-${String(sequence.lastSeq).padStart(4, "0")}`;
+        const reportValues = {
+          clientId: job.clientId, jobId: job.id, contractId: job.linkedContractId || null,
+          technicianId: worker.id, technicianName: worker.name,
+          reportDate: finishTime.toISOString().slice(0, 10), reportNumber,
+          serviceType: job.serviceType, treatmentType: input.treatmentType,
+          pestType: input.pests.map(pest => pest.pestType === "other" ? pest.otherDescription : pest.pestType).join(", "),
+          siteArea: input.areas.map(area => area.area === "other" ? area.otherDescription : area.area).join(", "),
+          treatmentNotes: input.treatmentNotes?.trim() || null,
+          recommendations: input.recommendationChoices.join(", ") || null,
+          followUpRequired: actionRequired, customerName: input.customerName?.trim() || null,
+          customerSignature: input.customerSignature || null, status: "completed",
+          tradingName: job.client?.tradingName || null, siteAddress: job.location || job.client?.address || null,
+          jobNumber: job.jobNumber || null, contractNumber: job.contractNo || null, salespersonName: job.salesperson || null,
+          pcoRegistrationNumber: (worker as any).pcoRegistrationNumber || null,
+          startTime, finishTime, timeOnSiteMinutes, cleanlinessAssessment: input.cleanlinessAssessment,
+          cleanlinessComments: input.cleanlinessComments?.trim() || null, noProductUsed: input.noProductUsed,
+          recommendationChoices: JSON.stringify(input.recommendationChoices),
+          otherRecommendationDetails: input.otherRecommendationDetails?.trim() || null,
+          signatureUnavailable: input.signatureUnavailable,
+          signatureUnavailableReason: input.signatureUnavailableReason?.trim() || null,
+          actionRequired, actionReason: actionReasons.join("; ") || null,
+          completedAt: finishTime, completedByWorkerId: worker.id, updatedAt: finishTime,
+        };
+        const report = existing
+          ? (await tx.update(treatmentReports).set(reportValues as any).where(eq(treatmentReports.id, existing.id)).returning())[0]
+          : (await tx.insert(treatmentReports).values(reportValues as any).returning())[0];
+        const pdfUrl = `/treatment-reports/${report.id}/print`;
+        await tx.update(treatmentReports).set({ pdfUrl, pdfGeneratedAt: finishTime }).where(eq(treatmentReports.id, report.id));
+        await replaceTreatmentReportChildren(tx, report.id, input, worker.id);
+        await tx.insert(treatmentReportAudits).values({
+          reportId: report.id, actorId: worker.id, actorName: worker.name, action: "completed",
+          fieldName: null, previousValue: existing ? "draft" : null, nextValue: "completed",
+        });
+        if (actionRequired) {
+          const salesAction = input.recommendationChoices.some(choice => ["customer_quotation", "sales_follow_up"].includes(choice));
+          const assignee = salesAction ? salesperson : coordinator;
+          await tx.insert(treatmentReportFollowUps).values({
+            reportId: report.id, clientId: job.clientId, jobId: job.id, reason: actionReasons.join("; "),
+            recommendation: [input.recommendationChoices.join(", "), input.treatmentNotes].filter(Boolean).join(" — "),
+            identifiedDate: finishTime.toISOString().slice(0, 10), assignedWorkerId: assignee?.id || null, status: "open",
+          });
+        }
+        await tx.update(jobs).set({
+          status: "completed", startTime, endTime: finishTime, completedDate: finishTime,
+          actualDuration: timeOnSiteMinutes, updatedAt: finishTime,
+        }).where(eq(jobs.id, job.id));
+        return report.id;
+      });
+
+      const report = await treatmentReportDetail(reportId);
+      const clientName = job.client?.name ?? "Client";
+      const notificationMessage = `${worker.name} completed ${report?.reportNumber ?? "a Pest Control treatment report"} for ${clientName}.${actionRequired ? " ACTION REQUIRED." : ""}`;
+      await storage.createNotification({
+        title: actionRequired ? "Pest Control treatment action required" : "Pest Control treatment completed",
+        message: notificationMessage, type: actionRequired ? "warning" : "success",
+        priority: actionRequired ? "high" : "medium", relatedEntityType: "treatment_report", relatedEntityId: reportId,
+      } as any);
+      const recipients = [...new Map([coordinator, salesperson].filter((item): item is NonNullable<typeof item> => Boolean(item?.email)).map(item => [item.email, item])).values()];
+      const subject = `Pest Control Treatment Completed – ${clientName} – ${new Date().toLocaleDateString("en-ZA")}`;
+      const emailText = [
+        `Client: ${clientName}`, `Job: ${job.jobNumber ?? job.id}`, `Technician: ${worker.name}`,
+        `Treatment type: ${report?.treatmentType ?? "—"}`, `Time on site: ${timeOnSiteMinutes} minutes`,
+        `Products: ${report?.noProductUsed ? "No product used" : (report?.products ?? []).map((product: any) => `${product.productName} (${product.quantityUsed} ${product.unit})`).join(", ")}`,
+        `Recommendations: ${input.recommendationChoices.join(", ") || "None"}`,
+        actionRequired ? `ACTION REQUIRED: ${actionReasons.join("; ")}` : "No action required.",
+        `Report: ${report?.pdfUrl ?? ""}`,
+      ].join("\n");
+      await Promise.all(recipients.map(async recipient => {
+        try {
+          await sendEmail({ to: recipient.email, from: process.env.SENDGRID_FROM || "noreply@terminators.co.za", subject, text: emailText });
+          await db.insert(emailLogs).values({ toEmail: recipient.email, subject, status: "sent", sentAt: new Date(), relatedEntityId: reportId, relatedEntityType: "treatment_report" });
+        } catch (error: any) {
+          await db.insert(emailLogs).values({ toEmail: recipient.email, subject, status: "failed", errorMessage: error?.message ?? "Email failed", relatedEntityId: reportId, relatedEntityType: "treatment_report" });
+        }
+      }));
+      res.json({ report: await treatmentReportDetail(reportId), jobCompleted: true });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message ?? "Invalid treatment report" });
+      console.error("Unable to complete treatment report", error);
+      res.status(error?.status ?? 500).json({ message: error?.message ?? "Unable to complete the treatment report" });
+    }
+  });
+
   app.patch("/api/mobile/jobs/:jobId/status", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
       const { jobId } = req.params;
@@ -834,10 +1195,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!["scheduled", "in_progress", "completed"].includes(status)) {
         return res.status(400).json({ message: "Choose a valid mobile job status" });
       }
-      if (!await getMobileJob(req.mobileWorker!.id, jobId)) {
+      const mobileJob = await getMobileJob(req.mobileWorker!.id, jobId);
+      if (!mobileJob) {
         return res.status(403).json({ message: "This job is not assigned to you or your team" });
       }
-      const updatedJob = await storage.updateJobStatus(jobId, status);
+      if (status === "completed" && isPestControlJob(mobileJob)) {
+        const completed = (await db.select().from(treatmentReports)
+          .where(and(eq(treatmentReports.jobId, jobId), eq(treatmentReports.status, "completed"))))[0];
+        if (!completed) return res.status(409).json({ message: "Complete the Pest Control Treatment Report before completing this job" });
+      }
+      const updatedJob = status === "in_progress"
+        ? (await db.update(jobs).set({ status, startTime: mobileJob.startTime || new Date(), updatedAt: new Date() }).where(eq(jobs.id, jobId)).returning())[0]
+        : await storage.updateJobStatus(jobId, status);
       res.json(updatedJob);
     } catch (error) {
       console.error("Error updating job status:", error);
@@ -6941,43 +7310,149 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
   // ── Treatment Reports ─────────────────────────────────────────────────────
 
-  app.get("/api/treatment-reports", async (req, res) => {
+  app.get("/api/pest-control-products", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
+    try {
+      res.json(await db.select().from(pestControlProducts).orderBy(pestControlProducts.isActive, pestControlProducts.name));
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/pest-control-products", requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const data = insertPestControlProductSchema.parse(req.body);
+      const [product] = await db.insert(pestControlProducts).values(data).returning();
+      res.status(201).json(product);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message ?? "Invalid product" });
+      res.status(400).json({ message: error.message ?? "Unable to add product" });
+    }
+  });
+
+  app.patch("/api/pest-control-products/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const data = insertPestControlProductSchema.partial().parse(req.body);
+      const [product] = await db.update(pestControlProducts).set({ ...data, updatedAt: new Date() })
+        .where(eq(pestControlProducts.id, req.params.id)).returning();
+      if (!product) return res.status(404).json({ message: "Product not found" });
+      res.json(product);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message ?? "Invalid product" });
+      res.status(400).json({ message: error.message ?? "Unable to update product" });
+    }
+  });
+
+  app.get("/api/treatment-reports", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
     try {
       const { clientId, jobId } = req.query;
-      if (clientId) return res.json(await storage.getTreatmentReportsByClient(clientId as string));
-      if (jobId)    return res.json(await storage.getTreatmentReportsByJob(jobId as string));
-      return res.json(await storage.getTreatmentReports());
+      const rows = await db.select().from(treatmentReports).orderBy(desc(treatmentReports.reportDate), desc(treatmentReports.createdAt));
+      const filtered = rows.filter(row =>
+        (!clientId || row.clientId === clientId) &&
+        (!jobId || row.jobId === jobId)
+      );
+      const details = await Promise.all(filtered.map(row => treatmentReportDetail(row.id)));
+      return res.json(details.filter(Boolean));
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  app.get("/api/treatment-reports/:id", async (req, res) => {
+  app.get("/api/treatment-reports/:id/audits", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
     try {
-      const r = await storage.getTreatmentReport(req.params.id);
+      res.json(await db.select().from(treatmentReportAudits)
+        .where(eq(treatmentReportAudits.reportId, req.params.id))
+        .orderBy(desc(treatmentReportAudits.createdAt)));
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.patch("/api/treatment-reports/:id/follow-ups/:followUpId", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
+    const status = z.enum(["open", "in_progress", "completed"]).safeParse(req.body?.status);
+    if (!status.success) return res.status(400).json({ message: "Choose a valid follow-up status" });
+    const [followUp] = await db.update(treatmentReportFollowUps).set({ status: status.data, updatedAt: new Date() })
+      .where(and(eq(treatmentReportFollowUps.id, req.params.followUpId), eq(treatmentReportFollowUps.reportId, req.params.id))).returning();
+    if (!followUp) return res.status(404).json({ message: "Follow-up not found" });
+    await db.insert(treatmentReportAudits).values({
+      reportId: req.params.id, actorId: req.user!.id, actorName: overtimeActorName(req), action: "follow_up_updated",
+      fieldName: "follow_up_status", previousValue: null, nextValue: status.data,
+    });
+    res.json(followUp);
+  });
+
+  app.post("/api/treatment-reports/:id/email", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
+    const parsed = z.object({ recipients: z.array(z.string().email()).min(1).max(10) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Enter at least one valid recipient email address" });
+    const report = await treatmentReportDetail(req.params.id);
+    if (!report) return res.status(404).json({ message: "Treatment report not found" });
+    const subject = `Pest Control Treatment Report – ${report.tradingName ?? "Client"} – ${report.reportDate}`;
+    const text = [
+      `Treatment report: ${report.reportNumber ?? report.id}`,
+      `Client: ${report.tradingName ?? "Client"}`,
+      `Technician: ${report.technicianName ?? "—"}`,
+      `Treatment type: ${report.treatmentType ?? "—"}`,
+      `Time on site: ${report.timeOnSiteMinutes ?? "—"} minutes`,
+      `Products: ${report.noProductUsed ? "No product used" : report.products.map((product: any) => `${product.productName} (${product.quantityUsed} ${product.unit})`).join(", ")}`,
+      report.actionRequired ? `ACTION REQUIRED: ${report.actionReason}` : "No action required.",
+      `Printable report: ${report.pdfUrl ?? `/treatment-reports/${report.id}/print`}`,
+    ].join("\n");
+    const outcomes = await Promise.all(parsed.data.recipients.map(async toEmail => {
+      try {
+        await sendEmail({ to: toEmail, from: process.env.SENDGRID_FROM || "noreply@terminators.co.za", subject, text });
+        await db.insert(emailLogs).values({ toEmail, subject, status: "sent", sentAt: new Date(), relatedEntityId: report.id, relatedEntityType: "treatment_report" });
+        return { toEmail, sent: true };
+      } catch (error: any) {
+        await db.insert(emailLogs).values({ toEmail, subject, status: "failed", errorMessage: error?.message ?? "Email failed", relatedEntityId: report.id, relatedEntityType: "treatment_report" });
+        return { toEmail, sent: false };
+      }
+    }));
+    res.json({ outcomes });
+  });
+
+  app.get("/api/treatment-reports/:id", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
+    try {
+      const r = await treatmentReportDetail(req.params.id);
       if (!r) return res.status(404).json({ message: "Not found" });
       res.json(r);
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  app.post("/api/treatment-reports", async (req, res) => {
+  app.post("/api/treatment-reports", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
     try {
       const parsed = insertTreatmentReportSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
-      const r = await storage.createTreatmentReport(parsed.data);
+      const [r] = await db.insert(treatmentReports).values({ ...parsed.data, status: parsed.data.status || "draft" } as any).returning();
+      await db.insert(treatmentReportAudits).values({
+        reportId: r.id, actorId: req.user!.id, actorName: overtimeActorName(req), action: "created",
+      });
       res.status(201).json(r);
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  app.put("/api/treatment-reports/:id", async (req, res) => {
+  app.put("/api/treatment-reports/:id", async (req: AuthenticatedRequest, res) => {
+    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
     try {
-      const r = await storage.updateTreatmentReport(req.params.id, req.body);
+      const current = await treatmentReportDetail(req.params.id);
+      if (!current) return res.status(404).json({ message: "Not found" });
+      const parsed = insertTreatmentReportSchema.partial().parse(req.body);
+      const [r] = await db.update(treatmentReports).set({ ...parsed, updatedAt: new Date() } as any)
+        .where(eq(treatmentReports.id, req.params.id)).returning();
+      const changed = Object.entries(parsed).filter(([key, value]) => JSON.stringify((current as any)[key]) !== JSON.stringify(value));
+      if (current.status === "completed" && changed.length) {
+        await Promise.all(changed.map(([fieldName, nextValue]) => db.insert(treatmentReportAudits).values({
+          reportId: current.id, actorId: req.user!.id, actorName: overtimeActorName(req), action: "authorised_correction",
+          fieldName, previousValue: JSON.stringify((current as any)[fieldName] ?? null), nextValue: JSON.stringify(nextValue ?? null),
+        })));
+      }
       res.json(r);
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  app.delete("/api/treatment-reports/:id", async (req, res) => {
+  app.delete("/api/treatment-reports/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const ok = await storage.deleteTreatmentReport(req.params.id);
-      ok ? res.json({ success: true }) : res.status(404).json({ message: "Not found" });
+      const deleted = await db.delete(treatmentReports).where(eq(treatmentReports.id, req.params.id)).returning({ id: treatmentReports.id });
+      deleted.length ? res.json({ success: true }) : res.status(404).json({ message: "Not found" });
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 

@@ -247,8 +247,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 <h1 className="text-2xl font-bold text-gray-900">Select Login Type</h1>
                 <p className="mt-2 text-sm text-gray-600">Choose the workspace you need to access.</p>
               </div>
-              {selectionCard("Staff Login", "Technician work orders, field diaries and fleet updates.", <Smartphone className="h-6 w-6" />, () => setStep("staff-list"), "red")}
-              {selectionCard("Admin Login", "Office, management and administrator access.", <BriefcaseBusiness className="h-6 w-6" />, () => setStep("admin-list"), "indigo")}
+              {selectionCard("Staff Login", "For technicians and mobile field staff.", <Smartphone className="h-6 w-6" />, () => setStep("staff-list"), "red")}
+              {selectionCard("Admin / Office Login", "For office, sales, service, finance and management users.", <BriefcaseBusiness className="h-6 w-6" />, () => setStep("admin-list"), "indigo")}
             </div>
           )}
 

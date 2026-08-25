@@ -1,0 +1,162 @@
+FIX SIGN OUT ROUTING AND REMOVE EMPLOYEE ID LOGIN AS DEFAULT
+
+Problem:
+When a mobile user signs out, Job Flow opens the Staff Login page with Employee ID input.
+
+I do not want this as the default logout screen.
+
+When any user signs out, the app must return to the main login selection screen.
+
+MAIN LOGIN SCREEN REQUIRED
+
+After sign out, show the main login screen with:
+
+Job Flow logo
+
+Heading:
+Select Login Type
+
+Two large cards/buttons:
+
+1. Staff Login
+Subtitle:
+For technicians and mobile field staff
+
+2. Admin / Office Login
+Subtitle:
+For office, sales, service, finance and management users
+
+The user must then choose Staff Login or Admin Login.
+
+SIGN OUT BEHAVIOUR
+
+When a user clicks Sign Out / Switch User:
+
+1. Clear logged-in user state
+2. Clear session/localStorage user role
+3. Clear mobile user state
+4. Clear selected login mode
+5. Redirect to the main login screen
+
+Do not redirect directly to:
+- Employee ID login
+- Staff Login form
+- Technician dashboard
+- Admin dashboard
+
+Always redirect to:
+Main Login Selector
+
+STAFF LOGIN BEHAVIOUR
+
+When Staff Login is clicked:
+
+Show mobile staff users as clickable cards/buttons:
+
+- Re-Althon
+- Leon
+- Garth
+- Jackie
+- Sheryl
+- Zain
+- Mike
+- X
+- Reece
+
+When the user clicks their name:
+- Immediately log in
+- Open their mobile technician dashboard
+
+Do not require Employee ID for now.
+Do not require a Sign In button after selecting a name.
+
+The Employee ID screen can be hidden for now or kept only as a future optional mode.
+
+ADMIN LOGIN BEHAVIOUR
+
+When Admin / Office Login is clicked:
+
+Show admin/office users as clickable cards/buttons.
+
+When the user clicks their name:
+- Immediately log in
+- Open the correct role dashboard
+
+ROLE ROUTING
+
+Mobile staff / Technician:
+Technician Dashboard
+
+Managing Member:
+Business Overview Dashboard
+
+Sales:
+Sales Dashboard
+
+Service Manager / Service Coordinator:
+Service Dashboard
+
+Finance:
+Finance Dashboard
+
+Admin:
+Admin / Business Overview Dashboard
+
+FUTURE EMPLOYEE ID / PASSWORD SUPPORT
+
+Keep the code ready for future login modes:
+
+authMode:
+- quickLogin
+- employeeIdLogin
+- pinLogin
+- passwordLogin
+
+For now use:
+
+authMode = quickLogin
+
+In quickLogin mode:
+- Staff Login shows staff names
+- Admin Login shows admin names
+- Clicking a name logs in immediately
+
+Do not show Employee ID input in quickLogin mode.
+
+DESIGN
+
+Use the Job Flow / Terminators branding.
+
+Main login screen:
+- Job Flow red logo at top
+- White card
+- Red/black/white theme
+- Staff Login card
+- Admin / Office Login card
+
+Staff Login screen:
+- Job Flow logo
+- Back to Main Login button
+- Staff user cards
+- No green theme
+- No Employee ID field in quickLogin mode
+
+TESTING
+
+Test:
+
+1. Login as mobile user Reece.
+2. Click Sign Out.
+3. Confirm it returns to main login selector.
+4. Confirm it does not open Employee ID login directly.
+5. Click Staff Login.
+6. Confirm mobile staff names appear.
+7. Click Reece.
+8. Confirm Reece logs in immediately.
+9. Click Sign Out again.
+10. Click Admin / Office Login.
+11. Confirm admin users appear.
+12. Click Julien.
+13. Confirm Managing Member dashboard opens.
+
+END

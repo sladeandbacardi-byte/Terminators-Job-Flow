@@ -35,6 +35,7 @@ export const workers = pgTable("workers", {
   emergencyContactName: text("emergency_contact_name"),
   emergencyContactPhone: text("emergency_contact_phone"),
   leaveBalance: integer("leave_balance").default(15), // remaining annual leave days
+  pcoRegistrationNumber: text("pco_registration_number"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -1589,6 +1590,28 @@ export const treatmentReports = pgTable("treatment_reports", {
   customerSignature:    text("customer_signature"),
   technicianSignature:  text("technician_signature"),
   status:               text("status").default("completed"),
+  tradingName:          text("trading_name"),
+  siteAddress:          text("site_address"),
+  jobNumber:            text("job_number"),
+  contractNumber:       text("contract_number"),
+  salespersonName:      text("salesperson_name"),
+  pcoRegistrationNumber:text("pco_registration_number"),
+  startTime:            timestamp("start_time"),
+  finishTime:           timestamp("finish_time"),
+  timeOnSiteMinutes:    integer("time_on_site_minutes"),
+  cleanlinessAssessment:text("cleanliness_assessment"),
+  cleanlinessComments:  text("cleanliness_comments"),
+  noProductUsed:        boolean("no_product_used").notNull().default(false),
+  recommendationChoices:text("recommendation_choices"),
+  otherRecommendationDetails: text("other_recommendation_details"),
+  signatureUnavailable: boolean("signature_unavailable").notNull().default(false),
+  signatureUnavailableReason: text("signature_unavailable_reason"),
+  actionRequired:       boolean("action_required").notNull().default(false),
+  actionReason:         text("action_reason"),
+  pdfUrl:               text("pdf_url"),
+  pdfGeneratedAt:       timestamp("pdf_generated_at"),
+  completedAt:          timestamp("completed_at"),
+  completedByWorkerId:  varchar("completed_by_worker_id"),
   createdAt:            timestamp("created_at").notNull().default(sql`now()`),
   updatedAt:            timestamp("updated_at").notNull().default(sql`now()`),
 });
@@ -1600,6 +1623,104 @@ export const insertTreatmentReportSchema = createInsertSchema(treatmentReports).
 });
 export type InsertTreatmentReport = z.infer<typeof insertTreatmentReportSchema>;
 export type TreatmentReport = typeof treatmentReports.$inferSelect;
+
+// ─── DIGITAL PEST CONTROL TREATMENT REPORT CHILD RECORDS ────────────────────
+// These retain the detailed evidence captured in the mobile report while the
+// legacy treatment_reports fields keep older reports and desktop forms working.
+export const pestControlProducts = pgTable("pest_control_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  formulation: text("formulation").notNull(),
+  registrationNumber: text("registration_number"),
+  defaultUnit: text("default_unit").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const treatmentReportAreas = pgTable("treatment_report_areas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  area: text("area").notNull(),
+  otherDescription: text("other_description"),
+});
+
+export const treatmentReportPests = pgTable("treatment_report_pests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  pestType: text("pest_type").notNull(),
+  infestationLevel: text("infestation_level").notNull(),
+  otherDescription: text("other_description"),
+});
+
+export const treatmentReportEquipment = pgTable("treatment_report_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  equipmentType: text("equipment_type").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  productType: text("product_type"),
+  notes: text("notes"),
+});
+
+export const treatmentReportProducts = pgTable("treatment_report_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  productId: varchar("product_id"),
+  productName: text("product_name").notNull(),
+  formulation: text("formulation"),
+  registrationNumber: text("registration_number"),
+  unit: text("unit").notNull(),
+  quantityUsed: text("quantity_used").notNull(),
+  mixtureDilution: text("mixture_dilution"),
+});
+
+export const treatmentReportPhotos = pgTable("treatment_report_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name"),
+  uploadedByWorkerId: varchar("uploaded_by_worker_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const treatmentReportAudits = pgTable("treatment_report_audits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  actorId: varchar("actor_id"),
+  actorName: text("actor_name").notNull(),
+  action: text("action").notNull(),
+  fieldName: text("field_name"),
+  previousValue: text("previous_value"),
+  nextValue: text("next_value"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const treatmentReportFollowUps = pgTable("treatment_report_follow_ups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  clientId: varchar("client_id").notNull(),
+  jobId: varchar("job_id"),
+  reason: text("reason").notNull(),
+  recommendation: text("recommendation"),
+  identifiedDate: text("identified_date").notNull(),
+  assignedWorkerId: varchar("assigned_worker_id"),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertPestControlProductSchema = createInsertSchema(pestControlProducts).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type PestControlProduct = typeof pestControlProducts.$inferSelect;
+export type InsertPestControlProduct = z.infer<typeof insertPestControlProductSchema>;
+export type TreatmentReportArea = typeof treatmentReportAreas.$inferSelect;
+export type TreatmentReportPest = typeof treatmentReportPests.$inferSelect;
+export type TreatmentReportEquipment = typeof treatmentReportEquipment.$inferSelect;
+export type TreatmentReportProduct = typeof treatmentReportProducts.$inferSelect;
+export type TreatmentReportPhoto = typeof treatmentReportPhotos.$inferSelect;
+export type TreatmentReportAudit = typeof treatmentReportAudits.$inferSelect;
+export type TreatmentReportFollowUp = typeof treatmentReportFollowUps.$inferSelect;
 
 // ─── COMMUNICATION NOTES ────────────────────────────────────────────────────
 

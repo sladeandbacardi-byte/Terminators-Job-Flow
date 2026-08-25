@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { Client, Job, Worker } from "@shared/schema";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "@shared/opportunities";
+import { MobileTreatmentReport } from "./mobile-treatment-report";
 
 type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "km" | "fuel" | "inspection" | "issue" | "opportunities";
 type MobileJob = Job & { client: Client };
@@ -44,6 +45,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   const [form, setForm] = useState<Record<string, string>>({});
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [opportunityPhotos, setOpportunityPhotos] = useState<Array<{ fileUrl: string; fileName: string }>>([]);
+  const [treatmentJobId, setTreatmentJobId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -68,6 +70,8 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   };
 
   const jobs = data?.jobs ?? [];
+  const isPestControlJob = (job: MobileJob) =>
+    job.departmentId === "div-1" || /pest|fumig|rodent|cockroach/i.test(`${job.serviceType ?? ""} ${(job as any).service ?? ""}`);
   const vehicleLabel = data?.vehicle ? `${data.vehicle.name} · ${data.vehicle.registration}` : "No vehicle assigned";
   const today = new Date().toISOString().slice(0, 10);
   const input = (name: string, placeholder: string, type = "text", required = false) => (
@@ -184,7 +188,8 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
             {job.location && <p className="mt-3 text-sm text-slate-600">{job.location}</p>}
             <div className="mt-3 flex gap-2">
               {job.status === "scheduled" && <button onClick={() => updateStatus(job.id, "in_progress")} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Start job</button>}
-              {job.status === "in_progress" && <button onClick={() => updateStatus(job.id, "completed")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Mark complete</button>}
+               {job.status === "in_progress" && !isPestControlJob(job) && <button onClick={() => updateStatus(job.id, "completed")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Mark complete</button>}
+               {isPestControlJob(job) && (job.status === "in_progress" || job.status === "completed") && <button onClick={() => setTreatmentJobId(job.id)} className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">{job.status === "completed" ? "View treatment report" : "Treatment report"}</button>}
               <button onClick={() => { chooseOpportunityJob(job.id); nav("opportunities"); }} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Report opportunity</button>
             </div>
           </article>
@@ -264,10 +269,10 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
 
   return <main className="min-h-screen bg-slate-50">
     <header className="sticky top-0 z-20 flex items-center justify-between bg-emerald-700 px-4 py-3 text-white shadow">
-      <div className="flex items-center gap-3"><button aria-label="Open menu" onClick={() => setMenuOpen(true)} className="rounded-lg p-2 hover:bg-emerald-800"><Menu className="h-5 w-5" /></button><div><h1 className="font-bold">{screenTitle[screen]}</h1><p className="text-xs text-emerald-100">{worker.name} · Technician</p></div></div>
+      <div className="flex items-center gap-3"><button aria-label="Open menu" onClick={() => setMenuOpen(true)} className="rounded-lg p-2 hover:bg-emerald-800"><Menu className="h-5 w-5" /></button><div><h1 className="font-bold">{treatmentJobId ? "Treatment Report" : screenTitle[screen]}</h1><p className="text-xs text-emerald-100">{worker.name} · Technician</p></div></div>
       <button aria-label="Refresh dashboard" onClick={load} className="rounded-lg p-2 hover:bg-emerald-800"><RefreshCw className="h-5 w-5" /></button>
     </header>
      {menuOpen && <div className="fixed inset-0 z-30"><button aria-label="Close menu" className="absolute inset-0 bg-slate-950/40" onClick={() => setMenuOpen(false)} /><aside className="absolute inset-y-0 left-0 w-80 overflow-y-auto bg-white p-5 shadow-2xl"><div className="mb-6 flex items-center justify-between"><div><p className="font-bold">{worker.name}</p><p className="text-xs text-slate-500">Mobile Technician</p></div><button aria-label="Close menu" onClick={() => setMenuOpen(false)}><X /></button></div><p className="mb-2 text-xs font-bold tracking-widest text-slate-400">SERVICE</p>{menuItems.map(item => { const Icon = item.icon; const expanded = item.screen === "jobs" && jobsExpanded; return <div key={item.screen}><div className="flex items-center"><button onClick={() => nav(item.screen)} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50"><Icon className="h-4 w-4 shrink-0 text-emerald-700" />{item.label}</button>{item.children && <button aria-label={`${expanded ? "Collapse" : "Expand"} ${item.label}`} aria-expanded={expanded} onClick={() => setJobsExpanded(current => !current)} className="rounded-lg p-3 text-slate-500 hover:bg-emerald-50">{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>}</div>{expanded && item.children?.map(child => <button key={child.href} onClick={() => { setMenuOpen(false); window.location.href = child.href; }} className="flex w-full items-start gap-3 rounded-lg py-2 pl-11 pr-3 text-left hover:bg-emerald-50"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" /><span><span className="block text-sm font-medium text-slate-700">{child.label}</span>{child.helper && <span className="block text-xs font-normal text-slate-400">{child.helper}</span>}</span></button>)}</div>; })}<p className="mb-2 mt-6 text-xs font-bold tracking-widest text-slate-400">FLEET</p><button onClick={openFleetGuard} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50"><Truck className="h-4 w-4 text-emerald-700" />FleetGuard<ExternalLink className="ml-auto h-3.5 w-3.5 text-slate-400" /></button><button onClick={onLogout} className="mt-8 flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-700"><LogOut className="h-4 w-4" />Sign out</button></aside></div>}
-    <div className="mx-auto max-w-lg p-4">{error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}{notice && <div className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}{loading ? <div className="py-20 text-center text-sm text-slate-500">Loading your technician dashboard…</div> : content}</div>
+     <div className="mx-auto max-w-lg p-4">{error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}{notice && <div className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}{treatmentJobId ? <MobileTreatmentReport jobId={treatmentJobId} onBack={() => setTreatmentJobId(null)} onCompleted={async () => { await load(); }} /> : loading ? <div className="py-20 text-center text-sm text-slate-500">Loading your technician dashboard…</div> : content}</div>
   </main>;
 }

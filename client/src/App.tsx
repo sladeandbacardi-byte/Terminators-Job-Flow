@@ -69,6 +69,8 @@ const MyOvertime          = lazy(() => import("@/pages/my-overtime"));
 const MobileOvertime      = lazy(() => import("@/components/mobile/mobile-overtime"));
 const OvertimeApproval    = lazy(() => import("@/pages/overtime-approval"));
 const Opportunities       = lazy(() => import("@/pages/opportunities"));
+const TreatmentReports    = lazy(() => import("@/pages/treatment-reports"));
+const TreatmentReportPrint = lazy(() => import("@/pages/treatment-report-print"));
 
 function PageLoader() {
   return (
@@ -170,6 +172,7 @@ function AuthenticatedApp() {
         {/* Standalone views — no shell */}
         <Route path="/mobile" component={Mobile} />
         <Route path="/jobs/:id/card" component={JobCard} />
+        <Route path="/treatment-reports/:id/print" component={TreatmentReportPrint} />
         <Route path="/daily-department-card" component={DailyDepartmentCard} />
 
         {/* All other authenticated routes wrapped in AppShell */}
@@ -224,6 +227,7 @@ function AuthenticatedApp() {
 
                 {/* ── Service / Operations ─────────────────────────────── */}
                 <Route path="/field-diaries" component={FieldDiaries} />
+                 <Route path="/treatment-reports">{() => <ProtectedRoute component={TreatmentReports} roles={["admin","manager","coordinator"]} />}</Route>
                 <Route path="/fleet" component={Fleet} />
                 <Route path="/fleet/km-log" component={FleetKmLog} />
                 <Route path="/fleet/inspection" component={FleetInspection} />

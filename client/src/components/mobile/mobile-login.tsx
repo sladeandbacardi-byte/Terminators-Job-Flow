@@ -1,154 +1,75 @@
-import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft, BriefcaseBusiness, Loader2, UserRound } from "lucide-react";
-import type { Worker } from '@shared/schema';
+import { useEffect, useState } from "react";
+import { ArrowLeft, Loader2, Smartphone, UserRound } from "lucide-react";
+import type { Worker } from "@shared/schema";
+
+type StaffProfile = { id: string; name: string; role: string; department: string; employeeId: string };
 
 interface MobileLoginProps {
   onSuccess: (worker: Worker) => void;
 }
 
+const FALLBACK_STAFF: StaffProfile[] = [
+  ["mobile-tech-01", "Re-Althon", "MT-001"], ["mobile-tech-02", "Leon", "MT-002"],
+  ["mobile-tech-03", "Garth", "MT-003"], ["mobile-tech-04", "Jackie", "MT-004"],
+  ["mobile-tech-06", "Zain", "MT-006"], ["mobile-tech-07", "Mike", "MT-007"],
+  ["mobile-tech-08", "X", "MT-008"], ["mobile-tech-09", "Reece", "MT-009"],
+].map(([id, name, employeeId]) => ({ id, name, employeeId, role: "Technician", department: "Field Service" }));
+
 export function MobileLogin({ onSuccess }: MobileLoginProps) {
-  const [employeeId, setEmployeeId] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [staff, setStaff] = useState<StaffProfile[]>(FALLBACK_STAFF);
+  const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
-  const goToMainLogin = () => {
-    window.location.href = '/';
-  };
+  useEffect(() => {
+    fetch("/api/auth/staff")
+      .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load staff")))
+      .then(data => { if (Array.isArray(data.staff) && data.staff.length) setStaff(data.staff); })
+      .catch(() => setStaff(FALLBACK_STAFF))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const goToAdminLogin = () => {
-    // Return to root login; admin can select "Admin Login" from there
-    window.location.href = '/?login=admin';
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
+  const signIn = async (profile: StaffProfile) => {
+    setError("");
+    setSigningIn(profile.id);
     try {
-      const response = await fetch('/api/auth/mobile-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: employeeId.trim() }),
+      // The server still owns credential/session creation; the employee ID is
+      // an internal compatibility field and is never shown in quickLogin UI.
+      const response = await fetch("/api/auth/mobile-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: profile.employeeId }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      localStorage.setItem('mobile_worker_id', data.worker.id);
-      localStorage.setItem('mobile_session_token', data.token);
-      localStorage.setItem('mobile_worker_data', JSON.stringify(data.worker));
-
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Unable to sign in");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      localStorage.removeItem("auth_user_role");
+      localStorage.removeItem("auth_user_type");
+      localStorage.removeItem("demo_mode");
+      localStorage.setItem("mobile_worker_id", data.worker.id);
+      localStorage.setItem("mobile_session_token", data.token);
+      localStorage.setItem("mobile_worker_data", JSON.stringify(data.worker));
+      localStorage.setItem("mobile_user_role", data.worker.role || "Technician");
+      localStorage.setItem("mobile_user_type", "staff");
       onSuccess(data.worker);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during login');
+      setError(err instanceof Error ? err.message : "Unable to sign in");
     } finally {
-      setIsLoading(false);
+      setSigningIn(null);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <img
-            src="/images/job-flow-full-logo.png"
-            alt="Job Flow Field Service Management"
-            className="h-auto w-[220px] object-contain sm:w-[260px]"
-            onError={event => {
-              const img = event.target as HTMLImageElement;
-              img.src = '/images/job-flow-header-logo.png';
-              img.onerror = () => { img.style.display = 'none'; };
-            }}
-          />
-        </div>
-
-        {/* Card */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-
-          {/* Heading */}
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Staff Login</h1>
-            <p className="mt-1.5 text-sm text-gray-500">Mobile access for field staff and technicians</p>
-            <div className="mt-2 text-xs font-semibold uppercase tracking-widest text-red-600">
-              The Terminators · Mobile Staff Access
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="employeeId" className="text-sm font-medium text-gray-700">Employee ID</Label>
-              <Input
-                id="employeeId"
-                type="text"
-                placeholder="Enter your employee ID"
-                value={employeeId}
-                onChange={e => setEmployeeId(e.target.value)}
-                className="h-12 text-base"
-                required
-                autoComplete="username"
-                data-testid="input-employee-id"
-              />
-              <p className="text-xs text-gray-500">Keep your employee ID private.</p>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12 text-base bg-red-600 hover:bg-red-700 text-white"
-              disabled={isLoading || !employeeId.trim()}
-              data-testid="button-login"
-            >
-              {isLoading
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</>
-                : 'Sign In'}
-            </Button>
-          </form>
-
-          {/* Navigation links */}
-          <div className="mt-6 flex flex-col items-center gap-3 border-t border-gray-100 pt-5">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-11 border-gray-300 text-gray-700 hover:bg-gray-50"
-              onClick={goToMainLogin}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Main Login
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full h-10 text-gray-600 hover:text-gray-900"
-              onClick={goToAdminLogin}
-            >
-              <BriefcaseBusiness className="mr-2 h-4 w-4" />
-              Admin / Office Login
-            </Button>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <p className="mt-6 text-center text-xs text-gray-400">
-          Job Flow · Field Service Management
-        </p>
-      </div>
+  return <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 px-4 py-8">
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center space-y-6">
+      <div className="flex justify-center"><img src="/images/job-flow-full-logo.png" alt="Job Flow Field Service Management" className="h-auto w-[260px] object-contain" onError={event => { (event.target as HTMLImageElement).style.display = "none"; }} /></div>
+      <main className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg sm:p-6">
+        <button type="button" onClick={() => { window.location.href = "/"; }} className="mb-4 flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-red-600"><ArrowLeft className="h-4 w-4" />Back to Main Login</button>
+        <div className="mb-5 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-600 text-white"><Smartphone className="h-6 w-6" /></div><h1 className="text-2xl font-bold text-gray-900">Staff Login</h1><p className="mt-2 text-sm text-gray-600">For technicians and mobile field staff</p></div>
+        {error && <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        {loading ? <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading staff…</div> : <div className="space-y-2">{staff.map(profile => <button key={profile.id} type="button" onClick={() => signIn(profile)} disabled={Boolean(signingIn)} className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-red-400 hover:bg-red-50 hover:shadow-md disabled:cursor-wait disabled:opacity-60"><div className="rounded-full bg-red-100 p-2.5 text-red-700">{signingIn === profile.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserRound className="h-5 w-5" />}</div><div><p className="font-semibold text-gray-900">{profile.name}</p><p className="text-sm text-gray-600">{profile.role}</p><p className="text-xs uppercase tracking-wide text-gray-400">{profile.department}</p></div></button>)}</div>}
+      </main>
+      <p className="text-center text-xs text-gray-400">Job Flow · Field Service Management</p>
     </div>
-  );
+  </div>;
 }

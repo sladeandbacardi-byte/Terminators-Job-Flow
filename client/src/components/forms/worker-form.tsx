@@ -50,6 +50,7 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
       emergencyContactName: worker?.emergencyContactName || "",
       emergencyContactPhone: worker?.emergencyContactPhone || "",
       leaveBalance: worker?.leaveBalance ?? 15,
+      pcoRegistrationNumber: worker?.pcoRegistrationNumber || "",
     },
   });
 
@@ -66,6 +67,7 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
       emergencyContactName: worker?.emergencyContactName || "",
       emergencyContactPhone: worker?.emergencyContactPhone || "",
       leaveBalance: worker?.leaveBalance ?? 15,
+      pcoRegistrationNumber: worker?.pcoRegistrationNumber || "",
     });
   }, [worker]);
 
@@ -290,6 +292,20 @@ export default function WorkerForm({ worker, onSuccess, onCancel }: WorkerFormPr
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">Number of annual leave days the employee has remaining</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="pcoRegistrationNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>PCO Registration Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Pest Control Operator registration number" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <p className="text-xs text-gray-500">Shown automatically on completed Pest Control treatment reports.</p>
                   <FormMessage />
                 </FormItem>
               )}

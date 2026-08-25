@@ -109,7 +109,7 @@ type TreatmentReport = {
   quantityUsed?: string; batchNumber?: string; activeIngredient?: string;
   treatmentNotes?: string; recommendations?: string;
   followUpRequired?: boolean; followUpDate?: string;
-  customerName?: string; status?: string; createdAt?: string;
+  customerName?: string; status?: string; createdAt?: string; actionRequired?: boolean; pdfUrl?: string;
 };
 
 type CommunicationNote = {
@@ -1625,12 +1625,7 @@ export default function ClientProfilePage() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-sm font-semibold text-muted-foreground">Treatment Reports ({treatmentRpts.length})</h3>
-                  <Button size="sm" className="gap-1" onClick={() => {
-                    setTrForm({ reportDate: format(new Date(), "yyyy-MM-dd"), customerName: client.name });
-                    setTrOpen(true);
-                  }}>
-                    <Plus className="h-3.5 w-3.5" />New Treatment Report
-                  </Button>
+                  <Button size="sm" variant="outline" asChild><Link href="/treatment-reports" className="gap-1"><ClipboardList className="h-3.5 w-3.5" />Review Treatment Reports</Link></Button>
                 </div>
                 {treatmentRpts.length === 0 ? (
                   <EmptyState message="No treatment reports for this client." />
@@ -1650,12 +1645,14 @@ export default function ClientProfilePage() {
                                   {r.serviceType && <Badge variant="outline" className="text-xs">{r.serviceType}</Badge>}
                                   {r.pestType && <span className="text-xs text-muted-foreground">{r.pestType}</span>}
                                   {r.followUpRequired && <Badge className="bg-amber-100 text-amber-800 text-xs">Follow-up</Badge>}
+                                   {r.actionRequired && <Badge className="bg-amber-100 text-amber-800 text-xs">Action Required</Badge>}
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
-                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
+                                  {r.status === "completed" && <Link href={`/treatment-reports/${r.id}/print`} target="_blank" onClick={e => e.stopPropagation()}><Button size="sm" variant="ghost" className="h-7 w-7 p-0"><Printer className="h-3.5 w-3.5" /></Button></Link>}
+                                  {r.status !== "completed" && <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
                                     onClick={e => { e.stopPropagation(); if (confirm("Delete this report?")) deleteTr.mutate(r.id); }}>
                                     <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                                  </Button>
+                                  </Button>}
                                 </div>
                               </div>
                             </CardContent>

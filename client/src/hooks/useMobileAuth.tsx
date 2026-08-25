@@ -61,11 +61,20 @@ export function MobileAuthProvider({ children }: MobileAuthProviderProps) {
 
   const logout = () => {
     setWorker(null);
+    // Mobile has its own token, but signing out must reset both auth
+    // namespaces so the next screen is always the main login selector.
     localStorage.removeItem('mobile_worker_id');
     localStorage.removeItem('mobile_session_token');
     localStorage.removeItem('mobile_worker_data');
     localStorage.removeItem('mobile_user_role');
     localStorage.removeItem('mobile_user_type');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_user_role');
+    localStorage.removeItem('auth_user_type');
+    localStorage.removeItem('demo_mode');
+    localStorage.removeItem('selected_login_mode');
+    window.location.replace('/');
   };
 
   const value: MobileAuthContextType = {
