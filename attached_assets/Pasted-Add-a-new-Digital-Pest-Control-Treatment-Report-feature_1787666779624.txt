@@ -1,0 +1,746 @@
+Add a new **Digital Pest Control Treatment Report** feature to the existing JobFlow application.
+
+This must be integrated into the existing **Pest Control job workflow**. Do NOT build it as a separate standalone app.
+
+The goal is to replace the existing printed and handwritten Pest Control Treatment Report with a mobile-friendly digital treatment report that is completed by the technician from **My Jobs**.
+
+## 1. Where the Treatment Report must appear
+
+For Pest Control jobs, when a technician opens a job from:
+
+**My Jobs → Select Job**
+
+add a prominent action:
+
+**Treatment Report**
+
+The job workflow should become:
+
+**Open Job → Start Job → Complete Treatment Report → Client Signature → Complete Job**
+
+Only Pest Control jobs need this treatment report.
+
+Do not show the Pest Control Treatment Report on Washroom, Deep Cleaning, Sanitary Bin or other department jobs.
+
+---
+
+# 2. Auto-populate information already known by JobFlow
+
+Do not ask the technician to enter information JobFlow already knows.
+
+Automatically populate:
+
+* Date of service
+* Client name
+* Trading name if applicable
+* Site/address
+* Job number
+* Contract number if applicable
+* Pest Control technician/operator name
+* PCO registration number from the technician profile
+* Sales representative assigned to the client/job
+* Service department
+* Treatment/service type where it can be determined from the job
+* Start Job Time
+* Finish Job Time
+
+The technician must not be able to accidentally change the client or job information from inside the Treatment Report.
+
+---
+
+# 3. Treatment Type
+
+Add a section:
+
+**Treatment Type**
+
+Options:
+
+* Once-off Treatment
+* Contract Treatment
+* Service Treatment
+* Follow-up
+
+Use a single-select control.
+
+If JobFlow can determine the correct treatment type from the job or contract, preselect it automatically but allow the technician to change it if necessary.
+
+---
+
+# 4. Areas Treated
+
+Add:
+
+**Areas Treated**
+
+Allow multiple selections:
+
+* Total Area
+* Offices
+* Warehouse
+* Perimeter
+* Other
+
+If Other is selected, display:
+
+**Describe other area treated**
+
+Allow more than one area to be selected.
+
+---
+
+# 5. Pest Type
+
+Add:
+
+**Pest Type**
+
+Allow multiple selections:
+
+* Cockroaches
+* Rodents
+* Ants
+* Fleas
+* Bird Lice
+* Thatch Beetle
+* Borer Beetle
+* Fishmoths
+* Flies
+* Other
+
+If Other is selected, require:
+
+**Other Pest Type**
+
+---
+
+# 6. Level of Infestation
+
+For each selected pest type, require the technician to record the level of infestation.
+
+Options:
+
+* NONE – 0% activity
+* LIGHT – 0–25% activity
+* MEDIUM – 26–50% activity
+* HEAVY – 51–100% activity
+
+Example:
+
+Cockroaches
+[ None ] [ Light ] [ Medium ] [ Heavy ]
+
+Rodents
+[ None ] [ Light ] [ Medium ] [ Heavy ]
+
+Do not use one infestation level for all pests if multiple pests have been selected.
+
+---
+
+# 7. Client Premises Cleanliness Assessment
+
+Add:
+
+**Client Premises Cleanliness Assessment**
+
+Single selection:
+
+* All OK
+* Good
+* Fair
+* Needs Attention
+* Major Problem
+
+Add:
+
+**Details / Comments**
+
+If the technician selects:
+
+* Fair
+* Needs Attention
+* Major Problem
+
+require them to enter details.
+
+For **Needs Attention** or **Major Problem**, also display an option to attach one or more photographs.
+
+---
+
+# 8. Equipment Serviced
+
+Add:
+
+**Equipment Serviced**
+
+The technician must be able to add zero or more items.
+
+Available equipment:
+
+* Fly Machine
+* Sleeved Globes LUV015-002UVA/BL368
+* Interior Rodent Bait Station
+* Exterior Rodent Bait Station
+* Insect Monitoring Station
+* Aerosol Dispenser
+* Cardboard Box
+* Liquid Bait Dispenser
+* Other
+
+For each selected equipment type allow:
+
+* Quantity
+* Bait/Product Type
+* Notes
+
+Example:
+
+**Exterior Rodent Bait Station**
+
+Quantity: 8
+Bait Type: Tomcat Blox
+Notes: 2 stations showed heavy feeding
+
+The technician must be able to add multiple equipment records.
+
+---
+
+# 9. Pesticides / Products Used
+
+Do NOT recreate the large printed pesticide table on the mobile screen.
+
+Create a reusable **Pest Control Product Library** in JobFlow.
+
+Each product must contain:
+
+* Product Name
+* Formulation
+* Registration Number
+* Default Measurement Unit
+* Active / Inactive status
+
+Seed the library with the products from the existing Treatment Report:
+
+* Ultrakill Crack & Crevice | Aerosol | L4598 | ml
+* Nuvan Profi | Aerosol | L1301 | ml
+* Avistelspuit | Aerosol | L4003 | ml
+* Maxforce Quantum Ant | Gel | L8460 | g
+* Ultrakill RoachForce | Gel | L8652 | ml
+* Proroach Gel | Gel | registration blank | g
+* Maxforce Ant | Granules | L5658 | g
+* Snail Bait | Granules | L70096 | g
+* Deltakill CS | Liquid | L9528 | ml
+* Dorine EC | Liquid | L4913 | ml
+* Fendona | Liquid | L5678 | ml
+* Thermidor 25 EC | Liquid | L6616 | ml
+* Rodex Liquid Concentrate | Liquid | L9290 | ml
+* Rossi 200 Super | Liquid | L8376 | ml
+* Tobaccoguard | Liquid | L4619 | ml
+* Promethrin | Liquid | L10291 | ml
+* Racumin Tracking | Powder | L2800 | ml
+* Roach Dust | Powder | L4567 | ml
+* Tomcat Blox | Wax Blocks | L5524 | blocks
+* Ultrakill Blox | Wax Blocks | L9739 | blocks
+* Non Toxic Blocks | Wax Blocks | - | blocks
+* Jaguar Blox | Wax Blocks | L8259 | blocks
+* Racumin Wax Blocks | Wax Blocks | L8465 | blocks
+* Delta 7 WP | WP | L8605 | ml
+
+The admin must later be able to add, edit, activate and deactivate products without changing code.
+
+On the Treatment Report provide:
+
+**+ Add Product Used**
+
+When tapped, allow the technician to search/select a product.
+
+Once selected automatically display:
+
+* Product name
+* Formulation
+* Registration number
+* Unit
+
+Then require:
+
+**Quantity Used**
+
+and optionally:
+
+**Mixture / Dilution**
+
+Example:
+
+Deltakill CS
+Liquid · L9528
+Quantity Used: 125 ml
+Mixture: 25 ml / 5 L water
+
+Allow multiple products to be added.
+
+Do not require products if no pesticide/product was used, but provide a checkbox:
+
+**No pesticide/product used**
+
+---
+
+# 10. Recommendations / Additional Information
+
+Add a large section:
+
+**Recommendations or Additional Information**
+
+Allow free-text notes.
+
+Also add quick-select recommendation options:
+
+* No further action required
+* Follow-up treatment required
+* Proofing required
+* Hygiene/cleaning improvements required
+* Remove food source
+* Remove standing water
+* Repair structural opening
+* Additional bait stations required
+* Additional treatment recommended
+* Customer quotation required
+* Sales representative follow-up required
+* Other
+
+Allow multiple selections.
+
+If Other is selected, require details.
+
+The technician must still be able to add free-text recommendations regardless of the options selected.
+
+---
+
+# 11. Treatment Precautions
+
+The existing paper Treatment Report contains customer precautions.
+
+Create two sections on the final report:
+
+## Precautions Before Treatment
+
+* Cover open foodstuffs or store away
+* Remove all pets/children from treated area
+* Cover all fish tanks/ponds and switch off pumps
+* Open cupboards, drawers and doors
+* Wash all surfaces where applicable
+
+## Precautions After Treatment
+
+* Keep area closed for 2 hours
+* Keep all pets/children from treated area
+* Ventilate area well
+* Clean all cooking/eating utensils before using and pack away once chemical has dried
+* Do not clean treated surfaces for 5 days
+* Do not tamper with rodent bait
+* Refrain from direct skin contact with treated carpets for 3 days
+
+Also include the existing notice:
+
+**Increased pest activity may become apparent after initial treatment. This is normal. Please allow approximately 7 days for the treatment to take effect.**
+
+These precautions do not all need to clutter the technician's mobile input screen.
+
+They should primarily appear on the completed customer Treatment Report/PDF.
+
+---
+
+# 12. Start and Finish Time
+
+Use the existing JobFlow job functionality where possible.
+
+When the technician presses:
+
+**Start Job**
+
+record the actual start time.
+
+When they eventually press:
+
+**Complete Job**
+
+record the finish time.
+
+Display both times on the Treatment Report.
+
+Do not allow finish time to be before start time.
+
+Calculate:
+
+**Time on Site**
+
+automatically.
+
+---
+
+# 13. Client Signature
+
+Before the job can be completed, show:
+
+**Client Confirmation**
+
+Include:
+
+Client/Representative Name
+
+and an on-screen signature pad:
+
+**Client Signature**
+
+The customer must be able to sign using a finger on the technician's phone.
+
+Include buttons:
+
+* Clear Signature
+* Save Signature
+
+If the customer is unavailable or refuses to sign, allow:
+
+**Unable to obtain client signature**
+
+If selected, require a reason.
+
+Examples:
+
+* Client representative unavailable
+* Site unattended
+* Client declined to sign
+* Other
+
+The technician should not be blocked from completing a legitimate unattended treatment.
+
+---
+
+# 14. Technician / PCO Details
+
+Automatically add:
+
+* Technician/PCO name
+* PCO registration number
+* Technician signature if JobFlow stores one
+
+If there is currently no PCO registration number field in the employee/technician profile, add:
+
+**PCO Registration Number**
+
+This should be editable by authorised admin users under the employee profile.
+
+---
+
+# 15. Complete Job Validation
+
+When the technician taps:
+
+**Complete Job**
+
+JobFlow must validate the Treatment Report before completion.
+
+Required fields:
+
+* Treatment Type
+* At least one Area Treated
+* At least one Pest Type
+* Infestation level for every selected pest
+* Cleanliness assessment
+* Products used OR "No pesticide/product used"
+* Client signature OR valid reason that a signature could not be obtained
+
+If something is missing, clearly tell the technician exactly what needs attention.
+
+Do not discard entered information.
+
+---
+
+# 16. Automatic actions when the job is completed
+
+Once all validation passes and the technician presses **Complete Job**, JobFlow must automatically:
+
+1. Record the finish time.
+2. Calculate time on site.
+3. Mark the job as Completed.
+4. Save the complete Treatment Report.
+5. Link the Treatment Report to the original job.
+6. Link it to the client.
+7. Link it to the applicable contract if it is a contract job.
+8. Generate a professional PDF Treatment Report.
+9. Store the PDF in JobFlow.
+10. Email completion notification to the Pest Control Services Coordinator.
+11. Email completion notification to the sales representative assigned to that client/job.
+12. Attach the completed Treatment Report PDF to the notification email where supported.
+
+Do not require the technician to manually select the Services Coordinator or Sales Rep.
+
+---
+
+# 17. Email recipients
+
+Add Pest Control department configuration for:
+
+**Pest Control Services Coordinator**
+
+The email address should come from the selected JobFlow employee/user record.
+
+For the sales rep:
+
+Use the sales representative already linked to the client, quote, contract or job.
+
+Use the most directly associated sales rep in this priority order:
+
+1. Job sales rep
+2. Contract sales rep
+3. Client assigned sales rep
+4. Quote sales rep
+
+Do not send a sales rep notification if no sales rep is associated.
+
+The job must still be completed normally.
+
+---
+
+# 18. Completion Email
+
+Use a useful subject such as:
+
+**Pest Control Treatment Completed – [Client Name] – [Date]**
+
+The email should contain:
+
+* Client
+* Site
+* Job number
+* Date
+* Technician
+* Treatment Type
+* Pest Type(s)
+* Infestation Level(s)
+* Start Time
+* Finish Time
+* Total Time on Site
+* Products Used
+* Recommendations
+* Whether follow-up is required
+
+Include a direct JobFlow link to the completed job/treatment report if possible.
+
+Attach the generated Treatment Report PDF.
+
+---
+
+# 19. Action Required logic
+
+The Treatment Report must not simply create a PDF and disappear.
+
+If any of the following are recorded:
+
+* Needs Attention
+* Major Problem
+* Follow-up treatment required
+* Proofing required
+* Additional treatment recommended
+* Additional bait stations required
+* Customer quotation required
+* Sales representative follow-up required
+
+mark the Treatment Report:
+
+**ACTION REQUIRED**
+
+Show this prominently in the Services Coordinator and Sales Rep notification email.
+
+Also create a follow-up item/task inside JobFlow linked to:
+
+* Client
+* Job
+* Treatment Report
+
+The follow-up must contain:
+
+* Reason/action required
+* Technician recommendation
+* Date identified
+* Client
+* Job number
+* Assigned user
+* Status: Open / In Progress / Completed
+
+If the recommendation is sales-related, assign it to the sales representative.
+
+If it is operational/service-related, assign it to the Pest Control Services Coordinator.
+
+---
+
+# 20. JobFlow Client Profile
+
+The existing Client Profile should have a tab:
+
+**Treatment Reports**
+
+If this already exists, use it rather than creating a duplicate.
+
+Display:
+
+* Date
+* Job Number
+* Technician
+* Treatment Type
+* Pest Types
+* Action Required indicator
+* View Report
+* Download PDF
+
+Clicking the Treatment Report should open the full digital record.
+
+---
+
+# 21. Job page
+
+On the completed Job page show a section:
+
+**Treatment Report**
+
+with:
+
+* View Treatment Report
+* View PDF
+* Email Report
+* Action Required status
+* Follow-up status
+
+---
+
+# 22. Mobile UX
+
+This feature will primarily be used on mobile phones.
+
+Do not reproduce the Excel sheet as a giant desktop-style form.
+
+Use large touch-friendly cards, buttons, selectors and expandable sections.
+
+Suggested screen order:
+
+### Treatment Report
+
+**Job Information**
+Auto-filled and collapsed/compact.
+
+**1. Treatment**
+
+* Treatment Type
+* Areas Treated
+* Pest Types
+* Infestation Levels
+
+**2. Site Assessment**
+
+* Cleanliness
+* Comments
+* Photos if necessary
+
+**3. Equipment Serviced**
+
+* Add Equipment
+
+**4. Products Used**
+
+* Add Product
+
+**5. Recommendations**
+
+* Quick selections
+* Additional notes
+
+**6. Client Confirmation**
+
+* Client Name
+* Signature
+
+At the bottom:
+
+**Complete Job**
+
+Use the existing JobFlow design language, logo, colours, typography, menu behaviour and mobile card styling.
+
+Do not create a visually separate application.
+
+---
+
+# 23. Draft saving
+
+Treatment Report entries must save while the technician is working.
+
+If the technician:
+
+* loses signal
+* accidentally closes the page
+* navigates back
+* locks the phone
+
+the captured report information must not simply disappear.
+
+At minimum implement reliable draft saving to the JobFlow backend whenever fields are changed or sections are completed.
+
+Where practical, retain temporary local form state until it has successfully synced.
+
+---
+
+# 24. Editing after completion
+
+Technicians should not freely edit a completed Treatment Report.
+
+After completion:
+
+* Technician: View only
+* Service Coordinator: View and authorised correction
+* Admin/Manager: View and edit
+
+If an authorised user changes a completed Treatment Report, store:
+
+* who changed it
+* date/time
+* fields changed
+* previous value
+* new value
+
+Do not silently overwrite completed compliance/service records.
+
+---
+
+# 25. Existing JobFlow architecture
+
+Before implementing, inspect the existing JobFlow code and database.
+
+Reuse:
+
+* existing job IDs
+* client records
+* contracts
+* worker/technician records
+* sales rep relationships
+* email system
+* PDF/report generation
+* JobFlow authentication
+* role permissions
+* client profile
+* existing Treatment Reports functionality if any
+
+Do not create duplicate tables/entities where the application already has the correct relationship.
+
+Implement database migrations carefully without deleting existing JobFlow data.
+
+---
+
+# 26. Important
+
+This feature replaces the existing Terminators Pest Control handwritten Treatment Report.
+
+The digital version should preserve the important operational and compliance information from the existing form, but the mobile experience must be much simpler than the paper document.
+
+The technician should mainly record **what happened on site**.
+
+JobFlow should automatically handle everything it already knows about the client, job, technician, timing, sales rep and filing.
+
+The final Treatment Report PDF can be detailed and formal even though the mobile capture interface is simple.
