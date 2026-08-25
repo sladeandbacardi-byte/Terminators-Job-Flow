@@ -1,0 +1,150 @@
+SIMPLIFY LOGIN TO ONE-CLICK USER LOGIN
+
+When a user clicks their name on the login screen, Job Flow must immediately log them in and open their dashboard.
+
+Do not require the user to click an extra Sign In button after selecting their name.
+
+Current problem:
+The user clicks their name, then still has to click Sign In. This is unnecessary.
+
+Required login behaviour:
+
+1. Main Login Screen
+
+Show:
+- Staff Login
+- Admin Login
+
+2. Staff Login
+
+Show the mobile staff users as clickable cards/buttons:
+
+- Re-Althon
+- Leon
+- Garth
+- Jackie
+- Sheryl
+- Zain
+- Mike
+- X
+- Reece
+
+When the user clicks their name:
+- Immediately log in as that user
+- Save selected user/session
+- Open the Technician / Mobile Dashboard
+
+Do not show or require a Sign In button.
+
+3. Admin Login
+
+Show admin/office users as clickable cards/buttons.
+
+Examples:
+- Julien Botha
+- Mariette Koekemoer
+- Maryka Venter
+- Sheryl-Lyn Lee
+- Chané du Toit
+- Finance user
+- Admin user
+- Service Manager
+
+When the user clicks their name:
+- Immediately log in as that user
+- Save selected user/session
+- Open the correct role-based dashboard
+
+Role routing:
+Managing Member -> Business Overview Dashboard
+Sales -> Sales Dashboard
+Service Manager / Service Coordinator -> Service Dashboard
+Finance -> Finance Dashboard
+Admin -> Admin / Business Overview Dashboard
+Technician / Mobile Staff -> Technician Dashboard
+
+4. Remove Sign In button from user selection screens
+
+The Sign In button can be removed or hidden for now.
+
+5. Future Password/PIN Support
+
+Design the code so passwords/PINs can be added later.
+
+Add a future-ready setting:
+
+authMode:
+- quickLogin
+- pinLogin
+- passwordLogin
+
+For now use:
+
+authMode = quickLogin
+
+In quickLogin mode:
+Clicking a user logs in immediately.
+
+Later, when authMode is changed to pinLogin or passwordLogin:
+Clicking a user should open a PIN/password screen.
+
+But do not require PIN or password now.
+
+6. Session Handling
+
+After user clicks their name:
+- Save logged-in user to localStorage/sessionStorage
+- Save user role
+- Save user type: staff or admin
+- Route to correct dashboard
+
+Refreshing the page should keep the user logged in unless they click Switch User / Logout.
+
+7. Switch User
+
+Keep a Switch User / Logout option in the header/menu.
+
+Clicking Switch User should:
+- Clear current user/session
+- Return to the main login screen
+
+8. Back Navigation
+
+Staff Login screen must have:
+Back to Main Login
+
+Admin Login screen must have:
+Back to Main Login
+
+9. Testing
+
+Test:
+
+Staff Login:
+- Click Reece
+- Confirm he immediately opens Technician Dashboard
+- No Sign In button required
+
+Staff Login:
+- Click Zain
+- Confirm he immediately opens Technician Dashboard
+
+Admin Login:
+- Click Julien Botha
+- Confirm he immediately opens Business Overview Dashboard
+
+Admin Login:
+- Click Sales user
+- Confirm Sales Dashboard opens
+
+Admin Login:
+- Click Finance user
+- Confirm Finance Dashboard opens
+
+Refresh page:
+- Confirm logged-in user remains logged in
+
+Switch User:
+- Confirm it returns to main login screen
+
+END

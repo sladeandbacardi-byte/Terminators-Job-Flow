@@ -8,6 +8,7 @@ import {
   AlertCircle, ArrowLeft, BriefcaseBusiness, Eye, EyeOff, Loader2,
   ShieldCheck, Smartphone, UserRound,
 } from "lucide-react";
+import { AUTH_MODE } from "@shared/auth";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
 
@@ -120,9 +121,16 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     onSuccess: ({ mode, data }) => {
       setLoginError("");
       if (mode === "mobile") {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+        localStorage.removeItem("auth_user_role");
+        localStorage.removeItem("auth_user_type");
+        localStorage.removeItem("demo_mode");
         localStorage.setItem("mobile_worker_id", data.worker.id);
         localStorage.setItem("mobile_session_token", data.token);
         localStorage.setItem("mobile_worker_data", JSON.stringify(data.worker));
+        localStorage.setItem("mobile_user_role", data.worker.role || "Technician");
+        localStorage.setItem("mobile_user_type", "staff");
         navigate("/mobile", { replace: true });
         return;
       }
@@ -140,13 +148,21 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const selectTechnician = (technician: Technician) => {
     resetCredentials();
     setSelectedTechnician(technician);
-    setStep("staff-credentials");
+    if (AUTH_MODE === "quickLogin") {
+      loginMutation.mutate({ mode: "mobile", employeeId: technician.employeeId });
+    } else {
+      setStep("staff-credentials");
+    }
   };
 
   const selectAdmin = (administrator: Administrator) => {
     resetCredentials();
     setSelectedAdmin(administrator);
-    setStep("admin-credentials");
+    if (AUTH_MODE === "quickLogin" && administrator.authMethod === "profile_picker") {
+      loginMutation.mutate({ mode: "profile", userId: administrator.id });
+    } else {
+      setStep("admin-credentials");
+    }
   };
 
   const goBack = () => {
@@ -193,7 +209,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       key={user.id}
       type="button"
       onClick={onClick}
-      className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+      disabled={loginMutation.isPending}
+      className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
     >
       <div className="flex items-start gap-3">
         <div className={`rounded-full p-2.5 ${type === "staff" ? "bg-red-100 text-red-700" : "bg-indigo-100 text-indigo-700"}`}>
@@ -254,10 +271,18 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading users…
                 </div>
               ) : (
-                <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
-                  {step === "staff-list"
-                    ? directory.staff.map(technician => userCard(technician, () => selectTechnician(technician), "staff"))
-                    : directory.admins.map(administrator => userCard(administrator, () => selectAdmin(administrator), "admin"))}
+                <div className="space-y-3">
+                  {loginMutation.isPending && (
+                    <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Opening {selectedTechnician?.name ?? selectedAdmin?.name ?? "your"} dashboard…
+                    </div>
+                  )}
+                  <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
+                    {step === "staff-list"
+                      ? directory.staff.map(technician => userCard(technician, () => selectTechnician(technician), "staff"))
+                      : directory.admins.map(administrator => userCard(administrator, () => selectAdmin(administrator), "admin"))}
+                  </div>
                 </div>
               )}
             </div>

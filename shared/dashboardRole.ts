@@ -4,14 +4,6 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
   const dept = user.departmentId ?? "";
   const role = (user.role ?? "").toLowerCase();
 
-  // Profile-picker sign-in intentionally grants staff-level access only. Its
-  // display role must not expose management dashboards based on a selected name.
-  if (user.authenticationMethod === "profile_picker") {
-    if (dept === "div-5") return "sales";
-    if (dept === "div-7") return "accounts";
-    return "service";
-  }
-
   // Owner/director keywords take priority over department
   if (
     role.includes("managing member") ||

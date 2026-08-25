@@ -64,7 +64,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsDemoMode(false);
     localStorage.setItem('auth_token', newToken);
     localStorage.setItem('auth_user', JSON.stringify(userData));
+    localStorage.setItem('auth_user_role', userData.role || 'User');
+    localStorage.setItem('auth_user_type', (userData as AdminUser & { userType?: string }).userType || 'admin');
     localStorage.removeItem('demo_mode');
+    localStorage.removeItem('mobile_worker_id');
+    localStorage.removeItem('mobile_session_token');
+    localStorage.removeItem('mobile_worker_data');
+    localStorage.removeItem('mobile_user_role');
+    localStorage.removeItem('mobile_user_type');
   };
 
   const loginDemo = (profile: DemoProfile) => {
@@ -98,7 +105,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsDemoMode(false);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_user_role');
+    localStorage.removeItem('auth_user_type');
     localStorage.removeItem('demo_mode');
+    localStorage.removeItem('mobile_worker_id');
+    localStorage.removeItem('mobile_session_token');
+    localStorage.removeItem('mobile_worker_data');
+    localStorage.removeItem('mobile_user_role');
+    localStorage.removeItem('mobile_user_type');
   };
 
   const value: AuthContextType = {

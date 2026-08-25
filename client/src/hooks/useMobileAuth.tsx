@@ -43,6 +43,8 @@ export function MobileAuthProvider({ children }: MobileAuthProviderProps) {
         localStorage.removeItem('mobile_worker_id');
         localStorage.removeItem('mobile_session_token');
         localStorage.removeItem('mobile_worker_data');
+        localStorage.removeItem('mobile_user_role');
+        localStorage.removeItem('mobile_user_type');
       }
     }
     
@@ -51,6 +53,10 @@ export function MobileAuthProvider({ children }: MobileAuthProviderProps) {
 
   const login = (workerData: Worker) => {
     setWorker(workerData);
+    localStorage.setItem('mobile_worker_id', workerData.id);
+    localStorage.setItem('mobile_worker_data', JSON.stringify(workerData));
+    localStorage.setItem('mobile_user_role', workerData.role || 'Technician');
+    localStorage.setItem('mobile_user_type', 'staff');
   };
 
   const logout = () => {
@@ -58,6 +64,8 @@ export function MobileAuthProvider({ children }: MobileAuthProviderProps) {
     localStorage.removeItem('mobile_worker_id');
     localStorage.removeItem('mobile_session_token');
     localStorage.removeItem('mobile_worker_data');
+    localStorage.removeItem('mobile_user_role');
+    localStorage.removeItem('mobile_user_type');
   };
 
   const value: MobileAuthContextType = {

@@ -355,6 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: worker.role || 'worker',
           departmentId: worker.departmentId,
           authenticationMethod: "profile_picker",
+           userType: "admin",
         }
       });
     } catch (error) {
