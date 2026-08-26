@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatOvertimeMinutes } from "@shared/overtime";
 import { OVERTIME_WORK_TYPE_LABELS, type OvertimeWorkType } from "@shared/schema";
 import type { Worker } from "@shared/schema";
+import { EmailNotificationDetails } from "@/components/time/email-notification-details";
 
 type OvertimeStatus = "pending" | "approved" | "rejected";
 
@@ -364,21 +365,24 @@ export default function OvertimeApproval() {
             <DialogDescription>{auditEntry ? `${auditEntry.employeeName} · ${readableDate(auditEntry.workDate)}` : ""}</DialogDescription>
           </DialogHeader>
           {loadingAudit ? <p className="py-6 text-center text-sm text-gray-500">Loading history…</p> : (
-            <ol className="space-y-4">
-              {audit.map(event => (
-                <li key={event.id} className="relative border-l-2 border-gray-200 pl-4">
-                  <span className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-red-500" />
-                  <p className="text-sm font-medium text-gray-900 capitalize">{event.action}</p>
-                  <p className="text-xs text-gray-600">by {event.actorName} · {format(new Date(event.createdAt), "dd MMM yyyy, HH:mm")}</p>
-                  {event.details && (() => {
-                    try {
-                      const parsed = JSON.parse(event.details);
-                      return parsed.reason ? <p className="mt-1 text-xs text-gray-500">Reason: {parsed.reason}</p> : null;
-                    } catch { return null; }
-                  })()}
-                </li>
-              ))}
-            </ol>
+            <>
+              <ol className="space-y-4">
+                {audit.filter(event => !event.action.startsWith("TIME_")).map(event => (
+                  <li key={event.id} className="relative border-l-2 border-gray-200 pl-4">
+                    <span className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-red-500" />
+                    <p className="text-sm font-medium text-gray-900 capitalize">{event.action.replaceAll("_", " ").toLowerCase()}</p>
+                    <p className="text-xs text-gray-600">by {event.actorName} · {format(new Date(event.createdAt), "dd MMM yyyy, HH:mm")}</p>
+                    {event.details && (() => {
+                      try {
+                        const parsed = JSON.parse(event.details);
+                        return parsed.reason ? <p className="mt-1 text-xs text-gray-500">Reason: {parsed.reason}</p> : null;
+                      } catch { return null; }
+                    })()}
+                  </li>
+                ))}
+              </ol>
+              <EmailNotificationDetails audit={audit} />
+            </>
           )}
           <div className="flex justify-end pt-2">
             <Button variant="outline" onClick={() => setAuditEntry(null)}>Close</Button>

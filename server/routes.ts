@@ -59,7 +59,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
-import { sendTimeAdjustmentNotification } from "./time-notifications";
+import { sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -440,24 +440,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const overtimeActorName = (req: AuthenticatedRequest) =>
     req.user?.username || [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || "Unknown user";
 
-  const logTimeOffNotificationAudit = async (
+  const logTimeNotificationAudit = async (
     entryId: string,
-    action: "TIME_OFF_NOTIFICATION_SENT" | "TIME_OFF_NOTIFICATION_FAILED",
+    notificationType: "OVERTIME" | "AUTHORISED_TIME_OFF",
     recipient: string,
-    error?: string,
+    delivery: { sent: boolean; error?: string },
   ) => {
+    const attemptedAt = new Date();
     await db.insert(overtimeAuditEntries).values({
       overtimeEntryId: entryId,
       actorId: "system",
       actorName: "JobFlow notifications",
-      action,
-      details: JSON.stringify({ recipient, error: error || null, timestamp: new Date().toISOString() }),
+      action: delivery.sent ? "TIME_NOTIFICATION_SENT" : "TIME_NOTIFICATION_FAILED",
+      details: JSON.stringify({
+        notificationType,
+        entryId,
+        recipient,
+        status: delivery.sent ? "sent" : "failed",
+        sentAt: delivery.sent ? attemptedAt.toISOString() : null,
+        attemptedAt: attemptedAt.toISOString(),
+        error: delivery.error || null,
+      }),
     });
   };
 
   const notifyTimeEntry = async (entry: any, employeeName: string, req: any, approvedByName?: string | null) => {
     const isTimeOff = entry.entryType === "AUTHORISED_TIME_OFF";
-    if (isTimeOff) console.info(`[TIME OFF] Sending notification for entry: ${entry.id}`);
+    const notificationType = isTimeOff ? "AUTHORISED_TIME_OFF" : "OVERTIME";
+    console.info(`[TIME NOTIFICATION] Sending ${notificationType} notification for entry: ${entry.id}`);
     try {
       const protocol = req.headers?.["x-forwarded-proto"] || req.protocol || "http";
       const host = req.get?.("host") || "";
@@ -465,28 +475,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         baseUrl: `${String(protocol).split(",")[0]}://${host}`,
         approvedByName,
       });
-      if (isTimeOff) {
-        for (const delivery of deliveries) {
-          if (delivery.sent) {
-            console.info(`[TIME OFF] Notification sent successfully to: ${delivery.recipient}`);
-            await logTimeOffNotificationAudit(entry.id, "TIME_OFF_NOTIFICATION_SENT", delivery.recipient);
-          } else {
-            console.error(`[TIME OFF] EMAIL FAILED\nEntry ID: ${entry.id}\nRecipient: ${delivery.recipient}\nError: ${delivery.error || "Unknown error"}`);
-            await logTimeOffNotificationAudit(entry.id, "TIME_OFF_NOTIFICATION_FAILED", delivery.recipient, delivery.error);
-          }
+      const attemptedDeliveries = deliveries.length
+        ? deliveries
+        : TIME_NOTIFICATION_RECIPIENTS.map(recipient => ({ recipient, sent: false, error: "No delivery result returned" }));
+      for (const delivery of attemptedDeliveries) {
+        try {
+          await logTimeNotificationAudit(entry.id, notificationType, delivery.recipient, delivery);
+        } catch (auditError) {
+          console.error(`[TIME NOTIFICATION] Could not write recipient audit for ${delivery.recipient}:`, auditError);
+        }
+        if (delivery.sent) {
+          console.info(`[TIME NOTIFICATION] ${notificationType} sent to: ${delivery.recipient}`);
+        } else {
+          console.error(`[TIME NOTIFICATION] ${notificationType} failed for ${delivery.recipient}: ${delivery.error || "Unknown error"}`);
         }
       }
+      const allSent = attemptedDeliveries.length === TIME_NOTIFICATION_RECIPIENTS.length && attemptedDeliveries.every(delivery => delivery.sent);
+      const result = allSent ? "SUCCESS" : attemptedDeliveries.some(delivery => delivery.sent) ? "PARTIAL_FAILURE" : "FAILURE";
+      console.info(`[TIME NOTIFICATION]\nType: ${notificationType}\nEntry ID: ${entry.id}\nRecipients:\n${TIME_NOTIFICATION_RECIPIENTS.join("\n")}\nResult: ${result}`);
       return deliveries;
     } catch (error) {
       // Email delivery must not turn a successfully saved time record into a failed request.
-      console.error(isTimeOff ? `[TIME OFF] EMAIL FAILED\nEntry ID: ${entry.id}\nRecipient: management\nError: ${error instanceof Error ? error.message : String(error)}` : "Could not send time adjustment notification:", error);
-      if (isTimeOff) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[TIME NOTIFICATION] ${notificationType} failed before delivery\nEntry ID: ${entry.id}\nError: ${errorMessage}`);
+      for (const recipient of TIME_NOTIFICATION_RECIPIENTS) {
         try {
-          await logTimeOffNotificationAudit(entry.id, "TIME_OFF_NOTIFICATION_FAILED", "management", error instanceof Error ? error.message : String(error));
+          await logTimeNotificationAudit(entry.id, notificationType, recipient, { sent: false, error: errorMessage });
         } catch (auditError) {
-          console.error("[TIME OFF] Could not write notification audit entry:", auditError);
+          console.error(`[TIME NOTIFICATION] Could not write failure audit for ${recipient}:`, auditError);
         }
       }
+      console.info(`[TIME NOTIFICATION]\nType: ${notificationType}\nEntry ID: ${entry.id}\nRecipients:\n${TIME_NOTIFICATION_RECIPIENTS.join("\n")}\nResult: FAILURE`);
       return [];
     }
   };
