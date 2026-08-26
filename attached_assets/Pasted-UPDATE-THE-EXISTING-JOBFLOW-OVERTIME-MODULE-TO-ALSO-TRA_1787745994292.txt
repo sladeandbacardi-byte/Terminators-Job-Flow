@@ -1,0 +1,561 @@
+UPDATE THE EXISTING JOBFLOW OVERTIME MODULE TO ALSO TRACK AUTHORISED TIME OFF.
+
+Do not create a separate disconnected application.
+
+Rename the employee-facing area to:
+
+MY TIME
+
+Under My Time provide two actions:
+
++ LOG OVERTIME
++ LOG TIME OFF
+
+The Admin area can be called:
+
+TIME & OVERTIME
+
+The purpose is to record both:
+1. Work performed outside normal working hours
+2. Periods during normal working hours where management has authorised an employee not to work
+
+NORMAL WORKING HOURS
+
+08:00 to 16:00
+
+--------------------------------------------------
+1. AUTHORISED TIME OFF
+--------------------------------------------------
+
+Add a new type:
+
+AUTHORISED TIME OFF
+
+This is NOT annual leave, sick leave or unpaid leave.
+
+It is used when Terminators allows an employee to stop working during part of the normal work day.
+
+Example:
+
+Employee completes their work at 12:00.
+Their next client appointment is at 16:00.
+Management allows them to go home between jobs.
+
+Record:
+
+Time Off Start: 12:00
+Time Off Finish: 16:00
+Total Time Off: 4 hrs
+
+The employee then attends the next job at 16:00.
+
+If they work:
+
+16:00 - 17:00
+
+the existing overtime system records:
+
+Overtime: 1 hr
+
+The employee's day would therefore show:
+
+08:00 - 12:00     Working
+12:00 - 16:00     Authorised Time Off
+16:00 - 17:00     Working / Overtime
+
+--------------------------------------------------
+2. LOG TIME OFF FORM
+--------------------------------------------------
+
+Create a mobile-friendly form:
+
+LOG TIME OFF
+
+Fields:
+
+Employee
+- Automatically logged-in employee
+- Normal employee cannot change it
+
+Date
+- Required
+
+Start Time
+- Required
+- Valid 24-hour time picker
+
+Finish Time
+- Required
+- Valid 24-hour time picker
+
+Reason
+Dropdown:
+
+- Finished scheduled work early
+- Gap between jobs
+- Management authorised
+- Returned home before later job
+- Operational downtime
+- Other
+
+If Other is selected:
+Require description.
+
+Notes
+- Optional
+
+Authorised By
+- Management approval field
+- Do not allow employees to approve their own Time Off entry
+
+Total Time Off
+- Automatically calculated
+- Read only
+
+Status:
+- Pending
+- Approved
+- Rejected
+
+--------------------------------------------------
+3. TIME OFF VALIDATION
+--------------------------------------------------
+
+Authorised Time Off should normally only apply inside normal working hours:
+
+08:00 - 16:00
+
+Only count the portion that falls between 08:00 and 16:00.
+
+Examples:
+
+12:00 - 16:00
+= 4 hrs authorised time off
+
+13:30 - 16:00
+= 2 hrs 30 min
+
+08:00 - 10:00
+= 2 hrs
+
+07:00 - 10:00
+= 2 hrs Time Off
+Only 08:00 - 10:00 falls inside normal working hours.
+
+15:00 - 17:00
+= 1 hr Time Off
+Only 15:00 - 16:00 falls inside normal working hours.
+
+If there is no portion between 08:00 and 16:00:
+Do not allow Time Off to be submitted.
+
+Show:
+
+"No normal working time exists in this period."
+
+--------------------------------------------------
+4. STORE TIME IN MINUTES
+--------------------------------------------------
+
+As with Overtime, store Time Off internally as minutes.
+
+Examples:
+
+30 minutes = 30
+1 hour = 60
+2 hours 30 minutes = 150
+4 hours = 240
+
+Display to users as:
+
+30 min
+1 hr
+2 hrs 30 min
+4 hrs
+
+--------------------------------------------------
+5. APPROVAL
+--------------------------------------------------
+
+Employees may submit Time Off.
+
+Time Off must be approved by Admin/Management.
+
+However, also allow Admin/Management to create Time Off directly for an employee.
+
+If an Admin creates the Time Off entry:
+- Allow it to be saved immediately as Approved
+- Record which Admin authorised it
+
+Employees cannot approve their own Time Off.
+
+Once approved, employees cannot edit it.
+
+--------------------------------------------------
+6. OPTIONAL QUICK AUTHORISATION
+--------------------------------------------------
+
+Add an Admin action from the employee's daily diary:
+
+AUTHORISE TIME OFF
+
+Admin selects:
+
+Employee
+Date
+From
+To
+Reason
+
+Example:
+
+Garth
+26/08/2026
+12:00
+16:00
+Gap between jobs
+
+Then click:
+
+AUTHORISE
+
+This should immediately create an approved Time Off record.
+
+This will often be easier than asking the employee to submit it themselves.
+
+--------------------------------------------------
+7. DAILY TIMELINE
+--------------------------------------------------
+
+On the employee's daily view show a simple timeline of their day.
+
+Example:
+
+GARTH
+Wednesday 26 August
+
+08:00 - 10:00
+ABC Motors
+JOB
+
+10:30 - 12:00
+Summerbreeze
+JOB
+
+12:00 - 16:00
+AUTHORISED TIME OFF
+4 hrs
+
+16:00 - 17:00
+Roman Pizza
+JOB
+
+16:00 - 17:00
+OVERTIME
+1 hr
+
+Use clear visual status labels for:
+
+JOB
+NORMAL WORK
+TIME OFF
+OVERTIME
+
+Do not duplicate the actual job record.
+Overtime and Time Off should reference the appropriate date/job where relevant.
+
+--------------------------------------------------
+8. MY TIME SUMMARY
+--------------------------------------------------
+
+Change the employee summary to show:
+
+MY TIME
+
+This Month
+
+Overtime
+14 hrs 30 min
+
+Authorised Time Off
+8 hrs
+
+Net Time Difference
++6 hrs 30 min
+
+Pending Overtime
+2 hrs
+
+Pending Time Off
+4 hrs
+
+IMPORTANT:
+
+Net Time Difference is for MANAGEMENT INFORMATION ONLY.
+
+Do NOT automatically change payroll calculations based on Net Time Difference.
+
+Approved Overtime and Approved Time Off must remain separate records.
+
+--------------------------------------------------
+9. NET TIME DIFFERENCE
+--------------------------------------------------
+
+Calculate:
+
+NET TIME DIFFERENCE =
+APPROVED OVERTIME MINUTES
+minus
+APPROVED AUTHORISED TIME OFF MINUTES
+
+Example:
+
+Overtime = 10 hrs
+Time Off = 4 hrs
+
+Net Time Difference = +6 hrs
+
+Example:
+
+Overtime = 3 hrs
+Time Off = 5 hrs
+
+Net Time Difference = -2 hrs
+
+Display:
+
++6 hrs
+
+or
+
+-2 hrs
+
+Do not automatically use this value for payroll.
+
+--------------------------------------------------
+10. ADMIN DASHBOARD
+--------------------------------------------------
+
+On TIME & OVERTIME show:
+
+This Month
+
+Approved Overtime
+36 hrs 30 min
+
+Approved Time Off
+21 hrs
+
+Net Time Difference
++15 hrs 30 min
+
+Pending Overtime
+8 requests
+
+Pending Time Off
+3 requests
+
+Then allow filtering by:
+
+Employee
+Date
+Department
+Type
+Status
+
+Type:
+
+Overtime
+Authorised Time Off
+
+--------------------------------------------------
+11. EMPLOYEE MONTHLY VIEW
+--------------------------------------------------
+
+For each employee show:
+
+GARTH - AUGUST 2026
+
+Normal scheduled hours
+[calculated if available]
+
+Overtime
+14 hrs 30 min
+
+Authorised Time Off
+8 hrs
+
+Net
++6 hrs 30 min
+
+Overtime Pending
+2 hrs
+
+Time Off Pending
+0 hrs
+
+Allow Admin to click any total to see the individual records.
+
+--------------------------------------------------
+12. IMPORTANT DIFFERENCE FROM LEAVE
+--------------------------------------------------
+
+Do NOT treat Authorised Time Off as:
+
+- Annual Leave
+- Sick Leave
+- Unpaid Leave
+- Absence
+
+Authorised Time Off means:
+
+"Management has authorised the employee not to work for a specified period during their normal working day."
+
+It must not reduce an employee's leave balance.
+
+Leave can be developed as a separate HR module later.
+
+--------------------------------------------------
+13. PREVENT OVERLAPPING ENTRIES
+--------------------------------------------------
+
+Check for conflicting Time Off entries.
+
+Example:
+
+Existing:
+12:00 - 16:00 Time Off
+
+Do not allow another:
+13:00 - 15:00 Time Off
+
+Warn:
+
+"This employee already has a Time Off entry covering this period."
+
+Also check against scheduled JobFlow jobs.
+
+If an employee tries to log:
+
+Time Off:
+12:00 - 16:00
+
+but JobFlow has a scheduled job:
+14:00 - 15:00
+
+display a warning:
+
+"This employee has a scheduled job during the selected Time Off period."
+
+Show the conflicting job details.
+
+Admin can then:
+- Cancel
+- Adjust the Time Off period
+- Override with a reason
+
+Record any Admin override in the audit trail.
+
+--------------------------------------------------
+14. AUDIT TRAIL
+--------------------------------------------------
+
+Record:
+
+Time Off created
+Time Off edited
+Submitted
+Approved
+Rejected
+Reopened
+Deleted
+Admin override
+
+Store:
+- User
+- Employee
+- Date/time
+- Previous values
+- New values
+- Reason where applicable
+
+--------------------------------------------------
+15. DATABASE
+--------------------------------------------------
+
+The preferred design is to use a common time-adjustment structure so Overtime and Time Off can be reported together.
+
+If practical, update the existing overtime structure to support:
+
+type:
+OVERTIME
+AUTHORISED_TIME_OFF
+
+Alternatively create:
+
+authorised_time_off
+
+with:
+
+id
+employee_id
+date
+start_time
+finish_time
+total_minutes
+reason
+notes
+status
+authorised_by
+authorised_at
+rejected_by
+rejected_at
+rejection_reason
+created_by
+created_at
+updated_at
+
+Use the EXISTING JobFlow employee/user database.
+
+Do not create duplicate employee records.
+
+--------------------------------------------------
+16. MOBILE DESIGN
+--------------------------------------------------
+
+The employee My Time screen should be extremely simple.
+
+At the top:
+
+MY TIME
+
+[ + LOG OVERTIME ]
+[ + LOG TIME OFF ]
+
+Then:
+
+THIS MONTH
+
+Overtime          6 hrs 30 min
+Time Off          4 hrs
+Net               +2 hrs 30 min
+
+Then show recent activity.
+
+Example:
+
+TODAY
+
+12:00 - 16:00
+Authorised Time Off
+4 hrs
+APPROVED
+
+16:00 - 17:30
+Overtime
+1 hr 30 min
+PENDING
+
+Keep this easy to use on a phone.
+
+Do not use a large desktop-style table on the mobile view.
