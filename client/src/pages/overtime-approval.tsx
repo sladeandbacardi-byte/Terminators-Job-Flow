@@ -90,6 +90,7 @@ export default function OvertimeApproval() {
   const { data: audit = [], isLoading: loadingAudit } = useQuery<AuditEvent[]>({
     queryKey: ["/api/overtime", auditEntry?.id, "audit"],
     enabled: Boolean(auditEntry),
+    refetchInterval: auditEntry ? 2000 : false,
   });
 
   const refreshOvertime = () => {
@@ -299,7 +300,7 @@ export default function OvertimeApproval() {
                     </Button>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => setAuditEntry(entry)}>
-                    <History className="h-3.5 w-3.5 mr-1.5" />History
+                     <History className="h-3.5 w-3.5 mr-1.5" />History &amp; email
                   </Button>
                 </div>
               </article>
@@ -366,7 +367,9 @@ export default function OvertimeApproval() {
           </DialogHeader>
           {loadingAudit ? <p className="py-6 text-center text-sm text-gray-500">Loading history…</p> : (
             <>
-              <ol className="space-y-4">
+              <EmailNotificationDetails audit={audit} />
+              <p className="mt-5 border-t pt-4 text-xs font-semibold uppercase tracking-wide text-gray-600">Approval history</p>
+              <ol className="mt-3 space-y-4">
                 {audit.filter(event => !event.action.startsWith("TIME_")).map(event => (
                   <li key={event.id} className="relative border-l-2 border-gray-200 pl-4">
                     <span className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-red-500" />
@@ -381,7 +384,6 @@ export default function OvertimeApproval() {
                   </li>
                 ))}
               </ol>
-              <EmailNotificationDetails audit={audit} />
             </>
           )}
           <div className="flex justify-end pt-2">
