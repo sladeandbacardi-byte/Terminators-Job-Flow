@@ -4,7 +4,7 @@ import { MapPin, Clock, User, Phone, Mail, FileText, Package, AlertTriangle } fr
 import { Badge } from "@/components/ui/badge";
 import { getStatusColor, formatDateTime } from "@/lib/utils";
 import { formatClientAddress, type Job, type Client, type Worker, type Department, type JobInventoryItem, type InventoryItem } from "@shared/schema";
-import termLogoPath from "@assets/job-flow-header-logo_1779307679615.png";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 interface JobCardData extends Job {
   client: Client;
@@ -56,11 +56,7 @@ export function JobCard({ jobId, className = "" }: JobCardProps) {
       {/* Header */}
       <div className="flex justify-between items-start mb-6">
         <div className="flex items-center gap-4">
-          <img 
-            src={termLogoPath} 
-            alt="Job Flow Field Service Management" 
-            className="h-16 w-auto"
-          />
+          <JobFlowBrandLockup size="sm" data-testid="job-card-brand-lockup" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900">JOB CARD</h1>
             <p className="text-gray-600">Field Service Management</p>

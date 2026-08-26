@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getStatusColor } from "@/lib/utils";
 import { formatClientAddress, type Job, type Client, type Worker, type Department, type JobInventoryItem, type InventoryItem } from "@shared/schema";
-import termLogoPath from "@assets/job-flow-dashboard-banner_1779307679615.png";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 interface JobWithDetails extends Job {
   client: Client;
@@ -86,11 +86,7 @@ export function DailyDepartmentCard({ departmentId, date, className = "" }: Dail
       <div className="bg-gray-50 p-3 print:p-1 border-b">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3 print:gap-2">
-            <img 
-              src={termLogoPath} 
-              alt="Job Flow Field Service Management" 
-              className="h-10 w-auto print:h-6"
-            />
+            <JobFlowBrandLockup size="sm" className="print:scale-75 print:origin-left" data-testid="daily-schedule-brand-lockup" />
             <div>
               <h1 className="text-lg print:text-sm font-bold text-gray-900">DAILY SCHEDULE</h1>
               <p className="text-xs print:text-xs text-gray-600">{format(date, 'EEEE, dd MMMM yyyy')}</p>

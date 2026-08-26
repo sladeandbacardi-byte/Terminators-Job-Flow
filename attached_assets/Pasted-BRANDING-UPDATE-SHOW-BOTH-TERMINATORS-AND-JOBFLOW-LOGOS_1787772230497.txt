@@ -1,0 +1,304 @@
+BRANDING UPDATE: SHOW BOTH TERMINATORS AND JOBFLOW LOGOS THROUGHOUT THE APP
+
+I want BOTH logos to appear throughout the JobFlow application:
+
+1. Terminators business logo
+2. JobFlow logo
+
+Do NOT replace one with the other.
+
+Use both logos together consistently across the application.
+
+--------------------------------------------------
+1. BRAND LOCKUP
+--------------------------------------------------
+
+Create one reusable branding component that contains:
+
+[ TERMINATORS LOGO ]   [ JOBFLOW LOGO ]
+
+Terminators logo first.
+JobFlow logo second.
+
+Keep both logos at visually balanced sizes.
+
+Maintain the original aspect ratio of both logos.
+
+Do not stretch, redraw, recolour or recreate either logo.
+
+Use the approved existing image assets already in the project.
+
+--------------------------------------------------
+2. USE ONE SHARED COMPONENT
+--------------------------------------------------
+
+Create a shared component such as:
+
+BrandHeader
+AppBranding
+JobFlowBrandLockup
+
+Use this same component everywhere rather than manually inserting two separate images on every page.
+
+This is important so the branding stays consistent throughout the app.
+
+--------------------------------------------------
+3. APPLY TO DESKTOP
+--------------------------------------------------
+
+Show both logos in:
+
+- Main JobFlow header
+- Desktop sidebar/header branding area
+- Dashboard
+- Sales
+- Service
+- Finance
+- Operations
+- Reports
+- Settings
+- Client pages
+- Job pages
+- Quote pages
+- Invoice pages
+- Contract pages
+- FleetGuard pages
+- Time & Overtime pages
+
+Wherever the current JobFlow branding is shown, use the combined Terminators + JobFlow branding.
+
+--------------------------------------------------
+4. APPLY TO MOBILE
+--------------------------------------------------
+
+The mobile version must use the same paired branding.
+
+Show:
+
+[ Terminators logo ] [ JobFlow logo ]
+
+in the mobile header.
+
+Because screen space is smaller:
+
+- scale both logos down proportionally
+- do not hide one logo
+- do not allow the logos to overlap
+- keep the header compact
+- ensure both remain readable
+
+Apply this to:
+
+- Mobile Dashboard
+- My Jobs
+- Job Details
+- My Time
+- Log Overtime
+- Log Time Off
+- Fleet Actions
+- Fuel
+- Vehicle Inspections
+- Mobile menu
+- User/sign-out screens
+
+--------------------------------------------------
+5. LOGIN SCREEN
+--------------------------------------------------
+
+The login screen must show BOTH:
+
+Terminators logo
+JobFlow logo
+
+Use the combined brand component at the top.
+
+Then show the existing login choices:
+
+Admin
+Mobile User
+
+Do not create a separate visual theme for the login screen.
+
+--------------------------------------------------
+6. EMAILS
+--------------------------------------------------
+
+Use BOTH logos at the top of JobFlow emails.
+
+Example:
+
+[ TERMINATORS LOGO ]    [ JOBFLOW LOGO ]
+
+Then:
+
+Overtime Logged
+
+or:
+
+Authorised Time Off Logged
+
+Apply this branding to all JobFlow-generated emails where a logo is displayed.
+
+This includes:
+
+- Overtime notifications
+- Time Off notifications
+- Fleet notifications
+- Job notifications
+- Quote emails
+- other JobFlow email templates
+
+where applicable.
+
+--------------------------------------------------
+7. EMAIL IMAGE COMPATIBILITY
+--------------------------------------------------
+
+For email templates, make sure both logos display correctly in Outlook.
+
+Use either:
+
+- inline CID embedded images
+
+OR
+
+- valid public HTTPS image URLs
+
+Do not use:
+
+- localhost
+- local filesystem paths
+- relative-only browser paths
+- temporary development URLs
+
+If one logo fails to load, do not leave a broken image icon.
+
+--------------------------------------------------
+8. RESPONSIVE LOGO SIZING
+--------------------------------------------------
+
+Desktop:
+Allow a wider brand lockup.
+
+Mobile:
+Use smaller versions.
+
+Example concept:
+
+Desktop:
+Terminators logo width approximately 180-220px
+JobFlow logo width approximately 110-160px
+
+Mobile:
+Terminators logo width approximately 110-140px
+JobFlow logo width approximately 70-100px
+
+These are guidelines only.
+
+Use sizing that looks balanced with the actual logo proportions.
+
+--------------------------------------------------
+9. SPACING
+--------------------------------------------------
+
+Add suitable space between the two logos.
+
+Do not squash them together.
+
+Do not make the logos so large that they dominate the interface.
+
+The branding should be visible but professional.
+
+--------------------------------------------------
+10. DO NOT USE TEXT AS A SUBSTITUTE
+--------------------------------------------------
+
+Do not replace either logo with plain text.
+
+Use the actual image assets.
+
+Where page headings say JobFlow, they may remain as text, but both logo images must still appear in the branding area.
+
+--------------------------------------------------
+11. DARK / LIGHT BACKGROUNDS
+--------------------------------------------------
+
+If the app uses different background colours:
+
+- use approved light/dark logo variants if they already exist
+- otherwise place the combined logos on a neutral/light background area
+
+Do not alter the official logo colours just to fit a background.
+
+--------------------------------------------------
+12. REMOVE INCONSISTENT BRANDING
+--------------------------------------------------
+
+Search the entire project for:
+
+- JobFlow logo usage
+- Terminators logo usage
+- old logo components
+- old header components
+
+Replace inconsistent branding with the new shared two-logo component.
+
+Do not leave some pages with:
+JobFlow only
+
+and others with:
+Terminators only
+
+The branding rule is:
+
+TERMINATORS + JOBFLOW
+
+throughout the application.
+
+--------------------------------------------------
+13. DO NOT CHANGE FUNCTIONALITY
+--------------------------------------------------
+
+This is a branding/UI update only.
+
+Do not change or break:
+
+- login logic
+- permissions
+- jobs
+- clients
+- quotes
+- contracts
+- invoices
+- overtime
+- time off
+- FleetGuard
+- email delivery logic
+- database
+- reports
+
+--------------------------------------------------
+14. FINAL VISUAL TEST
+--------------------------------------------------
+
+Check the following side-by-side:
+
+Desktop login
+Desktop dashboard
+Mobile login
+Mobile dashboard
+My Time
+FleetGuard
+Email notification
+
+Every one should clearly display BOTH:
+
+Terminators logo
+JobFlow logo
+
+The app should now look like:
+
+Terminators = company/business brand
+JobFlow = software/platform brand
+
+Both brands must be consistently visible.

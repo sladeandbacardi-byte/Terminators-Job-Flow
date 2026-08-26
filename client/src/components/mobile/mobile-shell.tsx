@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, ChevronRight, LogOut, Menu, X } from "lucide-react";
-import jobFlowLogo from "@assets/job-flow-header-logo_1779307679615.png";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 export type MobileNavItem = {
   id: string;
@@ -57,7 +57,7 @@ export function MobileShell({
             >
               {onBack ? <ArrowLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
-            <img src={jobFlowLogo} alt="JobFlow" className="hidden h-8 w-auto max-w-[112px] object-contain sm:block" />
+            <JobFlowBrandLockup size="xs" className="shrink-0" data-testid="mobile-header-brand-lockup" />
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-tight text-gray-900">{title}</h1>
               <p className="truncate text-xs text-gray-500">
@@ -81,7 +81,7 @@ export function MobileShell({
           <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-gray-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <div className="min-w-0">
-                <img src={jobFlowLogo} alt="JobFlow" className="h-8 w-auto max-w-[150px] object-contain" />
+                <JobFlowBrandLockup size="sm" data-testid="mobile-menu-brand-lockup" />
                 <p className="mt-2 truncate text-sm font-semibold text-gray-900">{workerName}</p>
                 <p className="text-xs text-gray-500">{workerRole || "Technician"}</p>
               </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Smartphone, UserRound } from "lucide-react";
 import type { Worker } from "@shared/schema";
-import jobFlowLogo from "@assets/job-flow-header-logo_1779307679615.png";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 type StaffProfile = { id: string; name: string; role: string; department: string; employeeId: string };
 
@@ -63,7 +63,7 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
 
   return <div className="min-h-screen bg-gray-50 px-4 py-8">
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center space-y-6">
-      <div className="flex justify-center"><img src={jobFlowLogo} alt="JobFlow Field Service Management" className="h-auto w-[260px] object-contain" /></div>
+      <div className="flex justify-center"><JobFlowBrandLockup size="md" className="max-w-full" data-testid="mobile-login-brand-lockup" /></div>
       <main className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <button type="button" onClick={() => { window.location.href = "/"; }} className="mb-4 flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-red-600"><ArrowLeft className="h-4 w-4" />Back to Main Login</button>
          <div className="mb-5 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-600 text-white"><Smartphone className="h-6 w-6" /></div><h1 className="text-2xl font-bold text-gray-900">Staff Login</h1><p className="mt-2 text-sm text-gray-600">For technicians and mobile field staff</p></div>

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, getDefaultDashboardRoute } from "@/lib/dashboardRole";
-import jobFlowLogo from "@assets/job-flow-header-logo_1779307679615.png";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 type NavItem = {
   name: string;
@@ -189,17 +189,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
             className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors group"
             title="Expand sidebar"
           >
-            <div className="w-7 h-7 bg-red-600 rounded flex items-center justify-center text-white font-bold text-xs leading-none group-hover:bg-red-700 transition-colors">
-              J
-            </div>
+            <JobFlowBrandLockup size="xs" stacked data-testid="collapsed-brand-lockup" />
           </button>
         ) : (
           <>
-            <img
-              src={jobFlowLogo}
-              alt="Job Flow"
-              className="h-8 w-auto object-contain flex-1 min-w-0"
-            />
+            <JobFlowBrandLockup size="sm" className="min-w-0" data-testid="sidebar-brand-lockup" />
             <button
               onClick={toggleCollapsed}
               className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"

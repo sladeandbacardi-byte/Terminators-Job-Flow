@@ -9,7 +9,7 @@ import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 import { ManagerDashboard } from "@/components/dashboard/manager-dashboard";
 import { CoordinatorDashboard } from "@/components/dashboard/coordinator-dashboard";
 import { SuspendedServices } from "@/components/dashboard/suspended-services";
-import { TerminatorsLogo } from "@/components/terminators-logo";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, dashboardRoleLabels, dashboardRoleColors, type DashboardRole } from "@/lib/dashboardRole";
 import { useToast } from "@/hooks/use-toast";
@@ -167,7 +167,7 @@ export default function Dashboard() {
 
               {/* Logo row */}
               <div className="flex items-center justify-between px-4 pt-3 pb-2.5">
-                <TerminatorsLogo size="sm" data-testid="company-logo" />
+                <JobFlowBrandLockup size="sm" data-testid="company-logo" />
                 <div className="flex flex-col items-end gap-0.5">
                   <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${dashboardRoleColors[dashboardRole]}`}>
                     {dashboardRoleLabels[dashboardRole]} View

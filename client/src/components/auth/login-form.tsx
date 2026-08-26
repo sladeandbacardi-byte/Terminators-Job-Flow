@@ -9,6 +9,7 @@ import {
   ShieldCheck, Smartphone, UserRound,
 } from "lucide-react";
 import { AUTH_MODE } from "@shared/auth";
+import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
 
@@ -232,12 +233,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 px-4 py-8">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center space-y-6">
         <div className="flex justify-center">
-          <img
-            src="/images/job-flow-full-logo.png"
-            alt="Job Flow Field Service Management"
-            className="h-auto w-[260px] object-contain sm:w-[320px]"
-            onError={event => { (event.target as HTMLImageElement).style.display = "none"; }}
-          />
+          <JobFlowBrandLockup size="lg" className="max-w-full" data-testid="login-brand-lockup" />
         </div>
 
         <main className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg sm:p-6">

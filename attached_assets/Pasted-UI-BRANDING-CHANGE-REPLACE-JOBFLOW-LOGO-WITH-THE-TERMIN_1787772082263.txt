@@ -1,0 +1,121 @@
+UI BRANDING CHANGE: REPLACE JOBFLOW LOGO WITH THE TERMINATORS BUSINESS LOGO EVERYWHERE THE JOBFLOW LOGO CURRENTLY APPEARS
+
+I do NOT only want the Terminators logo added to the emails.
+
+I want the Terminators business logo to be used EVERYWHERE the current JobFlow logo appears across the whole application.
+
+--------------------------------------------------
+REQUIREMENT
+--------------------------------------------------
+
+Wherever the current JobFlow logo is displayed, replace it with the official Terminators business logo.
+
+This includes all areas of the application where the JobFlow logo/branding graphic currently appears.
+
+Do not redraw, recreate, restyle or generate a new logo.
+
+Use the existing official Terminators business logo asset already available in the project / uploaded assets.
+
+--------------------------------------------------
+APPLY THIS CHANGE TO ALL OF THE FOLLOWING
+--------------------------------------------------
+
+1. Main desktop JobFlow header
+2. Mobile user header
+3. Login screen
+4. Admin login / mobile login selection screen
+5. Sidebar / navigation branding area
+6. Dashboard header cards if logo is shown there
+7. Overtime pages
+8. My Time pages
+9. Fleet pages
+10. Forms/modals where the JobFlow logo is shown
+11. Email templates
+12. Any splash/loading/header branding areas
+13. Sign-in / sign-out related pages
+14. Any PDF / printable views if the JobFlow logo is currently shown there
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+Do not just add the Terminators logo alongside the JobFlow logo.
+
+If the JobFlow logo graphic is currently shown, replace that graphic with the Terminators business logo.
+
+The system/app name can still remain "JobFlow" as text where appropriate, but the visual logo graphic should be the Terminators business logo.
+
+Example:
+- Terminators logo at top
+- "JobFlow" can remain as the product/module name in text if needed
+
+So the branding can read more like:
+
+[TERMINATORS LOGO]
+JobFlow
+
+rather than showing the old JobFlow logo graphic.
+
+--------------------------------------------------
+EMAILS
+--------------------------------------------------
+
+Apply the same rule to emails.
+
+Wherever the JobFlow logo is used in email templates, replace it with the Terminators business logo.
+
+Email headings can still say:
+- JobFlow
+- Overtime Logged
+- Time Off Logged
+
+But the displayed logo image must be the Terminators business logo.
+
+--------------------------------------------------
+CONSISTENCY
+--------------------------------------------------
+
+Use ONE consistent Terminators logo asset everywhere.
+
+Do not use different variations in different places unless there is already an approved light/dark version.
+
+If a dark header needs a light logo version, use the correct approved version of the same Terminators branding.
+
+Do not distort the logo.
+
+Maintain correct aspect ratio and professional spacing.
+
+--------------------------------------------------
+DO NOT BREAK
+--------------------------------------------------
+
+Do not change any business logic.
+
+Do not break:
+- login flow
+- mobile flow
+- overtime calculations
+- time off calculations
+- email notifications
+- approvals
+- permissions
+- audit trail
+- routing/navigation
+
+This is a branding/UI change only.
+
+--------------------------------------------------
+FINAL CHECK
+--------------------------------------------------
+
+After the change, search the project for all places where the JobFlow logo component or JobFlow logo image is used.
+
+Replace all of those instances with the Terminators business logo.
+
+Do a final check on:
+- desktop
+- mobile
+- login
+- emails
+
+to make sure there are no old JobFlow logo graphics left anywhere.

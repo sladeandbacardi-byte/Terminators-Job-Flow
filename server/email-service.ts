@@ -1,5 +1,10 @@
 import { MailService } from '@sendgrid/mail';
 import type { PurchaseOrder, Supplier, PurchaseOrderItem, InventoryItem } from "@shared/schema";
+import {
+  EMAIL_BRANDING_MARKER,
+  EMAIL_BRANDING_SENDGRID_ATTACHMENTS,
+  withEmailBranding,
+} from "./email-branding";
 
 if (!process.env.SENDGRID_API_KEY) {
   console.warn("SENDGRID_API_KEY not found. Email functionality will be disabled.");
@@ -15,6 +20,7 @@ interface EmailAttachment {
   filename: string;
   type: string;
   disposition?: string;
+  content_id?: string;
 }
 
 interface EmailParams {
@@ -33,19 +39,25 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 
   try {
+    const shouldAddBranding = Boolean(params.html) && !params.html.includes(EMAIL_BRANDING_MARKER);
+    const html = withEmailBranding(params.html || '');
+    const attachments = shouldAddBranding
+      ? [...(params.attachments || []), ...EMAIL_BRANDING_SENDGRID_ATTACHMENTS]
+      : params.attachments;
     const message: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
       text: params.text || '',
-      html: params.html || '',
+      html,
     };
-    if (params.attachments && params.attachments.length > 0) {
-      message.attachments = params.attachments.map(a => ({
+    if (attachments && attachments.length > 0) {
+      message.attachments = attachments.map(a => ({
         content: a.content,
         filename: a.filename,
         type: a.type,
         disposition: a.disposition ?? 'attachment',
+        ...(a.content_id ? { content_id: a.content_id } : {}),
       }));
     }
     await mailService.send(message);
