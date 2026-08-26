@@ -465,14 +465,14 @@ export function MobileEquipmentChecklist({ worker, onBack }: Props) {
   if (screen === "home") {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-green-700 text-white p-4">
+        <div className="border-b border-gray-200 bg-white p-4 text-gray-900 shadow-sm">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="text-white hover:bg-green-800 p-1 rounded">
+            <button onClick={onBack} className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
               <h1 className="text-lg font-bold">Equipment Checklist</h1>
-              <p className="text-green-100 text-sm">{worker.name}</p>
+              <p className="text-gray-500 text-sm">{worker.name}</p>
             </div>
           </div>
         </div>
@@ -505,9 +505,9 @@ export function MobileEquipmentChecklist({ worker, onBack }: Props) {
 
             <button
               onClick={() => startChecklist("daily")}
-              className="w-full mb-3 flex items-center gap-4 bg-green-50 border border-green-200 rounded-xl p-4 text-left hover:bg-green-100 transition-colors"
+              className="mb-3 flex w-full items-center gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-left text-red-800 transition-colors hover:bg-red-100"
             >
-              <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shrink-0">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-600">
                 <ClipboardList className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -597,16 +597,16 @@ export function MobileEquipmentChecklist({ worker, onBack }: Props) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-green-700 text-white p-4 sticky top-0 z-20">
+      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white p-4 text-gray-900 shadow-sm">
         <div className="flex items-center gap-3">
-          <button onClick={() => setScreen("home")} className="text-white hover:bg-green-800 p-1 rounded">
+          <button onClick={() => setScreen("home")} className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex-1">
             <h1 className="text-base font-bold">
               {header.checklistType === "daily" ? "Daily Equipment Checklist" : "Job-Specific Checklist"}
             </h1>
-            <p className="text-green-100 text-xs">{new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}</p>
+            <p className="text-xs text-gray-500">{new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}</p>
           </div>
         </div>
       </div>
@@ -734,7 +734,7 @@ export function MobileEquipmentChecklist({ worker, onBack }: Props) {
           ) : (
             <Button
               size="lg"
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 text-base"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 text-base"
               onClick={onSubmitPress}
               disabled={saving}
             >

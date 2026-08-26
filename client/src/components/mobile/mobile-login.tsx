@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Smartphone, UserRound } from "lucide-react";
 import type { Worker } from "@shared/schema";
+import jobFlowLogo from "@assets/job-flow-header-logo_1779307679615.png";
 
 type StaffProfile = { id: string; name: string; role: string; department: string; employeeId: string };
 
@@ -60,12 +61,12 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
     }
   };
 
-  return <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 px-4 py-8">
+  return <div className="min-h-screen bg-gray-50 px-4 py-8">
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center space-y-6">
-      <div className="flex justify-center"><img src="/images/job-flow-full-logo.png" alt="Job Flow Field Service Management" className="h-auto w-[260px] object-contain" onError={event => { (event.target as HTMLImageElement).style.display = "none"; }} /></div>
-      <main className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg sm:p-6">
+      <div className="flex justify-center"><img src={jobFlowLogo} alt="JobFlow Field Service Management" className="h-auto w-[260px] object-contain" /></div>
+      <main className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <button type="button" onClick={() => { window.location.href = "/"; }} className="mb-4 flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-red-600"><ArrowLeft className="h-4 w-4" />Back to Main Login</button>
-        <div className="mb-5 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-600 text-white"><Smartphone className="h-6 w-6" /></div><h1 className="text-2xl font-bold text-gray-900">Staff Login</h1><p className="mt-2 text-sm text-gray-600">For technicians and mobile field staff</p></div>
+         <div className="mb-5 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-600 text-white"><Smartphone className="h-6 w-6" /></div><h1 className="text-2xl font-bold text-gray-900">Staff Login</h1><p className="mt-2 text-sm text-gray-600">For technicians and mobile field staff</p></div>
         {error && <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
         {loading ? <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading staff…</div> : <div className="space-y-2">{staff.map(profile => <button key={profile.id} type="button" onClick={() => signIn(profile)} disabled={Boolean(signingIn)} className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-red-400 hover:bg-red-50 hover:shadow-md disabled:cursor-wait disabled:opacity-60"><div className="rounded-full bg-red-100 p-2.5 text-red-700">{signingIn === profile.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserRound className="h-5 w-5" />}</div><div><p className="font-semibold text-gray-900">{profile.name}</p><p className="text-sm text-gray-600">{profile.role}</p><p className="text-xs uppercase tracking-wide text-gray-400">{profile.department}</p></div></button>)}</div>}
       </main>

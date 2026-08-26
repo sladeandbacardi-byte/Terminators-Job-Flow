@@ -132,7 +132,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
           <p className="mt-2 text-gray-600">Loading work orders...</p>
         </div>
       </div>
@@ -142,21 +142,21 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-green-600 text-white p-4 sticky top-0 z-20">
+       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white p-4 text-gray-900 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowMenu(true)}
-              className="text-white hover:bg-green-700 p-2"
+               className="text-gray-500 hover:bg-gray-100 hover:text-gray-900 p-2"
               data-testid="button-menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
             <div>
               <h1 className="text-lg font-semibold">My Work Orders</h1>
-              <p className="text-green-100 text-sm">{worker.name}</p>
+               <p className="text-gray-500 text-sm">{worker.name}</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -164,7 +164,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
               variant="ghost"
               size="sm"
               onClick={fetchWorkOrders}
-              className="text-white hover:bg-green-700"
+               className="text-gray-500 hover:bg-gray-100 hover:text-gray-900"
               data-testid="button-refresh"
             >
               <RefreshCw className="h-4 w-4" />
@@ -185,17 +185,17 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
           {/* Menu Content */}
           <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-xl">
             {/* Menu Header */}
-            <div className="bg-green-600 text-white p-4">
+             <div className="border-b border-gray-200 bg-white p-4 text-gray-900">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold">Menu</h2>
-                  <p className="text-green-100 text-sm">{worker.name}</p>
+                   <p className="text-gray-500 text-sm">{worker.name}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowMenu(false)}
-                  className="text-white hover:bg-green-700"
+                   className="text-gray-500 hover:bg-gray-100 hover:text-gray-900"
                   data-testid="button-close-menu"
                 >
                   <X className="h-5 w-5" />
@@ -229,7 +229,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                 <h3 className="font-medium text-gray-900 mb-2">Tools</h3>
                 <button
                   onClick={() => { setShowMenu(false); setActiveScreen('equipment-checklist'); }}
-                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-800 transition-colors"
+                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 transition-colors"
                   data-testid="button-equipment-checklist"
                 >
                   <ClipboardCheck className="h-5 w-5 shrink-0" />
@@ -317,7 +317,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                       href={job.googleMapsLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-sm flex items-center justify-center space-x-2"
+                      className="block w-full text-center bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg shadow-sm flex items-center justify-center space-x-2"
                       data-testid={`button-open-google-maps-${job.id}`}
                     >
                       <Navigation className="h-5 w-5" />
@@ -364,7 +364,7 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
                     <Button
                       size="lg"
                       onClick={() => updateJobStatus(job.id, 'completed')}
-                      className="w-full bg-green-600 hover:bg-green-700 font-semibold"
+                      className="w-full bg-red-600 hover:bg-red-700 font-semibold"
                       data-testid={`button-complete-${job.id}`}
                     >
                       Complete Job

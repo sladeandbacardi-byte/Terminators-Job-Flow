@@ -63,7 +63,7 @@ const EQUIPMENT_OPTIONS = [
 ];
 
 function ToggleCard({ checked, label, onClick }: { checked: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${checked ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>
+  return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${checked ? "border-red-600 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-600"}`}>
     {checked && <Check className="mr-1 inline h-3.5 w-3.5" />}{label}
   </button>;
 }
@@ -225,7 +225,7 @@ export function MobileTreatmentReport({
   if (loading) return <div className="py-16 text-center text-sm text-slate-500">Loading treatment report…</div>;
   if (!job) return <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error || "Treatment report unavailable."}</div>;
   if (job.status === "completed") return <div className="space-y-4">
-    <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold text-emerald-700"><ChevronLeft className="h-4 w-4" />Back to My Jobs</button>
+    <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold text-red-700"><ChevronLeft className="h-4 w-4" />Back to My Jobs</button>
     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900"><Check className="mb-2 h-6 w-6" /><h2 className="font-bold">Treatment report complete</h2><p className="mt-1 text-sm">This completed record is view-only for technicians.</p></div>
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="font-bold text-slate-900">Completed treatment summary</h3>
@@ -240,13 +240,13 @@ export function MobileTreatmentReport({
   </div>;
 
   return <div className="space-y-4 pb-8">
-    <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold text-emerald-700"><ChevronLeft className="h-4 w-4" />Back to My Jobs</button>
+    <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold text-red-700"><ChevronLeft className="h-4 w-4" />Back to My Jobs</button>
     {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}
     {validationErrors.length > 0 && <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><div className="mb-2 flex items-center gap-2 font-bold"><ShieldAlert className="h-4 w-4" />Please complete the report</div><ul className="list-disc space-y-1 pl-5">{validationErrors.map(item => <li key={item}>{item}</li>)}</ul></div>}
 
     <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 h-5 w-5 text-emerald-700" /><div><h2 className="font-bold text-slate-900">Treatment Report</h2><p className="text-xs text-slate-500">{job.jobNumber || "Job"} · {job.clientName}</p></div></div>
+      <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 h-5 w-5 text-red-600" /><div><h2 className="font-bold text-slate-900">Treatment Report</h2><p className="text-xs text-slate-500">{job.jobNumber || "Job"} · {job.clientName}</p></div></div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600"><span>Technician: {job.technicianName}</span><span>PCO: {job.pcoRegistrationNumber || "Not recorded"}</span><span className="col-span-2">Site: {job.siteAddress || "Not recorded"}</span><span>Contract: {job.contractNumber || "Once-off"}</span><span>Started: {job.startTime ? new Date(job.startTime).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : "Start job first"}</span></div>
     </section>
 
@@ -269,7 +269,7 @@ export function MobileTreatmentReport({
 
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h3 className="font-bold text-slate-900">6. Client Confirmation</h3><input value={form.customerName || ""} onChange={event => setField("customerName", event.target.value)} placeholder="Client / representative name" className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" /><label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={form.signatureUnavailable} onChange={event => { setField("signatureUnavailable", event.target.checked); if (event.target.checked) { clearSignature(); } }} />Unable to obtain client signature</label>{form.signatureUnavailable ? <select value={form.signatureUnavailableReason || ""} onChange={event => setField("signatureUnavailableReason", event.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"><option value="">Why was a signature unavailable?</option><option value="Client representative unavailable">Client representative unavailable</option><option value="Site unattended">Site unattended</option><option value="Client declined to sign">Client declined to sign</option><option value="Other">Other</option></select> : <><p className="text-xs text-slate-500">Ask the client to sign below using their finger.</p><canvas ref={canvasRef} width={640} height={200} onPointerDown={drawStart} onPointerMove={drawMove} onPointerUp={drawEnd} onPointerLeave={drawEnd} className="h-32 w-full touch-none rounded-lg border border-dashed border-slate-400 bg-white" /><div className="flex gap-2"><button type="button" onClick={clearSignature} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold"><Eraser className="h-3.5 w-3.5" />Clear signature</button><span className={`flex flex-1 items-center justify-center rounded-lg text-xs font-semibold ${signatureSaved ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{signatureSaved ? "Signature saved" : "Sign above"}</span></div></>}</section>
 
-    <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900"><strong>Customer precautions on the final report:</strong> keep children and pets out of treated areas, ventilate well, cover food, avoid cleaning treated surfaces for 5 days, and do not tamper with bait. Increased pest activity after initial treatment can be normal; allow about 7 days for treatment to take effect.</section>
-    <div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => saveDraft()} disabled={saving} className="flex items-center justify-center gap-2 rounded-xl border border-emerald-700 bg-white px-4 py-3 font-bold text-emerald-800"><Save className="h-4 w-4" />Save draft</button><button type="button" onClick={complete} disabled={saving} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 font-bold text-white disabled:opacity-60"><Send className="h-4 w-4" />{saving ? "Saving…" : "Complete job"}</button></div>
+    <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950"><strong>Customer precautions on the final report:</strong> keep children and pets out of treated areas, ventilate well, cover food, avoid cleaning treated surfaces for 5 days, and do not tamper with bait. Increased pest activity after initial treatment can be normal; allow about 7 days for treatment to take effect.</section>
+    <div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => saveDraft()} disabled={saving} className="flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 font-bold text-gray-700 hover:bg-gray-50"><Save className="h-4 w-4" />Save draft</button><button type="button" onClick={complete} disabled={saving} className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 font-bold text-white hover:bg-red-700 disabled:opacity-60"><Send className="h-4 w-4" />{saving ? "Saving…" : "Complete job"}</button></div>
   </div>;
 }
