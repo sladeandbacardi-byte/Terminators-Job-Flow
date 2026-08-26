@@ -432,10 +432,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const protocol = req.headers?.["x-forwarded-proto"] || req.protocol || "http";
       const host = req.get?.("host") || "";
-      await sendTimeAdjustmentNotification(entry, employeeName, {
+      const notification = sendTimeAdjustmentNotification(entry, employeeName, {
         baseUrl: `${String(protocol).split(",")[0]}://${host}`,
         approvedByName,
       });
+      await Promise.race([
+        notification,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("notification delivery timed out")), 8000)),
+      ]);
     } catch (error) {
       // Email delivery must not turn a successfully saved time record into a failed request.
       console.error("Could not send time adjustment notification:", error);
@@ -1633,7 +1637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
       }).returning();
       const enriched = (await enrichOvertimeEntries([created]))[0];
-      await notifyTimeEntry(enriched, req.mobileWorker!.name, req);
+      void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
       res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit mobile overtime:", error);
@@ -1690,7 +1694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "submitted", details: JSON.stringify({ entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes }),
       });
       const enriched = (await enrichOvertimeEntries([created]))[0];
-      await notifyTimeEntry(enriched, req.mobileWorker!.name, req);
+      void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
       res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit mobile time off:", error);
@@ -1740,7 +1744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return created;
       });
       const enriched = (await enrichOvertimeEntries([entry]))[0];
-      await notifyTimeEntry(enriched, target.name, req, directManagementEntry ? overtimeActorName(req) : null);
+      void notifyTimeEntry(enriched, target.name, req, directManagementEntry ? overtimeActorName(req) : null);
       res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit time off:", error);
@@ -1952,7 +1956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const enriched = (await enrichOvertimeEntries([entry]))[0];
       const employee = await storage.getWorker(entry.employeeId);
-      await notifyTimeEntry(enriched, employee?.name || "Unknown employee", req);
+      void notifyTimeEntry(enriched, employee?.name || "Unknown employee", req);
       res.status(201).json(enriched);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not submit overtime";
