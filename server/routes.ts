@@ -402,6 +402,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherReason"], message: "Describe the other reason" });
     }
   });
+  const mobileTimeOffInput = z.object({
+    workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date"),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
+    finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
+    reason: z.enum(TIME_OFF_REASONS),
+    otherReason: z.string().trim().max(500).optional().nullable(),
+    notes: z.string().trim().max(4000).optional().default(""),
+  }).superRefine((data, ctx) => {
+    if (data.reason === "other" && !data.otherReason?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherReason"], message: "Describe the other reason" });
+    }
+  });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
     if (req.user?.authenticationMethod === "profile_picker" || req.user?.sourceWorkerRole !== undefined) {
@@ -428,21 +440,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const overtimeActorName = (req: AuthenticatedRequest) =>
     req.user?.username || [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || "Unknown user";
 
+  const logTimeOffNotificationAudit = async (
+    entryId: string,
+    action: "TIME_OFF_NOTIFICATION_SENT" | "TIME_OFF_NOTIFICATION_FAILED",
+    recipient: string,
+    error?: string,
+  ) => {
+    await db.insert(overtimeAuditEntries).values({
+      overtimeEntryId: entryId,
+      actorId: "system",
+      actorName: "JobFlow notifications",
+      action,
+      details: JSON.stringify({ recipient, error: error || null, timestamp: new Date().toISOString() }),
+    });
+  };
+
   const notifyTimeEntry = async (entry: any, employeeName: string, req: any, approvedByName?: string | null) => {
+    const isTimeOff = entry.entryType === "AUTHORISED_TIME_OFF";
+    if (isTimeOff) console.info(`[TIME OFF] Sending notification for entry: ${entry.id}`);
     try {
       const protocol = req.headers?.["x-forwarded-proto"] || req.protocol || "http";
       const host = req.get?.("host") || "";
-      const notification = sendTimeAdjustmentNotification(entry, employeeName, {
+      const deliveries = await sendTimeAdjustmentNotification(entry, employeeName, {
         baseUrl: `${String(protocol).split(",")[0]}://${host}`,
         approvedByName,
       });
-      await Promise.race([
-        notification,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("notification delivery timed out")), 8000)),
-      ]);
+      if (isTimeOff) {
+        for (const delivery of deliveries) {
+          if (delivery.sent) {
+            console.info(`[TIME OFF] Notification sent successfully to: ${delivery.recipient}`);
+            await logTimeOffNotificationAudit(entry.id, "TIME_OFF_NOTIFICATION_SENT", delivery.recipient);
+          } else {
+            console.error(`[TIME OFF] EMAIL FAILED\nEntry ID: ${entry.id}\nRecipient: ${delivery.recipient}\nError: ${delivery.error || "Unknown error"}`);
+            await logTimeOffNotificationAudit(entry.id, "TIME_OFF_NOTIFICATION_FAILED", delivery.recipient, delivery.error);
+          }
+        }
+      }
+      return deliveries;
     } catch (error) {
       // Email delivery must not turn a successfully saved time record into a failed request.
-      console.error("Could not send time adjustment notification:", error);
+      console.error(isTimeOff ? `[TIME OFF] EMAIL FAILED\nEntry ID: ${entry.id}\nRecipient: management\nError: ${error instanceof Error ? error.message : String(error)}` : "Could not send time adjustment notification:", error);
+      if (isTimeOff) {
+        try {
+          await logTimeOffNotificationAudit(entry.id, "TIME_OFF_NOTIFICATION_FAILED", "management", error instanceof Error ? error.message : String(error));
+        } catch (auditError) {
+          console.error("[TIME OFF] Could not write notification audit entry:", auditError);
+        }
+      }
+      return [];
     }
   };
 
@@ -1672,7 +1717,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/mobile/time-off", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
-    const parsed = timeOffInput.omit({ employeeId: true, overrideConflictReason: true }).safeParse(req.body);
+    const parsed = mobileTimeOffInput.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid Time Off entry" });
     const data = parsed.data;
     const minutes = calculateAuthorisedTimeOffMinutes(data.startTime, data.finishTime);
@@ -1693,6 +1738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         overtimeEntryId: created.id, actorId: req.mobileWorker!.id, actorName: req.mobileWorker!.name,
         action: "submitted", details: JSON.stringify({ entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes }),
       });
+      console.info(`[TIME OFF] Entry created: ${created.id}`);
       const enriched = (await enrichOvertimeEntries([created]))[0];
       void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
       res.status(201).json(enriched);
@@ -1743,6 +1789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, tx);
         return created;
       });
+      console.info(`[TIME OFF] Entry created: ${entry.id}`);
       const enriched = (await enrichOvertimeEntries([entry]))[0];
       void notifyTimeEntry(enriched, target.name, req, directManagementEntry ? overtimeActorName(req) : null);
       res.status(201).json(enriched);
@@ -1789,6 +1836,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Could not delete time off:", error);
       res.status(500).json({ error: "Could not delete Time Off" });
+    }
+  });
+
+  app.post("/api/time-off/:id/resend-notification", requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const [entry] = await db.select().from(overtimeEntries).where(eq(overtimeEntries.id, req.params.id)).limit(1);
+      if (!entry || entry.entryType !== "AUTHORISED_TIME_OFF") return res.status(404).json({ error: "Time Off entry not found" });
+      const employee = await storage.getWorker(entry.employeeId);
+      const enriched = (await enrichOvertimeEntries([entry]))[0];
+      const deliveries = await notifyTimeEntry(enriched, employee?.name || "Unknown employee", req, entry.approvedByName);
+      if (!deliveries.length || deliveries.some((delivery: any) => !delivery.sent)) {
+        return res.status(502).json({ error: "Time Off notification could not be delivered to all management recipients" });
+      }
+      res.json({ message: "Time Off notification sent successfully." });
+    } catch (error) {
+      console.error("Could not resend Time Off notification:", error);
+      res.status(500).json({ error: "Could not resend Time Off notification" });
     }
   });
 

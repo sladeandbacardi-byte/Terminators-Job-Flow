@@ -1,0 +1,261 @@
+BUG FIX: TIME OFF EMAIL NOT BEING SENT
+
+The Overtime email notification is working correctly.
+
+However:
+
+- User submits Overtime -> record saves AND email is received correctly.
+- User submits Authorised Time Off -> record saves, but NO email is received.
+
+Do not change or break the working Overtime email functionality.
+
+Investigate the Time Off submission flow and fix it so that Authorised Time Off uses the same reliable email notification process as Overtime.
+
+--------------------------------------------------
+1. COMPARE BOTH SUBMISSION FLOWS
+--------------------------------------------------
+
+Trace the complete backend flow for:
+
+A. Overtime submission
+B. Authorised Time Off submission
+
+Identify exactly where the Overtime notification email is triggered.
+
+The Time Off submission must trigger its notification AFTER the Time Off record has successfully been saved to the database.
+
+Do not rely only on frontend code to send the email.
+
+The backend/API responsible for saving the Time Off entry must trigger the notification.
+
+--------------------------------------------------
+2. TIME OFF EMAIL MUST ALWAYS BE TRIGGERED
+--------------------------------------------------
+
+When a new Authorised Time Off record is successfully created:
+
+1. Save the Time Off record
+2. Confirm database save succeeded
+3. Call the email notification service
+4. Send the Time Off email to the configured management recipients
+5. Log whether the email succeeded or failed
+
+The Time Off record must remain saved even if the email fails.
+
+--------------------------------------------------
+3. USE THE SAME EMAIL SERVICE AS OVERTIME
+--------------------------------------------------
+
+Do not create another email system.
+
+Reuse the SAME:
+- mail transport
+- SMTP/service configuration
+- sender address
+- recipient configuration
+- authentication
+- error handling
+
+that the working Overtime email currently uses.
+
+Only the email content should be different.
+
+--------------------------------------------------
+4. TIME OFF EMAIL CONTENT
+--------------------------------------------------
+
+Subject:
+
+JobFlow - Time Off Logged - [Employee Name] - [Total Time Off]
+
+Example:
+
+JobFlow - Time Off Logged - Garth - 4 hrs
+
+Email body:
+
+Authorised Time Off has been logged in JobFlow.
+
+Employee: [Employee Name]
+Date: [Date]
+Start Time: [Start Time]
+Finish Time: [Finish Time]
+Total Time Off: [Calculated Hours and Minutes]
+
+Reason: [Reason]
+
+Notes:
+[Notes]
+
+Status: [Pending / Approved]
+
+If the Time Off was created directly by Admin also include:
+
+Authorised By: [Admin Name]
+
+Include a link/button where possible:
+
+VIEW TIME OFF
+
+This must link directly to the relevant Time Off record in JobFlow.
+
+--------------------------------------------------
+5. CHECK NOTIFICATION SETTINGS
+--------------------------------------------------
+
+Check that Time Off notifications are not accidentally:
+
+- disabled
+- using a blank recipient
+- using a different email address
+- checking the wrong setting key
+- checking an undefined environment variable
+
+Overtime and Time Off should use the same configured management recipient list unless Admin explicitly configures them differently.
+
+If separate notification settings currently exist, verify:
+
+New Overtime Submitted = ON
+New Time Off Submitted = ON
+
+--------------------------------------------------
+6. CHECK RECORD TYPE VALUES
+--------------------------------------------------
+
+Check for inconsistent enum/string values.
+
+For example the database may use:
+
+AUTHORISED_TIME_OFF
+
+while email code checks:
+
+TIME_OFF
+
+or:
+
+AUTHORIZED_TIME_OFF
+
+Make sure the same canonical type is used everywhere.
+
+Use:
+
+OVERTIME
+AUTHORISED_TIME_OFF
+
+consistently in:
+
+- database
+- API
+- frontend
+- notification logic
+- reports
+- audit log
+
+Do not rely on display labels for backend logic.
+
+--------------------------------------------------
+7. ADD SERVER LOGGING
+--------------------------------------------------
+
+Add useful server logs for Time Off email delivery.
+
+When Time Off is submitted log:
+
+[TIME OFF] Entry created: [entry ID]
+
+Then:
+
+[TIME OFF] Sending notification for entry: [entry ID]
+
+Then either:
+
+[TIME OFF] Notification sent successfully to: [recipient]
+
+OR:
+
+[TIME OFF] EMAIL FAILED
+Entry ID: [entry ID]
+Recipient: [recipient]
+Error: [actual error]
+
+Do not silently swallow email errors.
+
+--------------------------------------------------
+8. AUDIT LOG
+--------------------------------------------------
+
+If successful add:
+
+TIME_OFF_NOTIFICATION_SENT
+
+If unsuccessful add:
+
+TIME_OFF_NOTIFICATION_FAILED
+
+Store:
+- Time Off entry ID
+- recipient
+- timestamp
+- error message if failed
+
+--------------------------------------------------
+9. ADMIN RESEND
+--------------------------------------------------
+
+On the Admin Time Off record add:
+
+RESEND NOTIFICATION
+
+Only show this to Admin.
+
+Clicking it must resend the Time Off email using the same notification service.
+
+After successful resend show:
+
+"Time Off notification sent successfully."
+
+--------------------------------------------------
+10. TEST THE COMPLETE FLOW
+--------------------------------------------------
+
+After fixing this, run an actual end-to-end test.
+
+TEST 1:
+
+Employee: Test Employee
+Date: today
+Time Off:
+12:00 - 16:00
+Reason: Gap between jobs
+
+Expected:
+
+- Time Off saves
+- Total = 4 hrs
+- Status created correctly
+- Management email sent
+- Email subject contains employee and 4 hrs
+- Audit log shows notification sent
+
+TEST 2:
+
+Overtime:
+16:00 - 17:00
+
+Expected:
+
+- Overtime still saves
+- Existing Overtime email still sends
+- Total = 1 hr
+
+IMPORTANT:
+
+Do not report this as fixed simply because the code compiles.
+
+Actually test both API flows and confirm the email send function is called for BOTH:
+
+OVERTIME
+AUTHORISED_TIME_OFF
+
+The existing working Overtime email must not be broken while fixing Time Off.

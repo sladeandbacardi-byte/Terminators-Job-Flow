@@ -19,3 +19,4 @@
 - [Opportunity lifecycle integrity](opportunity-lifecycle-integrity.md) — mobile reports must derive client from an authorized source job; quote links need row locking plus the canonical document sequence.
 - [Mobile overtime customer capture](mobile-overtime-customer-capture.md) — technicians enter a customer name directly; optional job context enriches the record but never blocks submission.
 - [Treatment report evidence model](treatment-report-evidence-model.md) — retain legacy treatment report fields while storing repeatable digital evidence in child records; completed reports are immutable to mobile staff.
+- [Refined Zod schemas](refined-zod-schemas.md) — a schema wrapped with `superRefine` cannot be shaped with `.omit()`; define the restricted input schema separately for mobile routes.

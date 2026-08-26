@@ -23,6 +23,7 @@ type TimeEntry = {
   status: string;
   approvedByName?: string | null;
 };
+export type TimeNotificationDelivery = { recipient: string; sent: boolean; error?: string };
 
 // Time adjustment notifications always go to both management contacts.
 const notificationRecipients = [
@@ -75,7 +76,7 @@ export async function sendTimeAdjustmentNotification(
   entry: TimeEntry,
   employeeName: string,
   options: { baseUrl?: string; approvedByName?: string | null } = {},
-): Promise<void> {
+): Promise<TimeNotificationDelivery[]> {
   const isTimeOff = entry.entryType === "AUTHORISED_TIME_OFF";
   const isApproved = isTimeOff && entry.status === "approved";
   const reason = entry.timeOffReason === "other"
@@ -84,7 +85,9 @@ export async function sendTimeAdjustmentNotification(
   const link = entryUrl(entry, options.baseUrl);
   const subject = isApproved
     ? `JobFlow - Time Off Authorised - ${employeeName}`
-    : `JobFlow - ${isTimeOff ? "Time Off" : "Overtime"} Logged - ${employeeName}`;
+    : isTimeOff
+      ? `JobFlow - Time Off Logged - ${employeeName} - ${formatOvertimeMinutes(entry.overtimeMinutes)}`
+      : `JobFlow - Overtime Logged - ${employeeName}`;
   const text = isTimeOff
     ? isApproved
       ? `Authorised Time Off has been recorded.\n\nEmployee: ${employeeName}\nDate: ${formatDate(entry.workDate)}\nTime: ${entry.startTime} - ${entry.finishTime}\nTotal: ${formatOvertimeMinutes(entry.overtimeMinutes)}\nReason: ${reason}\nAuthorised By: ${options.approvedByName || entry.approvedByName || "Management"}\nStatus: Approved\n\nVIEW TIME OFF REQUEST: ${link}`
@@ -98,11 +101,12 @@ export async function sendTimeAdjustmentNotification(
     : [["Employee", employeeName], ["Date", formatDate(entry.workDate)], ["Client", entry.customerName || entry.clientName || "—"], ["Job", entry.jobNumber || entry.jobLabel || "—"], ["Start Time", entry.startTime], ["Finish Time", entry.finishTime], ["Before 08:00", formatOvertimeMinutes(entry.beforeHoursMinutes || 0)], ["After 16:00", formatOvertimeMinutes(entry.afterHoursMinutes || 0)], ["Total Overtime", formatOvertimeMinutes(entry.overtimeMinutes)], ["Reason / Notes", entry.notes || "—"], ["Status", "Pending Approval"]];
   const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.5"><h2 style="color:#dc2626">${escapeHtml(subject)}</h2><p>${escapeHtml(isApproved ? "Authorised Time Off has been recorded." : isTimeOff ? "An Authorised Time Off entry has been submitted in JobFlow." : "An overtime entry has been submitted in JobFlow.")}</p><table style="border-collapse:collapse;width:100%;max-width:640px">${rows.map(([label, value]) => `<tr><td style="padding:7px 12px 7px 0;font-weight:bold;border-bottom:1px solid #e5e7eb">${escapeHtml(label)}</td><td style="padding:7px 0;border-bottom:1px solid #e5e7eb">${escapeHtml(value)}</td></tr>`).join("")}</table><p style="margin-top:24px"><a href="${escapeHtml(link)}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:11px 16px;border-radius:6px">${isTimeOff ? "VIEW TIME OFF REQUEST" : "VIEW OVERTIME REQUEST"}</a></p><p style="font-size:12px;color:#6b7280">Sent by JobFlow.</p></body></html>`;
 
-  const deliveries = await Promise.allSettled(
-    notificationRecipients.map(to => deliverEmail({ to, from: sender(), subject, text, html })),
-  );
-  const failures = deliveries.filter((delivery): delivery is PromiseRejectedResult => delivery.status === "rejected");
-  if (failures.length) {
-    throw new Error(`Notification delivery failed for ${failures.length} recipient${failures.length === 1 ? "" : "s"}: ${failures.map(failure => failure.reason instanceof Error ? failure.reason.message : String(failure.reason)).join("; ")}`);
-  }
+  return Promise.all(notificationRecipients.map(async recipient => {
+    try {
+      await deliverEmail({ to: recipient, from: sender(), subject, text, html });
+      return { recipient, sent: true };
+    } catch (error) {
+      return { recipient, sent: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }));
 }
