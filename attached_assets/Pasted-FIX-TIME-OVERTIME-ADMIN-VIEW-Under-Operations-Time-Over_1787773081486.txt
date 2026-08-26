@@ -1,0 +1,117 @@
+FIX TIME & OVERTIME ADMIN VIEW
+
+Under:
+
+Operations > Time & Overtime
+
+this page must be the Admin/Management view for ALL employee time entries.
+
+It must display both:
+
+- Overtime
+- Authorised Time Off
+
+Do not make Admin search individual employee profiles to find these records.
+
+--------------------------------------------------
+PAGE LAYOUT
+--------------------------------------------------
+
+At the top show summary cards:
+
+Pending Overtime
+Pending Time Off
+Approved Overtime This Month
+Approved Time Off This Month
+
+Then add tabs:
+
+ALL
+OVERTIME
+TIME OFF
+PENDING APPROVAL
+APPROVED
+REJECTED
+
+--------------------------------------------------
+TABLE
+--------------------------------------------------
+
+Show:
+
+Employee
+Date
+Type
+Client / Job
+Start
+Finish
+Total
+Reason
+Status
+Actions
+
+Example:
+
+Garth | 26/08/26 | Time Off | — | 12:00 | 16:00 | 4 hrs | Gap between jobs | Approved
+
+Zain | 29/08/26 | Overtime | Temporary email delivery test | 16:00 | 17:00 | 1 hr | — | Pending
+
+--------------------------------------------------
+FILTERS
+--------------------------------------------------
+
+Allow Admin to filter by:
+
+- Employee
+- Date from
+- Date to
+- Type
+- Status
+- Client
+- Job
+
+--------------------------------------------------
+ACTIONS
+--------------------------------------------------
+
+For Pending entries:
+
+Approve
+Reject
+View
+
+For Approved entries:
+
+View
+Reopen
+
+For Rejected entries:
+
+View
+Reopen
+
+--------------------------------------------------
+MY TIME
+--------------------------------------------------
+
+Keep Operations > My Time as the logged-in user's PERSONAL view only.
+
+My Time must show only the current user's:
+
+- Overtime
+- Authorised Time Off
+- Monthly totals
+- Recent entries
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+The distinction must be:
+
+MY TIME = personal employee view
+
+TIME & OVERTIME = management/admin view for all staff
+
+Do not duplicate or split the records into separate databases.
+Both views must use the same underlying time records.
