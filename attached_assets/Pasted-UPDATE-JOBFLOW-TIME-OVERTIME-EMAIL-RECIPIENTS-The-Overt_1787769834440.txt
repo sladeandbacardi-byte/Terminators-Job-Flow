@@ -1,0 +1,113 @@
+UPDATE JOBFLOW TIME & OVERTIME EMAIL RECIPIENTS
+
+The Overtime and Authorised Time Off email notifications are now working correctly.
+
+Do NOT change the working email sending logic.
+
+Change the management notification recipients so that BOTH Overtime and Authorised Time Off notifications are sent to:
+
+julien@terminators.co.za
+accounts@terminators.co.za
+
+--------------------------------------------------
+REQUIREMENTS
+--------------------------------------------------
+
+For all NEW OVERTIME submissions send the notification email to BOTH:
+
+julien@terminators.co.za
+accounts@terminators.co.za
+
+For all NEW AUTHORISED TIME OFF submissions send the notification email to BOTH:
+
+julien@terminators.co.za
+accounts@terminators.co.za
+
+Do not send these notifications only to info@terminators.co.za anymore.
+
+--------------------------------------------------
+IMPLEMENTATION
+--------------------------------------------------
+
+Prefer using a configurable management recipient list rather than hard-coding the addresses separately in multiple functions.
+
+For example create/use one configuration such as:
+
+TIME_NOTIFICATION_RECIPIENTS = [
+  "julien@terminators.co.za",
+  "accounts@terminators.co.za"
+]
+
+Then use this same recipient list for:
+
+- Overtime Logged
+- Time Off Logged
+
+This avoids the two email functions getting out of sync later.
+
+--------------------------------------------------
+EMAIL DELIVERY
+--------------------------------------------------
+
+Both recipients must receive the same notification.
+
+The email can either:
+
+- send one email addressed to both recipients
+
+OR
+
+- send separate emails to each recipient
+
+Either is acceptable, provided BOTH addresses reliably receive every notification.
+
+--------------------------------------------------
+KEEP EXISTING EMAIL CONTENT
+--------------------------------------------------
+
+Do not change the existing working email subjects or layout except where necessary.
+
+Examples:
+
+JobFlow - Overtime Logged - Garth - 1 hr 30 min
+
+JobFlow - Time Off Logged - Garth - 1 hr 30 min
+
+--------------------------------------------------
+DO NOT BREAK
+--------------------------------------------------
+
+Do not change:
+
+- overtime calculations
+- time off calculations
+- database saving
+- approvals
+- employee permissions
+- audit trail
+- existing working email service
+- sender address/configuration
+
+Only update the notification recipients.
+
+--------------------------------------------------
+TEST
+--------------------------------------------------
+
+After making the change, test BOTH types.
+
+TEST 1:
+Submit a new Overtime entry.
+
+Confirm email is sent to:
+julien@terminators.co.za
+accounts@terminators.co.za
+
+TEST 2:
+Submit a new Time Off entry.
+
+Confirm email is sent to:
+julien@terminators.co.za
+accounts@terminators.co.za
+
+Do not consider the change complete until both notification types use the same two-recipient list.

@@ -1,0 +1,319 @@
+UI FIX: MAKE MOBILE USER VIEW MATCH THE MAIN JOBFLOW THEME
+
+The current mobile user interface does not visually match the main Terminators JobFlow application.
+
+Fix the mobile user view so it uses the SAME design system, branding and visual language as the main JobFlow screen.
+
+Do not create a separate theme for mobile users.
+
+--------------------------------------------------
+1. USE THE EXISTING JOBFLOW DESIGN SYSTEM
+--------------------------------------------------
+
+Reuse the existing JobFlow:
+
+- colours
+- fonts
+- logo treatment
+- button styles
+- card styles
+- border radius
+- shadows
+- spacing
+- icons
+- status badges
+- form fields
+- headers
+- navigation styling
+
+Do not hard-code a second set of colours or styles for mobile.
+
+Where possible, use the same shared CSS variables, Tailwind classes, theme tokens and reusable UI components already used by the main JobFlow interface.
+
+--------------------------------------------------
+2. MOBILE HEADER
+--------------------------------------------------
+
+The mobile header must visually match the main JobFlow header.
+
+Include:
+
+- JobFlow logo / branding
+- current page title
+- logged-in user name
+- user menu / sign out
+
+Keep it compact for mobile.
+
+Do not use a completely different header design.
+
+--------------------------------------------------
+3. MOBILE NAVIGATION
+--------------------------------------------------
+
+Use a mobile version of the main JobFlow navigation.
+
+For example:
+
+Dashboard
+My Jobs
+My Time
+Fleet Actions
+
+If nested menu items are required, keep the same structure and labels as the main JobFlow navigation.
+
+The mobile navigation can be a:
+
+- bottom navigation bar
+OR
+- slide-out menu
+
+but it must use the same JobFlow colours, icons and styling.
+
+--------------------------------------------------
+4. DASHBOARD
+--------------------------------------------------
+
+The mobile dashboard should use the same visual style as the desktop JobFlow dashboard.
+
+Use responsive cards.
+
+Example:
+
+TODAY'S JOBS
+3
+
+OVERTIME THIS MONTH
+6 hrs 30 min
+
+TIME OFF THIS MONTH
+4 hrs
+
+NEXT JOB
+Roman Pizza
+16:00
+
+Cards must look like the existing JobFlow KPI cards, just stacked vertically on mobile.
+
+--------------------------------------------------
+5. MY TIME
+--------------------------------------------------
+
+Make the My Time screen visually consistent with JobFlow.
+
+At the top:
+
+MY TIME
+
+Then two primary actions:
+
++ LOG OVERTIME
++ LOG TIME OFF
+
+Use the standard JobFlow primary and secondary button styles.
+
+Below this show:
+
+THIS MONTH
+
+Overtime
+6 hrs 30 min
+
+Time Off
+4 hrs
+
+Net
++2 hrs 30 min
+
+Then show recent activity using JobFlow-style cards.
+
+Example:
+
+26 AUG
+
+Authorised Time Off
+12:00 - 16:00
+4 hrs
+
+APPROVED
+
+and:
+
+26 AUG
+
+Overtime
+16:00 - 17:30
+1 hr 30 min
+
+PENDING
+
+Use the same status badge colours as the rest of JobFlow.
+
+--------------------------------------------------
+6. FORMS
+--------------------------------------------------
+
+Overtime and Time Off forms must use the same form components as the rest of JobFlow.
+
+Use the same:
+
+- field labels
+- input boxes
+- dropdowns
+- date pickers
+- time pickers
+- validation messages
+- modal styling
+- Save / Cancel buttons
+
+Do not use browser-default forms where JobFlow already has styled components.
+
+--------------------------------------------------
+7. MODALS
+--------------------------------------------------
+
+Mobile modals must match the existing JobFlow modal design.
+
+They must:
+
+- have the same header style
+- same border radius
+- same buttons
+- same overlay
+- same typography
+
+Existing JobFlow rule still applies:
+
+DO NOT close a modal by clicking outside it.
+
+It may only close by:
+
+- X
+- Cancel
+- Save / Submit
+
+--------------------------------------------------
+8. PAGE BACKGROUND AND SPACING
+--------------------------------------------------
+
+Use the same background colour as the main JobFlow app.
+
+Use consistent padding and spacing.
+
+Mobile pages should not look like isolated white forms floating on a different background.
+
+--------------------------------------------------
+9. REUSE COMPONENTS
+--------------------------------------------------
+
+Before adding any new mobile UI component, check whether JobFlow already has an equivalent component.
+
+For example reuse existing:
+
+Button
+Card
+Badge
+Modal
+Input
+Select
+DatePicker
+TimePicker
+PageHeader
+UserMenu
+Navigation
+
+Do not duplicate these components unnecessarily.
+
+--------------------------------------------------
+10. RESPONSIVE DESIGN
+--------------------------------------------------
+
+The same JobFlow theme must work across:
+
+Desktop
+Tablet
+Mobile
+
+Use responsive layouts rather than separate theme files.
+
+Desktop may use:
+- side navigation
+- wider tables
+- multiple columns
+
+Mobile may use:
+- stacked cards
+- compact navigation
+- single-column forms
+
+BUT both must clearly look like the same application.
+
+--------------------------------------------------
+11. DO NOT CHANGE BUSINESS LOGIC
+--------------------------------------------------
+
+This is a visual/theme fix.
+
+Do not break or change:
+
+- overtime calculations
+- time off calculations
+- email notifications
+- approvals
+- user permissions
+- job linking
+- client linking
+- audit trail
+
+Only improve the mobile layout and ensure it uses the existing JobFlow theme.
+
+--------------------------------------------------
+12. CHECK ALL MOBILE PAGES
+--------------------------------------------------
+
+Apply the JobFlow theme consistently to ALL mobile user pages, including:
+
+- Mobile Dashboard
+- My Jobs
+- Job Details
+- My Time
+- Log Overtime
+- Log Time Off
+- Overtime History
+- Time Off History
+- Fleet Actions
+- Fuel
+- Vehicle Inspection
+- User Profile / Menu
+- Sign Out
+
+Do not fix only the My Time screen.
+
+--------------------------------------------------
+13. LOGIN FLOW
+--------------------------------------------------
+
+After a mobile user selects their name and logs in, continue opening directly to the mobile JobFlow Dashboard.
+
+The Dashboard must now visually match the main JobFlow application.
+
+When the mobile user signs out, return them to the main JobFlow login screen where Admin and Mobile user login options are shown.
+
+Do not send mobile users to a separate unrelated login page.
+
+--------------------------------------------------
+14. FINAL CHECK
+--------------------------------------------------
+
+Compare the mobile screen side-by-side with the main JobFlow desktop interface.
+
+They should clearly share the same:
+
+- brand
+- theme
+- colours
+- component styling
+- navigation language
+- typography
+
+The mobile version should feel like a responsive version of JobFlow, not another app.
