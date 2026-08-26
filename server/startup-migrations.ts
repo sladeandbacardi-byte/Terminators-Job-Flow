@@ -560,6 +560,15 @@ export async function runStartupMigrations(): Promise<void> {
     "overtime_entries.job_number",
     `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS job_number text`
   );
+  await run(
+    "overtime_entries.authorised_time_off",
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS entry_type text NOT NULL DEFAULT 'OVERTIME';
+     ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS time_off_reason text;
+     ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS time_off_other_reason text;
+     ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS conflict_override_reason text;
+     CREATE INDEX IF NOT EXISTS overtime_entries_type_employee_date_idx
+       ON overtime_entries (entry_type, employee_id, work_date DESC)`
+  );
 
   // ── Additional opportunities ─────────────────────────────────────────────
   // These tables deliberately link to the existing client, worker, lead, job,

@@ -163,7 +163,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
       screen: "jobs",
       label: "My Jobs",
       icon: ListChecks,
-      children: [{ label: "Overtime", href: "/my-overtime", helper: "View and log overtime" }],
+      children: [{ label: "My Time", href: "/my-overtime", helper: "Log overtime or authorised time off" }],
     },
     { screen: "diaries", label: "Field Diaries", icon: ClipboardPenLine },
     { screen: "calendar", label: "Calendar", icon: CalendarDays },

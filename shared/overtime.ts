@@ -38,6 +38,14 @@ export function calculateOvertimeBreakdown(
   return { beforeMinutes, afterMinutes, totalMinutes: beforeMinutes + afterMinutes };
 }
 
+/** Returns the portion of a same-day interval that falls inside 08:00–16:00. */
+export function calculateAuthorisedTimeOffMinutes(startTime: string, finishTime: string): number | null {
+  const start = timeToMinutes(startTime);
+  const finish = timeToMinutes(finishTime);
+  if (start === null || finish === null || finish <= start) return null;
+  return Math.max(0, Math.min(finish, NORMAL_WORK_END_MINUTES) - Math.max(start, NORMAL_WORK_START_MINUTES));
+}
+
 export function formatOvertimeMinutes(minutes: number): string {
   const safeMinutes = Math.max(0, Math.round(minutes || 0));
   const hours = Math.floor(safeMinutes / 60);
@@ -45,4 +53,9 @@ export function formatOvertimeMinutes(minutes: number): string {
   if (hours === 0) return `${remainder} min`;
   if (remainder === 0) return `${hours} hr${hours === 1 ? "" : "s"}`;
   return `${hours} hr${hours === 1 ? "" : "s"} ${remainder} min`;
+}
+
+export function formatNetTimeDifference(minutes: number): string {
+  if (minutes === 0) return "0 min";
+  return `${minutes > 0 ? "+" : "−"}${formatOvertimeMinutes(Math.abs(minutes))}`;
 }

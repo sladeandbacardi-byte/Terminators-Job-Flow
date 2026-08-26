@@ -233,6 +233,21 @@ export const jobs = pgTable("jobs", {
 
 export const OVERTIME_WORK_TYPES = ["client_job", "internal", "workshop", "stock_warehouse", "travel", "other"] as const;
 export type OvertimeWorkType = typeof OVERTIME_WORK_TYPES[number];
+export const TIME_ADJUSTMENT_TYPES = ["OVERTIME", "AUTHORISED_TIME_OFF"] as const;
+export type TimeAdjustmentType = typeof TIME_ADJUSTMENT_TYPES[number];
+export const TIME_OFF_REASONS = [
+  "finished_scheduled_work_early", "gap_between_jobs", "management_authorised",
+  "returned_home_before_later_job", "operational_downtime", "other",
+] as const;
+export type TimeOffReason = typeof TIME_OFF_REASONS[number];
+export const TIME_OFF_REASON_LABELS: Record<TimeOffReason, string> = {
+  finished_scheduled_work_early: "Finished scheduled work early",
+  gap_between_jobs: "Gap between jobs",
+  management_authorised: "Management authorised",
+  returned_home_before_later_job: "Returned home before later job",
+  operational_downtime: "Operational downtime",
+  other: "Other",
+};
 
 export const OVERTIME_WORK_TYPE_LABELS: Record<OvertimeWorkType, string> = {
   client_job:      "Client Job",
@@ -245,6 +260,7 @@ export const OVERTIME_WORK_TYPE_LABELS: Record<OvertimeWorkType, string> = {
 
 export const overtimeEntries = pgTable("overtime_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entryType: text("entry_type").notNull().default("OVERTIME"), // OVERTIME | AUTHORISED_TIME_OFF
   employeeId: varchar("employee_id").notNull(),
   workDate: text("work_date").notNull(), // YYYY-MM-DD
   customerName: text("customer_name"),
@@ -253,6 +269,9 @@ export const overtimeEntries = pgTable("overtime_entries", {
   jobNumber: text("job_number"),
   workType: text("work_type").notNull().default("client_job"), // OvertimeWorkType
   otherDescription: text("other_description"),
+  timeOffReason: text("time_off_reason"),
+  timeOffOtherReason: text("time_off_other_reason"),
+  conflictOverrideReason: text("conflict_override_reason"),
   startTime: text("start_time").notNull(), // HH:mm
   finishTime: text("finish_time").notNull(), // HH:mm
   beforeHoursMinutes: integer("before_hours_minutes").notNull().default(0),

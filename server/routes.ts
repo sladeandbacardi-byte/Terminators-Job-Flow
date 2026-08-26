@@ -58,7 +58,8 @@ import { AuthService, requireAuth, requireMobileTechnician, logActivity, type Au
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
-import { calculateOvertimeMinutes, calculateOvertimeBreakdown } from "@shared/overtime";
+import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
+import { sendTimeAdjustmentNotification } from "./time-notifications";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -79,11 +80,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ]);
 
   const profilePickerSelfService = (method: string, path: string) => {
-    if (["GET /api/auth/me", "POST /api/auth/logout", "GET /api/overtime/my", "POST /api/overtime"].includes(`${method} ${path}`)) {
+    if (["GET /api/auth/me", "POST /api/auth/logout", "GET /api/overtime/my", "POST /api/overtime", "GET /api/time/my", "POST /api/time-off"].includes(`${method} ${path}`)) {
       return true;
     }
     return (
       (method === "PATCH" && /^\/api\/overtime\/[^/]+$/.test(path)) ||
+      (method === "PATCH" && /^\/api\/time-off\/[^/]+$/.test(path)) ||
       (method === "GET" && /^\/api\/overtime\/[^/]+\/audit$/.test(path)) ||
       (method === "GET" && /^\/api\/overtime\/prefill\/[^/]+$/.test(path))
     );
@@ -104,7 +106,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "POST /api/mobile/opportunities",
       "GET /api/mobile/pest-control-products",
       "GET /api/mobile/overtime",
-      "POST /api/mobile/overtime",
+        "POST /api/mobile/overtime",
+        "GET /api/mobile/time",
+        "POST /api/mobile/time-off",
     ].includes(signature)) {
       return true;
     }
@@ -380,6 +384,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const TIME_OFF_REASONS = [
+    "finished_scheduled_work_early", "gap_between_jobs", "management_authorised",
+    "returned_home_before_later_job", "operational_downtime", "other",
+  ] as const;
+  const timeOffInput = z.object({
+    employeeId: z.string().optional(),
+    workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date"),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
+    finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
+    reason: z.enum(TIME_OFF_REASONS),
+    otherReason: z.string().trim().max(500).optional().nullable(),
+    notes: z.string().trim().max(4000).optional().default(""),
+    overrideConflictReason: z.string().trim().max(1000).optional().nullable(),
+  }).superRefine((data, ctx) => {
+    if (data.reason === "other" && !data.otherReason?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherReason"], message: "Describe the other reason" });
+    }
+  });
+
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
     if (req.user?.authenticationMethod === "profile_picker" || req.user?.sourceWorkerRole !== undefined) {
       return false;
@@ -404,6 +427,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const overtimeActorName = (req: AuthenticatedRequest) =>
     req.user?.username || [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || "Unknown user";
+
+  const notifyTimeEntry = async (entry: any, employeeName: string, req: any, approvedByName?: string | null) => {
+    try {
+      const protocol = req.headers?.["x-forwarded-proto"] || req.protocol || "http";
+      const host = req.get?.("host") || "";
+      await sendTimeAdjustmentNotification(entry, employeeName, {
+        baseUrl: `${String(protocol).split(",")[0]}://${host}`,
+        approvedByName,
+      });
+    } catch (error) {
+      // Email delivery must not turn a successfully saved time record into a failed request.
+      console.error("Could not send time adjustment notification:", error);
+    }
+  };
 
   const logOvertimeAudit = async (
     overtimeEntryId: string,
@@ -437,11 +474,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const job = entry.jobId ? jobsById.get(entry.jobId) : undefined;
       return {
         ...entry,
+        entryType: entry.entryType || "OVERTIME",
         employeeName: employee?.name ?? "Unknown employee",
         clientName: entry.customerName ?? client?.name ?? "",
         jobLabel: entry.jobNumber ?? (job ? (job.jobNumber || job.title) : null),
       };
     });
+  };
+
+  const calculateTimeSummary = (entries: (typeof overtimeEntries.$inferSelect)[], month?: string) => {
+    const active = month ? entries.filter(entry => entry.workDate.startsWith(month)) : entries;
+    const minutesFor = (entryType: string, status: string) => active
+      .filter(entry => (entry.entryType || "OVERTIME") === entryType && entry.status === status)
+      .reduce((total, entry) => total + entry.overtimeMinutes, 0);
+    const approvedOvertimeMinutes = minutesFor("OVERTIME", "approved");
+    const approvedTimeOffMinutes = minutesFor("AUTHORISED_TIME_OFF", "approved");
+    return {
+      approvedOvertimeMinutes, approvedTimeOffMinutes,
+      pendingOvertimeMinutes: minutesFor("OVERTIME", "pending"),
+      pendingTimeOffMinutes: minutesFor("AUTHORISED_TIME_OFF", "pending"),
+      rejectedOvertimeMinutes: minutesFor("OVERTIME", "rejected"),
+      rejectedTimeOffMinutes: minutesFor("AUTHORISED_TIME_OFF", "rejected"),
+      netMinutes: approvedOvertimeMinutes - approvedTimeOffMinutes,
+    };
+  };
+
+  const timeOffConflicts = async (employeeId: string, workDate: string, startTime: string, finishTime: string, excludeId?: string) => {
+    const start = timeToMinutes(startTime)!;
+    const finish = timeToMinutes(finishTime)!;
+    const [entries, allJobs] = await Promise.all([
+      db.select().from(overtimeEntries).where(and(
+        eq(overtimeEntries.employeeId, employeeId),
+        eq(overtimeEntries.workDate, workDate),
+        eq(overtimeEntries.entryType, "AUTHORISED_TIME_OFF"),
+      )),
+      storage.getJobs(),
+    ]);
+    const overlappingEntries = entries.filter(entry => {
+      if (entry.id === excludeId || entry.status === "rejected") return false;
+      const entryStart = timeToMinutes(entry.startTime);
+      const entryFinish = timeToMinutes(entry.finishTime);
+      return entryStart !== null && entryFinish !== null && start < entryFinish && finish > entryStart;
+    }).map(entry => ({ id: entry.id, startTime: entry.startTime, finishTime: entry.finishTime }));
+    const scheduledJobs = allJobs.filter(job => {
+      const jobDate = new Date(job.scheduledDate).toISOString().slice(0, 10);
+      if (job.workerId !== employeeId || jobDate !== workDate || !job.scheduledTime) return false;
+      const jobStart = timeToMinutes(job.scheduledTime);
+      const jobFinish = jobStart === null ? null : jobStart + (job.estimatedDuration || 60);
+      return jobStart !== null && jobFinish !== null && start < jobFinish && finish > jobStart;
+    }).map(job => ({
+      id: job.id, title: job.title, jobNumber: job.jobNumber, startTime: job.scheduledTime,
+      finishTime: (() => { const value = (timeToMinutes(job.scheduledTime || "") ?? 0) + (job.estimatedDuration || 60); return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`; })(),
+    }));
+    return { overlappingEntries, scheduledJobs };
   };
 
   const ensureOvertimeRelations = async (clientId?: string | null, jobId?: string | null) => {
@@ -1547,12 +1632,238 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: data.notes || "",
         status: "pending",
       }).returning();
-      res.status(201).json((await enrichOvertimeEntries([created]))[0]);
+      const enriched = (await enrichOvertimeEntries([created]))[0];
+      await notifyTimeEntry(enriched, req.mobileWorker!.name, req);
+      res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit mobile overtime:", error);
       res.status(500).json({ error: "Could not submit overtime" });
     }
   });
+
+  // ── Combined employee time summaries ──────────────────────────────────────
+  app.get("/api/time/my", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const entries = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.employeeId, req.user!.id))
+        .orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt));
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      res.json({ entries: await enrichOvertimeEntries(entries), summary: calculateTimeSummary(entries, thisMonth) });
+    } catch (error) {
+      console.error("Could not load employee time:", error);
+      res.status(500).json({ error: "Could not load time entries" });
+    }
+  });
+
+  app.get("/api/mobile/time", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const entries = await db.select().from(overtimeEntries)
+        .where(eq(overtimeEntries.employeeId, req.mobileWorker!.id))
+        .orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt));
+      res.json({ entries: await enrichOvertimeEntries(entries), summary: calculateTimeSummary(entries, new Date().toISOString().slice(0, 7)) });
+    } catch (error) {
+      console.error("Could not load mobile time:", error);
+      res.status(500).json({ error: "Could not load time entries" });
+    }
+  });
+
+  app.post("/api/mobile/time-off", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const parsed = timeOffInput.omit({ employeeId: true, overrideConflictReason: true }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid Time Off entry" });
+    const data = parsed.data;
+    const minutes = calculateAuthorisedTimeOffMinutes(data.startTime, data.finishTime);
+    if (minutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (minutes === 0) return res.status(400).json({ error: "No normal working time exists in this period." });
+    try {
+      const conflicts = await timeOffConflicts(req.mobileWorker!.id, data.workDate, data.startTime, data.finishTime);
+      if (conflicts.overlappingEntries.length || conflicts.scheduledJobs.length) {
+        return res.status(409).json({ error: conflicts.overlappingEntries.length ? "This employee already has a Time Off entry covering this period." : "This employee has a scheduled job during the selected Time Off period.", conflicts });
+      }
+      const [created] = await db.insert(overtimeEntries).values({
+        entryType: "AUTHORISED_TIME_OFF", employeeId: req.mobileWorker!.id, workDate: data.workDate,
+        startTime: data.startTime, finishTime: data.finishTime, overtimeMinutes: minutes,
+        notes: data.notes || "", timeOffReason: data.reason, timeOffOtherReason: data.otherReason || null,
+        workType: "internal", status: "pending", beforeHoursMinutes: 0, afterHoursMinutes: 0,
+      }).returning();
+      await db.insert(overtimeAuditEntries).values({
+        overtimeEntryId: created.id, actorId: req.mobileWorker!.id, actorName: req.mobileWorker!.name,
+        action: "submitted", details: JSON.stringify({ entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes }),
+      });
+      const enriched = (await enrichOvertimeEntries([created]))[0];
+      await notifyTimeEntry(enriched, req.mobileWorker!.name, req);
+      res.status(201).json(enriched);
+    } catch (error) {
+      console.error("Could not submit mobile time off:", error);
+      res.status(500).json({ error: "Could not submit Time Off" });
+    }
+  });
+
+  app.post("/api/time-off", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const parsed = timeOffInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid Time Off entry" });
+    const data = parsed.data;
+    const minutes = calculateAuthorisedTimeOffMinutes(data.startTime, data.finishTime);
+    if (minutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (minutes === 0) return res.status(400).json({ error: "No normal working time exists in this period." });
+    const targetEmployeeId = isOvertimeApprover(req) && data.employeeId ? data.employeeId : req.user!.id;
+    const directManagementEntry = isOvertimeApprover(req) && targetEmployeeId !== req.user!.id;
+    try {
+      const target = await storage.getWorker(targetEmployeeId);
+      if (!target) return res.status(404).json({ error: "Employee not found" });
+      const conflicts = await timeOffConflicts(targetEmployeeId, data.workDate, data.startTime, data.finishTime);
+      const hasConflicts = conflicts.overlappingEntries.length > 0 || conflicts.scheduledJobs.length > 0;
+      if (hasConflicts && !(directManagementEntry && data.overrideConflictReason?.trim())) {
+        return res.status(409).json({
+          error: conflicts.overlappingEntries.length ? "This employee already has a Time Off entry covering this period." : "This employee has a scheduled job during the selected Time Off period.",
+          conflicts, canOverride: directManagementEntry,
+        });
+      }
+      const entry = await db.transaction(async tx => {
+        const now = new Date();
+        const [created] = await tx.insert(overtimeEntries).values({
+          entryType: "AUTHORISED_TIME_OFF", employeeId: targetEmployeeId, workDate: data.workDate,
+          startTime: data.startTime, finishTime: data.finishTime, overtimeMinutes: minutes,
+          notes: data.notes || "", timeOffReason: data.reason, timeOffOtherReason: data.otherReason || null,
+          workType: "internal", status: directManagementEntry ? "approved" : "pending",
+          approvedById: directManagementEntry ? req.user!.id : null,
+          approvedByName: directManagementEntry ? overtimeActorName(req) : null,
+          approvalTimestamp: directManagementEntry ? now : null,
+          conflictOverrideReason: hasConflicts ? data.overrideConflictReason!.trim() : null,
+          beforeHoursMinutes: 0, afterHoursMinutes: 0, updatedAt: now,
+        }).returning();
+        await logOvertimeAudit(created.id, req, directManagementEntry ? "approved" : "submitted", {
+          entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes, employeeId: targetEmployeeId,
+        }, tx);
+        if (hasConflicts) await logOvertimeAudit(created.id, req, "admin_override" as any, {
+          reason: data.overrideConflictReason, conflicts,
+        }, tx);
+        return created;
+      });
+      const enriched = (await enrichOvertimeEntries([entry]))[0];
+      await notifyTimeEntry(enriched, target.name, req, directManagementEntry ? overtimeActorName(req) : null);
+      res.status(201).json(enriched);
+    } catch (error) {
+      console.error("Could not submit time off:", error);
+      res.status(500).json({ error: "Could not submit Time Off" });
+    }
+  });
+
+  app.patch("/api/time-off/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    const parsed = timeOffInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid Time Off entry" });
+    const data = parsed.data;
+    const minutes = calculateAuthorisedTimeOffMinutes(data.startTime, data.finishTime);
+    if (!minutes) return res.status(400).json({ error: minutes === 0 ? "No normal working time exists in this period." : "Finish time must be later than start time on the same day" });
+    try {
+      const [existing] = await db.select().from(overtimeEntries).where(eq(overtimeEntries.id, req.params.id)).limit(1);
+      if (!existing || existing.entryType !== "AUTHORISED_TIME_OFF") return res.status(404).json({ error: "Time Off entry not found" });
+      if (!isOvertimeApprover(req) && existing.employeeId !== req.user!.id) return res.status(403).json({ error: "You can only edit your own Time Off" });
+      if (existing.status !== "pending") return res.status(409).json({ error: "Only pending Time Off entries can be edited" });
+      const conflicts = await timeOffConflicts(existing.employeeId, data.workDate, data.startTime, data.finishTime, existing.id);
+      if (conflicts.overlappingEntries.length || conflicts.scheduledJobs.length) return res.status(409).json({ error: "This Time Off period conflicts with an existing entry or scheduled job.", conflicts });
+      const [updated] = await db.update(overtimeEntries).set({
+        workDate: data.workDate, startTime: data.startTime, finishTime: data.finishTime, overtimeMinutes: minutes,
+        notes: data.notes || "", timeOffReason: data.reason, timeOffOtherReason: data.otherReason || null, updatedAt: new Date(),
+      }).where(and(eq(overtimeEntries.id, existing.id), eq(overtimeEntries.status, "pending"))).returning();
+      if (!updated) return res.status(409).json({ error: "Only pending Time Off entries can be edited" });
+      await logOvertimeAudit(updated.id, req, "edited", { previous: existing, next: updated });
+      res.json((await enrichOvertimeEntries([updated]))[0]);
+    } catch (error) {
+      console.error("Could not update time off:", error);
+      res.status(500).json({ error: "Could not update Time Off" });
+    }
+  });
+
+  app.delete("/api/time-off/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only management can delete Time Off entries" });
+    try {
+      const [existing] = await db.select().from(overtimeEntries).where(eq(overtimeEntries.id, req.params.id)).limit(1);
+      if (!existing || existing.entryType !== "AUTHORISED_TIME_OFF") return res.status(404).json({ error: "Time Off entry not found" });
+      await logOvertimeAudit(existing.id, req, "deleted" as any, { previous: existing });
+      await db.delete(overtimeEntries).where(eq(overtimeEntries.id, existing.id));
+      res.status(204).end();
+    } catch (error) {
+      console.error("Could not delete time off:", error);
+      res.status(500).json({ error: "Could not delete Time Off" });
+    }
+  });
+
+  app.get("/api/time", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can review time" });
+    try {
+      const { employeeId, status, type, departmentId, from, to } = req.query as Record<string, string | undefined>;
+      const [entries, allWorkers] = await Promise.all([
+        db.select().from(overtimeEntries).orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt)),
+        storage.getWorkers(),
+      ]);
+      const workerMap = new Map(allWorkers.map(worker => [worker.id, worker]));
+      const filtered = entries.filter(entry =>
+        (!employeeId || employeeId === "all" || entry.employeeId === employeeId) &&
+        (!status || status === "all" || entry.status === status) &&
+        (!type || type === "all" || (entry.entryType || "OVERTIME") === type) &&
+        (!departmentId || departmentId === "all" || workerMap.get(entry.employeeId)?.departmentId === departmentId) &&
+        (!from || entry.workDate >= from) && (!to || entry.workDate <= to)
+      );
+      const month = new Date().toISOString().slice(0, 7);
+      res.json({ entries: await enrichOvertimeEntries(filtered), summary: calculateTimeSummary(entries, month) });
+    } catch (error) {
+      console.error("Could not load management time:", error);
+      res.status(500).json({ error: "Could not load time entries" });
+    }
+  });
+
+  app.get("/api/time/timeline", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only management can view employee timelines" });
+    const employeeId = String(req.query.employeeId || "");
+    const workDate = String(req.query.date || "");
+    if (!employeeId || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) return res.status(400).json({ error: "Employee and date are required" });
+    try {
+      const [entries, allJobs] = await Promise.all([
+        db.select().from(overtimeEntries).where(and(eq(overtimeEntries.employeeId, employeeId), eq(overtimeEntries.workDate, workDate))),
+        storage.getJobs(),
+      ]);
+      const jobsForDay = allJobs.filter(job => job.workerId === employeeId && new Date(job.scheduledDate).toISOString().slice(0, 10) === workDate)
+        .map(job => ({ id: job.id, type: "JOB", label: job.title, startTime: job.scheduledTime || "08:00", finishTime: (() => { const minutes = (timeToMinutes(job.scheduledTime || "08:00") || 480) + (job.estimatedDuration || 60); return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`; })() }));
+      const adjustments = entries.map(entry => ({
+        id: entry.id, type: entry.entryType === "AUTHORISED_TIME_OFF" ? "TIME_OFF" : "OVERTIME",
+        label: entry.entryType === "AUTHORISED_TIME_OFF" ? "Authorised Time Off" : "Overtime",
+        startTime: entry.startTime, finishTime: entry.finishTime, minutes: entry.overtimeMinutes, status: entry.status,
+      }));
+      res.json({ items: [...jobsForDay, ...adjustments].sort((a, b) => a.startTime.localeCompare(b.startTime)) });
+    } catch (error) {
+      console.error("Could not load employee timeline:", error);
+      res.status(500).json({ error: "Could not load employee timeline" });
+    }
+  });
+
+  for (const action of ["approve", "reject", "reopen"] as const) {
+    app.post(`/api/time-off/:id/${action}`, requireAuth, async (req: AuthenticatedRequest, res) => {
+      if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can update Time Off" });
+      const rejectionReason = typeof req.body?.reason === "string" ? req.body.reason.trim() : null;
+      try {
+        const [existing] = await db.select().from(overtimeEntries).where(eq(overtimeEntries.id, req.params.id)).limit(1);
+        if (!existing || existing.entryType !== "AUTHORISED_TIME_OFF") return res.status(404).json({ error: "Time Off entry not found" });
+        if (action === "approve" && existing.employeeId === req.user!.id) return res.status(403).json({ error: "You cannot approve your own Time Off entry" });
+        if (action === "approve" && existing.status !== "pending") return res.status(409).json({ error: "Only pending Time Off entries can be approved" });
+        if (action === "reject" && existing.status !== "pending") return res.status(409).json({ error: "Only pending Time Off entries can be rejected" });
+        if (action === "reopen" && !["approved", "rejected"].includes(existing.status)) return res.status(409).json({ error: "Only approved or rejected Time Off entries can be reopened" });
+        const now = new Date();
+        const update = action === "approve"
+          ? { status: "approved", approvedById: req.user!.id, approvedByName: overtimeActorName(req), approvalTimestamp: now, rejectionReason: null, updatedAt: now }
+          : action === "reject"
+            ? { status: "rejected", approvedById: req.user!.id, approvedByName: overtimeActorName(req), approvalTimestamp: now, rejectionReason, updatedAt: now }
+            : { status: "pending", approvedById: null, approvedByName: null, approvalTimestamp: null, rejectionReason: null, updatedAt: now };
+        const [updated] = await db.update(overtimeEntries).set(update).where(eq(overtimeEntries.id, existing.id)).returning();
+        await logOvertimeAudit(updated.id, req, action === "reopen" ? "reopened" : action === "approve" ? "approved" : "rejected", {
+          previous: { status: existing.status }, next: { status: updated.status }, reason: rejectionReason,
+        });
+        res.json((await enrichOvertimeEntries([updated]))[0]);
+      } catch (error) {
+        console.error(`Could not ${action} time off:`, error);
+        res.status(500).json({ error: `Could not ${action} Time Off` });
+      }
+    });
+  }
 
   app.get("/api/overtime", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can review overtime" });
@@ -1639,7 +1950,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, tx);
         return created;
       });
-      res.status(201).json((await enrichOvertimeEntries([entry]))[0]);
+      const enriched = (await enrichOvertimeEntries([entry]))[0];
+      const employee = await storage.getWorker(entry.employeeId);
+      await notifyTimeEntry(enriched, employee?.name || "Unknown employee", req);
+      res.status(201).json(enriched);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not submit overtime";
       console.error("Could not submit overtime:", error);

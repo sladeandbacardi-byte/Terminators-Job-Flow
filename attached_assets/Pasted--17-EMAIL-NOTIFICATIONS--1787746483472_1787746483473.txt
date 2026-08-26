@@ -1,0 +1,217 @@
+--------------------------------------------------
+17. EMAIL NOTIFICATIONS
+--------------------------------------------------
+
+Whenever an employee submits an Overtime or Authorised Time Off entry, automatically send an email notification to management.
+
+The email must be sent immediately after the entry is successfully saved.
+
+Do NOT send an email if the save fails.
+
+--------------------------------------------------
+OVERTIME EMAIL
+--------------------------------------------------
+
+Subject:
+
+JobFlow - Overtime Logged - [Employee Name]
+
+Email body:
+
+An overtime entry has been submitted in JobFlow.
+
+Employee: [Employee Name]
+Date: [Date Worked]
+Client: [Client Name]
+Job: [Job Number / Description]
+Start Time: [Start Time]
+Finish Time: [Finish Time]
+
+Before 08:00: [Calculated Time]
+After 16:00: [Calculated Time]
+
+Total Overtime: [Total Hours and Minutes]
+
+Reason / Notes:
+[Notes]
+
+Status: Pending Approval
+
+Include a button/link:
+
+VIEW OVERTIME REQUEST
+
+This must open the relevant overtime entry inside JobFlow.
+
+--------------------------------------------------
+TIME OFF EMAIL
+--------------------------------------------------
+
+Subject:
+
+JobFlow - Time Off Logged - [Employee Name]
+
+Email body:
+
+An Authorised Time Off entry has been submitted in JobFlow.
+
+Employee: [Employee Name]
+Date: [Date]
+Start Time: [Start Time]
+Finish Time: [Finish Time]
+
+Total Time Off: [Hours and Minutes]
+
+Reason:
+[Reason]
+
+Notes:
+[Notes]
+
+Status: Pending Approval
+
+Include a button/link:
+
+VIEW TIME OFF REQUEST
+
+This must open the relevant Time Off entry inside JobFlow.
+
+--------------------------------------------------
+ADMIN-CREATED TIME OFF
+--------------------------------------------------
+
+If an Admin directly creates and approves Authorised Time Off, still send an email notification.
+
+Example:
+
+Subject:
+JobFlow - Time Off Authorised - Garth
+
+Body:
+
+Authorised Time Off has been recorded.
+
+Employee: Garth
+Date: 26/08/2026
+Time: 12:00 - 16:00
+Total: 4 hrs
+Reason: Gap between jobs
+Authorised By: Julien
+Status: Approved
+
+--------------------------------------------------
+APPROVAL EMAIL
+--------------------------------------------------
+
+When an overtime or time-off request is APPROVED, optionally email the employee if the employee has an email address.
+
+Subject:
+
+JobFlow - Overtime Approved
+
+or:
+
+JobFlow - Time Off Approved
+
+Do not require employee email addresses for the system to work.
+
+If the mobile employee does not have an email address, simply update their JobFlow status and do not attempt to email them.
+
+--------------------------------------------------
+REJECTION EMAIL
+--------------------------------------------------
+
+If a request is rejected, optionally email the employee if an email address exists.
+
+Include:
+
+Type
+Date
+Time
+Total
+Rejected By
+Rejection Reason
+
+--------------------------------------------------
+MANAGEMENT RECIPIENTS
+--------------------------------------------------
+
+Create configurable email notification recipients in JobFlow Settings.
+
+Settings > Notifications > Time & Overtime
+
+Fields:
+
+Overtime Notifications:
+[Email recipient list]
+
+Time Off Notifications:
+[Email recipient list]
+
+Allow multiple email addresses.
+
+Example:
+
+julien@...
+service@...
+hr@...
+
+Do NOT hard-code the email address into the application.
+
+Admin must be able to add/remove recipients later.
+
+--------------------------------------------------
+EMAIL PREFERENCES
+--------------------------------------------------
+
+Add notification switches:
+
+[ON] New Overtime Submitted
+[ON] New Time Off Submitted
+[ON] Overtime Approved
+[ON] Time Off Approved
+[ON] Overtime Rejected
+[ON] Time Off Rejected
+
+Default:
+
+New Overtime Submitted = ON
+New Time Off Submitted = ON
+
+The other notifications can be configurable.
+
+--------------------------------------------------
+EMAIL FAILURE
+--------------------------------------------------
+
+If the overtime/time-off record saves successfully but the email fails:
+
+DO NOT lose or roll back the submitted record.
+
+Save the entry normally.
+
+Log the failed email in the system.
+
+Show Admin a warning such as:
+
+"Time entry saved, but notification email could not be sent."
+
+Allow Admin to resend the notification.
+
+--------------------------------------------------
+AUDIT TRAIL
+--------------------------------------------------
+
+Also record email activity in the audit trail:
+
+Notification email sent
+Notification email failed
+Notification email resent
+
+Store:
+
+Recipient
+Time sent
+Email type
+Related overtime/time-off entry
+Success/failure
