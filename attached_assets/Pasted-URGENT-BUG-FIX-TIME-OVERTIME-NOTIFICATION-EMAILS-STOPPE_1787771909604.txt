@@ -1,0 +1,206 @@
+URGENT BUG FIX: TIME & OVERTIME NOTIFICATION EMAILS STOPPED WORKING
+
+The Overtime and Time Off notification emails were working before.
+
+After changing the recipient list to:
+
+julien@terminators.co.za
+accounts@terminators.co.za
+
+the notifications are no longer working correctly.
+
+Do NOT redesign the email system.
+
+Restore the previously working email send logic and only fix the recipient handling.
+
+--------------------------------------------------
+1. FIND THE LAST WORKING EMAIL FUNCTION
+--------------------------------------------------
+
+Identify the exact email function that successfully sent:
+
+- Overtime Logged emails
+- Time Off Logged emails
+
+before the multi-recipient change.
+
+Use that same function.
+
+Do not create a new transporter, new mail service or duplicate email implementation.
+
+--------------------------------------------------
+2. FIX MULTIPLE RECIPIENT FORMAT
+--------------------------------------------------
+
+The notification must be sent to BOTH:
+
+julien@terminators.co.za
+accounts@terminators.co.za
+
+Check what format the existing email provider expects.
+
+If it expects a string, use:
+
+julien@terminators.co.za, accounts@terminators.co.za
+
+If it supports arrays, use the correct array format supported by the existing mail library.
+
+Do not guess the format.
+
+Check the mail library/API already being used by JobFlow and use its documented recipient format.
+
+--------------------------------------------------
+3. SIMPLE FALLBACK
+--------------------------------------------------
+
+If sending one email to two recipients is causing problems, send TWO separate emails instead.
+
+Example:
+
+sendEmail({
+  to: "julien@terminators.co.za",
+  ...
+})
+
+then:
+
+sendEmail({
+  to: "accounts@terminators.co.za",
+  ...
+})
+
+This is acceptable and may be more reliable.
+
+The priority is that BOTH addresses receive the notification.
+
+--------------------------------------------------
+4. DO NOT USE INFO@ ANYMORE
+--------------------------------------------------
+
+For Time & Overtime notifications, do not send to:
+
+info@terminators.co.za
+
+unless it is required as the sender account.
+
+The notification recipients must be:
+
+julien@terminators.co.za
+accounts@terminators.co.za
+
+The FROM address can remain whatever existing working sender JobFlow already uses.
+
+Do not change the sender configuration.
+
+--------------------------------------------------
+5. SERVER LOGGING
+--------------------------------------------------
+
+Add temporary detailed logging around the send function.
+
+For every notification log:
+
+[EMAIL DEBUG]
+Type: OVERTIME or AUTHORISED_TIME_OFF
+Entry ID: [id]
+From: [sender address]
+Recipients:
+- julien@terminators.co.za
+- accounts@terminators.co.za
+
+Then log the actual provider response.
+
+For each recipient show:
+
+julien@terminators.co.za -> SENT / FAILED
+accounts@terminators.co.za -> SENT / FAILED
+
+If failed, print the FULL provider error.
+
+Do not hide or replace the error with a generic message.
+
+--------------------------------------------------
+6. IMPORTANT ERROR HANDLING
+--------------------------------------------------
+
+Do not use one try/catch that stops both sends if the first recipient fails.
+
+If sending separately, use:
+
+try send Julien
+log result
+
+try send Accounts
+log result
+
+This way one failed recipient does not prevent the other email from being sent.
+
+--------------------------------------------------
+7. TEST OVERTIME
+--------------------------------------------------
+
+Create a test overtime entry:
+
+16:00 - 17:00
+
+Expected:
+
+Overtime = 1 hr
+
+Then confirm:
+
+julien@terminators.co.za -> email sent
+accounts@terminators.co.za -> email sent
+
+Show the actual email provider response in the server logs.
+
+--------------------------------------------------
+8. TEST TIME OFF
+--------------------------------------------------
+
+Create a test Time Off entry:
+
+12:00 - 16:00
+
+Expected:
+
+Time Off = 4 hrs
+
+Then confirm:
+
+julien@terminators.co.za -> email sent
+accounts@terminators.co.za -> email sent
+
+Show the actual provider response in the server logs.
+
+--------------------------------------------------
+9. DO NOT REPORT FIXED UNTIL VERIFIED
+--------------------------------------------------
+
+Do not say this is fixed merely because the app compiles.
+
+Verify FOUR deliveries:
+
+1. Overtime -> Julien
+2. Overtime -> Accounts
+3. Time Off -> Julien
+4. Time Off -> Accounts
+
+If any one fails, show me the exact server/provider error.
+
+--------------------------------------------------
+10. DO NOT CHANGE OTHER FEATURES
+--------------------------------------------------
+
+Do not change:
+
+- overtime calculations
+- time off calculations
+- My Time interface
+- approvals
+- audit trail
+- mobile theme
+- permissions
+- database schema
+
+This task is ONLY to restore reliable notification email delivery to both management addresses.
