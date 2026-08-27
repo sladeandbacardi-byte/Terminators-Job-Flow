@@ -186,6 +186,16 @@ const ALL_SECTIONS: NavSection[] = [
           { name: "Stock Reports",        href: "/stock-reports",      icon: BarChart,        roles: ["admin", "manager", "coordinator", "accounts", "service"] },
         ],
       },
+      {
+        type: "group",
+        key: "operations-tools",
+        name: "Operational Tools",
+        icon: Wrench,
+        roles: ["admin", "manager", "coordinator", "service"],
+        items: [
+          { name: "Equipment Checklists", href: "/equipment-checklists", icon: CheckSquare, roles: ["admin", "manager", "coordinator", "service"] },
+        ],
+      },
     ],
   },
   {

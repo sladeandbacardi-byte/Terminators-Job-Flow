@@ -237,7 +237,8 @@ function AuthenticatedApp() {
                 <Route path="/workers">{() => <ProtectedRoute component={Workers} roles={["admin","manager","coordinator","accounts"]} />}</Route>
 
                 {/* ── Service / Operations ─────────────────────────────── */}
-                <Route path="/field-diaries" component={FieldDiaries} />
+                <Route path="/field-diaries">{() => { window.location.replace("/calendar"); return null; }}</Route>
+                <Route path="/stock-management">{() => { window.location.replace("/inventory"); return null; }}</Route>
                 <Route path="/treatment-reports">{() => <ProtectedRoute component={TreatmentReports} roles={["admin","manager","coordinator","service"]} />}</Route>
                 <Route path="/fleet" component={Fleet} />
                 <Route path="/fleet/vehicles" component={Fleet} />
