@@ -177,7 +177,7 @@ export default function Header({ title, subtitle, onMobileMenuToggle }: HeaderPr
         </div>
 
         {/* CENTRE — global search */}
-        <div className="flex-1 flex justify-center px-2 max-w-xs sm:max-w-sm lg:max-w-md mx-auto">
+        <div className="flex-none sm:flex-1 flex justify-center px-1 sm:px-2 max-w-none sm:max-w-sm lg:max-w-md mx-0 sm:mx-auto">
           <GlobalSearch />
         </div>
 
