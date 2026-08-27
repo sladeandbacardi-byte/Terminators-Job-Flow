@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Expense, Department } from "@shared/schema";
 import { EXPENSE_CATEGORIES } from "@shared/schema";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 const fmtR = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
@@ -138,6 +139,11 @@ export default function Expenses() {
   return (
       <>
         <div className="p-6 pb-20 lg:pb-6 space-y-5">
+          <div>
+            <FinanceBreadcrumb section="Expenses" current="Expense Capture" />
+            <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">Expense Capture</h1>
+            <p className="text-sm text-gray-600 mt-1">Capture and manage business expenses</p>
+          </div>
 
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

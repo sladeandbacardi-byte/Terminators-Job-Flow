@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -242,7 +243,8 @@ export default function FinanceDashboard() {
           {/* Page header + period selector */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Finance Overview</h1>
+              <FinanceBreadcrumb current="Finance Dashboard" />
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Finance Dashboard</h1>
               <p className="text-sm text-gray-500 mt-0.5">Revenue, collections, outstanding debt and invoicing queue</p>
             </div>
             <div className="flex gap-2 items-center">

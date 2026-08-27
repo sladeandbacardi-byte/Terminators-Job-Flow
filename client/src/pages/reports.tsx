@@ -30,6 +30,8 @@ import type { Job, RentalContract, Worker, Department } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
 import { formatOvertimeMinutes } from "@shared/overtime";
+import { useLocation } from "wouter";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 // ─── Quick-preset helpers ─────────────────────────────────────────────────────
 type Preset = '7d' | '30d' | '90d' | '6m' | 'ytd' | '1y' | 'custom';
@@ -120,6 +122,8 @@ function buildChartData(jobs: Job[], groupBy: GroupBy, from: Date, to: Date): Ch
 }
 
 export default function Reports() {
+  const [location] = useLocation();
+  const isFinanceReportsPage = location === "/finance-reports";
   const { user } = useAuth();
   const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
   const canSeeFinancials = role !== "manager";
@@ -266,7 +270,10 @@ export default function Reports() {
           {/* Global date range (for overview tabs) */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Business Reports</h3>
+              {isFinanceReportsPage && <FinanceBreadcrumb current="Reports" />}
+              <h1 className="text-lg font-semibold text-gray-900" data-testid="page-title">
+                {isFinanceReportsPage ? "Reports" : "Business Reports"}
+              </h1>
               <p className="text-sm text-gray-600">Analyse performance and generate insights for your business</p>
             </div>
             <div className="flex items-center gap-4">

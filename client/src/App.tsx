@@ -13,6 +13,7 @@ import AppShell from "@/components/layout/app-shell";
 const NotFound            = lazy(() => import("@/pages/not-found"));
 const Dashboard           = lazy(() => import("@/pages/dashboard"));
 const Jobs                = lazy(() => import("@/pages/jobs"));
+const ContractJobs        = lazy(() => import("@/pages/contract-jobs"));
 const Workers             = lazy(() => import("@/pages/workers"));
 const Clients             = lazy(() => import("@/pages/clients"));
 const Inventory           = lazy(() => import("@/pages/inventory"));
@@ -30,9 +31,7 @@ const DailyDepartmentCard = lazy(() => import("@/pages/daily-department-card"));
 const QuoteRequest        = lazy(() => import("@/pages/quote-request"));
 const Leads               = lazy(() => import("@/pages/leads"));
 const Backup              = lazy(() => import("@/pages/backup"));
-const FieldDiaries        = lazy(() => import("@/pages/field-diaries"));
 const Quotes              = lazy(() => import("@/pages/quotes"));
-const SalesDiary          = lazy(() => import("@/pages/sales-diary"));
 const Fleet               = lazy(() => import("@/pages/fleet"));
 const FleetKmLog          = lazy(() => import("@/pages/fleet-km-log"));
 const FleetInspection     = lazy(() => import("@/pages/fleet-inspection"));
@@ -54,7 +53,11 @@ const TestingChecklist    = lazy(() => import("@/pages/testing-checklist"));
 const FinanceDashboard    = lazy(() => import("@/pages/finance-dashboard"));
 const HRDashboard         = lazy(() => import("@/pages/hr-dashboard"));
 const Expenses            = lazy(() => import("@/pages/expenses"));
+const OvertimeTimeOff     = lazy(() => import("@/pages/overtime-time-off"));
+const StockDashboard      = lazy(() => import("@/pages/stock-dashboard"));
+const StockReports        = lazy(() => import("@/pages/stock-reports"));
 const ServiceScheduling   = lazy(() => import("@/pages/service-scheduling"));
+const ServiceContracts    = lazy(() => import("@/pages/service-contracts"));
 const PricingLibraryPage  = lazy(() => import("@/pages/pricing-library"));
 const FollowUpsPage       = lazy(() => import("@/pages/follow-ups"));
 const ContractsPendingPage = lazy(() => import("@/pages/contracts-pending"));
@@ -183,12 +186,15 @@ function AuthenticatedApp() {
                 <Route path="/" component={RoleDashboard} />
                 <Route path="/dashboard" component={Dashboard} />
                 <Route path="/jobs" component={Jobs} />
+                <Route path="/once-off-jobs" component={Jobs} />
+                <Route path="/contract-jobs" component={ContractJobs} />
                 <Route path="/clients" component={Clients} />
                 <Route path="/clients/:id" component={ClientProfile} />
                 <Route path="/inventory" component={Inventory} />
                 <Route path="/contracts" component={Contracts} />
                 <Route path="/emails" component={Emails} />
                 <Route path="/reports" component={Reports} />
+                <Route path="/finance-reports" component={Reports} />
                 <Route path="/custom-reports" component={CustomReports} />
                 <Route path="/calendar" component={Calendar} />
 
@@ -196,7 +202,8 @@ function AuthenticatedApp() {
                 <Route path="/leads">{() => <ProtectedRoute component={Leads} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/quotes">{() => <ProtectedRoute component={Quotes} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/accepted-work">{() => <ProtectedRoute component={AcceptedWork} roles={["admin","manager","sales"]} />}</Route>
-                <Route path="/sales-diary">{() => <ProtectedRoute component={SalesDiary} roles={["admin","manager","sales"]} />}</Route>
+                {/* Legacy Sales Diary URL now opens the shared calendar. */}
+                <Route path="/sales-diary">{() => { window.location.replace(`/calendar${window.location.search}`); return null; }}</Route>
                 <Route path="/sales-dashboard">{() => <ProtectedRoute component={SalesDashboard} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/opportunities">{() => <ProtectedRoute component={Opportunities} roles={["admin","manager","sales"]} />}</Route>
                 <Route path="/follow-ups">{() => <ProtectedRoute component={FollowUpsPage} roles={["admin","manager","sales"]} />}</Route>
@@ -206,9 +213,12 @@ function AuthenticatedApp() {
                 {/* ── Finance ──────────────────────────────────────────── */}
                 <Route path="/finance-dashboard">{() => <ProtectedRoute component={FinanceDashboard} roles={["admin","accounts"]} />}</Route>
                 <Route path="/invoices">{() => <ProtectedRoute component={Invoices} roles={["admin","accounts","manager"]} />}</Route>
+                <Route path="/receipts">{() => <ProtectedRoute component={Invoices} roles={["admin","accounts","manager"]} />}</Route>
                 <Route path="/expenses">{() => <ProtectedRoute component={Expenses} roles={["admin","accounts"]} />}</Route>
                 <Route path="/debtors">{() => <ProtectedRoute component={Debtors} roles={["admin","accounts"]} />}</Route>
+                <Route path="/statements">{() => <ProtectedRoute component={Debtors} roles={["admin","accounts"]} />}</Route>
                 <Route path="/creditors">{() => <ProtectedRoute component={Creditors} roles={["admin","accounts"]} />}</Route>
+                <Route path="/supplier-payments">{() => <ProtectedRoute component={Creditors} roles={["admin","accounts"]} />}</Route>
                 <Route path="/sage-export">{() => <ProtectedRoute component={SageExport} roles={["admin","accounts"]} />}</Route>
 
                 {/* ── Admin-only ───────────────────────────────────────── */}
@@ -222,13 +232,14 @@ function AuthenticatedApp() {
 
                 {/* ── Suppliers / Purchase Orders ──────────────────────── */}
                 <Route path="/suppliers">{() => <ProtectedRoute component={Suppliers} roles={["admin","manager","coordinator"]} />}</Route>
-                <Route path="/purchase-orders">{() => <ProtectedRoute component={PurchaseOrders} roles={["admin","manager","coordinator"]} />}</Route>
+                <Route path="/purchase-orders">{() => <ProtectedRoute component={PurchaseOrders} roles={["admin","manager","coordinator","accounts"]} />}</Route>
                 <Route path="/workers">{() => <ProtectedRoute component={Workers} roles={["admin","manager","coordinator","accounts"]} />}</Route>
 
                 {/* ── Service / Operations ─────────────────────────────── */}
-                <Route path="/field-diaries" component={FieldDiaries} />
-                 <Route path="/treatment-reports">{() => <ProtectedRoute component={TreatmentReports} roles={["admin","manager","coordinator"]} />}</Route>
+                <Route path="/field-diaries">{() => { window.location.replace("/calendar"); return null; }}</Route>
+                <Route path="/treatment-reports">{() => <ProtectedRoute component={TreatmentReports} roles={["admin","manager","coordinator","service"]} />}</Route>
                 <Route path="/fleet" component={Fleet} />
+                <Route path="/fleet/vehicles" component={Fleet} />
                 <Route path="/fleet/km-log" component={FleetKmLog} />
                 <Route path="/fleet/inspection" component={FleetInspection} />
                 <Route path="/fleet/fuel" component={FleetFuel} />
@@ -239,7 +250,12 @@ function AuthenticatedApp() {
                 <Route path="/attendance" component={Attendance} />
                 <Route path="/team-management" component={TeamManagement} />
                 <Route path="/testing-checklist" component={TestingChecklist} />
-                <Route path="/service-contracts">{() => { window.location.replace("/contracts"); return null; }}</Route>
+                <Route path="/overtime-time-off" component={OvertimeTimeOff} />
+                <Route path="/stock-dashboard" component={StockDashboard} />
+                <Route path="/stock-reports" component={StockReports} />
+                <Route path="/stock-usage" component={Inventory} />
+                <Route path="/stock-adjustments" component={Inventory} />
+                <Route path="/service-contracts">{() => <ProtectedRoute component={ServiceContracts} roles={["admin","manager","coordinator"]} />}</Route>
                 <Route path="/contracts-pending" component={ContractsPendingPage} />
                 <Route path="/hr-dashboard" component={HRDashboard} />
                 <Route path="/service-scheduling" component={ServiceScheduling} />

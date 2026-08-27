@@ -9,6 +9,8 @@ import {
   Wallet, Search, FileText, Calendar as CalIcon, Building2, PackageCheck,
 } from "lucide-react";
 import type { PurchaseOrder, Supplier } from "@shared/schema";
+import { useLocation } from "wouter";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 const fmtR = (n: number) =>
   `R${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
@@ -43,6 +45,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function Creditors() {
+  const [location] = useLocation();
+  const isSupplierPaymentsPage = location === "/supplier-payments";
   const [searchTerm, setSearchTerm] = useState("");
   const [bucketFilter, setBucketFilter] = useState<"all" | Bucket>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
@@ -109,6 +113,15 @@ export default function Creditors() {
   return (
       <>
         <div className="p-6 space-y-5">
+          <div>
+            <FinanceBreadcrumb section="Expenses" current={isSupplierPaymentsPage ? "Supplier Payments" : "Creditors"} />
+            <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
+              {isSupplierPaymentsPage ? "Supplier Payments" : "Creditors"}
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {isSupplierPaymentsPage ? "Review supplier balances and outstanding payments" : "Review supplier balances and money owed"}
+            </p>
+          </div>
 
           {/* KPI tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

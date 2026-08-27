@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Invoice, Client } from "@shared/schema";
+import { useLocation } from "wouter";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 const fmtR = (n: number) =>
   `R${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
@@ -43,6 +45,8 @@ function bucketFor(daysOverdue: number): Bucket {
 }
 
 export default function Debtors() {
+  const [location] = useLocation();
+  const isStatementsPage = location === "/statements";
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [bucketFilter, setBucketFilter] = useState<"all" | Bucket>("all");
@@ -170,6 +174,15 @@ export default function Debtors() {
   return (
       <>
         <div className="p-6 space-y-5">
+          <div>
+            <FinanceBreadcrumb section="Income" current={isStatementsPage ? "Statements" : "Debtors"} />
+            <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
+              {isStatementsPage ? "Statements" : "Debtors"}
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {isStatementsPage ? "Review customer balances and outstanding invoices" : "Review customer money owed and overdue balances"}
+            </p>
+          </div>
 
           {/* KPI tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -1,0 +1,493 @@
+URGENT FULL PRODUCTION FIX - QUOTES, MOBILE DASHBOARD, FLEETGUARD, TIME/OFF
+
+The Railway app is now online, but several live production features are failing.
+
+Current issues seen in the live app:
+
+1. New Quote partly works, but quote creation fails.
+Error shown:
+Failed to create quote
+
+2. Mobile technician dashboard fails.
+Error shown:
+Unable to load your mobile dashboard.
+
+3. FleetGuard does not open properly from mobile dashboard/menu.
+
+4. Overtime / Time Off page opens, but submission fails.
+Error shown:
+Could not submit Time Off
+
+These must be fixed as production blockers.
+
+IMPORTANT:
+Do not make cosmetic changes first.
+Fix the API/database flow so the app can save and load data correctly.
+
+--------------------------------------------------
+PART 1 - CHECK DATABASE SCHEMA
+--------------------------------------------------
+
+Confirm the Railway database has all required tables.
+
+Run/check:
+
+pnpm run db:push
+
+If the database has partial/broken tables from earlier setup, provide a safe reset option for development only:
+
+pnpm run db:reset
+pnpm run db:push
+pnpm run db:seed
+
+Required tables or equivalent must exist:
+
+- users
+- staff
+- clients
+- leads
+- quotes
+- quote_line_items
+- legal_entities
+- jobs
+- field_diaries
+- invoices
+- vehicles
+- vehicle_assignments
+- vehicle_issues
+- km_logs
+- vehicle_inspections
+- fuel_fillups
+- overtime_entries
+- time_off_entries
+
+Do not run db:push, db:reset, or db:seed automatically during Railway startup.
+
+--------------------------------------------------
+PART 2 - SEED REQUIRED DEFAULT DATA
+--------------------------------------------------
+
+The fresh Railway database must be seeded with default data.
+
+Seed must be safe to run multiple times and must not create duplicates.
+
+Required default legal entities:
+
+- Terminators CC
+- Terminators Pty Ltd
+
+Required mobile users:
+
+- Re-Althon
+- Leon
+- Garth
+- Jackie
+- Sheryl
+- Zain
+- Mike
+- X
+- Reece
+
+Required admin/office users:
+
+- Julien Botha
+- Sheryl-Lyn Lee
+- Chané du Toit
+- Mariette Koekemoer
+- Maryka Venter
+- Finance User
+- Admin User
+- Service Manager
+
+Required departments:
+
+- Pest Control
+- Washroom
+- Sanitary Bins
+- Deep Cleaning
+- Sales
+- Finance
+- Operations
+- Admin
+- Fleet
+
+Required demo vehicles if no vehicles exist:
+
+- DPN524EC - 2006 Mercedes Benz Vito - Re-Althon
+- HDF872EC - 2013 VW Caddy - Leon
+- JPC031EC - 2020 VW Caddy - Garth
+- DJG667EC - 2005 VW Caddy - Jackie
+- HKY517EC - 2015 Suzuki Celerio - Sheryl
+- HRW489EC - 2016 VW Caddy - Zain
+- KRM914EC - 2023 Isuzu D Max - Mike
+- HRS116EC - 2016 VW Caddy - X
+- KDM688EC - 2023 VW Caddy - Reece
+- KTZ909EC - 2026 BYD Dolphin Surf - Julien
+
+--------------------------------------------------
+PART 3 - FIX NEW QUOTE CREATION
+--------------------------------------------------
+
+New Quote currently fails with:
+Failed to create quote
+
+Please inspect the browser console and server logs for the exact API error.
+
+Fix the quote creation flow.
+
+The New Quote form must be able to save with:
+
+- issuing legal entity
+- client
+- contact person
+- phone
+- email
+- address
+- quote type
+- quote status
+- VAT treatment
+- description
+- internal notes
+- line items
+- totals
+
+If the database is empty, the form must still work.
+
+Quote create endpoint must validate and save:
+
+- clientId, optional if creating new client
+- clientName
+- legalEntityId
+- legalEntityName
+- quoteType
+- quoteStatus
+- vatTreatment
+- description
+- internalNotes
+- onceOffTotal
+- monthlyRecurringTotal
+- vatAmount
+- totalIncludingVat
+- lineItems array
+
+Each line item must save:
+
+- quoteId
+- department
+- serviceType
+- description
+- quantity
+- unit
+- unitPrice
+- frequency
+- lineTotal
+
+If selected client does not exist, create the client first, then create the quote linked to that client.
+
+Quote must get a document number:
+
+QT-YYYY-0001
+
+After saving:
+- close modal
+- show success message
+- show quote in Quotes list
+- show quote in Client profile
+- do not show “Failed to create quote” unless the API actually failed
+
+Add clear server-side error logging for quote creation, but do not expose secrets.
+
+--------------------------------------------------
+PART 4 - FIX MOBILE TECHNICIAN DASHBOARD
+--------------------------------------------------
+
+Mobile dashboard currently shows:
+Unable to load your mobile dashboard.
+
+Fix the mobile dashboard API.
+
+The mobile dashboard must not crash if:
+- user has no jobs
+- user has no assigned vehicle
+- user has no field diaries
+- user has no overtime entries
+- user has no team assignment
+
+For a mobile user like Jackie or Reece, the dashboard must load even with empty data.
+
+Expected fallback dashboard:
+
+Jobs Today: 0
+Completed Today: 0
+In Progress: 0
+Field Diaries Due: 0
+
+Current Job:
+No job currently in progress.
+
+My Jobs Today:
+No jobs are assigned to you or your team.
+
+My Week:
+0 jobs scheduled for the next seven days.
+
+FleetGuard:
+Show buttons:
+- Report Issue
+- Log KMs
+- Vehicle Inspection
+- Fuel Fill-up
+
+API must return safe empty arrays instead of errors.
+
+Mobile dashboard endpoint should return:
+
+{
+  user,
+  stats,
+  currentJob,
+  jobsToday,
+  weekJobs,
+  fieldDiariesDue,
+  assignedVehicle,
+  fleetActions
+}
+
+If any part fails, log the error but still return safe defaults.
+
+--------------------------------------------------
+PART 5 - FIX FLEETGUARD INTEGRATION
+--------------------------------------------------
+
+FleetGuard does not open properly.
+
+FleetGuard must be part of Job Flow, not a separate broken app.
+
+Mobile FleetGuard buttons must route to working pages:
+
+/fleet/report-issue
+/fleet/log-kms
+/fleet/vehicle-inspection
+/fleet/fuel-fill-up
+
+For mobile users:
+- no second login
+- use current logged-in user
+- prefill technician name
+- preselect assigned vehicle if available
+- if no vehicle assigned, allow vehicle selection
+
+Each page must load even if there are no previous fleet records.
+
+Fix these forms:
+
+Report Issue:
+- Save vehicle issue
+- Link user and vehicle
+- Show success
+
+Log KMs:
+- Save km log
+- Validate end km higher than start km
+- Update vehicle odometer if needed
+
+Vehicle Inspection:
+- Save inspection
+- Save checklist items
+- If failed item, create vehicle issue
+
+Fuel Fill-up:
+- Save fuel fill-up
+- Allow manual values if OCR/photo fails
+
+FleetGuard must use the same Job Flow database and same user session.
+
+--------------------------------------------------
+PART 6 - FIX OVERTIME AND TIME OFF SUBMISSION
+--------------------------------------------------
+
+The My Time page opens, but Time Off submission fails with:
+Could not submit Time Off
+
+Fix both overtime and time off APIs.
+
+Required routes/endpoints must work:
+
+- GET my overtime/time entries
+- POST overtime entry
+- POST time off entry
+- GET manager approval list
+- POST approve/decline entry
+
+Mobile user must be able to submit:
+
+OVERTIME:
+Fields:
+- date
+- customerName
+- startTime
+- endTime
+- notes optional
+
+The app calculates overtime automatically using normal working hours:
+08:00 to 16:00
+
+Only time before 08:00 and after 16:00 counts as overtime.
+
+TIME OFF:
+Fields:
+- date
+- startTime
+- finishTime
+- reason
+- notes optional
+
+The app calculates total time off.
+
+Example:
+08:00 to 14:00 = 6 hours time off
+
+Each entry must save:
+
+- userId
+- userName
+- date
+- startTime
+- endTime or finishTime
+- calculatedMinutes
+- type: overtime or time_off
+- reason/notes
+- status: Submitted
+- createdAt
+
+If the database table does not exist, add it.
+
+If user ID is missing from session, use the logged-in mobile user object correctly.
+
+Do not fail silently.
+
+Show useful error messages in console/server logs.
+
+--------------------------------------------------
+PART 7 - SESSION / LOGIN FIXES
+--------------------------------------------------
+
+Mobile pages must use the logged-in user session consistently.
+
+When user clicks their name on login:
+- save userId
+- save userName
+- save role
+- save userType
+- save department/team if available
+
+All mobile APIs must know which user is logged in.
+
+If the user session is missing:
+- redirect to main login
+- do not show broken dashboard
+
+Sign out must return to main login selector:
+- Staff Login
+- Admin / Office Login
+
+Do not return directly to Employee ID screen.
+
+--------------------------------------------------
+PART 8 - API TESTING REQUIRED
+--------------------------------------------------
+
+After fixing, test these API endpoints on Railway:
+
+Legal entities:
+GET /api/legal-entities
+
+Clients:
+GET /api/clients
+GET /api/clients/search?q=test
+
+Quotes:
+GET /api/quote-submissions
+POST /api/quote-submissions
+
+Mobile dashboard:
+GET mobile dashboard endpoint for Jackie
+GET mobile dashboard endpoint for Reece
+
+Fleet:
+GET /api/fleet/vehicles
+POST /api/fleet/report-issue
+POST /api/fleet/log-kms
+POST /api/fleet/vehicle-inspection
+POST /api/fleet/fuel-fill-up
+
+Time:
+GET my time entries
+POST overtime
+POST time off
+
+If route names differ, test the actual implemented route names.
+
+--------------------------------------------------
+PART 9 - UI ERROR HANDLING
+--------------------------------------------------
+
+Replace generic errors with useful messages.
+
+Instead of:
+Unable to load your mobile dashboard.
+
+Show:
+Could not load dashboard data. Please refresh or contact admin.
+
+But only after safe fallback fails.
+
+Instead of:
+Failed to create quote.
+
+Show:
+Could not create quote. Please check required fields and try again.
+
+Also log the technical error to server logs.
+
+--------------------------------------------------
+PART 10 - FINAL ACCEPTANCE TEST
+--------------------------------------------------
+
+Test full workflow:
+
+1. Login as Admin / Managing Member.
+2. Confirm dashboard loads.
+
+3. Login as Sales user.
+4. Create new quote.
+5. Select legal entity.
+6. Select or create client.
+7. Add line item.
+8. Create quote successfully.
+
+9. Login as mobile user Reece.
+10. Confirm mobile dashboard loads.
+11. Open My Time.
+12. Submit overtime.
+13. Submit time off.
+14. Confirm entries appear.
+
+15. Open FleetGuard.
+16. Submit Report Issue.
+17. Submit Log KMs.
+18. Submit Vehicle Inspection.
+19. Submit Fuel Fill-up.
+
+16. Login as manager/admin.
+17. Confirm overtime/time off entries appear for approval.
+18. Confirm fleet records appear in fleet dashboard.
+
+Do not mark complete until all four issues are fixed:
+
+- New Quote saves successfully
+- Mobile dashboard loads
+- FleetGuard opens and saves records
+- Overtime/Time Off submits successfully
+
+END

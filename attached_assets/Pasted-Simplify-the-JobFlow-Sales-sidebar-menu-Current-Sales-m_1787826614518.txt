@@ -1,0 +1,192 @@
+Simplify the JobFlow Sales sidebar menu.
+
+Current Sales menu has too many items:
+- Leads
+- Quotes
+- Accepted Work
+- Diary
+- Clients
+- Follow-ups
+- Opportunities
+- Reports
+- Email Center
+
+Update the Sales menu to show only:
+
+- Leads
+- Quotes
+- Calendar
+- Clients
+- Follow-ups
+- Reports
+- Email Center
+
+MENU CHANGES:
+
+1. Rename "Diary" to "Calendar".
+
+The Calendar must be the same shared JobFlow calendar used by all departments.
+It must not be a separate Sales-only diary.
+
+The shared Calendar must show:
+- Sales appointments
+- Site visits
+- Quote follow-ups
+- Service jobs
+- Operations tasks
+- Finance/admin reminders where applicable
+
+All users with permission must be able to view and edit the same calendar.
+
+Calendar filters:
+- My items
+- All users
+- Department
+- User
+- Item type
+- Status
+- Date range
+
+Calendar item types:
+- Sales appointment
+- Site visit
+- Quote follow-up
+- Service job
+- Contract job
+- Once-off job
+- Installation
+- Internal task
+- Other
+
+2. Remove "Accepted Work" from the Sales sidebar.
+
+Accepted Work should not be a separate Sales menu item.
+
+When a quote is accepted:
+- Convert it to a Job
+- The Job must appear under the Jobs/Service workflow
+- The Job must appear on the shared Calendar
+- The quote must remain visible in Quotes as Accepted / Converted to Job
+
+Sales should be able to see accepted/converted quotes from the Quotes page and Reports, but not as a separate sidebar item.
+
+3. Remove "Opportunities" as a separate menu item.
+
+Opportunities must live inside Leads.
+
+Inside Leads, add filters/tabs:
+- All Leads
+- New Leads
+- Opportunities
+- Contacted
+- Appointment Booked
+- Quote Needed
+- Quoted
+- Lost
+- Converted
+
+An opportunity is simply a lead with a higher chance or active sales potential.
+Do not create a separate Opportunities module.
+
+Add field on lead:
+- Opportunity: Yes / No
+
+Optional opportunity fields:
+- Estimated value
+- Expected close date
+- Probability %
+- Priority
+- Next action
+
+4. Clients must be the shared client database.
+
+The Clients page must be a central database that all departments can view and edit according to permissions.
+
+Clients must not be Sales-only.
+
+Client profile must show:
+- Client details
+- Contacts
+- Addresses
+- Leads
+- Quotes
+- Jobs
+- Contracts
+- Invoices
+- Payments/payment status if allowed
+- Service history
+- Notes
+- Attachments
+- Photos
+- Follow-ups
+
+All users with permission must be able to view and edit client information.
+
+5. Follow-ups can stay separate.
+
+Follow-ups must include:
+- Lead follow-ups
+- Quote follow-ups
+- Client follow-ups
+- After-sales follow-ups
+- Contract renewal follow-ups
+- Price increase reminders
+
+Follow-ups must also appear on the shared Calendar if they have a date/time.
+
+6. Reports can stay.
+
+Reports must include:
+- Sales report by date range
+- Commission report
+- Leads by origination
+- Quotes sent
+- Quotes accepted
+- Quotes lost
+- Sales by rep
+- Sales by department
+- Conversion rate
+- Follow-up performance
+
+7. Email Center can stay.
+
+Email Center should allow users to create emails from:
+- Lead
+- Quote
+- Client
+- Job
+- Follow-up
+
+Emails should open Outlook/default email app using mailto for now.
+
+FINAL SALES MENU ORDER:
+
+Sales
+- Leads
+- Quotes
+- Calendar
+- Clients
+- Follow-ups
+- Reports
+- Email Center
+
+IMPORTANT WORKFLOW RULE:
+
+The Sales workflow must stay simple:
+
+Lead → Quote → Job → Invoice
+
+Do not add separate stages/modules that confuse this flow.
+
+Appointments, opportunities, site visits and notes must live inside Leads/Quotes/Calendar.
+Accepted work must become Jobs.
+Contracts must be linked to Jobs/Clients, not shown as a separate Sales sidebar item.
+
+The goal is to make the Sales menu simple and obvious for reps:
+- Leads are prospects
+- Quotes are prices sent
+- Calendar is where work/appointments happen
+- Clients is the shared customer database
+- Follow-ups are tasks/reminders
+- Reports are for performance and commission
+- Email Center opens Outlook emails

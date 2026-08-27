@@ -1,0 +1,283 @@
+Update the Job Flow navigation/menu structure.
+
+The current Service menu is confusing.
+
+Current Service menu shows:
+- Once Off Jobs
+- Calendar
+- Contracts
+- Equipment Checklists
+- Daily Diaries
+- Treatment Reports
+- Stock Management
+- Reports
+
+Change it to the simpler structure below.
+
+SERVICE MENU
+
+Service must show only:
+
+- Jobs
+- Calendar
+- Contracts
+- Reports
+
+Jobs must be expandable.
+
+Under Jobs, show:
+
+- Contract Jobs
+- Once-off Jobs
+
+This means:
+
+Service
+- Jobs
+  - Contract Jobs
+  - Once-off Jobs
+- Calendar
+- Contracts
+- Reports
+
+IMPORTANT WORDING
+
+Use:
+Once-off Jobs
+
+Do not use:
+Once Off Jobs
+
+CALENDAR / DIARY RULE
+
+Remove Daily Diaries from the Service menu.
+
+Daily Diaries are no longer a separate menu item.
+
+The Calendar is the diary.
+
+The Calendar must show:
+- once-off jobs
+- contract jobs
+- technician/team daily diary view
+- day/week/month views
+- Outlook-style diary/calendar layout
+
+If users need a daily diary, they must use the Calendar in Day view with filters.
+
+Calendar filters must allow:
+- Date
+- Technician
+- Team
+- Department
+- Service Type
+- Client
+- Area/Suburb
+- Status
+- Contract Jobs / Once-off Jobs
+
+JOBS SECTION
+
+The Jobs section must show two subpages:
+
+1. Contract Jobs
+
+This shows job occurrences generated from active contracts.
+
+Contract Jobs must include:
+- client
+- contract number
+- service type
+- department
+- scheduled date
+- scheduled time
+- route sequence
+- assigned technician/team
+- status
+- invoice status
+- open job
+- open contract
+- open client
+
+2. Once-off Jobs
+
+This shows once-off service jobs.
+
+Once-off Jobs must include:
+- client
+- job title
+- service type
+- department
+- date
+- time
+- assigned technician/team
+- status
+- invoice status
+- open job
+- open client
+
+CONTRACTS SECTION
+
+Contracts stays under Service.
+
+Contracts is where users create and manage recurring work.
+
+The Contracts section must contain:
+- Contract List
+- Schedule View if needed
+- Contracts Ending
+- Increase Dates
+- Documents if needed
+
+Contracts are the source of truth for recurring service work.
+
+OPERATIONS MENU
+
+Move the following items out of Service and into Operations:
+
+- Equipment Checklists
+- Treatment Reports
+- Stock Management
+
+Operations should show:
+
+Operations
+- Equipment Checklists
+- Treatment Reports
+- Stock Management
+- Fleet
+- HR / Attendance if already there
+- Other operational tools as applicable
+
+TREATMENT REPORTS
+
+Treatment Reports should be under Operations, but they must still link back to:
+- clientId
+- jobId
+- contractId if applicable
+- technicianId
+
+Treatment Reports must still appear under:
+- Client Profile > Treatment Reports
+- Job detail > Treatment Reports/Documents
+
+STOCK MANAGEMENT
+
+Stock Management should be under Operations.
+
+Stock Management must still support:
+- inventory items
+- stock locations
+- stock movement
+- stock usage by job
+- stock usage by client
+- stock usage by technician
+- low stock alerts
+- purchase order links if applicable
+
+Stock usage must still appear under:
+- Client Profile > Stock Usage
+- Job detail > Stock Usage
+
+EQUIPMENT CHECKLISTS
+
+Equipment Checklists should be under Operations.
+
+Equipment Checklists must still be able to link to:
+- vehicle
+- technician
+- job if applicable
+- client if applicable
+- date
+- checklist status
+
+ROUTING / LINKS
+
+Update all routes and navigation links.
+
+Old route/menu:
+Service > Daily Diaries
+
+should redirect to:
+Service > Calendar
+
+Old route/menu:
+Service > Stock Management
+
+should redirect to:
+Operations > Stock Management
+
+Old route/menu:
+Service > Equipment Checklists
+
+should redirect to:
+Operations > Equipment Checklists
+
+Old route/menu:
+Service > Treatment Reports
+
+should redirect to:
+Operations > Treatment Reports
+
+PERMISSIONS
+
+Do not break permissions.
+
+Service managers must still be able to access:
+- Jobs
+- Calendar
+- Contracts
+- Reports
+- Treatment Reports if their role requires it
+- Stock Management if their role requires it
+- Equipment Checklists if their role requires it
+
+Even though Treatment Reports, Stock Management, and Equipment Checklists move to Operations, service managers/hygiene managers must still have access if needed.
+
+TEST REQUIRED
+
+Run this test:
+
+1. Log in as Mariette Koekemoer.
+2. Confirm Service menu shows:
+   - Jobs
+   - Calendar
+   - Contracts
+   - Reports
+
+3. Expand Jobs.
+4. Confirm Jobs shows:
+   - Contract Jobs
+   - Once-off Jobs
+
+5. Confirm Daily Diaries is removed from Service.
+
+6. Confirm Calendar opens and can be used as the daily diary.
+
+7. Confirm Equipment Checklists is now under Operations.
+
+8. Confirm Treatment Reports is now under Operations.
+
+9. Confirm Stock Management is now under Operations.
+
+10. Confirm old links/routes do not break and redirect correctly.
+
+11. Confirm Client Profile tabs still work:
+   - Jobs
+   - Contracts
+   - Treatment Reports
+   - Stock Usage
+
+12. Confirm Calendar still shows both contract jobs and once-off jobs.
+
+IMPORTANT
+
+Do not duplicate diary/calendar functionality.
+
+There must be one calendar/diary system.
+
+Calendar = Diary.
+
+Jobs are either:
+- Contract Jobs
+- Once-off Jobs

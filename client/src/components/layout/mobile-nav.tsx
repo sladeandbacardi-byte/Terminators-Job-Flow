@@ -7,8 +7,8 @@ const navigation = [
   { name: "Calendar", href: "/calendar", icon: Calendar, category: "Service" },
   { name: "Clients", href: "/clients", icon: Shield, category: "Sales" },
   { name: "Jobs", href: "/jobs", icon: Calendar, category: "Service" },
-  { name: "Workers", href: "/workers", icon: Users, category: "Service" },
-  { name: "Stock", href: "/inventory", icon: Box, category: "Service" },
+  { name: "Workers", href: "/workers", icon: Users, category: "Operations" },
+  { name: "Stock", href: "/inventory", icon: Box, category: "Operations" },
   { name: "Invoices", href: "/invoices", icon: Receipt, category: "Finance" },
   { name: "Reports", href: "/reports", icon: BarChart, category: "Admin" },
 ];

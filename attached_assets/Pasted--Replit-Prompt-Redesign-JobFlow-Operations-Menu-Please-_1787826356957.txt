@@ -1,0 +1,196 @@
+# Replit Prompt: Redesign JobFlow Operations Menu
+
+Please redesign the **JobFlow > Operations** section so that it is grouped logically and the left navigation is much cleaner.
+
+## Goal
+
+Operations should only contain three main areas:
+
+1. **HR**
+2. **Vehicles**
+3. **Stock**
+
+Do not list every FleetGuard function individually in the JobFlow Operations menu.
+
+---
+
+## 1. HR
+
+Create an **HR** group under Operations.
+
+It must contain:
+
+* HR Dashboard
+* Staff
+* Attendance
+* Overtime & Time Off
+* Teams
+
+### Changes from the current menu
+
+Rename:
+
+* `Team Attendance` → `Attendance`
+
+Combine:
+
+* `My Time`
+* `Time & Overtime`
+
+into one menu item:
+
+* `Overtime & Time Off`
+
+The Overtime & Time Off screen can contain tabs or sections for:
+
+* My Time
+* Overtime
+* Under-time / Time Off
+* Staff summaries
+
+Do not lose any existing attendance, overtime, under-time, staff or team functionality.
+
+---
+
+## 2. Vehicles
+
+Create one menu item under Operations:
+
+* **FleetGuard**
+
+Clicking **FleetGuard** must open the existing FleetGuard application/module.
+
+Remove these individual items from the main JobFlow Operations navigation:
+
+* Fleet Dashboard
+* Maintenance
+* Report Issue
+* Log KMs
+* Vehicle Inspection
+* Fuel Fill-up
+* Testing Checklist
+
+These functions must remain available inside FleetGuard.
+
+Do not delete their functionality or data.
+
+The JobFlow navigation should simply provide one gateway:
+
+`Operations > Vehicles > FleetGuard`
+
+---
+
+## 3. Stock
+
+Create a **Stock** group under Operations.
+
+It must contain:
+
+* Stock Dashboard
+* Inventory
+* Stock In / Purchases
+* Stock Usage
+* Stock Adjustments
+* Stock Reports
+
+### Stock Dashboard
+
+Show useful operational information such as:
+
+* Total inventory items
+* Low-stock items
+* Out-of-stock items
+* Stock purchased this month
+* Stock used this month
+* Recent stock transactions
+
+---
+
+## Stock Integration With Jobs
+
+Stock usage should integrate with jobs instead of requiring duplicate capturing.
+
+Example:
+
+A technician completes a sanitary-bin service and records:
+
+* 4 plastic bags
+* 200 g powder
+
+JobFlow should automatically create the relevant stock-usage transactions and deduct those quantities from available stock.
+
+The technician must not have to go into Operations > Stock afterward and capture the same usage again.
+
+Similarly, stock or parts purchased specifically for a job should be able to be allocated to:
+
+* Client
+* Job
+* Vehicle, where applicable
+* Department
+* Technician
+
+and should still appear in the central Stock/Purchases records.
+
+---
+
+## Stock Categories
+
+Use the existing operational departments/categories where applicable:
+
+* Pest Control
+* Washroom
+* Deep Cleaning
+* Sanitary Bins
+
+Stock can have additional sensible categories where required, but these existing departments must be supported.
+
+---
+
+## Desired Navigation Structure
+
+The Operations navigation should look approximately like this:
+
+```text
+OPERATIONS
+
+HR
+    HR Dashboard
+    Staff
+    Attendance
+    Overtime & Time Off
+    Teams
+
+VEHICLES
+    FleetGuard
+
+STOCK
+    Stock Dashboard
+    Inventory
+    Stock In / Purchases
+    Stock Usage
+    Stock Adjustments
+    Stock Reports
+```
+
+Use expandable/collapsible groups if this matches the existing JobFlow navigation design.
+
+---
+
+## Important
+
+* Do not delete existing FleetGuard functionality.
+* Do not delete existing HR records or functionality.
+* Preserve existing permissions.
+* Preserve current database records.
+* Existing URLs should continue working where reasonably possible.
+* If routes are changed, add redirects or compatibility routes where necessary.
+* Mobile navigation must use the same logical grouping.
+* Keep the design simple and uncluttered.
+
+The principle should be:
+
+**Sales = getting work**
+**Service = planning and completing work**
+**Finance = money**
+**Operations = people, vehicles and physical stock**
+**Reports = management visibility**

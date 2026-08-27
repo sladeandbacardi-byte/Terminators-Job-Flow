@@ -19,6 +19,7 @@ import { exportInventory } from "@/lib/data-export";
 import { DepartmentFilter } from "@/components/filters/department-filter";
 import { useDepartmentFilter } from "@/hooks/useDepartmentFilter";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 import type { InventoryItem, Department, StockLocation, StockMovement, PickingList, StockCheck } from "@shared/schema";
 
 interface StockAlerts { lowStock: InventoryItem[]; reorderRequired: InventoryItem[]; overstocked: InventoryItem[]; }
@@ -50,7 +51,9 @@ function statusBadge(status: string) {
 }
 
 export default function Inventory() {
-  const [activeTab, setActiveTab] = useState("items");
+  const [location] = useLocation();
+  const initialTab = location === "/stock-usage" ? "movements" : location === "/stock-adjustments" ? "checks" : "items";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);

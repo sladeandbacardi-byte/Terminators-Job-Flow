@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useSearch } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, FileText, Eye, Edit, Trash2, DollarSign, AlertCircle, CheckCircle, Mail, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,17 @@ import { exportInvoices } from "@/lib/data-export";
 import type { Invoice, Client, InvoiceItem, Job, QuoteSubmission } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { SageIntegration } from "@/components/sage-integration";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 export default function Invoices() {
+  const [location] = useLocation();
+  const isReceiptsPage = location === "/receipts";
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(isReceiptsPage ? "paid" : "all");
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ['/api/invoices'],
@@ -159,8 +162,13 @@ export default function Invoices() {
           <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">Invoice Management</h1>
-          <p className="text-gray-600 mt-2">Create and manage customer invoices</p>
+          <FinanceBreadcrumb section="Income" current={isReceiptsPage ? "Receipts" : "Invoices"} />
+          <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
+            {isReceiptsPage ? "Receipts" : "Invoices"}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {isReceiptsPage ? "Review customer payments received against invoices" : "Create and manage customer invoices"}
+          </p>
         </div>
         <div className="flex gap-2">
           <ExportButton 

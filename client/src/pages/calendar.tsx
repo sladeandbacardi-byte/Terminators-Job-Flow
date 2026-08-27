@@ -82,7 +82,7 @@ export default function Calendar() {
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "oneoff" | "contract">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "oneoff" | "contract" | "sales" | "followup">("all");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
@@ -110,6 +110,15 @@ export default function Calendar() {
   // Queries
   const { data: customEvents = [] } = useQuery<any[]>({
     queryKey: ['/api/calendar/events', format(currentDate, 'yyyy-MM')],
+  });
+  const { data: salesAppointments = [] } = useQuery<any[]>({
+    queryKey: ['/api/sales-appointments'],
+  });
+  const { data: salesFollowUps = [] } = useQuery<any[]>({
+    queryKey: ['/api/sales-follow-ups'],
+  });
+  const { data: salesLeads = [] } = useQuery<any[]>({
+    queryKey: ['/api/quote-submissions'],
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({ queryKey: ['/api/jobs'] });
@@ -295,12 +304,112 @@ export default function Calendar() {
     };
   }, [role]);
 
+  const salesAppointmentToDiaryEvent = useCallback((appointment: any): DiaryEvent | null => {
+    const start = new Date(`${appointment.date}T${appointment.startTime || "09:00"}:00`);
+    if (isNaN(start.getTime())) return null;
+    const duration = Number(appointment.estimatedDuration) || 60;
+    const end = appointment.endTime
+      ? new Date(`${appointment.date}T${appointment.endTime}:00`)
+      : new Date(start.getTime() + duration * 60_000);
+    const worker = workers.find(candidate => candidate.id === appointment.assignedToId);
+    const canEdit = role === "admin" || role === "manager" || role === "sales";
+
+    return {
+      eventId: `sales-appointment-${appointment.id}`,
+      sourceType: "salesAppointment",
+      sourceId: appointment.id,
+      clientId: appointment.clientId,
+      title: appointment.title || appointment.clientName || "Sales appointment",
+      clientName: appointment.clientName,
+      department: "Sales",
+      serviceType: appointment.appointmentType === "site_visit" ? "Site visit" : "Sales appointment",
+      assignedUserId: appointment.assignedToId,
+      assignedUserName: worker?.name ?? appointment.assignedToName,
+      startDateTime: start.toISOString(),
+      endDateTime: end.toISOString(),
+      durationMinutes: duration,
+      status: appointment.status || "scheduled",
+      priority: appointment.priority,
+      location: appointment.siteAddress || appointment.address,
+      colour: appointment.appointmentType === "site_visit" ? "#0f766e" : "#7c3aed",
+      editable: canEdit,
+      draggable: canEdit,
+      meta: { raw: appointment, salesAppointment: true },
+    };
+  }, [role, workers]);
+
+  const quoteFollowUpToDiaryEvent = useCallback((lead: any): DiaryEvent | null => {
+    if (!lead.followUpDate) return null;
+    const start = new Date(lead.followUpDate);
+    if (isNaN(start.getTime())) return null;
+    start.setHours(start.getHours() || 9, start.getMinutes(), 0, 0);
+    const worker = workers.find(candidate => candidate.id === lead.assignedTo);
+    const canEdit = role === "admin" || role === "manager" || role === "sales";
+
+    return {
+      eventId: `quote-follow-up-${lead.id}`,
+      sourceType: "followUp",
+      sourceId: lead.id,
+      clientId: lead.clientId,
+      title: `Quote follow-up – ${lead.companyName}`,
+      clientName: lead.companyName,
+      department: "Sales",
+      serviceType: "Quote follow-up",
+      assignedUserId: lead.assignedTo,
+      assignedUserName: worker?.name,
+      startDateTime: start.toISOString(),
+      endDateTime: new Date(start.getTime() + 30 * 60_000).toISOString(),
+      durationMinutes: 30,
+      status: lead.status || "scheduled",
+      priority: lead.priority,
+      location: lead.address,
+      colour: "#f59e0b",
+      editable: canEdit,
+      draggable: false,
+      meta: { raw: lead, quoteFollowUp: true },
+    };
+  }, [role, workers]);
+
+  const salesFollowUpToDiaryEvent = useCallback((followUp: any): DiaryEvent | null => {
+    if (!followUp.dueDate) return null;
+    const start = new Date(`${followUp.dueDate}T09:00:00`);
+    if (isNaN(start.getTime())) return null;
+    const lead = salesLeads.find(candidate => candidate.id === followUp.leadId);
+    const worker = workers.find(candidate => candidate.id === followUp.assignedToId || candidate.id === followUp.assignedTo);
+    const canEdit = role === "admin" || role === "manager" || role === "sales";
+
+    return {
+      eventId: `sales-follow-up-${followUp.id}`,
+      sourceType: "followUp",
+      sourceId: followUp.id,
+      clientId: lead?.clientId,
+      title: followUp.title || followUp.subject || `Follow-up – ${lead?.companyName || "Sales"}`,
+      clientName: lead?.companyName,
+      department: "Sales",
+      serviceType: "Follow-up",
+      assignedUserId: followUp.assignedToId || followUp.assignedTo,
+      assignedUserName: worker?.name,
+      startDateTime: start.toISOString(),
+      endDateTime: new Date(start.getTime() + 30 * 60_000).toISOString(),
+      durationMinutes: 30,
+      status: followUp.status || "scheduled",
+      priority: followUp.priority,
+      colour: "#f59e0b",
+      editable: canEdit,
+      draggable: false,
+      meta: { raw: followUp, salesFollowUp: true },
+    };
+  }, [role, salesLeads, workers]);
+
   const allEvents = useMemo(() => {
     const j = jobs.map(jobToDiaryEvent).filter(Boolean) as DiaryEvent[];
     const o = contractOccurrences.map(occurrenceToDiaryEvent).filter(Boolean) as DiaryEvent[];
     const c = customEvents.map(customToDiaryEvent).filter(Boolean) as DiaryEvent[];
-    return [...j, ...o, ...c];
-  }, [jobs, contractOccurrences, customEvents, jobToDiaryEvent, occurrenceToDiaryEvent, customToDiaryEvent]);
+    const a = salesAppointments.map(salesAppointmentToDiaryEvent).filter(Boolean) as DiaryEvent[];
+    const q = salesLeads.map(quoteFollowUpToDiaryEvent).filter(Boolean) as DiaryEvent[];
+    const f = salesFollowUps.map(salesFollowUpToDiaryEvent).filter(Boolean) as DiaryEvent[];
+    return [...j, ...o, ...c, ...a, ...q, ...f];
+  }, [jobs, contractOccurrences, customEvents, salesAppointments, salesLeads, salesFollowUps, jobToDiaryEvent, occurrenceToDiaryEvent, customToDiaryEvent, salesAppointmentToDiaryEvent, quoteFollowUpToDiaryEvent, salesFollowUpToDiaryEvent]);
 
   const filteredEvents = useMemo(() => allEvents.filter(ev => {
     if (searchTerm && !ev.title.toLowerCase().includes(searchTerm.toLowerCase()) && !ev.clientName?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -329,7 +438,9 @@ export default function Calendar() {
     if (invoiceStatusFilter !== "all" && ev.meta?.invoiceStatus !== invoiceStatusFilter) return false;
 
     if (typeFilter === "contract" && !ev.meta?.isOccurrence) return false;
-    if (typeFilter === "oneoff" && ev.meta?.isOccurrence) return false;
+    if (typeFilter === "oneoff" && ev.sourceType !== "onceOffJob") return false;
+    if (typeFilter === "sales" && ev.sourceType !== "salesAppointment") return false;
+    if (typeFilter === "followup" && ev.sourceType !== "followUp") return false;
 
     if (areaFilter !== "all") {
       const client = clients.find(c => c.id === ev.clientId);
@@ -399,6 +510,15 @@ export default function Calendar() {
       }).then(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] });
       }).catch(revert);
+    } else if (ev.sourceType === 'salesAppointment') {
+      apiRequest('PATCH', `/api/sales-appointments/${ev.sourceId}`, {
+        date: format(newStart, 'yyyy-MM-dd'),
+        startTime: format(newStart, 'HH:mm'),
+        endTime: format(newEnd, 'HH:mm'),
+        estimatedDuration: duration,
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/sales-appointments'] });
+      }).catch(revert);
     }
   }, [moveJobMutation]);
 
@@ -414,6 +534,12 @@ export default function Calendar() {
     } else if (ev.sourceType === 'other') {
        apiRequest('PATCH', `/api/calendar/events/${ev.sourceId}`, { estimatedDuration: duration })
         .then(() => queryClient.invalidateQueries({ queryKey: ['/api/calendar/events'] }))
+        .catch(revert);
+    } else if (ev.sourceType === 'salesAppointment') {
+      apiRequest('PATCH', `/api/sales-appointments/${ev.sourceId}`, {
+        endTime: format(newEnd, 'HH:mm'),
+        estimatedDuration: duration,
+      }).then(() => queryClient.invalidateQueries({ queryKey: ['/api/sales-appointments'] }))
         .catch(revert);
     }
   }, [moveJobMutation]);
@@ -435,8 +561,12 @@ export default function Calendar() {
       });
     } else if (ev.sourceType === 'onceOffJob') {
       moveJobMutation.mutate({ id: ev.sourceId, workerId: targetColumnId } as any);
+    } else if (ev.sourceType === 'salesAppointment') {
+      apiRequest('PATCH', `/api/sales-appointments/${ev.sourceId}`, { assignedToId: targetColumnId })
+        .then(() => queryClient.invalidateQueries({ queryKey: ['/api/sales-appointments'] }))
+        .catch(() => toast({ title: "Unable to reassign appointment", variant: "destructive" }));
     }
-  }, [workers, upsertExceptionMutation, moveJobMutation]);
+  }, [workers, upsertExceptionMutation, moveJobMutation, toast]);
 
   const handleOccurrenceMoveAction = (action: 'occurrence' | 'schedule' | 'cancel') => {
     if (!occurrenceMoveTarget) return;
@@ -623,6 +753,8 @@ export default function Calendar() {
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="oneoff">One-off Jobs</SelectItem>
                 <SelectItem value="contract">Contracts</SelectItem>
+                <SelectItem value="sales">Sales Appointments</SelectItem>
+                <SelectItem value="followup">Follow-ups</SelectItem>
               </SelectContent>
             </Select>
 

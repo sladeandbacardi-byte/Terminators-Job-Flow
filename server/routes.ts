@@ -219,6 +219,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.user?.authenticationMethod !== "profile_picker" &&
     ["admin", "superadmin", "manager", "coordinator"].includes(String(req.user?.role ?? "").toLowerCase());
 
+  // Product library access is intentionally separate from treatment-report
+  // management: authorised office managers/coordinators and service managers
+  // may view it, while Sales and Finance users cannot.
+  const productLibraryViewer = (req: AuthenticatedRequest) =>
+    ["admin", "superadmin", "manager", "coordinator", "service"].includes(String(req.user?.role ?? "").toLowerCase());
+
   const reportCompletionErrors = (input: z.infer<typeof treatmentReportInput>) => {
     const errors: string[] = [];
     if (!input.treatmentType) errors.push("Select a treatment type");
@@ -4726,6 +4732,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updateData = insertQuoteSubmissionSchema.partial().parse(body);
+      if (updateData.status === "converted" && existing.status !== "converted") {
+        return res.status(409).json({
+          error: "Use the quote conversion action to create the linked Service job.",
+        });
+      }
       const updated = await storage.updateQuoteSubmission(req.params.id, updateData);
 
       // "Mark Site Visit Done" — explicit activity text called out in spec,
@@ -7712,7 +7723,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // ── Treatment Reports ─────────────────────────────────────────────────────
 
   app.get("/api/pest-control-products", async (req: AuthenticatedRequest, res) => {
-    if (!officeTreatmentManager(req)) return res.status(403).json({ message: "Treatment report management access required" });
+    if (!productLibraryViewer(req)) return res.status(403).json({ message: "Operations product library access required" });
     try {
       res.json(await db.select().from(pestControlProducts).orderBy(pestControlProducts.isActive, pestControlProducts.name));
     } catch (error: any) { res.status(500).json({ message: error.message }); }

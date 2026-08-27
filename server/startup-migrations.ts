@@ -36,6 +36,26 @@ export async function runStartupMigrations(): Promise<void> {
     `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS priority text DEFAULT 'medium'`
   );
   await run(
+    "quote_submissions.opportunity",
+    `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS opportunity boolean NOT NULL DEFAULT false`
+  );
+  await run(
+    "quote_submissions.estimated_value",
+    `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS estimated_value text`
+  );
+  await run(
+    "quote_submissions.expected_close_date",
+    `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS expected_close_date text`
+  );
+  await run(
+    "quote_submissions.probability",
+    `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS probability integer`
+  );
+  await run(
+    "quote_submissions.next_action",
+    `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS next_action text`
+  );
+  await run(
     "quote_submissions.trading_name",
     `ALTER TABLE quote_submissions ADD COLUMN IF NOT EXISTS trading_name text`
   );

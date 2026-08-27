@@ -68,6 +68,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 import { PurchaseOrderForm } from "@/components/forms/purchase-order-form";
 import { ExportButton } from "@/components/export-button";
 import { exportPurchaseOrders } from "@/lib/data-export";
@@ -269,6 +270,7 @@ export default function PurchaseOrdersPage() {
           <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
+          <FinanceBreadcrumb section="Expenses" current="Purchase Orders" />
           <h1 className="text-3xl font-bold tracking-tight" data-testid="page-title">Purchase Orders</h1>
           <p className="text-muted-foreground">
             Create and manage purchase orders with approval workflow

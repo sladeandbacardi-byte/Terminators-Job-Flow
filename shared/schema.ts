@@ -877,6 +877,11 @@ export const quoteSubmissions = pgTable("quote_submissions", {
   tradingName: text("trading_name"),
   leadType: text("lead_type"),               // Once-off, Contract, Rental, Outright Purchase, Unknown
   priority: text("priority").default("medium"), // low, medium, high
+  opportunity: boolean("opportunity").notNull().default(false),
+  estimatedValue: text("estimated_value"),
+  expectedCloseDate: text("expected_close_date"), // YYYY-MM-DD
+  probability: integer("probability"),
+  nextAction: text("next_action"),
   stage: text("stage"),                      // full 16-stage pipeline value
   quoteType: text("quote_type"),             // Once-off, Contract, Rental, Outright Purchase
   lostReason: text("lost_reason"),

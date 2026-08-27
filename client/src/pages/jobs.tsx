@@ -31,7 +31,9 @@ export default function Jobs() {
   const isTechnician = role === "service";
   // Only Admin/Coordinator/Accounts can move jobs into the invoicing pipeline (not manager)
   const canInvoice = role === "admin" || role === "coordinator" || role === "accounts";
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const isOnceOffJobsPage = location === "/once-off-jobs";
+  const jobPageTitle = isOnceOffJobsPage ? "Once-off Jobs" : "All Jobs";
   const { toast } = useToast();
 
   const markReady = useMutation({
@@ -212,6 +214,8 @@ export default function Jobs() {
     const matchesServiceType = serviceTypeFilter === "all" || job.serviceType === serviceTypeFilter;
     const matchesInvoiceStatus = invoiceStatusFilter === "all" ||
       (invoiceStatusFilter === "not_invoiced" ? (!job.invoiceStatus || job.invoiceStatus === "not_invoiced") : job.invoiceStatus === invoiceStatusFilter);
+    const isContractJob = Boolean(job.linkedContractId || job.contractNo);
+    const matchesOnceOffJob = !isOnceOffJobsPage || !isContractJob;
 
     let matchesDateFrom = true;
     let matchesDateTo = true;
@@ -234,11 +238,13 @@ export default function Jobs() {
 
     return matchesSearch && matchesAddress && matchesStatus && matchesDepartment &&
       matchesTeam && matchesWorkerFilter && matchesClient && matchesPriority &&
-      matchesServiceType && matchesInvoiceStatus && matchesDateFrom && matchesDateTo && matchesWorker;
+      matchesServiceType && matchesInvoiceStatus && matchesOnceOffJob &&
+      matchesDateFrom && matchesDateTo && matchesWorker;
   }), [
     jobs, searchTerm, addressFilter, statusFilter, departmentFilter, teamFilter,
     workerFilter, clientFilter, priorityFilter, serviceTypeFilter, invoiceStatusFilter,
     dateFrom, dateTo, clientMap, workerTeamsMap, isTechnician, myWorker,
+    isOnceOffJobsPage,
   ]);
 
   const activeFilterCount = [
@@ -286,6 +292,16 @@ export default function Jobs() {
 
   return (
         <div className="p-6 pb-20 lg:pb-6">
+          {!isTechnician && (
+            <div className="mb-4">
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">{jobPageTitle}</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                {isOnceOffJobsPage
+                  ? "One-time service jobs and their current progress"
+                  : "Create, schedule and manage service jobs"}
+              </p>
+            </div>
+          )}
           {isTechnician && (
             <p className="text-sm text-muted-foreground mb-4">
               Your daily work sheet. Start, continue and complete assigned jobs.
@@ -308,7 +324,7 @@ export default function Jobs() {
               {!isTechnician && (
                 <ExportButton
                   onExportCSV={() => exportJobs(filteredJobs)}
-                  entityName="Jobs"
+                  entityName={jobPageTitle}
                   variant="outline"
                   size="sm"
                 />
@@ -498,7 +514,7 @@ export default function Jobs() {
           {/* Jobs List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">{isTechnician ? "My Assigned Jobs" : "All Jobs"}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{isTechnician ? "My Assigned Jobs" : jobPageTitle}</h3>
               <p className="text-sm text-gray-600 mt-1">
                 {filteredJobs.length} job{filteredJobs.length !== 1 ? 's' : ''} found
               </p>

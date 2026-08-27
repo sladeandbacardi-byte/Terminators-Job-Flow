@@ -21,6 +21,7 @@ import {
   RefreshCw, Info, ChevronDown, ChevronUp,
 } from "lucide-react";
 import type { Worker, Department, Client } from "@shared/schema";
+import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 interface SageJob {
   id: string;
@@ -225,6 +226,7 @@ export default function SageExport() {
       {/* Page title row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
+          <FinanceBreadcrumb current="Sage Export" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-green-600" />
             Sage Export

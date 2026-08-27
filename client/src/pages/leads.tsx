@@ -123,6 +123,7 @@ export default function Leads() {
   const [salespersonFilter, setSalespersonFilter] = useState("all");
   const [originationFilter, setOriginationFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pipelineFilter, setPipelineFilter] = useState<string>("all");
 
   const { data: leads = [], isLoading } = useQuery<QuoteSubmission[]>({ queryKey: ["/api/quote-submissions"] });
   const urlSearch = useSearch();
@@ -197,7 +198,7 @@ export default function Leads() {
       if (variables.status === "converted") {
         toast({
           title: "Lead converted! 🎉",
-          description: "Workflow created — go to Accepted Work to manage the next steps.",
+           description: "Workflow created — manage the new job from the Service workflow.",
         });
       } else {
         toast({ title: "Lead updated" });
@@ -271,6 +272,11 @@ export default function Leads() {
   const [editStatus, setEditStatus] = useState<string>("");
   const [editPriority, setEditPriority] = useState<string>("");
   const [editLeadType, setEditLeadType] = useState<string>("");
+  const [editOpportunity, setEditOpportunity] = useState(false);
+  const [editEstimatedValue, setEditEstimatedValue] = useState("");
+  const [editExpectedCloseDate, setEditExpectedCloseDate] = useState("");
+  const [editProbability, setEditProbability] = useState("");
+  const [editNextAction, setEditNextAction] = useState("");
   const [editTradingName, setEditTradingName] = useState<string>("");
   const [editInternalNotes, setEditInternalNotes] = useState<string>("");
   // New site detail fields
@@ -309,28 +315,35 @@ export default function Leads() {
     return leads.filter(l => {
       const status = getLeadStatus(l);
       if (statusFilter !== "all" && status !== statusFilter) return false;
+        if (pipelineFilter === "opportunities" && !(l as any).opportunity) return false;
+        if (pipelineFilter !== "all" && pipelineFilter !== "opportunities" && status !== pipelineFilter) return false;
       if (q && !l.companyName.toLowerCase().includes(q) && !(l.contactPerson ?? "").toLowerCase().includes(q) && !((l as any).tradingName ?? "").toLowerCase().includes(q)) return false;
       if (serviceFilter !== "all" && l.serviceType !== serviceFilter) return false;
       if (salespersonFilter !== "all" && l.assignedTo !== salespersonFilter) return false;
       if (originationFilter !== "all" && (l.origination ?? "other") !== originationFilter) return false;
       return true;
     });
-  }, [leads, search, serviceFilter, salespersonFilter, originationFilter, statusFilter]);
+  }, [leads, search, serviceFilter, salespersonFilter, originationFilter, statusFilter, pipelineFilter]);
 
   // Board columns: the 7 canonical statuses, plus a fallback "Needs Review"
   // column whenever any lead has an unrecognised status — so nothing is ever
   // silently hidden.
   const hasNeedsReview = filteredLeads.some(l => getLeadStatus(l) === NEEDS_REVIEW_STATUS);
   const pipelineColumns = useMemo(() => {
-    const base = statusFilter === "all" ? PIPELINE : PIPELINE.filter(c => c.status === statusFilter);
-    if (hasNeedsReview && (statusFilter === "all" || statusFilter === NEEDS_REVIEW_STATUS)) {
+    const selectedStatus = statusFilter !== "all"
+      ? statusFilter
+      : pipelineFilter !== "all" && pipelineFilter !== "opportunities"
+        ? pipelineFilter
+        : "all";
+    const base = selectedStatus === "all" ? PIPELINE : PIPELINE.filter(c => c.status === selectedStatus);
+    if (hasNeedsReview && (selectedStatus === "all" || selectedStatus === NEEDS_REVIEW_STATUS)) {
       return [...base, { status: NEEDS_REVIEW_STATUS as any, label: "Other / Needs Review", color: "bg-gray-100 border-gray-300", dotColor: "bg-gray-500" }];
     }
     return base;
-  }, [statusFilter, hasNeedsReview]);
+  }, [statusFilter, pipelineFilter, hasNeedsReview]);
 
-  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all" || statusFilter !== "all";
-  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); setStatusFilter("all"); };
+  const hasFilters = search || serviceFilter !== "all" || salespersonFilter !== "all" || originationFilter !== "all" || statusFilter !== "all" || pipelineFilter !== "all";
+  const clearFilters = () => { setSearch(""); setServiceFilter("all"); setSalespersonFilter("all"); setOriginationFilter("all"); setStatusFilter("all"); setPipelineFilter("all"); };
 
   return (
         <div className="p-6 pb-20 lg:pb-6">
@@ -358,6 +371,31 @@ export default function Leads() {
             <span className={`px-2 py-0.5 rounded-full font-medium ${step.cls}`}>{step.label}</span>
             {i < arr.length - 1 && <ArrowRight className="h-3 w-3 text-gray-400" />}
           </span>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lead pipeline filters">
+        {[
+          { value: "all", label: "All Leads" },
+          { value: "new", label: "New Leads" },
+          { value: "opportunities", label: "Opportunities" },
+          { value: "contacted", label: "Contacted" },
+          { value: "appointment_booked", label: "Appointment Booked" },
+          { value: "quote_required", label: "Quote Needed" },
+          { value: "quoted", label: "Quoted" },
+          { value: "lost", label: "Lost" },
+          { value: "converted", label: "Converted" },
+        ].map(tab => (
+          <Button
+            key={tab.value}
+            type="button"
+            variant={pipelineFilter === tab.value ? "default" : "outline"}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setPipelineFilter(tab.value)}
+          >
+            {tab.label}
+          </Button>
         ))}
       </div>
 
@@ -500,7 +538,7 @@ export default function Leads() {
                           appointmentType: "site_visit",
                           ...(lead.assignedTo ? { assignedTo: lead.assignedTo } : {}),
                         });
-                        navigate(`/sales-diary?${p.toString()}`);
+                        navigate(`/calendar?${p.toString()}`);
                       }}
                       onMarkSiteVisitDone={() => markSiteVisitDone.mutate(lead.id)}
                       onCreateQuote={() => { setQuoteLead(lead); setQuotePreview(false); }}
@@ -514,6 +552,11 @@ export default function Leads() {
                         setEditStatus(getLeadStatus(lead));
                         setEditPriority((lead as any).priority ?? "medium");
                         setEditLeadType((lead as any).leadType ?? "");
+                        setEditOpportunity(Boolean((lead as any).opportunity));
+                        setEditEstimatedValue((lead as any).estimatedValue ?? "");
+                        setEditExpectedCloseDate((lead as any).expectedCloseDate ?? "");
+                        setEditProbability((lead as any).probability?.toString() ?? "");
+                        setEditNextAction((lead as any).nextAction ?? "");
                         setEditTradingName((lead as any).tradingName ?? "");
                         setEditInternalNotes((lead as any).internalNotes ?? "");
                         setEditAfterHours((lead as any).afterHoursRequired ?? "");
@@ -636,6 +679,40 @@ export default function Leads() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="border-t pt-3 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editOpportunity}
+                    onChange={event => setEditOpportunity(event.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                  Opportunity
+                </label>
+                {editOpportunity && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Estimated Value</label>
+                        <Input value={editEstimatedValue} onChange={event => setEditEstimatedValue(event.target.value)} placeholder="e.g. 12,500" className="h-9 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Probability %</label>
+                        <Input type="number" min="0" max="100" value={editProbability} onChange={event => setEditProbability(event.target.value)} placeholder="0–100" className="h-9 text-sm" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Expected Close Date</label>
+                      <Input type="date" value={editExpectedCloseDate} onChange={event => setEditExpectedCloseDate(event.target.value)} className="h-9 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Next Action</label>
+                      <Input value={editNextAction} onChange={event => setEditNextAction(event.target.value)} placeholder="e.g. Call decision maker on Friday" className="h-9 text-sm" />
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Origination */}
@@ -779,6 +856,11 @@ export default function Leads() {
                     status: editStatus || undefined,
                     priority: editPriority || undefined,
                     leadType: editLeadType || undefined,
+                    opportunity: editOpportunity,
+                    estimatedValue: editOpportunity ? editEstimatedValue || null : null,
+                    expectedCloseDate: editOpportunity ? editExpectedCloseDate || null : null,
+                    probability: editOpportunity && editProbability ? Number(editProbability) : null,
+                    nextAction: editOpportunity ? editNextAction || null : null,
                     tradingName: editTradingName || undefined,
                     internalNotes: editInternalNotes || undefined,
                     afterHoursRequired: editAfterHours || null,
