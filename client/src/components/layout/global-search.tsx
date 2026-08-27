@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import {
   Search, X, Loader2,
   Building2, Briefcase, FileText, Receipt, UserPlus,
-  FileCheck, BookOpen, Users, ClipboardList,
+  FileCheck, BookOpen, Users, ClipboardList, History,
 } from "lucide-react";
 
 interface SearchResult {
@@ -19,6 +19,9 @@ interface SearchResponse {
   results: SearchResult[];
 }
 
+const RECENT_SEARCHES_KEY = "global-search-recents";
+const MAX_RECENT_SEARCHES = 5;
+
 const TYPE_CONFIG: Record<string, { icon: React.ComponentType<any>; color: string; label: string }> = {
   client:           { icon: Building2,     color: "text-blue-600",   label: "Clients" },
   job:              { icon: Briefcase,     color: "text-green-600",  label: "Jobs" },
@@ -30,6 +33,24 @@ const TYPE_CONFIG: Record<string, { icon: React.ComponentType<any>; color: strin
   field_diary:      { icon: BookOpen,      color: "text-orange-600", label: "Field Diaries" },
   staff:            { icon: Users,         color: "text-gray-600",   label: "Staff" },
 };
+
+function isSearchResult(value: unknown): value is SearchResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<SearchResult>;
+  return [result.type, result.id, result.label, result.sublabel, result.url]
+    .every(field => typeof field === "string");
+}
+
+function loadRecentSearches(): SearchResult[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) ?? "[]");
+    return Array.isArray(stored)
+      ? stored.filter(isSearchResult).slice(0, MAX_RECENT_SEARCHES)
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function groupResults(results: SearchResult[]): [string, SearchResult[]][] {
   const map = new Map<string, SearchResult[]>();
@@ -45,9 +66,14 @@ export default function GlobalSearch() {
   const [debouncedQuery, setDebounced]  = useState("");
   const [open, setOpen]                 = useState(false);
   const [activeIndex, setActiveIndex]   = useState(-1);
+  const [recentSearches, setRecentSearches] = useState<SearchResult[]>([]);
   const inputRef                        = useRef<HTMLInputElement>(null);
   const containerRef                    = useRef<HTMLDivElement>(null);
   const [, navigate]                    = useLocation();
+
+  useEffect(() => {
+    setRecentSearches(loadRecentSearches());
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 300);
@@ -63,6 +89,9 @@ export default function GlobalSearch() {
   const results = data?.results ?? [];
   const groups  = groupResults(results);
   const flat    = groups.flatMap(([, items]) => items);
+  const displayedGroups: [string, SearchResult[]][] =
+    query.length === 0 ? [["recent", recentSearches]] : groups;
+  const displayedFlat = displayedGroups.flatMap(([, items]) => items);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -88,6 +117,18 @@ export default function GlobalSearch() {
   }, []);
 
   function handleSelect(result: SearchResult) {
+    setRecentSearches(previous => {
+      const updated = [
+        result,
+        ...previous.filter(item => item.type !== result.type || item.id !== result.id),
+      ].slice(0, MAX_RECENT_SEARCHES);
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      } catch {
+        // Keep the in-memory recents available if browser storage is unavailable.
+      }
+      return updated;
+    });
     navigate(result.url);
     setOpen(false);
     setQuery("");
@@ -102,20 +143,21 @@ export default function GlobalSearch() {
       inputRef.current?.blur();
       return;
     }
-    if (!open || flat.length === 0) return;
+    if (!open || displayedFlat.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex(i => (i + 1) % flat.length);
+      setActiveIndex(i => (i + 1) % displayedFlat.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex(i => (i - 1 + flat.length) % flat.length);
+      setActiveIndex(i => (i - 1 + displayedFlat.length) % displayedFlat.length);
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
-      handleSelect(flat[activeIndex]);
+      handleSelect(displayedFlat[activeIndex]);
     }
   }
 
-  const showDropdown = open && query.length >= 2;
+  const showRecents = open && query.length === 0 && recentSearches.length > 0;
+  const showDropdown = open && (query.length >= 2 || showRecents);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -156,8 +198,10 @@ export default function GlobalSearch() {
             </div>
           ) : (
             <div className="max-h-[440px] overflow-y-auto py-1">
-              {groups.map(([type, items]) => {
-                const cfg = TYPE_CONFIG[type] ?? { icon: FileText, color: "text-gray-500", label: type };
+              {displayedGroups.map(([type, items]) => {
+                const cfg = type === "recent"
+                  ? { icon: History, color: "text-gray-500", label: "Recent" }
+                  : TYPE_CONFIG[type] ?? { icon: FileText, color: "text-gray-500", label: type };
                 const Icon = cfg.icon;
                 return (
                   <div key={type}>
@@ -165,7 +209,7 @@ export default function GlobalSearch() {
                       {cfg.label}
                     </div>
                     {items.map(result => {
-                      const flatIdx = flat.findIndex(r => r.id === result.id && r.type === result.type);
+                      const flatIdx = displayedFlat.findIndex(r => r.id === result.id && r.type === result.type);
                       const isActive = flatIdx === activeIndex;
                       return (
                         <button
@@ -187,6 +231,23 @@ export default function GlobalSearch() {
                   </div>
                 );
               })}
+              {showRecents && (
+                <button
+                  type="button"
+                  className="w-full border-t border-gray-100 px-3 py-2 text-left text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                  onClick={() => {
+                    setRecentSearches([]);
+                    setActiveIndex(-1);
+                    try {
+                      localStorage.removeItem(RECENT_SEARCHES_KEY);
+                    } catch {
+                      // Ignore storage errors; the visible list is already cleared.
+                    }
+                  }}
+                >
+                  Clear recents
+                </button>
+              )}
             </div>
           )}
           {isFetching && results.length > 0 && (
