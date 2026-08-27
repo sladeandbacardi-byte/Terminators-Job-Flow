@@ -1,0 +1,135 @@
+URGENT: FIX RAILWAY PRODUCTION BUILD FAILURE
+
+The latest Railway deployment is failing during:
+
+npm run build
+
+The existing production deployment is still running correctly, so do NOT make broad changes or rebuild unrelated parts of JobFlow.
+
+The failure started after the latest changes relating to the Overtime / Time & Overtime admin view.
+
+--------------------------------------------------
+1. REPRODUCE THE PRODUCTION BUILD
+--------------------------------------------------
+
+Run the exact production build locally in Replit:
+
+npm run build
+
+Do not rely on the development server working.
+
+The development server may tolerate issues that the production esbuild process does not.
+
+--------------------------------------------------
+2. FIND THE FIRST REAL BUILD ERROR
+--------------------------------------------------
+
+Inspect the FULL build output.
+
+Do not focus only on the final:
+
+ELIFECYCLE Command failed with exit code 1
+
+or the esbuild node_modules stack trace.
+
+Find the FIRST actual application/source-code error immediately before the stack trace.
+
+Examples may include:
+
+- syntax error
+- duplicate declaration
+- invalid JSX
+- missing import
+- missing component
+- unresolved module
+- bad route
+- incorrect export
+- TypeScript error
+- malformed object
+- invalid closing tag
+
+Fix the actual first error.
+
+--------------------------------------------------
+3. CHECK THE LATEST OVERTIME CHANGES FIRST
+--------------------------------------------------
+
+The previous Railway version deployed successfully.
+
+The latest failed deployment relates to the recent:
+
+Time & Overtime / Overtime Admin View changes.
+
+Inspect files modified by the latest commit first.
+
+Check specifically for:
+
+- duplicate component definitions
+- duplicate imports
+- incorrect imports
+- incorrect file paths
+- missing exports
+- invalid JSX
+- unclosed JSX tags
+- components pasted inside other components accidentally
+- documentation/text accidentally pasted into source code
+- route definition mistakes
+- duplicated route names
+- syntax introduced by the latest Replit Agent change
+
+--------------------------------------------------
+4. DO NOT CHANGE WORKING FUNCTIONALITY
+--------------------------------------------------
+
+Do NOT remove or redesign:
+
+- Overtime
+- Authorised Time Off
+- email notifications
+- mobile user functionality
+- branding
+- employee login
+- FleetGuard
+- existing database logic
+
+Only repair the build error.
+
+--------------------------------------------------
+5. VERIFY BEFORE PUSHING
+--------------------------------------------------
+
+After fixing the source error run:
+
+npm run build
+
+The build MUST complete successfully locally before committing or deploying.
+
+Do not push another Railway deployment until npm run build succeeds.
+
+--------------------------------------------------
+6. THEN COMMIT AND DEPLOY
+--------------------------------------------------
+
+Once the local production build succeeds:
+
+- commit the fix
+- push to GitHub
+- allow Railway to redeploy
+
+Confirm Railway reports:
+
+Deployment successful
+
+--------------------------------------------------
+7. REPORT BACK
+--------------------------------------------------
+
+Tell me:
+
+1. What exact build error was found
+2. Which file caused it
+3. What was changed
+4. Confirmation that npm run build passes
+5. Confirmation that Railway deployment succeeded
+
+Do not simply say "fixed" without running the production build.
