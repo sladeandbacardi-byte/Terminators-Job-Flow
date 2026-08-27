@@ -253,7 +253,10 @@ export async function runDailyBackupEmail(
 export async function sendBackupFailureAlert(
   errorMessage: string,
 ): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
-  const recipient = BACKUP_ALERT_RECIPIENT;
+  const schedule = await storage.getBackupSchedule().catch(() => null);
+  const recipient =
+    (schedule?.alertEmail?.trim()) ||
+    BACKUP_ALERT_RECIPIENT;
   const dateStr = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
   const subject = `⚠️ Job Flow Nightly Backup FAILED — ${new Date().toISOString().split("T")[0]}`;

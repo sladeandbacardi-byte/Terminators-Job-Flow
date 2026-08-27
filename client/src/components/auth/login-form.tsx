@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   AlertCircle, ArrowLeft, BriefcaseBusiness, Eye, EyeOff, Loader2,
-  ShieldCheck, Smartphone, UserRound,
+  ShieldCheck, Smartphone, UserRound, ChevronRight, FlaskConical,
 } from "lucide-react";
 import { AUTH_MODE } from "@shared/auth";
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
+import { DEMO_PROFILES } from "@/lib/demoProfiles";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
 
@@ -56,9 +57,10 @@ const FALLBACK_DIRECTORY: LoginDirectory = {
 
 interface LoginFormProps {
   onSuccess: (token: string, user: any) => void;
+  onDemoLogin?: (profile: (typeof DEMO_PROFILES)[number]) => void;
 }
 
-export function LoginForm({ onSuccess }: LoginFormProps) {
+export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const [, navigate] = useLocation();
   const search = useSearch();
   const [step, setStep] = useState<LoginStep>(() => {
@@ -414,6 +416,37 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             </form>
           )}
         </main>
+
+        {onDemoLogin && (
+          <section className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <div className="border-b border-amber-100 bg-amber-50 px-4 py-3">
+              <div className="mb-1 flex items-center gap-2">
+                <FlaskConical className="h-4 w-4 shrink-0 text-amber-600" />
+                <p className="text-sm font-semibold text-amber-900">Demo / Safe Review Access</p>
+              </div>
+              <p className="text-xs leading-snug text-amber-700">
+                Demo Mode uses sample data only. Destructive actions are disabled.
+              </p>
+            </div>
+            <div className="space-y-2 p-3">
+              {DEMO_PROFILES.map(profile => (
+                <button
+                  key={profile.key}
+                  type="button"
+                  onClick={() => onDemoLogin(profile)}
+                  className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all hover:shadow-sm active:scale-[0.99] ${profile.colorClass}`}
+                >
+                  <ShieldCheck className="h-4 w-4 shrink-0 opacity-60" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold leading-tight">{profile.label}</p>
+                    <p className="mt-0.5 text-xs opacity-60">{profile.description}</p>
+                  </div>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-35" />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

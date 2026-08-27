@@ -4010,7 +4010,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
 
-
       // Log the email attempt
       await storage.createEmailLog({
         toEmail: recipientEmail,
@@ -5921,14 +5920,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/backup/schedule", requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const { enabled, frequency, dayOfWeek, hourUTC, minuteUTC, recipientEmail } = req.body;
+      const { enabled, frequency, dayOfWeek, hourUTC, minuteUTC, recipientEmail, alertEmail } = req.body;
       if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be boolean" });
       if (!["daily", "weekly"].includes(frequency)) return res.status(400).json({ error: "frequency must be daily or weekly" });
       if (typeof hourUTC !== "number" || hourUTC < 0 || hourUTC > 23) return res.status(400).json({ error: "hourUTC must be 0-23" });
       if (typeof minuteUTC !== "number" || minuteUTC < 0 || minuteUTC > 59) return res.status(400).json({ error: "minuteUTC must be 0-59" });
       if (typeof dayOfWeek !== "number" || dayOfWeek < 0 || dayOfWeek > 6) return res.status(400).json({ error: "dayOfWeek must be 0-6" });
       if (typeof recipientEmail !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) return res.status(400).json({ error: "recipientEmail must be a valid email address" });
-      const saved = await storage.setBackupSchedule({ enabled, frequency, dayOfWeek, hourUTC, minuteUTC, recipientEmail });
+      if (alertEmail !== undefined && alertEmail !== "" && (typeof alertEmail !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alertEmail))) return res.status(400).json({ error: "alertEmail must be a valid email address" });
+      const saved = await storage.setBackupSchedule({ enabled, frequency, dayOfWeek, hourUTC, minuteUTC, recipientEmail, alertEmail: alertEmail || undefined });
       res.json(saved);
     } catch (e: any) {
       res.status(500).json({ error: e.message });

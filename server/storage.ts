@@ -490,6 +490,7 @@ export interface BackupScheduleSettings {
   hourUTC: number;
   minuteUTC: number;
   recipientEmail: string;
+  alertEmail?: string;
 }
 
 export class MemStorage implements IStorage {

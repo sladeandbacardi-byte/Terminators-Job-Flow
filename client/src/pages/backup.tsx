@@ -115,6 +115,7 @@ interface BackupScheduleSettings {
   hourUTC: number;
   minuteUTC: number;
   recipientEmail: string;
+  alertEmail?: string;
 }
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -731,6 +732,20 @@ export default function BackupPage() {
                           className="h-9"
                           placeholder="admin@example.com"
                         />
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label className="text-xs font-medium">Alert email <span className="text-muted-foreground font-normal">(failure notifications)</span></Label>
+                        <Input
+                          type="email"
+                          value={activeSchedule.alertEmail ?? ""}
+                          onChange={(e) =>
+                            setScheduleForm((f) => f ? { ...f, alertEmail: e.target.value } : { ...scheduleData!, alertEmail: e.target.value })
+                          }
+                          className="h-9"
+                          placeholder="Leave blank to use Recipient email"
+                        />
+                        <p className="text-xs text-muted-foreground">When set, backup failure alerts go here instead of the recipient address above.</p>
                       </div>
                     </div>
 
