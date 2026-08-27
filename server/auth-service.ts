@@ -8,10 +8,13 @@ import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/sche
 import { getDashboardRole } from '@shared/dashboardRole';
 import { storage } from './storage';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET or SESSION_SECRET must be configured for authenticated sessions.");
+const configuredSecret = process.env.JWT_SECRET?.trim() || process.env.SESSION_SECRET?.trim();
+if (!configuredSecret) {
+  throw new Error(
+    "Missing SESSION_SECRET or JWT_SECRET in Railway Variables. Add one under Railway > App Service > Variables.",
+  );
 }
+const JWT_SECRET: string = configuredSecret;
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 export type AuthenticatedUser = AdminUser & {
