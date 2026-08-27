@@ -1,4 +1,5 @@
 #!/bin/bash
-set -e
-npm install
-npm run db:push
+set -euo pipefail
+
+pnpm install --frozen-lockfile
+pnpm run db:push

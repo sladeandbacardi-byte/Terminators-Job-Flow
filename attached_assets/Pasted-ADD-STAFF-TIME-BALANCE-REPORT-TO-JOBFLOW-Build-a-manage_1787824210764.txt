@@ -1,0 +1,523 @@
+ADD STAFF TIME BALANCE REPORT TO JOBFLOW
+
+Build a management report that combines:
+
+- Approved Overtime
+- Approved Authorised Time Off
+
+for each employee and calculates a clear net time balance.
+
+Do NOT replace the existing Overtime or Time Off records.
+
+This report must use the same underlying approved records already stored in JobFlow.
+
+--------------------------------------------------
+1. REPORT NAME
+--------------------------------------------------
+
+Add:
+
+Operations > Time & Overtime > Time Balance Report
+
+Also allow access from:
+
+Reports > Staff Time Balance
+
+--------------------------------------------------
+2. CALCULATION
+--------------------------------------------------
+
+For each employee calculate:
+
+NET TIME BALANCE =
+APPROVED OVERTIME MINUTES
+minus
+APPROVED AUTHORISED TIME OFF MINUTES
+
+Example:
+
+Overtime:
+12 hrs 30 min
+
+Authorised Time Off:
+7 hrs
+
+Net Time Balance:
++5 hrs 30 min
+
+Another example:
+
+Overtime:
+3 hrs
+
+Authorised Time Off:
+6 hrs 30 min
+
+Net Time Balance:
+-3 hrs 30 min
+
+Store/calculate using MINUTES internally.
+
+Do not use decimal hours.
+
+--------------------------------------------------
+3. IMPORTANT RULE
+--------------------------------------------------
+
+ONLY APPROVED records must affect the Net Time Balance.
+
+Pending Overtime:
+DO NOT include
+
+Pending Time Off:
+DO NOT include
+
+Rejected records:
+DO NOT include
+
+Show pending amounts separately for information.
+
+--------------------------------------------------
+4. SUMMARY TABLE
+--------------------------------------------------
+
+Create a management table:
+
+Employee | Overtime | Time Off | Net Balance | Pending OT | Pending Time Off
+
+Example:
+
+Garth
+Overtime: 12 hrs 30 min
+Time Off: 7 hrs
+Net: +5 hrs 30 min
+
+Zain
+Overtime: 3 hrs
+Time Off: 6 hrs 30 min
+Net: -3 hrs 30 min
+
+Leon
+Overtime: 8 hrs
+Time Off: 8 hrs
+Net: 0 hrs
+
+--------------------------------------------------
+5. COLOUR CODING
+--------------------------------------------------
+
+Use:
+
+Positive balance:
+GREEN
+
+Example:
++5 hrs 30 min
+
+Negative balance:
+RED
+
+Example:
+-3 hrs 30 min
+
+Zero:
+Neutral / grey
+
+Example:
+0 hrs
+
+Do not colour the underlying individual records differently from their existing status colours.
+
+--------------------------------------------------
+6. FILTERS
+--------------------------------------------------
+
+Allow Admin/Management to filter by:
+
+- This Week
+- This Month
+- Previous Month
+- This Year
+- Custom Date Range
+- Employee
+- Department
+
+Default view:
+
+THIS MONTH
+
+--------------------------------------------------
+7. STAFF DETAIL VIEW
+--------------------------------------------------
+
+Clicking an employee must open their detailed Time Balance view.
+
+Example:
+
+GARTH
+AUGUST 2026
+
+SUMMARY
+
+Approved Overtime:
+12 hrs 30 min
+
+Approved Time Off:
+7 hrs
+
+NET TIME BALANCE:
++5 hrs 30 min
+
+Pending Overtime:
+2 hrs
+
+Pending Time Off:
+4 hrs
+
+--------------------------------------------------
+8. DETAILED TRANSACTIONS
+--------------------------------------------------
+
+Below the summary show all underlying time entries chronologically.
+
+Example:
+
+03 Aug 2026
+OVERTIME
+Summerbreeze
+16:00 - 17:00
++1 hr
+Approved
+
+08 Aug 2026
+OVERTIME
+Beechwood
+06:30 - 08:00
++1 hr 30 min
+Approved
+
+10 Aug 2026
+TIME OFF
+Gap between jobs
+12:00 - 16:00
+-4 hrs
+Approved
+
+15 Aug 2026
+OVERTIME
+Client X
+16:00 - 18:30
++2 hrs 30 min
+Approved
+
+Use:
+
++ for approved overtime
+
+- for approved authorised time off
+
+Pending records may be shown but must clearly say:
+
+PENDING
+
+and must not affect the Net Time Balance.
+
+--------------------------------------------------
+9. RUNNING BALANCE
+--------------------------------------------------
+
+In the employee detail view show a running balance.
+
+Example:
+
+Date | Type | Adjustment | Balance
+
+03 Aug | Overtime | +1:00 | +1:00
+08 Aug | Overtime | +1:30 | +2:30
+10 Aug | Time Off | -4:00 | -1:30
+15 Aug | Overtime | +2:30 | +1:00
+
+This makes it easy to see how the employee's time balance changed during the month.
+
+--------------------------------------------------
+10. COMPANY SUMMARY
+--------------------------------------------------
+
+At the top of the Time Balance Report show:
+
+TOTAL APPROVED OVERTIME
+[hours]
+
+TOTAL APPROVED TIME OFF
+[hours]
+
+NET STAFF TIME BALANCE
+[hours]
+
+EMPLOYEES OVER
+[count]
+
+EMPLOYEES UNDER
+[count]
+
+EMPLOYEES BALANCED
+[count]
+
+--------------------------------------------------
+11. SORTING
+--------------------------------------------------
+
+Allow sorting by:
+
+- Employee Name
+- Most Overtime
+- Most Time Off
+- Highest Positive Balance
+- Highest Negative Balance
+
+This will help management quickly identify unusual time patterns.
+
+--------------------------------------------------
+12. EXPORT
+--------------------------------------------------
+
+Add:
+
+EXPORT TO EXCEL / CSV
+
+Export the selected reporting period.
+
+Include one summary sheet/table with:
+
+Employee
+Approved Overtime Minutes
+Approved Overtime Display
+Approved Time Off Minutes
+Approved Time Off Display
+Net Balance Minutes
+Net Balance Display
+Pending Overtime
+Pending Time Off
+
+Also include detailed transaction data:
+
+Employee
+Date
+Type
+Client
+Job
+Start Time
+Finish Time
+Minutes
+Display Time
+Status
+Approved By
+Approved Date
+Reason / Notes
+
+--------------------------------------------------
+13. PAYROLL CAUTION
+--------------------------------------------------
+
+The Time Balance Report is a MANAGEMENT INFORMATION report.
+
+Do NOT automatically alter payroll calculations based on the Net Time Balance.
+
+Keep these values separate:
+
+Approved Overtime
+Approved Authorised Time Off
+Net Time Balance
+
+Management can decide how the information is used for payroll.
+
+--------------------------------------------------
+14. MONTHLY BALANCE / CARRY FORWARD
+--------------------------------------------------
+
+Add an optional:
+
+CARRY FORWARD BALANCE
+
+Do not enable automatic carry-forward by default yet.
+
+Show:
+
+Opening Balance
+Period Overtime
+Period Time Off
+Closing Balance
+
+Formula:
+
+Closing Balance =
+Opening Balance
++ Approved Overtime
+- Approved Time Off
+
+Example:
+
+Opening Balance:
++2 hrs 30 min
+
+August Overtime:
++8 hrs
+
+August Time Off:
+-4 hrs
+
+Closing Balance:
++6 hrs 30 min
+
+For now create the structure and display, but do not automatically carry balances into the next month unless Admin enables it later.
+
+--------------------------------------------------
+15. EMPLOYEE PROFILE
+--------------------------------------------------
+
+Add a TIME BALANCE section to each employee profile.
+
+Show:
+
+Current Month
+
+Overtime
+8 hrs 30 min
+
+Time Off
+4 hrs
+
+Net Balance
++4 hrs 30 min
+
+Allow Admin to click:
+
+VIEW TIME DETAILS
+
+This opens the employee Time Balance detail page.
+
+--------------------------------------------------
+16. MOBILE ADMIN VIEW
+--------------------------------------------------
+
+On mobile, do not use a wide table.
+
+Use cards.
+
+Example:
+
+GARTH
+
+Overtime
+12 hrs 30 min
+
+Time Off
+7 hrs
+
+BALANCE
++5 hrs 30 min
+
+Pending
+2 hrs OT / 4 hrs Time Off
+
+[ VIEW DETAILS ]
+
+--------------------------------------------------
+17. PERMISSIONS
+--------------------------------------------------
+
+Normal employees:
+
+May view their own Time Balance only if enabled.
+
+They must not be able to:
+- edit calculated balances
+- view other employees
+- approve entries
+
+Admin/Management:
+
+May view all employee balances.
+May filter/export.
+May open underlying records.
+May approve/reject/reopen through the existing Time & Overtime system.
+
+--------------------------------------------------
+18. DO NOT DUPLICATE DATA
+--------------------------------------------------
+
+Do NOT create a separate database of overtime and time-off values just for this report.
+
+Calculate the report from the existing approved time records.
+
+The report must always reflect the actual underlying records.
+
+If an entry is approved, rejected, reopened or edited, the report must update accordingly.
+
+--------------------------------------------------
+19. VALIDATION TEST
+--------------------------------------------------
+
+Create test data:
+
+GARTH
+
+Approved Overtime:
+1 hr
+1 hr 30 min
+2 hrs
+
+Approved Time Off:
+3 hrs
+
+Expected:
+
+Overtime:
+4 hrs 30 min
+
+Time Off:
+3 hrs
+
+Net:
++1 hr 30 min
+
+Then add:
+
+Pending Overtime:
+2 hrs
+
+Expected:
+
+Approved Overtime:
+4 hrs 30 min
+
+Pending Overtime:
+2 hrs
+
+Net must remain:
++1 hr 30 min
+
+Then reject the pending overtime.
+
+Expected:
+
+Net remains:
++1 hr 30 min
+
+--------------------------------------------------
+20. IMPORTANT
+--------------------------------------------------
+
+This feature should extend the existing:
+
+Operations > Time & Overtime
+
+system.
+
+Do not build another disconnected HR module.
+
+The goal is to give management one clear answer for every employee:
+
+How much approved overtime have they worked?
+How much authorised time off have they received?
+What is their current net time balance?

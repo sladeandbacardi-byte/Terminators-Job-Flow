@@ -20,3 +20,4 @@
 - [Mobile overtime customer capture](mobile-overtime-customer-capture.md) — technicians enter a customer name directly; optional job context enriches the record but never blocks submission.
 - [Treatment report evidence model](treatment-report-evidence-model.md) — retain legacy treatment report fields while storing repeatable digital evidence in child records; completed reports are immutable to mobile staff.
 - [Refined Zod schemas](refined-zod-schemas.md) — a schema wrapped with `superRefine` cannot be shaped with `.omit()`; define the restricted input schema separately for mobile routes.
+- [Post-merge package manager](post-merge-package-manager.md) — post-merge dependency setup must use the repository's declared pnpm manager; npm cannot resolve workspace:* dependencies here.
