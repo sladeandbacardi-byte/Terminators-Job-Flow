@@ -420,6 +420,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherReason"], message: "Describe the other reason" });
     }
   });
+  const mobileOvertimeInput = z.object({
+    workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid work date"),
+    customerName: z.string().trim().min(1, "Enter a customer name").max(200),
+    jobId: z.string().trim().min(1).optional().nullable(),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
+    finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
+    notes: z.string().trim().max(4000).optional().default(""),
+  });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
     if (req.user?.authenticationMethod === "profile_picker" || req.user?.sourceWorkerRole !== undefined) {
@@ -532,6 +540,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
+  const logMobileTimeAudit = async (
+    overtimeEntryId: string,
+    worker: NonNullable<MobileAuthenticatedRequest["mobileWorker"]>,
+    action: "submitted" | "edited" | "approved" | "rejected" | "reopened",
+    details?: Record<string, unknown>,
+    executor: any = db,
+  ) => {
+    await executor.insert(overtimeAuditEntries).values({
+      overtimeEntryId,
+      actorId: worker.id,
+      actorName: worker.name,
+      action,
+      details: details ? JSON.stringify(details) : null,
+    });
+  };
+
   const enrichOvertimeEntries = async (entries: (typeof overtimeEntries.$inferSelect)[]) => {
     const [workers, clients, jobs] = await Promise.all([
       storage.getWorkers(),
@@ -573,17 +597,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   };
 
-  const timeOffConflicts = async (employeeId: string, workDate: string, startTime: string, finishTime: string, excludeId?: string) => {
+  const timeOffConflicts = async (
+    employeeId: string,
+    workDate: string,
+    startTime: string,
+    finishTime: string,
+    excludeId?: string,
+    executor: any = db,
+  ) => {
     const start = timeToMinutes(startTime)!;
     const finish = timeToMinutes(finishTime)!;
-    const [entries, allJobs] = await Promise.all([
-      db.select().from(overtimeEntries).where(and(
+    const [rawEntries, allJobs] = await Promise.all([
+      executor.select().from(overtimeEntries).where(and(
         eq(overtimeEntries.employeeId, employeeId),
         eq(overtimeEntries.workDate, workDate),
         eq(overtimeEntries.entryType, "AUTHORISED_TIME_OFF"),
       )),
       storage.getJobs(),
     ]);
+    const entries = rawEntries as (typeof overtimeEntries.$inferSelect)[];
     const overlappingEntries = entries.filter(entry => {
       if (entry.id === excludeId || entry.status === "rejected") return false;
       const entryStart = timeToMinutes(entry.startTime);
@@ -1673,45 +1705,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/mobile/overtime", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
-    const parsed = z.object({
-      workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid work date"),
-      customerName: z.string().trim().min(1, "Enter a customer name").max(200),
-      jobId: z.string().trim().min(1).optional().nullable(),
-      startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
-      finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
-      notes: z.string().trim().optional().default(""),
-    }).safeParse(req.body);
+    const parsed = mobileOvertimeInput.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid overtime entry" });
 
     const data = parsed.data;
     const breakdown = calculateOvertimeBreakdown(data.startTime, data.finishTime);
     if (breakdown === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
+    if (breakdown.totalMinutes === 0) {
+      return res.status(400).json({ error: "No overtime detected. Overtime is only counted before 08:00 or after 16:00." });
+    }
     try {
       const job = data.jobId ? await getMobileJob(req.mobileWorker!.id, data.jobId) : null;
       if (data.jobId && !job) return res.status(403).json({ error: "This job is not assigned to you or your team" });
       await ensureOvertimeRelations(job?.clientId ?? null, job?.id ?? null);
-      const [created] = await db.insert(overtimeEntries).values({
-        employeeId: req.mobileWorker!.id,
-        workDate: data.workDate,
-        customerName: data.customerName,
-        clientId: job?.clientId ?? null,
-        jobId: job?.id ?? null,
-        jobNumber: job?.jobNumber ?? null,
-        workType: "client_job",
-        startTime: data.startTime,
-        finishTime: data.finishTime,
-        beforeHoursMinutes: breakdown.beforeMinutes,
-        afterHoursMinutes: breakdown.afterMinutes,
-        overtimeMinutes: breakdown.totalMinutes,
-        notes: data.notes || "",
-        status: "pending",
-      }).returning();
+      const created = await db.transaction(async tx => {
+        const [entry] = await tx.insert(overtimeEntries).values({
+          employeeId: req.mobileWorker!.id,
+          workDate: data.workDate,
+          customerName: data.customerName,
+          clientId: job?.clientId ?? null,
+          jobId: job?.id ?? null,
+          jobNumber: job?.jobNumber ?? null,
+          workType: "client_job",
+          startTime: data.startTime,
+          finishTime: data.finishTime,
+          beforeHoursMinutes: breakdown.beforeMinutes,
+          afterHoursMinutes: breakdown.afterMinutes,
+          overtimeMinutes: breakdown.totalMinutes,
+          notes: data.notes || "",
+          status: "pending",
+          updatedAt: new Date(),
+        }).returning();
+        await logMobileTimeAudit(entry.id, req.mobileWorker!, "submitted", {
+          workDate: entry.workDate,
+          overtimeMinutes: entry.overtimeMinutes,
+        }, tx);
+        return entry;
+      });
       const enriched = (await enrichOvertimeEntries([created]))[0];
       void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
       res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit mobile overtime:", error);
-      res.status(500).json({ error: "Could not submit overtime" });
+      const relationMessage = error instanceof Error && /Selected client|Selected job/.test(error.message)
+        ? error.message
+        : null;
+      res.status(relationMessage ? 400 : 500).json({
+        error: relationMessage ?? "Could not submit overtime. Please try again.",
+      });
     }
   });
 
@@ -1749,27 +1790,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (minutes === null) return res.status(400).json({ error: "Finish time must be later than start time on the same day" });
     if (minutes === 0) return res.status(400).json({ error: "No normal working time exists in this period." });
     try {
-      const conflicts = await timeOffConflicts(req.mobileWorker!.id, data.workDate, data.startTime, data.finishTime);
-      if (conflicts.overlappingEntries.length || conflicts.scheduledJobs.length) {
-        return res.status(409).json({ error: conflicts.overlappingEntries.length ? "This employee already has a Time Off entry covering this period." : "This employee has a scheduled job during the selected Time Off period.", conflicts });
-      }
-      const [created] = await db.insert(overtimeEntries).values({
-        entryType: "AUTHORISED_TIME_OFF", employeeId: req.mobileWorker!.id, workDate: data.workDate,
-        startTime: data.startTime, finishTime: data.finishTime, overtimeMinutes: minutes,
-        notes: data.notes || "", timeOffReason: data.reason, timeOffOtherReason: data.otherReason || null,
-        workType: "internal", status: "pending", beforeHoursMinutes: 0, afterHoursMinutes: 0,
-      }).returning();
-      await db.insert(overtimeAuditEntries).values({
-        overtimeEntryId: created.id, actorId: req.mobileWorker!.id, actorName: req.mobileWorker!.name,
-        action: "submitted", details: JSON.stringify({ entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes }),
+      const created = await db.transaction(async tx => {
+        // Keep the conflict check and insert in one serialized transaction so
+        // two field devices cannot submit overlapping Time Off at once.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`time-off:${req.mobileWorker!.id}:${data.workDate}`}))`);
+        const conflicts = await timeOffConflicts(
+          req.mobileWorker!.id,
+          data.workDate,
+          data.startTime,
+          data.finishTime,
+          undefined,
+          tx,
+        );
+        if (conflicts.overlappingEntries.length || conflicts.scheduledJobs.length) {
+          throw Object.assign(new Error(
+            conflicts.overlappingEntries.length
+              ? "This employee already has a Time Off entry covering this period."
+              : "This employee has a scheduled job during the selected Time Off period.",
+          ), { status: 409, conflicts });
+        }
+        const [entry] = await tx.insert(overtimeEntries).values({
+          entryType: "AUTHORISED_TIME_OFF", employeeId: req.mobileWorker!.id, workDate: data.workDate,
+          startTime: data.startTime, finishTime: data.finishTime, overtimeMinutes: minutes,
+          notes: data.notes || "", timeOffReason: data.reason, timeOffOtherReason: data.otherReason || null,
+          workType: "internal", status: "pending", beforeHoursMinutes: 0, afterHoursMinutes: 0,
+          updatedAt: new Date(),
+        }).returning();
+        await logMobileTimeAudit(entry.id, req.mobileWorker!, "submitted", {
+          entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes,
+        }, tx);
+        return entry;
       });
       console.info(`[TIME OFF] Entry created: ${created.id}`);
       const enriched = (await enrichOvertimeEntries([created]))[0];
       void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
       res.status(201).json(enriched);
     } catch (error) {
+      if (typeof error === "object" && error !== null && (error as any).status === 409) {
+        return res.status(409).json({
+          error: error instanceof Error ? error.message : "This Time Off entry conflicts with existing work.",
+          conflicts: (error as any).conflicts,
+        });
+      }
       console.error("Could not submit mobile time off:", error);
-      res.status(500).json({ error: "Could not submit Time Off" });
+      res.status(500).json({ error: "Could not submit Time Off. Please try again." });
     }
   });
 
