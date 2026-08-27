@@ -708,6 +708,7 @@ export default function Contracts() {
                                 </Button>
                               </Link>
                             ) : (
+                              <>
                                 <Button variant="outline" size="sm" className="text-xs"
                                   onClick={() => { setEditingRental(contract as RentalContract); setIsRentalFormOpen(true); }}>
                                   <Edit className="h-3.5 w-3.5 mr-1" />Edit
@@ -716,6 +717,7 @@ export default function Contracts() {
                                   onClick={() => { setDeletingRental(contract as RentalContract); setDeleteReason(""); }}>
                                   <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
                                 </Button>
+                              </>
                             )}
                           </div>
                         )}

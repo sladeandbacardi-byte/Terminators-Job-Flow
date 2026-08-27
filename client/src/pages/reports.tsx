@@ -474,10 +474,12 @@ export default function Reports() {
                         />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         {actStatus === 'all' ? (
+                          <>
                             <Bar dataKey="completed"  name="Completed"   fill="#22c55e" stackId="s" radius={[0,0,0,0]} />
                             <Bar dataKey="inProgress" name="In Progress" fill="#f97316" stackId="s" />
                             <Bar dataKey="scheduled"  name="Scheduled"   fill="#94a3b8" stackId="s" />
                             <Bar dataKey="cancelled"  name="Cancelled"   fill="#ef4444" stackId="s" radius={[4,4,0,0]} />
+                          </>
                         ) : (
                           <Bar dataKey="total" name="Jobs" fill="#3b82f6" radius={[4,4,0,0]} />
                         )}

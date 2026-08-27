@@ -190,6 +190,7 @@ export default function Settings() {
   });
 
   return (
+    <>
         <div className="p-6 pb-20 lg:pb-6">
           <div className="max-w-2xl mx-auto space-y-6">
 
@@ -417,6 +418,7 @@ export default function Settings() {
       entity={editingEntity}
       onClose={() => setEntityDialogOpen(false)}
     />
+    </>
   );
 }
 

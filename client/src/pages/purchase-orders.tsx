@@ -461,6 +461,7 @@ export default function PurchaseOrdersPage() {
                           View Details
                         </DropdownMenuItem>
                         {po.status === "pending" && (
+                          <>
                             <DropdownMenuItem onClick={() => setEditingPO(po)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
@@ -473,6 +474,7 @@ export default function PurchaseOrdersPage() {
                               <X className="mr-2 h-4 w-4" />
                               Reject
                             </DropdownMenuItem>
+                          </>
                         )}
                         {po.status === "approved" && (
                           <DropdownMenuItem onClick={() => setSendingPO(po)}>
@@ -527,8 +529,10 @@ export default function PurchaseOrdersPage() {
                   <div className="space-y-2 text-sm">
                     <div>Requested By: User {viewingPO.requestedById}</div>
                     {viewingPO.approvedById && (
+                      <>
                         <div>Approved By: User {viewingPO.approvedById}</div>
                         <div>Approval Date: {new Date(viewingPO.approvalDate!).toLocaleDateString()}</div>
+                      </>
                     )}
                     {viewingPO.rejectionReason && (
                       <div>Rejection Reason: {viewingPO.rejectionReason}</div>

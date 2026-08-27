@@ -741,6 +741,7 @@ export default function ServiceScheduling() {
 
             {/* ─── WEEKLY / DAILY: Day + Time ─── */}
             {(weeklyOrDaily) && (
+              <>
                 <div>
                   <Label>Day</Label>
                   <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
@@ -754,10 +755,12 @@ export default function ServiceScheduling() {
                   <Label>Time</Label>
                   <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
                 </div>
+              </>
             )}
 
             {/* ─── 2 x A WEEK: Two days + Time ─── */}
             {showSecondDay && (
+              <>
                 <div>
                   <Label>First Day</Label>
                   <Select value={form.dayOfWeek} onValueChange={v => setForm(f => ({ ...f, dayOfWeek: v }))}>
@@ -780,10 +783,12 @@ export default function ServiceScheduling() {
                   <Label>Time</Label>
                   <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
                 </div>
+              </>
             )}
 
             {/* ─── TWICE A MONTH: Two week+day+time combos ─── */}
             {showTwiceAMonth && (
+              <>
                 <div className="sm:col-span-2">
                   <p className="text-xs font-semibold text-gray-500 mb-2">First visit</p>
                   <div className="grid grid-cols-3 gap-2">
@@ -842,10 +847,12 @@ export default function ServiceScheduling() {
                     </div>
                   </div>
                 </div>
+              </>
             )}
 
             {/* ─── MONTHLY / EVERY N MONTHS: Week + Day + Time ─── */}
             {showWeekOfMonth && !showTwiceAMonth && (
+              <>
                 <div>
                   <Label>Week</Label>
                   <Select value={form.weekOfMonth ?? "Week 1"} onValueChange={v => setForm(f => ({ ...f, weekOfMonth: v }))}>
@@ -870,6 +877,7 @@ export default function ServiceScheduling() {
                   <Label>Time</Label>
                   <Input type="time" value={form.serviceTime ?? ""} onChange={e => setForm(f => ({ ...f, serviceTime: e.target.value }))} className="text-sm" />
                 </div>
+              </>
             )}
 
             {/* Estimated Duration */}

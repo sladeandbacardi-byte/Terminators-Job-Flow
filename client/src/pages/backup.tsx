@@ -627,6 +627,7 @@ export default function BackupPage() {
               </CardHeader>
               <CardContent className="space-y-5">
                 {activeSchedule && (
+                  <>
                     <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
                       <div>
                         <p className="text-sm font-medium">Enable scheduled backups</p>
@@ -749,6 +750,7 @@ export default function BackupPage() {
                         ? <><CheckCircle className="mr-2 h-4 w-4" />Schedule saved!</>
                         : <><Save className="mr-2 h-4 w-4" />Save Schedule</>}
                     </Button>
+                  </>
                 )}
               </CardContent>
             </Card>

@@ -356,11 +356,13 @@ export default function FleetVehicleProfile() {
                     <span className="text-xs text-gray-500 font-medium">Next Service</span>
                   </div>
                   {latestService?.nextServiceDate ? (
+                    <>
                       <p className="text-sm font-semibold text-gray-900">{fmt(latestService.nextServiceDate)}</p>
                       <p className={`text-xs font-medium ${nextServiceDays !== null && nextServiceDays <= 0 ? "text-red-600" : nextServiceDays !== null && nextServiceDays <= 30 ? "text-orange-600" : "text-gray-400"}`}>
                         {nextServiceDays !== null && nextServiceDays <= 0 ? "Overdue" : nextServiceDays !== null ? `${nextServiceDays}d` : ""}
                         {latestService.nextServiceOdometer ? ` · ${latestService.nextServiceOdometer.toLocaleString()} km` : ""}
                       </p>
+                    </>
                   ) : <p className="text-sm text-gray-400">Not scheduled</p>}
                 </CardContent>
               </Card>

@@ -244,12 +244,14 @@ function DatabaseStatusSection() {
             Persistent database storage active. Data survives server restarts.
           </Badge>
           {data && (
+            <>
               <Badge variant="outline" className="border-green-300 text-green-800 text-xs">
                 Storage Type: {data.storageType}
               </Badge>
               <Badge variant="outline" className="border-green-300 text-green-800 text-xs">
                 MemStorage: Disabled for production data
               </Badge>
+            </>
           )}
         </div>
 

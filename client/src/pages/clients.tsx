@@ -536,6 +536,7 @@ export default function ClientsPage() {
                             </>
                         )}
                         {!isSales && !isAccounts && (
+                          <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => setDeletingClient(client)}
@@ -544,6 +545,7 @@ export default function ClientsPage() {
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
+                          </>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -590,6 +592,7 @@ export default function ClientsPage() {
                 <h3 className="font-semibold mb-2">Address</h3>
                 <div className="space-y-2 text-sm">
                   {hasStructuredAddress(viewingClient) ? (
+                      <>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                         <div><span className="text-muted-foreground">Street Number:</span> {viewingClient.streetNumber || "—"}</div>
                         <div><span className="text-muted-foreground">Street Name:</span> {viewingClient.streetName || "—"}</div>
@@ -602,6 +605,7 @@ export default function ClientsPage() {
                         <span className="text-muted-foreground text-xs uppercase tracking-wide">Full Address</span>
                         <p className="whitespace-pre-line mt-1">{formatClientAddress(viewingClient)}</p>
                       </div>
+                      </>
                   ) : viewingClient.address ? (
                     <div className="bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
                       <div className="font-semibold text-xs uppercase tracking-wide mb-1">Old Address (legacy)</div>
