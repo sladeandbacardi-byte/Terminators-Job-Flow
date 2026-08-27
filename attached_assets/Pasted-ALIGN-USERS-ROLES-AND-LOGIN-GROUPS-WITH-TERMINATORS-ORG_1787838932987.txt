@@ -1,0 +1,376 @@
+ALIGN USERS, ROLES AND LOGIN GROUPS WITH TERMINATORS ORGANOGRAM 2026
+
+Use the uploaded Terminators Organogram 2026 as the source of truth for user setup.
+
+Goal:
+Make sure Job Flow users match the actual company structure.
+
+There must be two login groups:
+
+1. Staff Login
+For mobile field staff, team supervisors, PCOs and field assistants.
+
+2. Admin / Office Login
+For management, admin, sales, finance and office users.
+
+--------------------------------------------------
+ADMIN / OFFICE USERS
+--------------------------------------------------
+
+Create or update these as Admin / Office users:
+
+1. Julien Botha
+Role: Managing Member / Operations
+Department: Management / Operations
+User type: admin
+Access: full system access
+
+2. Juli Holtshausen
+Role: Finance / Human Resources Manager
+Department: Finance / HR
+User type: admin
+Access: finance, HR, staff attendance, overtime/time off approval, reports
+
+3. Mariette Koekemoer
+Role: Hygiene Services Manager
+Department: Hygiene Services
+User type: admin
+Access: service dashboard, hygiene teams, jobs, calendar, field diaries, clients, invoices if permitted
+
+4. Maryka Venter
+Role: Pest Control Services Manager
+Department: Pest Control
+User type: admin
+Access: service dashboard, pest control team, jobs, calendar, field diaries, clients
+
+5. Anzel Marais
+Role: Sales Rep
+Department: Marketing & Sales
+User type: admin
+Access: leads, quotes, sales diary, clients, follow-ups
+
+6. Sheryl-Lyn Lee
+Role: Existing Clients Sales & Admin
+Department: Marketing & Sales / Admin
+User type: admin
+Access: existing clients, sales, quotes, clients, admin support
+
+Important:
+Juli and Julien must be admin users.
+Do not create them as mobile technician users.
+
+--------------------------------------------------
+MOBILE USERS
+--------------------------------------------------
+
+Create or update the following as mobile users.
+
+These users must appear under Staff Login.
+
+Team supervisors must be mobile users:
+
+1. Re-Althon
+Role: Supervisor
+Team: Sanitary Bin Service A Team
+Department: Sanitary Bins
+User type: staff
+Mobile access: yes
+
+2. Jackie Roelfse
+Role: Supervisor
+Team: Sanitary Bin Service B Team
+Department: Sanitary Bins
+User type: staff
+Mobile access: yes
+
+3. Zain Abdol
+Role: Supervisor
+Team: Washroom Services
+Department: Washroom
+User type: staff
+Mobile access: yes
+
+4. Zuki Sandi
+Role: Supervisor
+Team: Ablution Deep Cleaning
+Department: Deep Cleaning
+User type: staff
+Mobile access: yes
+
+Pest Control PCOs and assistant must be mobile users:
+
+5. Reece Ebrahim
+Role: PCO
+Team: Pest Control Team
+Department: Pest Control
+User type: staff
+Mobile access: yes
+
+6. Garth du Preez
+Role: PCO
+Team: Pest Control Team
+Department: Pest Control
+User type: staff
+Mobile access: yes
+
+7. Michael Meyer
+Role: PCO
+Team: Pest Control Team
+Department: Pest Control
+User type: staff
+Mobile access: yes
+
+8. Xolani Ndzotoyi
+Role: PCO
+Team: Pest Control Team
+Department: Pest Control
+User type: staff
+Mobile access: yes
+
+9. Leon Coltman
+Role: Pest Control Assistant
+Team: Pest Control Team
+Department: Pest Control
+User type: staff
+Mobile access: yes
+
+--------------------------------------------------
+FIELD TEAM MEMBERS
+--------------------------------------------------
+
+Also create or keep these as field staff records.
+
+They do not necessarily need full mobile login unless required, but they must be available for team attendance and job/team allocation.
+
+Sanitary Bin Service A Team:
+- Belinda
+- Racquel
+
+Sanitary Bin Service B Team:
+- Asanda
+
+Ablution Deep Cleaning:
+- Nosipho
+- Nini
+- Babalwa
+
+Daily Cleaning Services:
+- Veronica
+- Margrett
+
+For these users:
+User type: staff
+Mobile access: optional, default no unless they need to log into Job Flow themselves
+Must appear in team attendance lists
+Must be assignable to teams
+Must be visible to supervisors/managers
+
+--------------------------------------------------
+LOGIN RULES
+--------------------------------------------------
+
+Staff Login must show only mobile users:
+
+- Re-Althon
+- Jackie Roelfse
+- Zain Abdol
+- Zuki Sandi
+- Reece Ebrahim
+- Garth du Preez
+- Michael Meyer
+- Xolani Ndzotoyi
+- Leon Coltman
+
+If we decide later that Belinda, Racquel, Asanda, Nosipho, Nini, Babalwa, Veronica or Margrett need mobile login, we can enable mobile access for them.
+
+Admin / Office Login must show only admin users:
+
+- Julien Botha
+- Juli Holtshausen
+- Mariette Koekemoer
+- Maryka Venter
+- Anzel Marais
+- Sheryl-Lyn Lee
+
+Do not mix mobile users and admin users on the same login list.
+
+--------------------------------------------------
+DASHBOARD ROUTING
+--------------------------------------------------
+
+When a mobile user logs in:
+Open Technician / Mobile Dashboard.
+
+When Julien logs in:
+Open Business Overview / Managing Member Dashboard.
+
+When Juli logs in:
+Open Finance / HR Dashboard.
+
+When Mariette logs in:
+Open Hygiene Services / Service Manager Dashboard.
+
+When Maryka logs in:
+Open Pest Control Services / Service Manager Dashboard.
+
+When Anzel logs in:
+Open Sales Dashboard.
+
+When Sheryl-Lyn logs in:
+Open Existing Clients Sales/Admin or Sales Dashboard.
+
+--------------------------------------------------
+PERMISSIONS
+--------------------------------------------------
+
+Mobile users can access only:
+
+- Dashboard
+- My Jobs
+- Field Diaries
+- My Time / Overtime / Time Off
+- FleetGuard:
+  - Report Issue
+  - Log KMs
+  - Vehicle Inspection
+  - Fuel Fill-up
+
+Mobile users must not see:
+
+- Sales
+- Quotes
+- Finance
+- Invoices
+- Admin
+- Users & Roles
+- Permissions
+- Backup & Restore
+- System Logs
+- Suppliers
+- Purchase Orders
+- Full reports
+
+Admin / Office users must get permissions based on role.
+
+--------------------------------------------------
+TEAM STRUCTURE
+--------------------------------------------------
+
+Create teams according to the organogram:
+
+Sanitary Bin Service A Team
+Supervisor: Re-Althon
+Members:
+- Belinda
+- Racquel
+
+Sanitary Bin Service B Team
+Supervisor: Jackie Roelfse
+Members:
+- Asanda
+
+Washroom Services
+Supervisor: Zain Abdol
+
+Ablution Deep Cleaning
+Supervisor: Zuki Sandi
+Members:
+- Nosipho
+- Nini
+- Babalwa
+
+Daily Cleaning Services
+Members:
+- Veronica
+- Margrett
+
+Pest Control Team
+Manager: Maryka Venter
+PCOs:
+- Reece Ebrahim
+- Garth du Preez
+- Michael Meyer
+- Xolani Ndzotoyi
+Assistant:
+- Leon Coltman
+
+--------------------------------------------------
+ATTENDANCE RULES
+--------------------------------------------------
+
+Team supervisors must be able to mark attendance for their own team members.
+
+Example:
+Re-Althon can mark attendance for:
+- Belinda
+- Racquel
+
+Jackie Roelfse can mark attendance for:
+- Asanda
+
+Zuki Sandi can mark attendance for:
+- Nosipho
+- Nini
+- Babalwa
+
+Maryka or service/admin users can view attendance for pest control team.
+
+Juli / HR must be able to view attendance across all teams.
+
+--------------------------------------------------
+DEDUPLICATION
+--------------------------------------------------
+
+Check existing users and update them instead of creating duplicates.
+
+If existing users have slightly different spellings, update to the organogram spelling:
+
+- Re-Althon
+- Jackie Roelfse
+- Zain Abdol
+- Zuki Sandi
+- Reece Ebrahim
+- Garth du Preez
+- Michael Meyer
+- Xolani Ndzotoyi
+- Leon Coltman
+- Juli Holtshausen
+- Mariette Koekemoer
+- Maryka Venter
+- Anzel Marais
+- Sheryl-Lyn Lee
+- Julien Botha
+
+If a previous user called Mike exists, update/display as Michael Meyer but allow nickname Mike if needed.
+
+--------------------------------------------------
+TESTING
+--------------------------------------------------
+
+Test Staff Login:
+- Re-Althon opens mobile dashboard
+- Jackie opens mobile dashboard
+- Zain opens mobile dashboard
+- Zuki opens mobile dashboard
+- Reece opens mobile dashboard
+- Garth opens mobile dashboard
+- Michael opens mobile dashboard
+- Xolani opens mobile dashboard
+- Leon opens mobile dashboard
+
+Test Admin Login:
+- Julien opens Managing Member dashboard
+- Juli opens Finance/HR dashboard
+- Mariette opens Hygiene Services dashboard
+- Maryka opens Pest Control Services dashboard
+- Anzel opens Sales dashboard
+- Sheryl-Lyn opens Sales/Admin dashboard
+
+Test that:
+- Mobile users do not see admin sections
+- Admin users do not appear in Staff Login
+- Team attendance shows correct team members
+- Job assignment can select the correct supervisor/PCO
+- Dashboards load without errors
+
+END
