@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useLocation } from "wouter";
+import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -185,7 +185,7 @@ function TabBtn({ active, icon: Icon, label, count, onClick }: {
 
 export function ServiceContractsContent() {
   const { toast } = useToast();
-  const [location] = useLocation();
+  const searchParams = useSearch();
   const [tab, setTab] = useState<TabId>("list");
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -204,9 +204,7 @@ export function ServiceContractsContent() {
 
   // ── Convert-to-contract URL prefill ───────────────────────────────────────
   useEffect(() => {
-    const qs = window.location.search;
-    if (!qs) return;
-    const p = new URLSearchParams(qs);
+    const p = new URLSearchParams(searchParams);
     if (!p.get("newContract")) return;
     const prefill: CF = {
       activeStatus: true, frequency: "Monthly", weekOfMonth: 1, dayOfWeek: "Monday",
@@ -224,7 +222,28 @@ export function ServiceContractsContent() {
     if (p.get("workerName"))   prefill.assignedTechnicianName = p.get("workerName")!;
     setForm(prefill); setEditing(null); setOpen(true);
     window.history.replaceState({}, "", window.location.pathname);
-  }, [location]);
+  }, [searchParams]);
+
+  // ── Deep-link: ?open=<contractId> from global search ─────────────────────
+  useEffect(() => {
+    const openContractId = new URLSearchParams(searchParams).get("open");
+    if (!openContractId || contracts.length === 0) return;
+    const found = contracts.find(contract => contract.id === openContractId);
+    if (!found) return;
+
+    setTab("list");
+    setSearch("");
+    setDeptFilter("all");
+    setStatusFilter("all");
+    setEditing(found);
+    setForm({
+      ...found,
+      startDate: found.startDate ? format(new Date(found.startDate), "yyyy-MM-dd") : "",
+      endDate: found.endDate ? format(new Date(found.endDate), "yyyy-MM-dd") : "",
+    });
+    setOpen(true);
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [contracts, searchParams]);
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const active = useMemo(() => contracts.filter(c => c.activeStatus), [contracts]);

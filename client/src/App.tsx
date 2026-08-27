@@ -72,6 +72,7 @@ const MyOvertime          = lazy(() => import("@/pages/my-time"));
 const MobileOvertime      = lazy(() => import("@/components/mobile/mobile-my-time"));
 const OvertimeApproval    = lazy(() => import("@/pages/time-overtime"));
 const Opportunities       = lazy(() => import("@/pages/opportunities"));
+const FieldDiaries        = lazy(() => import("@/pages/field-diaries"));
 const TreatmentReports    = lazy(() => import("@/pages/treatment-reports"));
 const TreatmentReportPrint = lazy(() => import("@/pages/treatment-report-print"));
 
@@ -236,7 +237,7 @@ function AuthenticatedApp() {
                 <Route path="/workers">{() => <ProtectedRoute component={Workers} roles={["admin","manager","coordinator","accounts"]} />}</Route>
 
                 {/* ── Service / Operations ─────────────────────────────── */}
-                <Route path="/field-diaries">{() => { window.location.replace("/calendar"); return null; }}</Route>
+                <Route path="/field-diaries" component={FieldDiaries} />
                 <Route path="/treatment-reports">{() => <ProtectedRoute component={TreatmentReports} roles={["admin","manager","coordinator","service"]} />}</Route>
                 <Route path="/fleet" component={Fleet} />
                 <Route path="/fleet/vehicles" component={Fleet} />

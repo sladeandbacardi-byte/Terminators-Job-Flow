@@ -18,7 +18,7 @@ import {
   ChevronLeft, ChevronRight, MapPin, Clock, User,
   X, Search, Navigation, FileText,
 } from "lucide-react";
-import type { Worker, Job, Client } from "@shared/schema";
+import type { Worker, Job, Client, FieldDiary } from "@shared/schema";
 import type { DiaryEvent } from "@shared/calendar-types";
 import { statusColorClasses } from "@shared/calendar-types";
 import {
@@ -93,6 +93,7 @@ export default function FieldDiaries() {
 
   // Details Dialog
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedDiary, setSelectedDiary] = useState<FieldDiary | null>(null);
 
   // ── Deep-link: ?open=<diaryId> from global search
   const search = useSearch();
@@ -108,13 +109,10 @@ export default function FieldDiaries() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
 
   useEffect(() => {
-    if (!openDiary || jobs.length === 0) return;
-    const job = jobs.find(j => j.id === openDiary.jobId);
-    if (job) {
-      setSelectedJob(job);
-      window.history.replaceState(null, '', '/field-diaries');
-    }
-  }, [openDiary, jobs]);
+    if (!openDiary) return;
+    setSelectedDiary(openDiary);
+    window.history.replaceState(null, '', '/field-diaries');
+  }, [openDiary]);
 
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients]);
 
@@ -378,6 +376,96 @@ export default function FieldDiaries() {
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSelectedJob(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Field diary details (opened from global search) */}
+      <Dialog open={!!selectedDiary} onOpenChange={open => !open && setSelectedDiary(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange-600" />
+              Field Diary {selectedDiary?.diaryNumber}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedDiary && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Client</Label>
+                  <p className="text-sm font-semibold">{selectedDiary.clientName || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Status</Label>
+                  <div><Badge variant="outline">{selectedDiary.status}</Badge></div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Job</Label>
+                  <p className="text-sm">{selectedDiary.jobNumber || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Technician</Label>
+                  <p className="text-sm">{selectedDiary.workerName || "—"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Service Date</Label>
+                  <p>{selectedDiary.serviceDate || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Arrived</Label>
+                  <p>{selectedDiary.arrivalTime || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Departed</Label>
+                  <p>{selectedDiary.departureTime || "—"}</p>
+                </div>
+              </div>
+
+              {selectedDiary.workCompleted && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Work Completed</Label>
+                  <p className="rounded bg-gray-50 p-2 text-sm text-gray-700">{selectedDiary.workCompleted}</p>
+                </div>
+              )}
+              {selectedDiary.productsUsed && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Products Used</Label>
+                  <p className="rounded bg-gray-50 p-2 text-sm text-gray-700">{selectedDiary.productsUsed}</p>
+                </div>
+              )}
+              {selectedDiary.notes && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-gray-400">Notes</Label>
+                  <p className="rounded bg-gray-50 p-2 text-sm text-gray-700">{selectedDiary.notes}</p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-2">
+                {selectedDiary.jobId && (
+                  <Button variant="outline" size="sm" className="gap-2" asChild>
+                    <Link href={`/jobs?open=${selectedDiary.jobId}`}>
+                      <FileText className="h-4 w-4" /> Open Job
+                    </Link>
+                  </Button>
+                )}
+                {selectedDiary.clientId && (
+                  <Button variant="outline" size="sm" className="gap-2" asChild>
+                    <Link href={`/clients/${selectedDiary.clientId}`}>
+                      <User className="h-4 w-4" /> Open Client
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSelectedDiary(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
