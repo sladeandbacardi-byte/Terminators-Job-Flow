@@ -556,6 +556,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
+  const mobileTimeSubmissionFailure = (
+    error: unknown,
+    entryLabel: "overtime" | "Time Off",
+  ) => {
+    const databaseCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "string"
+        ? (error as { code: string }).code
+        : "";
+
+    if (["42P01", "42703", "23502"].includes(databaseCode)) {
+      return {
+        status: 503,
+        body: {
+          error: `The Railway time-entry database is not ready for ${entryLabel}. Please ask an administrator to redeploy the latest version.`,
+          code: "TIME_SCHEMA_NOT_READY",
+        },
+      };
+    }
+
+    if (
+      databaseCode.startsWith("08") ||
+      ["53300", "57P01", "57P02", "57P03"].includes(databaseCode)
+    ) {
+      return {
+        status: 503,
+        body: {
+          error: "The Railway database is temporarily unavailable. Please try again shortly.",
+          code: "TIME_DATABASE_UNAVAILABLE",
+        },
+      };
+    }
+
+    return {
+      status: 500,
+      body: {
+        error: `Could not submit ${entryLabel}. Please try again.`,
+        code: "TIME_SUBMISSION_FAILED",
+      },
+    };
+  };
+
   const enrichOvertimeEntries = async (entries: (typeof overtimeEntries.$inferSelect)[]) => {
     const [workers, clients, jobs] = await Promise.all([
       storage.getWorkers(),
@@ -1718,8 +1762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const job = data.jobId ? await getMobileJob(req.mobileWorker!.id, data.jobId) : null;
       if (data.jobId && !job) return res.status(403).json({ error: "This job is not assigned to you or your team" });
       await ensureOvertimeRelations(job?.clientId ?? null, job?.id ?? null);
-      const created = await db.transaction(async tx => {
-        const [entry] = await tx.insert(overtimeEntries).values({
+      const [created] = await db.insert(overtimeEntries).values({
           employeeId: req.mobileWorker!.id,
           workDate: data.workDate,
           customerName: data.customerName,
@@ -1736,12 +1779,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: "pending",
           updatedAt: new Date(),
         }).returning();
-        await logMobileTimeAudit(entry.id, req.mobileWorker!, "submitted", {
-          workDate: entry.workDate,
-          overtimeMinutes: entry.overtimeMinutes,
-        }, tx);
-        return entry;
-      });
+      try {
+        await logMobileTimeAudit(created.id, req.mobileWorker!, "submitted", {
+          workDate: created.workDate,
+          overtimeMinutes: created.overtimeMinutes,
+        });
+      } catch (auditError) {
+        // A secondary audit-schema problem must not discard a valid field submission.
+        console.error(`[TIME AUDIT] Could not audit submitted overtime ${created.id}:`, auditError);
+      }
       const enriched = (await enrichOvertimeEntries([created]))[0];
       void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
       res.status(201).json(enriched);
@@ -1750,9 +1796,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const relationMessage = error instanceof Error && /Selected client|Selected job/.test(error.message)
         ? error.message
         : null;
-      res.status(relationMessage ? 400 : 500).json({
-        error: relationMessage ?? "Could not submit overtime. Please try again.",
-      });
+      if (relationMessage) {
+        return res.status(400).json({ error: relationMessage, code: "INVALID_TIME_RELATION" });
+      }
+      const failure = mobileTimeSubmissionFailure(error, "overtime");
+      res.status(failure.status).json(failure.body);
     }
   });
 
@@ -1816,11 +1864,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           workType: "internal", status: "pending", beforeHoursMinutes: 0, afterHoursMinutes: 0,
           updatedAt: new Date(),
         }).returning();
-        await logMobileTimeAudit(entry.id, req.mobileWorker!, "submitted", {
-          entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes,
-        }, tx);
         return entry;
       });
+      try {
+        await logMobileTimeAudit(created.id, req.mobileWorker!, "submitted", {
+          entryType: "AUTHORISED_TIME_OFF", totalMinutes: minutes,
+        });
+      } catch (auditError) {
+        // Preserve the serialized Time Off insert even if its secondary audit write fails.
+        console.error(`[TIME AUDIT] Could not audit submitted Time Off ${created.id}:`, auditError);
+      }
       console.info(`[TIME OFF] Entry created: ${created.id}`);
       const enriched = (await enrichOvertimeEntries([created]))[0];
       void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
@@ -1833,7 +1886,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       console.error("Could not submit mobile time off:", error);
-      res.status(500).json({ error: "Could not submit Time Off. Please try again." });
+      const failure = mobileTimeSubmissionFailure(error, "Time Off");
+      res.status(failure.status).json(failure.body);
     }
   });
 

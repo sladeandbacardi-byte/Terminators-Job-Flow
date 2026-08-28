@@ -12,13 +12,16 @@ import { sql } from "drizzle-orm";
 export async function runStartupMigrations(): Promise<void> {
   console.log("[migrations] Running startup schema migrations…");
 
-  const run = async (label: string, statement: string) => {
+  const run = async (label: string, statement: string, critical = false) => {
     try {
       await db.execute(sql.raw(statement));
       console.log(`[migrations]   ✓ ${label}`);
     } catch (err: any) {
-      // Non-fatal — log and continue so one bad migration doesn't crash the server
-      console.warn(`[migrations]   ✗ ${label}: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[migrations]   ✗ ${label}: ${message}`);
+      if (critical) {
+        throw new Error(`[migrations] Critical migration failed (${label}): ${message}`);
+      }
     }
   };
 
@@ -526,7 +529,8 @@ export async function runStartupMigrations(): Promise<void> {
       rejection_reason text,
       created_at timestamp NOT NULL DEFAULT now(),
       updated_at timestamp NOT NULL DEFAULT now()
-    )`
+    )`,
+    true
   );
   await run(
     "overtime_audit_entries table",
@@ -538,7 +542,8 @@ export async function runStartupMigrations(): Promise<void> {
       action text NOT NULL,
       details text,
       created_at timestamp NOT NULL DEFAULT now()
-    )`
+    )`,
+    true
   );
   await run(
     "overtime entries lookup indexes",
@@ -547,38 +552,46 @@ export async function runStartupMigrations(): Promise<void> {
      CREATE INDEX IF NOT EXISTS overtime_entries_status_work_date_idx
        ON overtime_entries (status, work_date DESC);
      CREATE INDEX IF NOT EXISTS overtime_audit_entries_entry_created_idx
-       ON overtime_audit_entries (overtime_entry_id, created_at DESC)`
+       ON overtime_audit_entries (overtime_entry_id, created_at DESC)`,
+    true
   );
 
   // ── Overtime: additional columns added in later revision ───────────────────
   await run(
     "overtime_entries.work_type",
-    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS work_type text NOT NULL DEFAULT 'client_job'`
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS work_type text NOT NULL DEFAULT 'client_job'`,
+    true
   );
   await run(
     "overtime_entries.other_description",
-    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS other_description text`
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS other_description text`,
+    true
   );
   await run(
     "overtime_entries.before_hours_minutes",
-    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS before_hours_minutes integer NOT NULL DEFAULT 0`
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS before_hours_minutes integer NOT NULL DEFAULT 0`,
+    true
   );
   await run(
     "overtime_entries.after_hours_minutes",
-    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS after_hours_minutes integer NOT NULL DEFAULT 0`
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS after_hours_minutes integer NOT NULL DEFAULT 0`,
+    true
   );
   // client_id is now optional (for internal/workshop overtime)
   await run(
     "overtime_entries.client_id nullable",
-    `ALTER TABLE overtime_entries ALTER COLUMN client_id DROP NOT NULL`
+    `ALTER TABLE overtime_entries ALTER COLUMN client_id DROP NOT NULL`,
+    true
   );
   await run(
     "overtime_entries.customer_name",
-    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS customer_name text`
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS customer_name text`,
+    true
   );
   await run(
     "overtime_entries.job_number",
-    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS job_number text`
+    `ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS job_number text`,
+    true
   );
   await run(
     "overtime_entries.authorised_time_off",
@@ -586,8 +599,9 @@ export async function runStartupMigrations(): Promise<void> {
      ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS time_off_reason text;
      ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS time_off_other_reason text;
      ALTER TABLE overtime_entries ADD COLUMN IF NOT EXISTS conflict_override_reason text;
-     CREATE INDEX IF NOT EXISTS overtime_entries_type_employee_date_idx
-       ON overtime_entries (entry_type, employee_id, work_date DESC)`
+      CREATE INDEX IF NOT EXISTS overtime_entries_type_employee_date_idx
+        ON overtime_entries (entry_type, employee_id, work_date DESC)`,
+    true
   );
 
   // ── Additional opportunities ─────────────────────────────────────────────

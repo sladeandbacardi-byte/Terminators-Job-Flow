@@ -21,3 +21,4 @@
 - [Treatment report evidence model](treatment-report-evidence-model.md) — retain legacy treatment report fields while storing repeatable digital evidence in child records; completed reports are immutable to mobile staff.
 - [Refined Zod schemas](refined-zod-schemas.md) — a schema wrapped with `superRefine` cannot be shaped with `.omit()`; define the restricted input schema separately for mobile routes.
 - [Post-merge package manager](post-merge-package-manager.md) — post-merge dependency setup must use the repository's declared pnpm manager; npm cannot resolve workspace:* dependencies here.
+- [Time submission audit boundary](time-submission-audit-boundary.md) — secondary audit writes must not roll back valid mobile time submissions; overtime schema migrations are startup-critical.
