@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, and, desc, eq, inArray, ne } from "drizzle-orm";
+import { sql, and, desc, eq, inArray, ne, isNull } from "drizzle-orm";
 import { runDailyBackupEmail, getBackupEmailConfig, sendBackupFailureAlert } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
 import { 
@@ -381,6 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
     notes: z.string().trim().min(1, "Enter an overtime reason"),
     employeeId: z.string().optional(), // admin-only override; ignored for normal users
+    allowDuplicate: z.boolean().optional(), // set only after the user confirms a duplicate warning
   }).superRefine((data, ctx) => {
     if (data.workType === "other" && !data.otherDescription?.trim()) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherDescription"], message: 'Enter a description for "Other" work type' });
@@ -2133,6 +2134,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await ensureOvertimeRelations(data.clientId, data.jobId);
       const entry = await db.transaction(async (tx) => {
+        // Serialize submissions for the same overtime signature so two
+        // simultaneous requests cannot both pass the duplicate check.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`overtime:${targetEmployeeId}:${data.workDate}:${data.startTime}:${data.finishTime}:${data.jobId || "none"}`}))`);
+        const [duplicate] = await tx.select({ id: overtimeEntries.id })
+          .from(overtimeEntries)
+          .where(and(
+            eq(overtimeEntries.employeeId, targetEmployeeId),
+            eq(overtimeEntries.workDate, data.workDate),
+            eq(overtimeEntries.startTime, data.startTime),
+            eq(overtimeEntries.finishTime, data.finishTime),
+            data.jobId ? eq(overtimeEntries.jobId, data.jobId) : isNull(overtimeEntries.jobId),
+          ))
+          .limit(1);
+        if (duplicate && !data.allowDuplicate) {
+          throw Object.assign(new Error(
+            "Possible duplicate overtime entry: an entry already exists for this employee on this date with the same times and job.",
+          ), { status: 409 });
+        }
         const [client, job] = await Promise.all([
           data.clientId ? storage.getClient(data.clientId) : null,
           data.jobId ? storage.getJob(data.jobId) : null,
@@ -2168,7 +2187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not submit overtime";
       console.error("Could not submit overtime:", error);
-      res.status(400).json({ error: message });
+      const status = typeof error === "object" && error !== null && (error as any).status === 409 ? 409 : 400;
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2195,6 +2215,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await ensureOvertimeRelations(data.clientId, data.jobId);
       const entry = await db.transaction(async (tx) => {
+        // Use the same signature lock as creation so an edit cannot race a
+        // matching submission and bypass the duplicate warning.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`overtime:${existing.employeeId}:${data.workDate}:${data.startTime}:${data.finishTime}:${data.jobId || "none"}`}))`);
+        const [duplicate] = await tx.select({ id: overtimeEntries.id })
+          .from(overtimeEntries)
+          .where(and(
+            eq(overtimeEntries.employeeId, existing.employeeId),
+            eq(overtimeEntries.workDate, data.workDate),
+            eq(overtimeEntries.startTime, data.startTime),
+            eq(overtimeEntries.finishTime, data.finishTime),
+            data.jobId ? eq(overtimeEntries.jobId, data.jobId) : isNull(overtimeEntries.jobId),
+            ne(overtimeEntries.id, existing.id),
+          ))
+          .limit(1);
+        if (duplicate && !data.allowDuplicate) {
+          throw Object.assign(new Error(
+            "Possible duplicate overtime entry: an entry already exists for this employee on this date with the same times and job.",
+          ), { status: 409 });
+        }
         const [updated] = await tx.update(overtimeEntries).set({
           workDate: data.workDate,
           clientId: data.clientId || null,
@@ -2224,7 +2263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not update overtime";
       console.error("Could not update overtime:", error);
-      res.status(400).json({ error: message });
+      const status = typeof error === "object" && error !== null && (error as any).status === 409 ? 409 : 400;
+      res.status(status).json({ error: message });
     }
   });
 

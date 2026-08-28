@@ -8,6 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,6 +121,7 @@ export default function MyOvertime() {
   const [form, setForm] = useState<FormState>(newEntry);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [auditEntry, setAuditEntry] = useState<OvertimeEntry | null>(null);
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -155,13 +166,14 @@ export default function MyOvertime() {
   }, [overtimeData, periodFilter, statusFilter]);
 
   const saveEntry = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ allowDuplicate = false }: { allowDuplicate?: boolean } = {}) => {
       const endpoint = editingId ? `/api/overtime/${editingId}` : "/api/overtime";
       const response = await apiRequest(editingId ? "PATCH" : "POST", endpoint, {
         ...form,
         jobId: form.jobId || null,
         clientId: form.clientId || null,
         otherDescription: form.otherDescription || null,
+        allowDuplicate,
       });
       return response.json();
     },
@@ -173,14 +185,22 @@ export default function MyOvertime() {
         description: editingId ? "Your pending overtime entry was updated." : "Your overtime entry is ready for approval.",
       });
       setEditingId(null);
+      setConfirmDuplicate(false);
       setForm(newEntry());
       window.history.replaceState(null, "", window.location.pathname);
     },
-    onError: (error: Error) => toast({ title: "Could not save overtime", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      if (error.message.includes("Possible duplicate")) {
+        setConfirmDuplicate(true);
+        return;
+      }
+      toast({ title: "Could not save overtime", description: error.message, variant: "destructive" });
+    },
   });
 
   const startEditing = (entry: OvertimeEntry) => {
     setEditingId(entry.id);
+    setConfirmDuplicate(false);
     setForm({
       workDate: entry.workDate,
       clientId: entry.clientId ?? "",
@@ -196,6 +216,7 @@ export default function MyOvertime() {
 
   const resetForm = () => {
     setEditingId(null);
+    setConfirmDuplicate(false);
     setForm(newEntry());
     window.history.replaceState(null, "", window.location.pathname);
   };
@@ -252,7 +273,7 @@ export default function MyOvertime() {
           <h2 className="text-lg font-semibold text-gray-900">{editingId ? "Edit pending overtime" : "Log overtime"}</h2>
           <p className="mt-1 text-sm text-gray-500">Your name is taken from your signed-in profile. Overtime is calculated automatically.</p>
         </div>
-        <form className="p-4 sm:p-6 space-y-5" onSubmit={event => { event.preventDefault(); if (canSave) saveEntry.mutate(); }}>
+        <form className="p-4 sm:p-6 space-y-5" onSubmit={event => { event.preventDefault(); if (canSave) saveEntry.mutate({}); }}>
 
           {/* Row 1: Date / Start / Finish */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -383,6 +404,29 @@ export default function MyOvertime() {
           </div>
         </form>
       </section>
+
+      <AlertDialog open={confirmDuplicate} onOpenChange={setConfirmDuplicate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Possible duplicate overtime</AlertDialogTitle>
+            <AlertDialogDescription>
+              This looks like a duplicate. Submit anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saveEntry.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saveEntry.isPending}
+              onClick={() => {
+                setConfirmDuplicate(false);
+                saveEntry.mutate({ allowDuplicate: true });
+              }}
+            >
+              {saveEntry.isPending ? "Submitting…" : "Submit"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* History filters */}
       <div className="flex flex-wrap gap-2 items-center">
