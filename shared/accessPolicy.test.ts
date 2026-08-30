@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getDashboardRole } from "./dashboardRole";
 import { hasUnrestrictedAccess, roleQualifiesForUnrestrictedAccess } from "./accessPolicy";
+import { getOfficeApiAllowedRoles } from "./officeApiPolicy";
 
 const unrestrictedWorkers = [
   ["Sheryl-Lyn Lee", "Existing Clients Sales & Admin"],
@@ -51,4 +52,17 @@ test("generic credential roles cannot override a linked worker's organogram role
     sourceWorkerRole: "Washroom Supervisor",
     authenticationMethod: "password",
   }), true);
+});
+
+test("client finance and mutation APIs enforce their module tiers", () => {
+  assert.deepEqual(getOfficeApiAllowedRoles("GET", "/api/clients/client-1"), ["admin", "manager", "sales", "service", "accounts", "coordinator"]);
+  assert.deepEqual(getOfficeApiAllowedRoles("POST", "/api/clients"), ["admin", "manager", "sales"]);
+  assert.deepEqual(getOfficeApiAllowedRoles("POST", "/api/clients/client-1/payments"), ["admin", "manager", "accounts"]);
+  assert.deepEqual(getOfficeApiAllowedRoles("GET", "/api/clients/client-1/financial-summary"), ["admin", "manager", "accounts"]);
+  assert.equal(getOfficeApiAllowedRoles("POST", "/api/clients/client-1/payments").includes("service"), false);
+  assert.equal(getOfficeApiAllowedRoles("POST", "/api/clients/client-1/payments").includes("sales"), false);
+});
+
+test("unclassified office APIs fail closed to unrestricted users", () => {
+  assert.deepEqual(getOfficeApiAllowedRoles("GET", "/api/future-sensitive-module"), ["admin"]);
 });

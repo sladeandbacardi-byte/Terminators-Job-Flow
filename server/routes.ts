@@ -64,6 +64,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { hasUnrestrictedAccess } from "@shared/accessPolicy";
+import { getOfficeApiAllowedRoles } from "@shared/officeApiPolicy";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
@@ -201,69 +202,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (method === "DELETE" && /^\/api\/mobile\/field-diaries\/[^/]+$/.test(path)) ||
       (method === "DELETE" && /^\/api\/mobile\/fleet\/issues\/[^/]+$/.test(path))
     );
-  };
-
-  const pathHasApiPrefix = (path: string, prefix: string) =>
-    path === `/api/${prefix}` || path.startsWith(`/api/${prefix}/`);
-
-  const officeApiRoles = (method: string, path: string): ReturnType<typeof getDashboardRole>[] | null => {
-    if (
-      method !== "GET" &&
-      (pathHasApiPrefix(path, "legal-entities") || pathHasApiPrefix(path, "settings"))
-    ) {
-      return ["admin"];
-    }
-    if (method !== "GET" && pathHasApiPrefix(path, "departments")) {
-      return ["admin", "manager"];
-    }
-
-    const policies: Array<{ prefixes: string[]; roles: ReturnType<typeof getDashboardRole>[] }> = [
-      {
-        prefixes: ["admin", "backup", "settings", "pricing-library", "custom-reports", "auth/activity-logs", "auth/cleanup-sessions"],
-        roles: ["admin"],
-      },
-      {
-        prefixes: ["quote-submissions", "sales-appointments", "sales-follow-ups", "accepted-workflows", "opportunities", "email-templates", "email-logs", "send-customer-email", "whatsapp"],
-        roles: ["admin", "manager", "sales"],
-      },
-      {
-        prefixes: ["invoices", "invoice-items", "expenses", "sage", "sage-export", "client-payments", "payments"],
-        roles: ["admin", "manager", "accounts"],
-      },
-      {
-        prefixes: ["fleet", "treatment-reports", "pest-control-products", "field-diaries", "equipment-checklists"],
-        roles: ["admin", "manager", "coordinator", "service"],
-      },
-      {
-        prefixes: ["workers", "attendance"],
-        roles: ["admin", "manager", "coordinator", "accounts"],
-      },
-      {
-        prefixes: ["teams", "team-members"],
-        roles: ["admin", "manager"],
-      },
-      {
-        prefixes: ["inventory", "job-inventory", "stock-checks", "stock-locations", "stock-movements", "stock-transfers", "stock-balances", "picking-lists", "suppliers", "purchase-orders"],
-        roles: ["admin", "manager", "coordinator", "accounts", "service"],
-      },
-      {
-        prefixes: ["jobs"],
-        roles: ["admin", "manager", "coordinator", "accounts", "service"],
-      },
-      {
-        prefixes: ["contracts", "contract-items", "department-defaults"],
-        roles: ["admin", "manager", "sales"],
-      },
-      {
-        prefixes: ["service-contracts", "service-schedule", "contract-occurrence-exceptions"],
-        roles: ["admin", "manager", "coordinator"],
-      },
-      {
-        prefixes: ["reports"],
-        roles: ["admin", "manager", "coordinator", "accounts"],
-      },
-    ];
-    return policies.find(policy => policy.prefixes.some(prefix => pathHasApiPrefix(path, prefix)))?.roles ?? null;
   };
 
   const officeOpportunityManager = (req: AuthenticatedRequest) =>
@@ -475,8 +413,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         return res.status(403).json({ error: "Profile sign-in can only access personal staff functions" });
       }
-      const allowedRoles = officeApiRoles(req.method, pathname);
-      if (allowedRoles && !allowedRoles.includes(getDashboardRole(authenticated.user ?? {}))) {
+      const allowedRoles = getOfficeApiAllowedRoles(req.method, pathname);
+      if (!allowedRoles.includes(getDashboardRole(authenticated.user ?? {}))) {
         return res.status(403).json({ error: "Your role does not have access to this module" });
       }
       next();
