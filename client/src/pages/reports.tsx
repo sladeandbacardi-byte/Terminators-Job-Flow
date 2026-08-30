@@ -30,7 +30,7 @@ import type { Job, RentalContract, Worker, Department } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole } from "@/lib/dashboardRole";
 import { formatOvertimeMinutes } from "@shared/overtime";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { FinanceBreadcrumb } from "@/components/layout/finance-breadcrumb";
 
 // ─── Quick-preset helpers ─────────────────────────────────────────────────────
@@ -289,6 +289,11 @@ export default function Reports() {
                 </PopoverContent>
               </Popover>
               {canSeeFinancials && <ExportButton onExportCSV={() => exportAllData()} entityName="All Business Data" variant="default" />}
+              {["admin", "manager"].includes(role) && (
+                <Link href="/time-balance" className="inline-flex h-10 items-center rounded-md border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 hover:bg-red-100">
+                  Staff Time Balance
+                </Link>
+              )}
             </div>
           </div>
 

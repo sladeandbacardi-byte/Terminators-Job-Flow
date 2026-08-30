@@ -2784,6 +2784,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Time balance report (management only) ───────────────────────────────────
+  // This is intentionally calculated from overtime_entries on every request.
+  // It is a reporting view, not a second balance or payroll data store.
+  app.get("/api/reports/time-balance", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can view time balance reports" });
+    try {
+      const query = req.query as Record<string, string | undefined>;
+      const currentDate = new Date();
+      const dateString = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      const defaultFrom = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-01`;
+      const from = query.from || defaultFrom;
+      const to = query.to || dateString(currentDate);
+      const employeeId = query.employeeId && query.employeeId !== "all" ? query.employeeId : undefined;
+      const departmentId = query.departmentId && query.departmentId !== "all" ? query.departmentId : undefined;
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) {
+        return res.status(400).json({ error: "A valid date range is required" });
+      }
+
+      const [allEntries, allWorkers, departments, clients, allJobs] = await Promise.all([
+        db.select().from(overtimeEntries).orderBy(overtimeEntries.workDate, overtimeEntries.startTime),
+        storage.getWorkers(),
+        storage.getDepartments(),
+        storage.getClients(),
+        storage.getJobs(),
+      ]);
+      const workerMap = new Map(allWorkers.map(worker => [worker.id, worker]));
+      const departmentMap = new Map(departments.map(department => [department.id, department.name]));
+      const clientMap = new Map(clients.map(client => [client.id, client.name]));
+      const jobMap = new Map(allJobs.map(job => [job.id, job]));
+
+      const inScope = allEntries.filter(entry =>
+        (entry.status === "approved" || entry.status === "pending") &&
+        entry.workDate >= from &&
+        entry.workDate <= to &&
+        (!employeeId || entry.employeeId === employeeId) &&
+        (!departmentId || workerMap.get(entry.employeeId)?.departmentId === departmentId),
+      );
+
+      const scopedWorkers = allWorkers.filter(worker =>
+        (worker.isActive !== false || inScope.some(entry => entry.employeeId === worker.id)) &&
+        (!employeeId || worker.id === employeeId) &&
+        (!departmentId || worker.departmentId === departmentId),
+      );
+      const employeeIds = new Set([
+        ...scopedWorkers.map(worker => worker.id),
+        ...inScope.map(entry => entry.employeeId),
+      ]);
+
+      const durationLabel = (minutes: number) => {
+        const safeMinutes = Math.max(0, Math.round(minutes || 0));
+        const hours = Math.floor(safeMinutes / 60);
+        const remainder = safeMinutes % 60;
+        return hours ? `${hours} hr${hours === 1 ? "" : "s"}${remainder ? ` ${remainder} min` : ""}` : `${remainder} min`;
+      };
+      const reasonFor = (entry: typeof overtimeEntries.$inferSelect) => {
+        if (entry.entryType === "AUTHORISED_TIME_OFF") {
+          return entry.timeOffReason === "other"
+            ? (entry.timeOffOtherReason || "Other")
+            : (entry.timeOffReason || "Authorised Time Off").replace(/_/g, " ");
+        }
+        return entry.workType === "other"
+          ? (entry.otherDescription || "Other")
+          : (entry.workType || "Overtime").replace(/_/g, " ");
+      };
+
+      const byEmployee = new Map<string, {
+        approvedOvertimeMinutes: number;
+        approvedTimeOffMinutes: number;
+        pendingOvertimeMinutes: number;
+        pendingTimeOffMinutes: number;
+        transactionCount: number;
+      }>();
+      for (const id of Array.from(employeeIds)) {
+        byEmployee.set(id, {
+          approvedOvertimeMinutes: 0,
+          approvedTimeOffMinutes: 0,
+          pendingOvertimeMinutes: 0,
+          pendingTimeOffMinutes: 0,
+          transactionCount: 0,
+        });
+      }
+      for (const entry of inScope) {
+        const summary = byEmployee.get(entry.employeeId);
+        if (!summary) continue;
+        summary.transactionCount++;
+        const minutes = Math.max(0, Math.round(entry.overtimeMinutes || 0));
+        if (entry.status === "approved") {
+          if ((entry.entryType || "OVERTIME") === "AUTHORISED_TIME_OFF") summary.approvedTimeOffMinutes += minutes;
+          else summary.approvedOvertimeMinutes += minutes;
+        } else if ((entry.entryType || "OVERTIME") === "AUTHORISED_TIME_OFF") {
+          summary.pendingTimeOffMinutes += minutes;
+        } else {
+          summary.pendingOvertimeMinutes += minutes;
+        }
+      }
+
+      const rows = Array.from(byEmployee.entries()).map(([id, summary]) => {
+        const worker = workerMap.get(id);
+        return {
+          employeeId: id,
+          name: worker?.name || "Unknown employee",
+          departmentId: worker?.departmentId || null,
+          departmentName: worker?.departmentId ? (departmentMap.get(worker.departmentId) || "Unknown department") : "Office / Management",
+          ...summary,
+          netMinutes: summary.approvedOvertimeMinutes - summary.approvedTimeOffMinutes,
+        };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      const transactions = [...inScope]
+        .sort((a, b) => `${a.employeeId} ${a.workDate} ${a.startTime}`.localeCompare(`${b.employeeId} ${b.workDate} ${b.startTime}`))
+        .map(entry => {
+              const worker = workerMap.get(entry.employeeId);
+              const job = entry.jobId ? jobMap.get(entry.jobId) : undefined;
+              const minutes = Math.max(0, Math.round(entry.overtimeMinutes || 0));
+              const isTimeOff = (entry.entryType || "OVERTIME") === "AUTHORISED_TIME_OFF";
+              return {
+                id: entry.id,
+                employeeId: entry.employeeId,
+                employeeName: worker?.name || "Unknown employee",
+                date: entry.workDate,
+                entryType: isTimeOff ? "AUTHORISED_TIME_OFF" : "OVERTIME",
+                typeLabel: isTimeOff ? "Authorised Time Off" : "Overtime",
+                clientName: entry.customerName || (entry.clientId ? clientMap.get(entry.clientId) : "") || "",
+                jobId: entry.jobId || null,
+                jobLabel: entry.jobNumber || (job ? (job.jobNumber || job.title) : null),
+                startTime: entry.startTime,
+                finishTime: entry.finishTime,
+                minutes,
+                displayDuration: durationLabel(minutes),
+                status: entry.status,
+                approver: entry.approvedByName || null,
+                approvalDate: entry.approvalTimestamp ? entry.approvalTimestamp.toISOString() : null,
+                reason: reasonFor(entry),
+                notes: entry.notes || "",
+                balanceImpactMinutes: entry.status === "approved" ? (isTimeOff ? -minutes : minutes) : 0,
+              };
+            });
+      const runningBalances = new Map<string, number>();
+      const transactionsWithRunningBalance = transactions.map(transaction => {
+        const runningBalance = (runningBalances.get(transaction.employeeId) || 0) + transaction.balanceImpactMinutes;
+        runningBalances.set(transaction.employeeId, runningBalance);
+        return { ...transaction, runningBalanceMinutes: runningBalance };
+      });
+
+      const totals = rows.reduce((result, row) => ({
+        approvedOvertimeMinutes: result.approvedOvertimeMinutes + row.approvedOvertimeMinutes,
+        approvedTimeOffMinutes: result.approvedTimeOffMinutes + row.approvedTimeOffMinutes,
+        pendingOvertimeMinutes: result.pendingOvertimeMinutes + row.pendingOvertimeMinutes,
+        pendingTimeOffMinutes: result.pendingTimeOffMinutes + row.pendingTimeOffMinutes,
+        employeesOver: result.employeesOver + (row.netMinutes > 0 ? 1 : 0),
+        employeesUnder: result.employeesUnder + (row.netMinutes < 0 ? 1 : 0),
+        employeesBalanced: result.employeesBalanced + (row.netMinutes === 0 ? 1 : 0),
+      }), {
+        approvedOvertimeMinutes: 0,
+        approvedTimeOffMinutes: 0,
+        pendingOvertimeMinutes: 0,
+        pendingTimeOffMinutes: 0,
+        employeesOver: 0,
+        employeesUnder: 0,
+        employeesBalanced: 0,
+      });
+
+      const selectedRow = employeeId ? rows.find(row => row.employeeId === employeeId) || null : null;
+      const openingBalanceMinutes = null;
+      res.json({
+        period: { from, to },
+        rows,
+        totals: {
+          ...totals,
+          netMinutes: totals.approvedOvertimeMinutes - totals.approvedTimeOffMinutes,
+          pendingMinutes: totals.pendingOvertimeMinutes + totals.pendingTimeOffMinutes,
+          employeeCount: rows.length,
+        },
+        pending: {
+          overtimeMinutes: totals.pendingOvertimeMinutes,
+          timeOffMinutes: totals.pendingTimeOffMinutes,
+          totalMinutes: totals.pendingOvertimeMinutes + totals.pendingTimeOffMinutes,
+        },
+        selectedEmployee: selectedRow
+          ? { ...selectedRow, openingBalanceMinutes, closingBalanceMinutes: selectedRow.netMinutes }
+          : null,
+        transactions: transactionsWithRunningBalance,
+      });
+    } catch (error) {
+      console.error("Could not load time balance report:", error);
+      res.status(500).json({ error: "Could not load time balance report" });
+    }
+  });
+
   app.post("/api/overtime/bulk-approve", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can approve overtime" });
     const ids = Array.isArray(req.body?.ids)

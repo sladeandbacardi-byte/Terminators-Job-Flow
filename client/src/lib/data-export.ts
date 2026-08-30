@@ -81,6 +81,109 @@ export function exportToCSV(data: any[], filename: string) {
   document.body.removeChild(link);
 }
 
+type TimeBalanceExportReport = {
+  period: { from: string; to: string };
+  rows: Array<{
+    employeeId: string;
+    name: string;
+    departmentName: string;
+    approvedOvertimeMinutes: number;
+    approvedTimeOffMinutes: number;
+    pendingOvertimeMinutes: number;
+    pendingTimeOffMinutes: number;
+    netMinutes: number;
+  }>;
+  totals: {
+    approvedOvertimeMinutes: number;
+    approvedTimeOffMinutes: number;
+    pendingOvertimeMinutes: number;
+    pendingTimeOffMinutes: number;
+    netMinutes: number;
+    employeesOver: number;
+    employeesUnder: number;
+    employeesBalanced: number;
+  };
+  transactions: Array<{
+    id: string;
+    employeeName: string;
+    date: string;
+    typeLabel: string;
+    clientName: string;
+    jobLabel: string | null;
+    startTime: string;
+    finishTime: string;
+    minutes: number;
+    displayDuration: string;
+    status: string;
+    approver: string | null;
+    approvalDate: string | null;
+    reason: string;
+    notes: string;
+    runningBalanceMinutes: number;
+  }>;
+};
+
+export function exportTimeBalanceReport(report: TimeBalanceExportReport) {
+  const escape = (value: unknown) => {
+    const text = value === null || value === undefined ? "" : String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const displayMinutes = (minutes: number, signed = false) => {
+    const absolute = Math.abs(Math.round(minutes || 0));
+    const hours = Math.floor(absolute / 60);
+    const remainder = absolute % 60;
+    const duration = hours ? `${hours} hr${hours === 1 ? "" : "s"}${remainder ? ` ${remainder} min` : ""}` : `${remainder} min`;
+    if (!signed || minutes === 0) return duration;
+    return `${minutes > 0 ? "+" : "−"}${duration}`;
+  };
+  const summaryRows = [
+    ["STAFF TIME BALANCE REPORT"],
+    ["Period from", report.period.from, "Period to", report.period.to],
+    [],
+    ["EMPLOYEE SUMMARY"],
+    ["Employee ID", "Employee", "Department", "Approved Overtime Minutes", "Approved Overtime Display", "Approved Time Off Minutes", "Approved Time Off Display", "Pending Overtime Minutes", "Pending Overtime Display", "Pending Time Off Minutes", "Pending Time Off Display", "Net Balance Minutes", "Net Balance Display"],
+    ...report.rows.map(row => [
+      row.employeeId, row.name, row.departmentName,
+      row.approvedOvertimeMinutes, displayMinutes(row.approvedOvertimeMinutes),
+      row.approvedTimeOffMinutes, displayMinutes(row.approvedTimeOffMinutes),
+      row.pendingOvertimeMinutes, displayMinutes(row.pendingOvertimeMinutes),
+      row.pendingTimeOffMinutes, displayMinutes(row.pendingTimeOffMinutes),
+      row.netMinutes, displayMinutes(row.netMinutes, true),
+    ]),
+    [],
+    ["COMPANY TOTALS"],
+    ["Approved Overtime Minutes", report.totals.approvedOvertimeMinutes, "Display", displayMinutes(report.totals.approvedOvertimeMinutes)],
+    ["Approved Time Off Minutes", report.totals.approvedTimeOffMinutes, "Display", displayMinutes(report.totals.approvedTimeOffMinutes)],
+    ["Net Staff Balance Minutes", report.totals.netMinutes, "Display", displayMinutes(report.totals.netMinutes, true)],
+    ["Pending Overtime Minutes", report.totals.pendingOvertimeMinutes, "Display", displayMinutes(report.totals.pendingOvertimeMinutes)],
+    ["Pending Time Off Minutes", report.totals.pendingTimeOffMinutes, "Display", displayMinutes(report.totals.pendingTimeOffMinutes)],
+    ["Employees Over", report.totals.employeesOver],
+    ["Employees Under", report.totals.employeesUnder],
+    ["Employees Balanced", report.totals.employeesBalanced],
+    [],
+    ["DETAILED TRANSACTIONS"],
+    ["Entry ID", "Employee", "Date", "Type", "Client", "Job", "Start Time", "Finish Time", "Minutes", "Display Duration", "Status", "Approver", "Approval Date", "Reason", "Notes", "Running Balance Minutes"],
+    ...report.transactions.map(transaction => [
+      transaction.id, transaction.employeeName, transaction.date, transaction.typeLabel,
+      transaction.clientName, transaction.jobLabel || "", transaction.startTime, transaction.finishTime,
+      transaction.minutes, transaction.displayDuration, transaction.status, transaction.approver || "",
+      transaction.approvalDate ? transaction.approvalDate.slice(0, 10) : "", transaction.reason,
+      transaction.notes, transaction.runningBalanceMinutes,
+    ]),
+  ];
+  const csvContent = summaryRows.map(row => row.map(escape).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = `staff-time-balance-${report.period.from}-to-${report.period.to}.csv`;
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // Specific export functions for each data type
 export function exportJobs(jobs: Job[]) {
   const exportData = jobs.map(job => ({

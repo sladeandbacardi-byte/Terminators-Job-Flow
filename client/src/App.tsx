@@ -71,6 +71,7 @@ const EquipmentChecklists = lazy(() => import("@/pages/equipment-checklists"));
 const MyOvertime          = lazy(() => import("@/pages/my-time"));
 const MobileOvertime      = lazy(() => import("@/components/mobile/mobile-my-time"));
 const OvertimeApproval    = lazy(() => import("@/pages/time-overtime"));
+const TimeBalance         = lazy(() => import("@/pages/time-balance"));
 const Opportunities       = lazy(() => import("@/pages/opportunities"));
 const FieldDiaries        = lazy(() => import("@/pages/field-diaries"));
 const TreatmentReports    = lazy(() => import("@/pages/treatment-reports"));
@@ -264,6 +265,7 @@ function AuthenticatedApp() {
                 <Route path="/equipment-checklists" component={EquipmentChecklists} />
                  <Route path="/my-overtime" component={MyOvertime} />
                  <Route path="/overtime-approval">{() => <ProtectedRoute component={OvertimeApproval} roles={["admin","manager"]} />}</Route>
+                 <Route path="/time-balance">{() => <ProtectedRoute component={TimeBalance} roles={["admin","manager"]} />}</Route>
                 <Route component={NotFound} />
               </Switch>
             </Suspense>

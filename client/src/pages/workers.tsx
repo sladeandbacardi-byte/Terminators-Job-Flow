@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { ExportButton } from "@/components/export-button";
 import { exportWorkers } from "@/lib/data-export";
 import { formatOvertimeMinutes } from "@shared/overtime";
 import type { Worker, Department } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 const DEPT_BADGE: Record<string, string> = {
   "div-1": "bg-green-100 text-green-800",
@@ -60,11 +61,20 @@ type WorkerOvertimeSummary = {
   }>;
 };
 
+type WorkerTimeBalance = {
+  selectedEmployee: {
+    approvedOvertimeMinutes: number;
+    approvedTimeOffMinutes: number;
+    netMinutes: number;
+  } | null;
+};
+
 export default function Workers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [overtimeWorker, setOvertimeWorker] = useState<Worker | null>(null);
+  const [, navigate] = useLocation();
 
   const { data: workers = [], isLoading } = useQuery<Worker[]>({
     queryKey: ["/api/workers"],
@@ -77,6 +87,17 @@ export default function Workers() {
   const { data: workerOvertime, isLoading: loadingOvertime } = useQuery<WorkerOvertimeSummary>({
     queryKey: [`/api/overtime/worker/${overtimeWorker?.id}`],
     enabled: Boolean(overtimeWorker),
+  });
+  const monthStart = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  })();
+  const monthEnd = new Date().toISOString().slice(0, 10);
+  const { data: workerTimeBalance } = useQuery<WorkerTimeBalance>({
+    queryKey: ["time-balance", monthStart, monthEnd, overtimeWorker?.id || ""],
+    queryFn: async () => (await apiRequest("GET", `/api/reports/time-balance?from=${monthStart}&to=${monthEnd}&employeeId=${overtimeWorker?.id || ""}`)).json(),
+    enabled: Boolean(overtimeWorker),
+    refetchOnMount: "always",
   });
 
   const search = useSearch();
@@ -290,6 +311,22 @@ export default function Workers() {
             <div className="py-8 text-center text-sm text-gray-500">Loading overtime summary…</div>
           ) : workerOvertime ? (
             <div className="space-y-4">
+               {workerTimeBalance?.selectedEmployee && (
+                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                   <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                     <div>
+                       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Current-month time balance</p>
+                       <p className={`mt-1 text-2xl font-bold ${workerTimeBalance.selectedEmployee.netMinutes > 0 ? "text-emerald-700" : workerTimeBalance.selectedEmployee.netMinutes < 0 ? "text-red-700" : "text-slate-700"}`}>
+                         {workerTimeBalance.selectedEmployee.netMinutes > 0 ? "+" : workerTimeBalance.selectedEmployee.netMinutes < 0 ? "−" : ""}{formatOvertimeMinutes(Math.abs(workerTimeBalance.selectedEmployee.netMinutes))}
+                       </p>
+                       <p className="mt-1 text-xs text-red-800">Approved Overtime less approved Time Off</p>
+                     </div>
+                     <Button variant="outline" onClick={() => { setOvertimeWorker(null); navigate(`/time-balance?employeeId=${overtimeWorker?.id}`); }}>
+                       View Time Details <ChevronRight className="ml-1 h-4 w-4" />
+                     </Button>
+                   </div>
+                 </div>
+               )}
               {/* This month */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">{workerOvertime.thisMonth.label}</p>

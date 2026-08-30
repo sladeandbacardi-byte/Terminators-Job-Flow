@@ -171,6 +171,7 @@ export default function TimeOvertime() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/time"] });
     queryClient.invalidateQueries({ queryKey: ["/api/time/my"] });
+    queryClient.invalidateQueries({ queryKey: ["time-balance"] });
   };
 
   const action = useMutation({

@@ -153,6 +153,7 @@ const ALL_SECTIONS: NavSection[] = [
           { name: "Staff",             href: "/workers",           icon: Users,       roles: ["admin", "manager", "coordinator", "accounts"] },
           { name: "Team Attendance",   href: "/attendance",        icon: UserCheck,   roles: ["admin", "manager", "coordinator", "accounts"] },
           { name: "Overtime & Time Off", href: "/overtime-time-off", icon: Clock,      roles: ["admin", "manager", "coordinator", "accounts", "service", "sales"] },
+          { name: "Time Balance Report", href: "/time-balance", icon: PieChart, roles: ["admin", "manager"] },
           { name: "Teams",             href: "/team-management",   icon: Users,       roles: ["admin", "manager"] },
         ],
       },
