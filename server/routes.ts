@@ -835,22 +835,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = z.object({
         workerId: z.string().trim().min(1),
-        pin: z.string().regex(/^\d{4}$/, "PIN must be 4 digits"),
       }).safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Worker and PIN are required" });
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Worker is required" });
       }
 
-      const { workerId, pin } = parsed.data;
-      const loginKey = mobileLoginKey(req, workerId);
-      if (mobileLoginBlocked(loginKey)) {
-        return res.status(429).json({ message: "Too many failed sign-in attempts. Try again in 15 minutes." });
-      }
-
+      const { workerId } = parsed.data;
       const worker = await storage.getWorker(workerId);
       if (!worker) {
-        recordFailedMobileLogin(loginKey);
-        return res.status(401).json({ message: "Invalid worker or PIN" });
+        return res.status(401).json({ message: "Invalid worker" });
       }
 
       if (
@@ -858,23 +851,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         worker.mobileAccessEnabled !== true ||
         String(worker.role ?? "").trim().toLowerCase() !== "technician"
       ) {
-        recordFailedMobileLogin(loginKey);
-        return res.status(401).json({ message: "Invalid worker or PIN" });
+        return res.status(401).json({ message: "Invalid worker" });
       }
-
-      const storedPin = worker.pin || "";
-      const isBcryptHash = /^\$2[aby]\$\d{2}\$/.test(storedPin);
-      const pinMatches = isBcryptHash
-        ? await AuthService.verifyPassword(pin, storedPin)
-        : storedPin.length > 0 && storedPin === pin;
-      if (!pinMatches) {
-        recordFailedMobileLogin(loginKey);
-        return res.status(401).json({ message: "Invalid worker or PIN" });
-      }
-      if (!isBcryptHash) {
-        await storage.updateWorker(worker.id, { pin: await AuthService.hashPassword(pin) });
-      }
-      failedMobileLogins.delete(loginKey);
 
       const token = AuthService.generateMobileWorkerToken(worker.id);
 

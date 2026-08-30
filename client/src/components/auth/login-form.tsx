@@ -88,7 +88,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const loginMutation = useMutation({
     mutationFn: async (
       credentials:
-        | { mode: "mobile"; workerId: string; pin: string }
+        | { mode: "mobile"; workerId: string }
         | { mode: "admin"; username: string; password: string },
     ) => {
       const response = await fetch(
@@ -102,7 +102,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             credentials.mode === "mobile"
-              ? { workerId: credentials.workerId, pin: credentials.pin }
+              ? { workerId: credentials.workerId }
               : { username: credentials.username, password: credentials.password },
           ),
         },
@@ -239,7 +239,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">{step === "staff-list" ? "Staff Login" : "Admin Login"}</h1>
                   <p className="mt-1 text-sm text-gray-600">
-                    {step === "staff-list" ? "Select your profile and enter your PIN." : "Select a protected administrator account."}
+                     {step === "staff-list" ? "Select your profile to open the technician dashboard." : "Select a protected administrator account."}
                   </p>
                 </div>
               </div>
@@ -271,7 +271,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
               className="space-y-5"
               onSubmit={event => {
                 event.preventDefault();
-                loginMutation.mutate({ mode: "mobile", workerId: selectedTechnician.id, pin });
+                loginMutation.mutate({ mode: "mobile", workerId: selectedTechnician.id });
               }}
             >
               <div className="flex items-start gap-3">
@@ -280,7 +280,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 </Button>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Welcome, {selectedTechnician.name}</h1>
-                  <p className="mt-1 text-sm text-gray-600">Enter your 4-digit PIN to open the technician dashboard.</p>
+                   <p className="mt-1 text-sm text-gray-600">PIN login has been disabled for mobile staff.</p>
                 </div>
               </div>
 
@@ -293,11 +293,10 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                   <AlertDescription>{loginError}</AlertDescription>
                 </Alert>
               )}
-              <div className="space-y-2">
-                <label htmlFor="technician-pin" className="text-sm font-medium text-gray-700">PIN</label>
-                <Input id="technician-pin" type="password" inputMode="numeric" autoComplete="current-password" pattern="[0-9]{4}" maxLength={4} value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} className="h-12 text-center text-lg tracking-[0.5em]" required autoFocus />
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Confirm your selected profile to continue.
               </div>
-              <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending || pin.length !== 4}>
+              <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending}>
                 {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><Smartphone className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
               </Button>
               <Button type="button" variant="link" className="w-full" onClick={() => { resetCredentials(); setStep("staff-list"); }}>
