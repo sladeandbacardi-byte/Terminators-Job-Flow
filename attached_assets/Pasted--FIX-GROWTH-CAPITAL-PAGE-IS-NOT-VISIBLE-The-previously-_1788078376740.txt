@@ -1,0 +1,250 @@
+## FIX: GROWTH & CAPITAL PAGE IS NOT VISIBLE
+
+The previously requested **Growth & Capital** owner dashboard is not visible anywhere in JobFlow.
+
+Do NOT redesign the feature.
+
+First inspect the existing implementation and determine what was actually created.
+
+I need you to FIX the integration so the page is visible and usable by Julien.
+
+### 1. CHECK WHAT EXISTS
+
+Search the codebase for all references to:
+
+* Growth & Capital
+* GrowthAndCapital
+* growth-capital
+* growthAndCapital
+* canViewGrowthAndCapital
+* Jan Capital
+* Property Fund
+
+Report briefly what already exists before changing anything.
+
+Then continue with the fix.
+
+---
+
+# 2. MAKE SURE THE PAGE ROUTE EXISTS
+
+There must be a working frontend route for the page.
+
+Use the routing convention already used by JobFlow.
+
+Preferred route:
+
+`/growth-capital`
+
+or the closest existing JobFlow routing convention.
+
+Opening this URL while logged in as Julien must load the Growth & Capital dashboard.
+
+It must NOT result in:
+
+* blank screen
+* 404
+* redirect to dashboard
+* unauthorized error for Julien
+* infinite loading
+* frontend crash
+
+---
+
+# 3. ADD THE MENU ITEM
+
+Add a visible navigation/menu item:
+
+**Growth & Capital**
+
+This menu item must appear for Julien in the normal desktop JobFlow navigation.
+
+Place it near:
+
+**Finance / Reports / Dashboard**
+
+whichever fits the current menu structure best.
+
+Use a chart/trending/growth icon.
+
+Do not create a second navigation system.
+
+Use the existing JobFlow sidebar/navigation component.
+
+---
+
+# 4. FIX JULIEN ACCESS
+
+The page must be visible to the existing Julien admin/owner user.
+
+IMPORTANT:
+
+Do not create another Julien account.
+
+Do not assume the username, email address or user ID.
+
+Inspect the existing production/seeding/database user records and identify the existing Julien admin account.
+
+Assign owner access to THAT user.
+
+If `canViewGrowthAndCapital` was added but is currently false/null/missing, fix it.
+
+If JobFlow uses roles instead of individual permissions, add the smallest safe owner-level access rule necessary.
+
+Do NOT grant the page to every Admin user.
+
+Juli and other admins must still not see this dashboard.
+
+---
+
+# 5. DO NOT RELY ON FRONTEND HIDING
+
+Access protection must work at both levels:
+
+### Frontend
+
+Only Julien sees the Growth & Capital navigation item.
+
+### Backend
+
+Only Julien may access the Growth & Capital API/data.
+
+If another logged-in user manually opens:
+
+`/growth-capital`
+
+they must receive an appropriate unauthorized response/page.
+
+---
+
+# 6. MAKE THE PAGE LOAD EVEN IF SOME DATA IS NOT READY
+
+Do not hide the entire dashboard because one data source is unavailable.
+
+The page must render.
+
+Where information is not linked yet, show:
+
+**Not yet linked**
+
+or
+
+**No data available**
+
+For example, if revenue recovery calculations are not complete yet, the Jan Capital section must still display.
+
+---
+
+# 7. JAN CAPITAL DATA MUST APPEAR IMMEDIATELY
+
+At minimum, after this fix I must be able to open the page and see:
+
+### Original Capital
+
+R8,550,000
+
+### Paid
+
+R3,450,000
+
+### Outstanding
+
+R5,100,000
+
+### Paid %
+
+40.35%
+
+### Extra Payments Recorded
+
+R900,000
+
+### Current Position Date
+
+25 August 2026
+
+Also show the existing Jan payment history that was previously supplied.
+
+The page must not wait for Finance integration before displaying this section.
+
+---
+
+# 8. TEMPORARY VISIBILITY TEST
+
+During implementation, add a temporary developer log or diagnostic that confirms:
+
+* logged-in user ID
+* logged-in user name
+* logged-in user role
+* whether Growth & Capital access resolves true/false
+* whether `/growth-capital` route loaded
+
+Do NOT log passwords, JWT secrets, session secrets or other sensitive credentials.
+
+Once the issue is confirmed/fixed, remove unnecessary diagnostic logging.
+
+---
+
+# 9. CHECK BOTH DESKTOP AND MOBILE
+
+Desktop:
+Growth & Capital must appear in the normal menu for Julien.
+
+Mobile:
+It may appear in the mobile navigation/menu if Julien is logged in.
+
+Do not expose it to normal mobile staff.
+
+---
+
+# 10. DO NOT STOP AFTER CREATING FILES
+
+This task is NOT complete merely because a component/page file exists.
+
+The feature is only complete when all of the following work:
+
+1. Julien logs in.
+2. Julien can see **Growth & Capital** in the JobFlow menu.
+3. Clicking it opens the page.
+4. The Jan Capital figures display.
+5. Refreshing the page still works.
+6. Direct navigation to `/growth-capital` works.
+7. Other users do not see the menu item.
+8. Other users cannot access the protected data directly.
+
+---
+
+# 11. TEST THE IMPLEMENTATION
+
+After making the changes:
+
+Run the application/build and check for:
+
+* TypeScript errors
+* routing errors
+* import errors
+* permission errors
+* database errors
+* blank page errors
+
+Then give me a short completion report stating:
+
+### Existing problem found
+
+What prevented the page from appearing.
+
+### Files changed
+
+List the relevant files.
+
+### Access
+
+Confirm which existing user has access.
+
+### Route
+
+Give me the actual Growth & Capital URL/route.
+
+### Test
+
+Confirm that the menu link and page load successfully.

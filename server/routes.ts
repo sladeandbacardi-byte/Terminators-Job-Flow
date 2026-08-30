@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, and, desc, eq, inArray, ne, isNull } from "drizzle-orm";
+import { sql, and, desc, eq, gte, inArray, lte, ne, isNull } from "drizzle-orm";
 import { runDailyBackupEmail, getBackupEmailConfig, sendBackupFailureAlert } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
 import { 
@@ -31,6 +31,8 @@ import {
   LEAD_STATUS_LABELS,
   overtimeEntries,
   overtimeAuditEntries,
+  employeeAttendanceRecords,
+  employeeAttendanceAudits,
   adminUsers,
   opportunities,
   opportunityPhotos,
@@ -59,7 +61,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
-import { sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
+import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -68,6 +70,37 @@ import { exec } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
+
+const ATTENDANCE_TIME_ZONE = "Africa/Johannesburg";
+const attendanceDateParts = (value: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ATTENDANCE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+    minutes: Number(values.hour) * 60 + Number(values.minute),
+  };
+};
+
+const attendanceMetrics = (startAt: Date, endAt?: Date | null) => {
+  const start = attendanceDateParts(startAt);
+  const finish = endAt ? attendanceDateParts(endAt) : null;
+  return {
+    startTime: start.time,
+    finishTime: finish?.time ?? null,
+    totalMinutes: finish ? Math.max(0, Math.round((endAt!.getTime() - startAt.getTime()) / 60000)) : null,
+    lateStartMinutes: Math.max(0, start.minutes - 8 * 60),
+    earlyFinishMinutes: finish ? Math.max(0, 16 * 60 - finish.minutes) : 0,
+  };
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -106,9 +139,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "POST /api/mobile/opportunities",
       "GET /api/mobile/pest-control-products",
       "GET /api/mobile/overtime",
-        "POST /api/mobile/overtime",
-        "GET /api/mobile/time",
-        "POST /api/mobile/time-off",
+      "POST /api/mobile/overtime",
+      "GET /api/mobile/time",
+      "POST /api/mobile/time-off",
+      "GET /api/mobile/attendance/today",
+      "POST /api/mobile/attendance/start",
+      "POST /api/mobile/attendance/end",
     ].includes(signature)) {
       return true;
     }
@@ -429,6 +465,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time"),
     notes: z.string().trim().max(4000).optional().default(""),
   });
+  const attendanceCorrectionInput = z.object({
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time"),
+    finishTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid finish time").optional().nullable(),
+    correctionReason: z.string().trim().min(1, "A correction reason is required").max(1000),
+  });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
     if (req.user?.authenticationMethod === "profile_picker" || req.user?.sourceWorkerRole !== undefined) {
@@ -556,6 +597,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       details: details ? JSON.stringify(details) : null,
     });
   };
+
+  const logEmployeeAttendanceAudit = async (params: {
+    attendanceId: string;
+    employeeId: string;
+    actorId: string;
+    actorName: string;
+    action: "START_WORK" | "END_WORK" | "ATTENDANCE_EDITED" | "ATTENDANCE_EMAIL_SENT" | "ATTENDANCE_EMAIL_FAILED";
+    originalValues?: Record<string, unknown> | null;
+    newValues?: Record<string, unknown> | null;
+    reason?: string | null;
+  }) => {
+    await db.insert(employeeAttendanceAudits).values({
+      attendanceId: params.attendanceId,
+      employeeId: params.employeeId,
+      actorId: params.actorId,
+      actorName: params.actorName,
+      action: params.action,
+      originalValues: params.originalValues ? JSON.stringify(params.originalValues) : null,
+      newValues: params.newValues ? JSON.stringify(params.newValues) : null,
+      reason: params.reason || null,
+    });
+  };
+
+  const notifyEmployeeAttendance = async (
+    record: typeof employeeAttendanceRecords.$inferSelect,
+    employeeName: string,
+    phase: "start" | "finish",
+  ) => {
+    try {
+      const deliveries = await sendAttendanceNotification(record, employeeName, phase);
+      const attemptedDeliveries = deliveries.length
+        ? deliveries
+        : TIME_NOTIFICATION_RECIPIENTS.map(recipient => ({ recipient, sent: false, error: "No delivery result returned" }));
+      for (const delivery of attemptedDeliveries) {
+        try {
+          await logEmployeeAttendanceAudit({
+            attendanceId: record.id,
+            employeeId: record.employeeId,
+            actorId: "system",
+            actorName: "JobFlow notifications",
+            action: delivery.sent ? "ATTENDANCE_EMAIL_SENT" : "ATTENDANCE_EMAIL_FAILED",
+            newValues: { phase, recipient: delivery.recipient, error: delivery.error || null },
+          });
+        } catch (auditError) {
+          console.error(`[ATTENDANCE] Could not write email audit for ${delivery.recipient}:`, auditError);
+        }
+      }
+      return deliveries;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[ATTENDANCE] ${phase} notification failed for ${record.id}:`, message);
+      for (const recipient of TIME_NOTIFICATION_RECIPIENTS) {
+        try {
+          await logEmployeeAttendanceAudit({
+            attendanceId: record.id,
+            employeeId: record.employeeId,
+            actorId: "system",
+            actorName: "JobFlow notifications",
+            action: "ATTENDANCE_EMAIL_FAILED",
+            newValues: { phase, recipient, error: message },
+          });
+        } catch (auditError) {
+          console.error(`[ATTENDANCE] Could not write failure audit for ${recipient}:`, auditError);
+        }
+      }
+      return [];
+    }
+  };
+
+  const attendanceRecordForResponse = (
+    record: typeof employeeAttendanceRecords.$inferSelect,
+    employee?: { name?: string | null; employeeId?: string | null },
+  ) => ({
+    ...record,
+    employeeName: employee?.name || record.employeeId,
+    employeeNumber: employee?.employeeId || null,
+    ...attendanceMetrics(record.startAt, record.endAt),
+    isMissingEnd: record.status === "WORKING",
+  });
 
   const mobileTimeSubmissionFailure = (
     error: unknown,
@@ -1828,6 +1948,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Could not load mobile time:", error);
       res.status(500).json({ error: "Could not load time entries" });
+    }
+  });
+
+  app.get("/api/mobile/attendance/today", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const workDate = attendanceDateParts(new Date()).date;
+      const [record] = await db.select().from(employeeAttendanceRecords)
+        .where(and(
+          eq(employeeAttendanceRecords.employeeId, req.mobileWorker!.id),
+          eq(employeeAttendanceRecords.workDate, workDate),
+        ))
+        .limit(1);
+      res.json({
+        workDate,
+        attendance: record ? attendanceRecordForResponse(record, req.mobileWorker!) : null,
+      });
+    } catch (error) {
+      console.error("Could not load today's employee attendance:", error);
+      res.status(500).json({ error: "Could not load today's attendance. Please try again." });
+    }
+  });
+
+  app.post("/api/mobile/attendance/start", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const now = new Date();
+    const workDate = attendanceDateParts(now).date;
+    try {
+      const result = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${req.mobileWorker!.id}:${workDate}`}))`);
+        const [existing] = await tx.select().from(employeeAttendanceRecords)
+          .where(and(
+            eq(employeeAttendanceRecords.employeeId, req.mobileWorker!.id),
+            eq(employeeAttendanceRecords.workDate, workDate),
+          ))
+          .limit(1);
+        if (existing) return { record: existing, created: false };
+
+        const metrics = attendanceMetrics(now);
+        const [record] = await tx.insert(employeeAttendanceRecords).values({
+          employeeId: req.mobileWorker!.id,
+          workDate,
+          startAt: now,
+          lateStartMinutes: metrics.lateStartMinutes,
+          earlyFinishMinutes: 0,
+          status: "WORKING",
+          updatedAt: now,
+        }).returning();
+        return { record, created: true };
+      });
+
+      if (result.created) {
+        try {
+          await logEmployeeAttendanceAudit({
+            attendanceId: result.record.id,
+            employeeId: result.record.employeeId,
+            actorId: req.mobileWorker!.id,
+            actorName: req.mobileWorker!.name,
+            action: "START_WORK",
+            newValues: { workDate, startAt: result.record.startAt.toISOString() },
+          });
+        } catch (auditError) {
+          console.error(`[ATTENDANCE] Could not audit start ${result.record.id}:`, auditError);
+        }
+        void notifyEmployeeAttendance(result.record, req.mobileWorker!.name, "start");
+      }
+
+      res.status(result.created ? 201 : 200).json({
+        attendance: attendanceRecordForResponse(result.record, req.mobileWorker!),
+        alreadyStarted: !result.created,
+      });
+    } catch (error) {
+      console.error("Could not start employee attendance:", error);
+      res.status(500).json({ error: "Could not start work. Please try again." });
+    }
+  });
+
+  app.post("/api/mobile/attendance/end", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const now = new Date();
+    const workDate = attendanceDateParts(now).date;
+    try {
+      const result = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${req.mobileWorker!.id}:${workDate}`}))`);
+        const [existing] = await tx.select().from(employeeAttendanceRecords)
+          .where(and(
+            eq(employeeAttendanceRecords.employeeId, req.mobileWorker!.id),
+            eq(employeeAttendanceRecords.workDate, workDate),
+          ))
+          .limit(1);
+        if (!existing) {
+          throw Object.assign(new Error("Start Work must be recorded before End Work."), { status: 409 });
+        }
+        if (existing.endAt) return { record: existing, updated: false };
+
+        const metrics = attendanceMetrics(existing.startAt, now);
+        const [record] = await tx.update(employeeAttendanceRecords).set({
+          endAt: now,
+          totalMinutes: metrics.totalMinutes,
+          lateStartMinutes: metrics.lateStartMinutes,
+          earlyFinishMinutes: metrics.earlyFinishMinutes,
+          status: "FINISHED",
+          updatedAt: now,
+        }).where(eq(employeeAttendanceRecords.id, existing.id)).returning();
+        return { record, updated: true };
+      });
+
+      if (result.updated) {
+        try {
+          await logEmployeeAttendanceAudit({
+            attendanceId: result.record.id,
+            employeeId: result.record.employeeId,
+            actorId: req.mobileWorker!.id,
+            actorName: req.mobileWorker!.name,
+            action: "END_WORK",
+            newValues: {
+              endAt: result.record.endAt?.toISOString() || null,
+              totalMinutes: result.record.totalMinutes,
+              lateStartMinutes: result.record.lateStartMinutes,
+              earlyFinishMinutes: result.record.earlyFinishMinutes,
+            },
+          });
+        } catch (auditError) {
+          console.error(`[ATTENDANCE] Could not audit finish ${result.record.id}:`, auditError);
+        }
+        void notifyEmployeeAttendance(result.record, req.mobileWorker!.name, "finish");
+      }
+
+      res.json({
+        attendance: attendanceRecordForResponse(result.record, req.mobileWorker!),
+        alreadyFinished: !result.updated,
+      });
+    } catch (error) {
+      if (typeof error === "object" && error !== null && (error as any).status === 409) {
+        return res.status(409).json({ error: error instanceof Error ? error.message : "Start Work must be recorded first." });
+      }
+      console.error("Could not finish employee attendance:", error);
+      res.status(500).json({ error: "Could not end work. Please try again." });
     }
   });
 
@@ -6556,6 +6811,105 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // ── ATTENDANCE ─────────────────────────────────────────────────────────────
+
+  // Employee start/end attendance is separate from the existing team-sheet
+  // attendance routes below. Keep these specific routes above /:id so Express
+  // cannot interpret "employee" as a team attendance record id.
+  app.get("/api/attendance/employee", async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Management access required" });
+    try {
+      const date = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : attendanceDateParts(new Date()).date;
+      const from = typeof req.query.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from) ? req.query.from : date;
+      const to = typeof req.query.to === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to) ? req.query.to : date;
+      const employeeId = typeof req.query.employeeId === "string" ? req.query.employeeId : "";
+      const conditions = [
+        gte(employeeAttendanceRecords.workDate, from),
+        lte(employeeAttendanceRecords.workDate, to),
+        ...(employeeId ? [eq(employeeAttendanceRecords.employeeId, employeeId)] : []),
+      ];
+      const [records, allWorkers] = await Promise.all([
+        db.select().from(employeeAttendanceRecords)
+          .where(and(...conditions))
+          .orderBy(desc(employeeAttendanceRecords.workDate), desc(employeeAttendanceRecords.startAt)),
+        storage.getWorkers(),
+      ]);
+      const workerMap = new Map(allWorkers.map(worker => [worker.id, worker]));
+      const decorated = records.map(record => attendanceRecordForResponse(record, workerMap.get(record.employeeId)));
+      const todayRecords = records.filter(record => record.workDate === date);
+      res.json({
+        records: decorated,
+        summary: {
+          date,
+          totalEmployees: allWorkers.filter(worker => worker.isActive !== false).length,
+          started: todayRecords.length,
+          working: todayRecords.filter(record => record.status === "WORKING").length,
+          finished: todayRecords.filter(record => record.status === "FINISHED").length,
+          notStarted: Math.max(0, allWorkers.filter(worker => worker.isActive !== false).length - todayRecords.length),
+        },
+      });
+    } catch (error) {
+      console.error("Could not load employee attendance:", error);
+      res.status(500).json({ error: "Could not load employee attendance" });
+    }
+  });
+
+  app.get("/api/attendance/employee/:id/audit", async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Management access required" });
+    const audit = await db.select().from(employeeAttendanceAudits)
+      .where(eq(employeeAttendanceAudits.attendanceId, req.params.id))
+      .orderBy(desc(employeeAttendanceAudits.createdAt));
+    res.json(audit);
+  });
+
+  app.patch("/api/attendance/employee/:id", async (req: AuthenticatedRequest, res) => {
+    if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Management access required" });
+    const parsed = attendanceCorrectionInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid correction" });
+    try {
+      const [existing] = await db.select().from(employeeAttendanceRecords)
+        .where(eq(employeeAttendanceRecords.id, req.params.id))
+        .limit(1);
+      if (!existing) return res.status(404).json({ error: "Attendance record not found" });
+
+      const startAt = new Date(`${existing.workDate}T${parsed.data.startTime}:00+02:00`);
+      const endAt = parsed.data.finishTime ? new Date(`${existing.workDate}T${parsed.data.finishTime}:00+02:00`) : null;
+      if (endAt && endAt <= startAt) return res.status(400).json({ error: "Finish time must be later than start time" });
+      const metrics = attendanceMetrics(startAt, endAt);
+      const actorName = overtimeActorName(req);
+      const [updated] = await db.update(employeeAttendanceRecords).set({
+        startAt,
+        endAt,
+        totalMinutes: metrics.totalMinutes,
+        lateStartMinutes: metrics.lateStartMinutes,
+        earlyFinishMinutes: metrics.earlyFinishMinutes,
+        status: endAt ? "FINISHED" : "WORKING",
+        correctedBy: req.user!.id,
+        correctionReason: parsed.data.correctionReason,
+        updatedAt: new Date(),
+      }).where(eq(employeeAttendanceRecords.id, existing.id)).returning();
+      try {
+        await logEmployeeAttendanceAudit({
+          attendanceId: existing.id,
+          employeeId: existing.employeeId,
+          actorId: req.user!.id,
+          actorName,
+          action: "ATTENDANCE_EDITED",
+          originalValues: attendanceRecordForResponse(existing),
+          newValues: attendanceRecordForResponse(updated),
+          reason: parsed.data.correctionReason,
+        });
+      } catch (auditError) {
+        console.error(`[ATTENDANCE] Could not audit management correction ${existing.id}:`, auditError);
+      }
+      const worker = await storage.getWorker(updated.employeeId);
+      res.json(attendanceRecordForResponse(updated, worker));
+    } catch (error) {
+      console.error("Could not correct employee attendance:", error);
+      res.status(500).json({ error: "Could not update attendance" });
+    }
+  });
 
   app.get("/api/attendance", async (req, res) => {
     try {

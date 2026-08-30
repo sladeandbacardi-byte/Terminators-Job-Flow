@@ -1304,10 +1304,41 @@ export const attendanceMemberRecords = pgTable("attendance_member_records", {
   notes: text("notes"),
 });
 
+export const employeeAttendanceRecords = pgTable("employee_attendance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  workDate: text("work_date").notNull(), // YYYY-MM-DD in Africa/Johannesburg
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at"),
+  totalMinutes: integer("total_minutes"),
+  lateStartMinutes: integer("late_start_minutes").notNull().default(0),
+  earlyFinishMinutes: integer("early_finish_minutes").notNull().default(0),
+  status: text("status").notNull().default("WORKING"), // WORKING | FINISHED
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+  correctedBy: varchar("corrected_by"),
+  correctionReason: text("correction_reason"),
+});
+
+export const employeeAttendanceAudits = pgTable("employee_attendance_audits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attendanceId: varchar("attendance_id").notNull(),
+  employeeId: varchar("employee_id").notNull(),
+  actorId: varchar("actor_id").notNull(),
+  actorName: text("actor_name").notNull(),
+  action: text("action").notNull(), // START_WORK | END_WORK | ATTENDANCE_EDITED | ATTENDANCE_EMAIL_SENT | ATTENDANCE_EMAIL_FAILED
+  originalValues: text("original_values"),
+  newValues: text("new_values"),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export const insertTeamSchema = createInsertSchema(teams).omit({ id: true, createdAt: true });
 export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({ id: true });
 export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true });
 export const insertAttendanceMemberRecordSchema = createInsertSchema(attendanceMemberRecords).omit({ id: true });
+export const insertEmployeeAttendanceRecordSchema = createInsertSchema(employeeAttendanceRecords).omit({ id: true, createdAt: true });
+export const insertEmployeeAttendanceAuditSchema = createInsertSchema(employeeAttendanceAudits).omit({ id: true, createdAt: true });
 
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type Team = typeof teams.$inferSelect;
@@ -1317,6 +1348,10 @@ export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type InsertAttendanceMemberRecord = z.infer<typeof insertAttendanceMemberRecordSchema>;
 export type AttendanceMemberRecord = typeof attendanceMemberRecords.$inferSelect;
+export type InsertEmployeeAttendanceRecord = z.infer<typeof insertEmployeeAttendanceRecordSchema>;
+export type EmployeeAttendanceRecord = typeof employeeAttendanceRecords.$inferSelect;
+export type InsertEmployeeAttendanceAudit = z.infer<typeof insertEmployeeAttendanceAuditSchema>;
+export type EmployeeAttendanceAudit = typeof employeeAttendanceAudits.$inferSelect;
 
 // Service Contracts — recurring jobs (Outlook-style)
 // Frequency: Daily | 2 x a week | Weekly | Twice a month | Monthly | Every 2 months | Quarterly | Every 6 months | Annually | Once-off

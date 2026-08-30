@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, History, LayoutDashboard, ListChecks, Plus, RefreshCw, Truck } from "lucide-react";
+import { Clock3, History, LayoutDashboard, ListChecks, Play, Plus, RefreshCw, Square, Truck } from "lucide-react";
 import { calculateAuthorisedTimeOffMinutes, calculateOvertimeBreakdown, formatNetTimeDifference, formatOvertimeMinutes } from "@shared/overtime";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,16 @@ type Summary = {
   pendingOvertimeMinutes: number;
   pendingTimeOffMinutes: number;
   netMinutes: number;
+};
+type Attendance = {
+  id: string;
+  workDate: string;
+  startTime: string;
+  finishTime: string | null;
+  totalMinutes: number | null;
+  lateStartMinutes: number;
+  earlyFinishMinutes: number;
+  status: "WORKING" | "FINISHED";
 };
 
 const authHeaders = () => ({
@@ -68,6 +78,8 @@ export default function MobileMyTime() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [attendance, setAttendance] = useState<Attendance | null>(null);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const worker = useMemo(() => {
@@ -81,15 +93,27 @@ export default function MobileMyTime() {
   const load = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/mobile/time", { headers: authHeaders() });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(response.status === 401
+      const [timeResponse, attendanceResponse] = await Promise.all([
+        fetch("/api/mobile/time", { headers: authHeaders() }),
+        fetch("/api/mobile/attendance/today", { headers: authHeaders() }),
+      ]);
+      const [data, attendanceData] = await Promise.all([
+        timeResponse.json().catch(() => ({})),
+        attendanceResponse.json().catch(() => ({})),
+      ]);
+      if (!timeResponse.ok) {
+        throw new Error(timeResponse.status === 401
           ? "Your mobile session has expired. Please sign in again."
           : data.error || data.message || "Unable to load your time.");
       }
+      if (!attendanceResponse.ok) {
+        throw new Error(attendanceResponse.status === 401
+          ? "Your mobile session has expired. Please sign in again."
+          : attendanceData.error || attendanceData.message || "Unable to load today's attendance.");
+      }
       setEntries(data.entries ?? []);
       setSummary(data.summary ?? {});
+      setAttendance(attendanceData.attendance ?? null);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load your time.");
@@ -98,6 +122,33 @@ export default function MobileMyTime() {
     }
   };
   useEffect(() => { load(); }, []);
+
+  const updateAttendance = async (action: "start" | "end") => {
+    setAttendanceSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/mobile/attendance/${action}`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: "{}",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(response.status === 401
+          ? "Your mobile session has expired. Please sign in again."
+          : data.error || `Unable to ${action} work.`);
+      }
+      setAttendance(data.attendance ?? null);
+      setMessage(action === "start"
+        ? `Work started at ${data.attendance?.startTime}.`
+        : `Work ended at ${data.attendance?.finishTime}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Unable to ${action} work.`);
+    } finally {
+      setAttendanceSaving(false);
+    }
+  };
 
   const overtime = useMemo(() => calculateOvertimeBreakdown(form.startTime, form.finishTime), [form.startTime, form.finishTime]);
   const timeOff = useMemo(() => calculateAuthorisedTimeOffMinutes(form.startTime, form.finishTime), [form.startTime, form.finishTime]);
@@ -167,7 +218,7 @@ export default function MobileMyTime() {
   return (
     <MobileShell
       title="My Time"
-      subtitle="Overtime and authorised Time Off"
+      subtitle="Attendance, overtime and authorised Time Off"
       workerName={worker.name}
       workerRole={worker.role}
       activeItem="my-time"
@@ -177,6 +228,51 @@ export default function MobileMyTime() {
     >
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {message && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div>}
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Attendance today</p>
+            <h2 className="mt-1 text-lg font-bold text-gray-900">
+              {!attendance ? "Not started" : attendance.status === "WORKING" ? "Working" : "Finished"}
+            </h2>
+          </div>
+          <Badge className={!attendance ? "bg-gray-100 text-gray-700" : attendance.status === "WORKING" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}>
+            {!attendance ? "NOT STARTED" : attendance.status}
+          </Badge>
+        </div>
+
+        {!attendance ? (
+          <Button
+            onClick={() => updateAttendance("start")}
+            disabled={attendanceSaving || loading}
+            className="mt-4 h-14 w-full bg-red-600 text-base font-bold hover:bg-red-700"
+          >
+            <Play className="mr-2 h-5 w-5" />
+            {attendanceSaving ? "Starting…" : "Start Work"}
+          </Button>
+        ) : attendance.status === "WORKING" ? (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+              Started at <strong>{attendance.startTime}</strong>
+            </div>
+            <Button
+              onClick={() => updateAttendance("end")}
+              disabled={attendanceSaving}
+              className="h-14 w-full bg-gray-900 text-base font-bold hover:bg-gray-800"
+            >
+              <Square className="mr-2 h-5 w-5" />
+              {attendanceSaving ? "Ending…" : "End Work"}
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Started</p><p className="mt-1 font-bold text-gray-900">{attendance.startTime}</p></div>
+            <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Finished</p><p className="mt-1 font-bold text-gray-900">{attendance.finishTime}</p></div>
+            <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Total</p><p className="mt-1 font-bold text-gray-900">{formatOvertimeMinutes(attendance.totalMinutes || 0)}</p></div>
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Button onClick={() => setMode(mode === "overtime" ? "none" : "overtime")} className="h-12 bg-red-600 text-sm font-bold hover:bg-red-700"><Plus className="mr-2 h-4 w-4" />Log overtime</Button>

@@ -43,6 +43,14 @@ export type TimeNotificationDelivery = {
   providerResponse?: TimeNotificationProviderResponse;
 };
 
+type AttendanceNotificationRecord = {
+  id: string;
+  workDate: string;
+  startAt: Date;
+  endAt?: Date | null;
+  totalMinutes?: number | null;
+};
+
 // Keep one shared recipient list so Overtime and Time Off cannot drift apart.
 export const TIME_NOTIFICATION_RECIPIENTS = [
   "julien@terminators.co.za",
@@ -160,6 +168,86 @@ export async function sendTimeAdjustmentNotification(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[EMAIL DEBUG] To: ${notificationTo}\nAll recipients -> FAILED\nProvider error: ${message}`);
+    return TIME_NOTIFICATION_RECIPIENTS.map(recipient => ({ recipient, sent: false, error: message }));
+  }
+}
+
+const formatAttendanceTime = (value: Date) =>
+  new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(value);
+
+const formatAttendanceDate = (value: string) =>
+  new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00Z`));
+
+const formatAttendanceMinutes = (minutes: number | null | undefined) => {
+  if (minutes === null || minutes === undefined) return "—";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours} hr${hours === 1 ? "" : "s"} ${remainder} min` : `${remainder} min`;
+};
+
+export async function sendAttendanceNotification(
+  record: AttendanceNotificationRecord,
+  employeeName: string,
+  phase: "start" | "finish",
+): Promise<TimeNotificationDelivery[]> {
+  const startTime = formatAttendanceTime(record.startAt);
+  const finishTime = record.endAt ? formatAttendanceTime(record.endAt) : null;
+  const currentTime = phase === "start" ? startTime : finishTime || formatAttendanceTime(new Date());
+  const finished = phase === "finish";
+  const subject = `JobFlow - Work ${finished ? "Finished" : "Started"} - ${employeeName} - ${currentTime}`;
+  const status = finished ? "Finished" : "Working";
+  const text = [
+    `WORK ${finished ? "FINISHED" : "STARTED"}`,
+    "",
+    `Employee: ${employeeName}`,
+    `Date: ${formatAttendanceDate(record.workDate)}`,
+    `Start Time: ${startTime}`,
+    ...(finished ? [`Finish Time: ${finishTime}`, `Total Attendance: ${formatAttendanceMinutes(record.totalMinutes)}`] : []),
+    `Status: ${status}`,
+    "",
+    "Sent automatically by JobFlow.",
+  ].join("\n");
+  const rows = [
+    ["Employee", employeeName],
+    ["Date", formatAttendanceDate(record.workDate)],
+    ["Start Time", startTime],
+    ...(finished ? [["Finish Time", finishTime || "—"], ["Total Attendance", formatAttendanceMinutes(record.totalMinutes)]] : []),
+    ["Status", status],
+  ];
+  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.5"><h2 style="color:#dc2626">${escapeHtml(subject)}</h2><p><strong>WORK ${finished ? "FINISHED" : "STARTED"}</strong></p><table style="border-collapse:collapse;width:100%;max-width:640px">${rows.map(([label, value]) => `<tr><td style="padding:7px 12px 7px 0;font-weight:bold;border-bottom:1px solid #e5e7eb">${escapeHtml(label)}</td><td style="padding:7px 0;border-bottom:1px solid #e5e7eb">${escapeHtml(value)}</td></tr>`).join("")}</table><p style="font-size:12px;color:#6b7280">Sent automatically by JobFlow.</p></body></html>`;
+  const notificationTo = TIME_NOTIFICATION_RECIPIENTS.join(", ");
+
+  console.info(`[EMAIL DEBUG]\nType: ATTENDANCE_${finished ? "END" : "START"}\nEntry ID: ${record.id}\nFrom: ${sender()}\nTo: ${notificationTo}`);
+  try {
+    const providerResponse = await deliverEmail({ to: notificationTo, from: sender(), subject, text, html });
+    const accepted = new Set((providerResponse.accepted || []).map(address => address.toLowerCase()));
+    const rejected = new Set((providerResponse.rejected || []).map(address => address.toLowerCase()));
+    return TIME_NOTIFICATION_RECIPIENTS.map(recipient => {
+      const normalizedRecipient = recipient.toLowerCase();
+      const wasRejected = rejected.has(normalizedRecipient);
+      const wasAccepted = accepted.size === 0 || accepted.has(normalizedRecipient);
+      const sent = !wasRejected && wasAccepted;
+      const error = sent
+        ? undefined
+        : wasRejected
+          ? `Provider rejected ${recipient}: ${providerResponse.response || "No provider reason returned"}`
+          : `Provider did not accept ${recipient}`;
+      console.info(`[EMAIL DEBUG] ${recipient} -> ${sent ? "SENT" : "FAILED"}\nProvider response: ${JSON.stringify(providerResponse)}${error ? `\nProvider error: ${error}` : ""}`);
+      return { recipient, sent, error, providerResponse };
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[EMAIL DEBUG] ATTENDANCE_${finished ? "END" : "START"} to ${notificationTo} failed: ${message}`);
     return TIME_NOTIFICATION_RECIPIENTS.map(recipient => ({ recipient, sent: false, error: message }));
   }
 }

@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { calculateOvertimeBreakdown, formatOvertimeMinutes } from "@shared/overtime";
 import { OVERTIME_WORK_TYPE_LABELS, TIME_OFF_REASON_LABELS, type Client, type Job, type Worker } from "@shared/schema";
 import { EmailNotificationDetails } from "@/components/time/email-notification-details";
+import { AttendanceManagement } from "@/components/time/attendance-management";
 
 type Entry = {
   id: string;
@@ -113,6 +114,7 @@ export default function TimeOvertime() {
     notes: "",
   });
   const [lastViewedEmployeeId, setLastViewedEmployeeId] = useState("");
+  const [attendanceMode, setAttendanceMode] = useState(false);
 
   const url = useMemo(() => {
     const params = new URLSearchParams();
@@ -259,6 +261,7 @@ export default function TimeOvertime() {
   });
 
   const currentTab =
+    attendanceMode ? "attendance" :
     type === "all" && status === "all"
       ? "all"
       : type === "OVERTIME" && status === "all"
@@ -274,6 +277,11 @@ export default function TimeOvertime() {
                 : "custom";
 
   const setTab = (tab: string) => {
+    if (tab === "attendance") {
+      setAttendanceMode(true);
+      return;
+    }
+    setAttendanceMode(false);
     const filters: Record<string, [string, string]> = {
       all: ["all", "all"],
       overtime: ["OVERTIME", "all"],
@@ -296,6 +304,27 @@ export default function TimeOvertime() {
       overtimeForm.notes.trim() &&
       (overtimeForm.workType !== "client_job" || overtimeForm.clientId),
   );
+
+  if (attendanceMode) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-6 pb-10">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-semibold text-red-700"><Clock3 className="h-5 w-5" /> Management time review</p>
+          <h1 className="mt-1 text-2xl font-bold">Time &amp; Overtime</h1>
+          <p className="mt-1 text-sm text-slate-500">Review server-timestamped employee attendance.</p>
+        </div>
+        <section className="rounded-xl border bg-white p-4 shadow-sm">
+          <Tabs value={currentTab} onValueChange={setTab}>
+            <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
+              <TabsTrigger value="all" className="flex-1">TIME RECORDS</TabsTrigger>
+              <TabsTrigger value="attendance" className="flex-1">ATTENDANCE</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </section>
+        <AttendanceManagement />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-10">
@@ -350,6 +379,7 @@ export default function TimeOvertime() {
               ["all", "ALL"],
               ["overtime", "OVERTIME"],
               ["time-off", "TIME OFF"],
+              ["attendance", "ATTENDANCE"],
               ["pending", "PENDING APPROVAL"],
               ["approved", "APPROVED"],
               ["rejected", "REJECTED"],

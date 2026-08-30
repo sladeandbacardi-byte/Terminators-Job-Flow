@@ -604,6 +604,56 @@ export async function runStartupMigrations(): Promise<void> {
     true
   );
 
+  // ── Employee day attendance ───────────────────────────────────────────────
+  // This is intentionally separate from the existing team attendance tables:
+  // the team module stores a supervisor's daily checklist, while these rows
+  // are server-timestamped employee start/end evidence.
+  await run(
+    "employee_attendance_records table",
+    `CREATE TABLE IF NOT EXISTS employee_attendance_records (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      employee_id varchar NOT NULL,
+      work_date text NOT NULL,
+      start_at timestamp NOT NULL,
+      end_at timestamp,
+      total_minutes integer,
+      late_start_minutes integer NOT NULL DEFAULT 0,
+      early_finish_minutes integer NOT NULL DEFAULT 0,
+      status text NOT NULL DEFAULT 'WORKING',
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now(),
+      corrected_by varchar,
+      correction_reason text
+    )`,
+    true
+  );
+  await run(
+    "employee_attendance_audits table",
+    `CREATE TABLE IF NOT EXISTS employee_attendance_audits (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      attendance_id varchar NOT NULL,
+      employee_id varchar NOT NULL,
+      actor_id varchar NOT NULL,
+      actor_name text NOT NULL,
+      action text NOT NULL,
+      original_values text,
+      new_values text,
+      reason text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    true
+  );
+  await run(
+    "employee attendance indexes",
+    `CREATE UNIQUE INDEX IF NOT EXISTS employee_attendance_employee_date_key
+       ON employee_attendance_records (employee_id, work_date);
+     CREATE INDEX IF NOT EXISTS employee_attendance_date_status_idx
+       ON employee_attendance_records (work_date, status);
+     CREATE INDEX IF NOT EXISTS employee_attendance_audits_record_created_idx
+       ON employee_attendance_audits (attendance_id, created_at DESC)`,
+    true
+  );
+
   // ── Additional opportunities ─────────────────────────────────────────────
   // These tables deliberately link to the existing client, worker, lead, job,
   // and invoice records instead of copying their information into a new sales
