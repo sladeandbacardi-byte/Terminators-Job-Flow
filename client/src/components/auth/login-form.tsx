@@ -142,7 +142,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const selectTechnician = (technician: Technician) => {
     resetCredentials();
     setSelectedTechnician(technician);
-    setStep("staff-credentials");
+    loginMutation.mutate({ mode: "mobile", workerId: technician.id });
   };
 
   const selectAdmin = (administrator: Administrator) => {
