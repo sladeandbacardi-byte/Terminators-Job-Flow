@@ -5,7 +5,9 @@ import type { AdminUser, Worker } from "@shared/schema";
 import {
   buildOfficeLoginDirectory,
   isEligibleOfficeWorker,
+  isPasswordlessOfficeWorker,
   passwordHashNeedsReconciliation,
+  normalizeDeploymentSecret,
   selectCanonicalSuperAdminTarget,
 } from "./office-account-policy";
 
@@ -29,6 +31,17 @@ test("password reconciliation detects a changed deployment secret without exposi
   assert.equal(await passwordHashNeedsReconciliation("replacement-secret", storedHash), true);
 });
 
+test("deployment secret normalization preserves a leading hash and removes only one matching outer quote pair", async () => {
+  const variants = [' #release-password', '  "#release-password"  ', "  '#release-password'  "];
+  for (const variant of variants) {
+    assert.equal(normalizeDeploymentSecret(variant), "#release-password");
+    const storedHash = await bcrypt.hash("#release-password", 4);
+    assert.equal(await passwordHashNeedsReconciliation(normalizeDeploymentSecret(variant), storedHash), false);
+  }
+  assert.equal(normalizeDeploymentSecret('"#release-password\''), '"#release-password\'');
+  assert.equal(normalizeDeploymentSecret('##release-password'), '##release-password');
+});
+
 test("startup reconciliation never repurposes an unrelated account that owns the configured username", () => {
   const unrelated = admin("other-id", "Another Person", "admin");
   const legacyJulien = admin("legacy-id", "Julien Botha", "admin");
@@ -40,14 +53,14 @@ test("startup reconciliation never repurposes an unrelated account that owns the
   );
 });
 
-test("office selector includes eligible roles and marks missing credentials without inventing them", () => {
+test("office selector gives canonical non-Julien workers passwordless access without inventing credentials", () => {
   const workers = [
     worker("worker-1", "Julien Botha", "Operations Manager"),
-    worker("sales-1", "Sales Person", "Sales Consultant"),
-    worker("service-1", "Service Person", "Service Manager"),
-    worker("finance-1", "Finance Person", "Finance & HR Manager"),
-    worker("supervisor-1", "Team Lead", "Washroom Supervisor"),
-    worker("pco-1", "Pest Operator", "Pest Control Operator"),
+    worker("worker-2", "Maryka Venter", "Pest Control Services Manager"),
+    worker("worker-3", "Mariette Koekemoer", "Hygiene Services Manager"),
+    worker("worker-4", "Juli Holtshausen", "Finance & HR Manager"),
+    worker("worker-5", "Sheryl-Lyn Lee", "Existing Clients Sales & Admin"),
+    worker("worker-6", "Anzel Marais", "Sales Rep"),
     worker("tech-1", "Field Tech", "Technician"),
     worker("generic-admin", "Administrator", "Admin"),
   ];
@@ -55,18 +68,48 @@ test("office selector includes eligible roles and marks missing credentials with
     workers,
     [
       admin("worker-1", "Julien Botha", "admin"),
-      admin("sales-1", "Sales Person", "sales"),
+      admin("worker-5", "Sheryl-Lyn Lee", "sales"),
       admin("legacy", "Administrator", "administrator"),
     ],
     new Map([["office", "Office"]]),
   );
   assert.deepEqual(directory.map(entry => entry.name), [
-    "Finance Person", "Julien Botha", "Pest Operator", "Sales Person", "Service Person", "Team Lead",
+    "Anzel Marais", "Juli Holtshausen", "Julien Botha", "Mariette Koekemoer", "Maryka Venter", "Sheryl-Lyn Lee",
   ]);
-  assert.equal(directory.find(entry => entry.name === "Sales Person")?.credentialStatus, "ready");
-  assert.equal(directory.find(entry => entry.name === "Finance Person")?.credentialStatus, "missing");
+  assert.equal(directory.find(entry => entry.name === "Julien Botha")?.authMethod, "password");
+  assert.equal(directory.find(entry => entry.name === "Sheryl-Lyn Lee")?.authMethod, "passwordless");
+  assert.equal(directory.find(entry => entry.name === "Juli Holtshausen")?.authMethod, "passwordless");
+  assert.equal(directory.find(entry => entry.name === "Juli Holtshausen")?.username, undefined);
   assert.equal(directory.some(entry => entry.name === "Field Tech"), false);
   assert.equal(directory.some(entry => entry.name === "Administrator"), false);
+});
+
+test("passwordless office eligibility rejects Julien, inactive, mobile, generic Administrator and field-only workers", () => {
+  assert.equal(isPasswordlessOfficeWorker(worker("worker-5", "Sales Person", "Sales Consultant")), true);
+  assert.equal(isPasswordlessOfficeWorker(worker("worker-1", "Julien Botha", "Operations Manager")), false);
+  assert.equal(isPasswordlessOfficeWorker({ ...worker("inactive", "Inactive", "Sales"), isActive: false }), false);
+  assert.equal(isPasswordlessOfficeWorker({ ...worker("mobile", "Mobile", "Sales"), mobileAccessEnabled: true }), false);
+  assert.equal(isPasswordlessOfficeWorker(worker("generic", "Someone", "Administrator")), false);
+  assert.equal(isPasswordlessOfficeWorker(worker("worker-6", "Anzel Marais", "Sales Rep")), true);
+  assert.equal(isPasswordlessOfficeWorker(worker("worker-23", "Field Tech", "Technician")), false);
+  assert.equal(isPasswordlessOfficeWorker(worker("tech", "Field Tech", "Technician")), false);
+});
+
+test("desktop office directory contains each of the six canonical admin organogram people exactly once", () => {
+  const names = [
+    "Julien Botha", "Juli Holtshausen", "Mariette Koekemoer",
+    "Maryka Venter", "Anzel Marais", "Sheryl-Lyn Lee",
+  ];
+  const workers = names.map((name, index) =>
+    worker(`worker-${index + 1}`, name, index === 0 ? "Operations Manager" : index === 9 ? "Sanitary Bin B Team Supervisor" : index === 18 ? "Pest Control Operator" : index === 22 ? "Pest Control Assistant" : "Office User"),
+  );
+  const directory = buildOfficeLoginDirectory(workers, [admin("worker-1", "Julien Botha", "admin")], new Map([
+    ["div-6", "Admin"], ["div-7", "Accounts"], ["div-5", "Sales"], ["div-1", "Pest Control"],
+  ]));
+  assert.deepEqual(directory.map(entry => entry.name).sort(), names.slice().sort());
+  assert.equal(new Set(directory.map(entry => entry.name)).size, 6);
+  assert.equal(directory.find(entry => entry.name === "Julien Botha")?.authMethod, "password");
+  assert.equal(directory.filter(entry => entry.authMethod === "passwordless").length, 5);
 });
 
 test("office role eligibility does not make generic technicians office accounts", () => {

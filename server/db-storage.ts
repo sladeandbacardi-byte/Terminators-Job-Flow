@@ -257,6 +257,7 @@ export class DbStorage implements IStorage {
       { id: "mobile-tech-07", name: "Mike", email: "mobile.mike@terminators.co.za", employeeId: "MT-007", pin: "$2b$12$NsFt8roiFgggruppux.pU.47RBM.2wcqgcwccGy1euAEv7ur3moMm" },
       { id: "mobile-tech-08", name: "X", email: "mobile.x@terminators.co.za", employeeId: "MT-008", pin: "$2b$12$/jWWeI5FnoOXHxfF4eFFU.ltklj6INnBjU15cZEH76K10DmKR/s/S" },
       { id: "mobile-tech-09", name: "Reece", email: "mobile.reece@terminators.co.za", employeeId: "MT-009", pin: "$2b$12$LsXLFAybBFD2sUNd8k1bPOGnTe8kGVkAd.i6nzigR2iEn06r4N3d2" },
+      { id: "mobile-tech-10", name: "Zuki Sandi", email: "mobile.zuki@terminators.co.za", employeeId: "MT-010", pin: null },
     ];
 
     for (const technician of technicianRows) {

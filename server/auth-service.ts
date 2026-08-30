@@ -2,10 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { adminUsers, userSessions, activityLogs } from '@shared/schema';
-import { eq, and, gt } from 'drizzle-orm';
+import { adminUsers, userSessions, officeWorkerSessions, activityLogs } from '@shared/schema';
+import { eq, and, gt, sql } from 'drizzle-orm';
 import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/schema';
 import { storage } from './storage';
+import { isPasswordlessOfficeWorker } from "./office-account-policy";
 
 const configuredSecret = process.env.JWT_SECRET?.trim() || process.env.SESSION_SECRET?.trim();
 if (!configuredSecret) {
@@ -21,12 +22,16 @@ export type AuthenticatedUser = AdminUser & {
   sourceWorkerName?: string | null;
   sourceWorkerRole?: string | null;
   sourceWorkerDepartmentId?: string | null;
-  authenticationMethod?: "profile_picker" | "password";
+  authenticationMethod?: "profile_picker" | "password" | "passwordless_office";
 };
 
 type MobileWorkerSessionClaims = {
   workerId: string;
   tokenType: "mobile_worker_v2";
+};
+type OfficeWorkerSessionClaims = {
+  workerId: string;
+  tokenType: "office_worker_v1";
 };
 
 export type MobileAuthenticatedRequest = Request & {
@@ -81,10 +86,54 @@ export class AuthService {
     return jwt.sign({ workerId, tokenType: "mobile_worker_v2" }, JWT_SECRET, { expiresIn: "12h" });
   }
 
+  static async authenticatePasswordlessOfficeWorker(
+    workerId: string,
+  ): Promise<{ user: AuthenticatedUser; token: string } | null> {
+    const worker = await storage.getWorker(workerId);
+    if (!worker || !isPasswordlessOfficeWorker(worker)) return null;
+
+    const token = jwt.sign(
+      { workerId: worker.id, tokenType: "office_worker_v1" } satisfies OfficeWorkerSessionClaims,
+      JWT_SECRET,
+      { expiresIn: "24h" },
+    );
+    await db.insert(officeWorkerSessions).values({
+      workerId: worker.id,
+      sessionToken: token,
+      expiresAt: new Date(Date.now() + SESSION_DURATION),
+    });
+    return { user: this.officeWorkerAsUser(worker), token };
+  }
+
+  private static officeWorkerAsUser(worker: Awaited<ReturnType<typeof storage.getWorker>>): AuthenticatedUser {
+    if (!worker) throw new Error("Worker required");
+    return {
+      id: worker.id,
+      username: worker.email,
+      email: worker.email,
+      passwordHash: "",
+      firstName: worker.name.split(/\s+/)[0] || worker.name,
+      lastName: worker.name.split(/\s+/).slice(1).join(" "),
+      role: worker.role || "Office User",
+      isActive: true,
+      lastLoginAt: null,
+      createdAt: worker.createdAt,
+      updatedAt: worker.createdAt,
+      sourceWorkerId: worker.id,
+      sourceWorkerName: worker.name,
+      sourceWorkerRole: worker.role,
+      sourceWorkerDepartmentId: worker.departmentId,
+      authenticationMethod: "passwordless_office",
+    };
+  }
+
   // Verify JWT token
   static verifyToken(token: string): { userId: string } | null {
     try {
-      return jwt.verify(token, JWT_SECRET) as { userId: string };
+      const claims = jwt.verify(token, JWT_SECRET) as Partial<{ userId: string }>;
+      return typeof claims.userId === "string" && claims.userId.length > 0
+        ? { userId: claims.userId }
+        : null;
     } catch {
       return null;
     }
@@ -172,7 +221,15 @@ export class AuthService {
     try {
       const decoded = this.verifyToken(token);
       if (!decoded) {
-        return null;
+        const officeClaims = this.verifyOfficeWorkerToken(token);
+        if (!officeClaims) return null;
+        const [session] = await db.select().from(officeWorkerSessions).where(and(
+          eq(officeWorkerSessions.sessionToken, token),
+          gt(officeWorkerSessions.expiresAt, new Date()),
+        ));
+        if (!session || session.workerId !== officeClaims.workerId) return null;
+        const worker = await storage.getWorker(session.workerId);
+        return worker && isPasswordlessOfficeWorker(worker) ? this.officeWorkerAsUser(worker) : null;
       }
 
       // Check if session exists and is not expired
@@ -195,12 +252,26 @@ export class AuthService {
     }
   }
 
+  private static verifyOfficeWorkerToken(token: string): OfficeWorkerSessionClaims | null {
+    try {
+      const claims = jwt.verify(token, JWT_SECRET) as Partial<OfficeWorkerSessionClaims>;
+      return claims.tokenType === "office_worker_v1" && typeof claims.workerId === "string"
+        ? claims as OfficeWorkerSessionClaims
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Logout user (invalidate session)
   static async logoutUser(token: string): Promise<boolean> {
     try {
       await db
         .delete(userSessions)
         .where(eq(userSessions.sessionToken, token));
+      await db
+        .delete(officeWorkerSessions)
+        .where(eq(officeWorkerSessions.sessionToken, token));
       return true;
     } catch (error) {
       console.error('Logout error:', error);
@@ -222,7 +293,8 @@ export class AuthService {
     try {
       await db
         .delete(userSessions)
-        .where(gt(userSessions.expiresAt, new Date()));
+        .where(sql`expires_at <= ${new Date()}`);
+      await db.delete(officeWorkerSessions).where(sql`expires_at <= ${new Date()}`);
     } catch (error) {
       console.error('Session cleanup error:', error);
     }

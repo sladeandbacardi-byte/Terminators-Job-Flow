@@ -796,6 +796,17 @@ export const userSessions = pgTable("user_sessions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Passwordless office sessions are deliberately separate from administrator
+// credential sessions and mobile-worker JWTs. The active worker row remains
+// the authoritative identity for the lifetime of every request.
+export const officeWorkerSessions = pgTable("office_worker_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workerId: varchar("worker_id").notNull().references(() => workers.id),
+  sessionToken: varchar("session_token").unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas for new tables
 export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
   id: true,

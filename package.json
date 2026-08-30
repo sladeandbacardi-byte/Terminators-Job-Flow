@@ -12,7 +12,7 @@
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
-    "test": "tsx --test client/src/lib/data-export.test.ts server/csv-utils.test.ts server/request-limits.test.ts server/office-api-policy.test.ts server/office-account-policy.test.ts shared/accessPolicy.test.ts shared/organogram.test.ts",
+    "test": "tsx --test client/src/lib/data-export.test.ts client/src/components/auth/login-form.test.ts server/csv-utils.test.ts server/request-limits.test.ts server/office-api-policy.test.ts server/office-account-policy.test.ts server/office-auth-http.test.ts shared/accessPolicy.test.ts shared/organogram.test.ts shared/officeOrganogram.test.ts",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:reset": "tsx server/reset-db.ts",

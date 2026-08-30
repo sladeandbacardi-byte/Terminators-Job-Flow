@@ -64,12 +64,14 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { hasUnrestrictedAccess } from "@shared/accessPolicy";
-import { getOfficeApiAllowedRoles } from "@shared/officeApiPolicy";
 import { buildOfficeLoginDirectory } from "./office-account-policy";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
+import { MOBILE_STAFF_ROSTER } from "@shared/organogram";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import { createMemoryRateLimiter } from "./request-limits";
+import { createPasswordlessOfficeLoginHandler, createPasswordLoginHandler } from "./office-auth-http";
+import { enforceOfficeApiAccess } from "./office-access-middleware";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -115,6 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const publicApiRoutes = new Set([
     "POST /api/auth/admin-login",
+    "POST /api/auth/office-login",
     "POST /api/auth/mobile-login",
     "GET /api/auth/staff",
     "POST /api/public/quote-request",
@@ -125,6 +128,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const quoteRequestRateLimiter = createMemoryRateLimiter({
     windowMs: 60 * 60 * 1000,
     maxRequests: 5,
+  });
+  const officeLoginRateLimiter = createMemoryRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 10,
+  });
+  const officeLoginIpRateLimiter = createMemoryRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 30,
   });
   const inventoryImportUserRateLimiter = createMemoryRateLimiter({
     windowMs: 15 * 60 * 1000,
@@ -414,27 +425,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         return res.status(403).json({ error: "Profile sign-in can only access personal staff functions" });
       }
-      const allowedRoles = getOfficeApiAllowedRoles(req.method, pathname);
-      if (!allowedRoles.includes(getDashboardRole(authenticated.user ?? {}))) {
-        return res.status(403).json({ error: "Your role does not have access to this module" });
-      }
-      next();
+      return enforceOfficeApiAccess(authenticated, res, next);
     });
   });
 
   // These values only keep the login chooser useful while a development
   // database is being created. They cannot authenticate without a matching
   // database worker and PIN.
-  const FALLBACK_MOBILE_STAFF = [
-    { id: "mobile-tech-01", name: "Re-Althon", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-02", name: "Leon Coltman", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-03", name: "Garth du Preez", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-04", name: "Jackie Roelfse", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-06", name: "Zain Abdol", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-07", name: "Michael Meyer", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-08", name: "Xolani Ndzotoyi", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-09", name: "Reece Ebrahim", role: "Technician", department: "Field Service" },
-  ];
+  const FALLBACK_MOBILE_STAFF = MOBILE_STAFF_ROSTER.map(worker => ({
+    id: worker.id, name: worker.name, role: "Technician", department: worker.team,
+  }));
   const FALLBACK_ADMINS = [
     {
       id: SOLE_SUPERADMIN.workerId,
@@ -890,25 +890,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Authentication routes
-  app.post("/api/auth/admin-login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      if (typeof username !== "string" || typeof password !== "string" || !username.trim() || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
-      }
+  app.post("/api/auth/admin-login", createPasswordLoginHandler({
+    authenticate: (username, password) => AuthService.authenticateUser(username, password),
+  }));
 
-      const result = await AuthService.authenticateUser(username.trim(), password);
-      if (!result) {
-        return res.status(401).json({ message: "Invalid username or password" });
-      }
-
-      const { passwordHash: _passwordHash, ...safeUser } = result.user;
-      res.json({ token: result.token, user: safeUser });
-    } catch (error) {
-      console.error("Administrator login error:", error);
-      res.status(500).json({ message: "Unable to sign in" });
-    }
-  });
+  app.post("/api/auth/office-login", createPasswordlessOfficeLoginHandler({
+    authenticate: workerId => AuthService.authenticatePasswordlessOfficeWorker(workerId),
+    rateLimit: (clientKey, workerId) => {
+      const ipDecision = officeLoginIpRateLimiter(clientKey);
+      return ipDecision.allowed ? officeLoginRateLimiter(`${clientKey}:${workerId}`) : ipDecision;
+    },
+    clientKey: requestClientKey,
+    logLogin: (user, req) => AuthService.logActivity({
+        userId: user.id,
+        action: "office_passwordless_login",
+        resource: "workers",
+        resourceId: user.sourceWorkerId,
+        details: JSON.stringify({ authenticationMethod: "passwordless_office" }),
+        ipAddress: req.ip || req.connection.remoteAddress || null,
+        userAgent: req.headers["user-agent"] || null,
+    }),
+  }));
 
   // Mobile authentication routes
   app.post("/api/auth/mobile-login", async (req, res) => {
@@ -921,6 +923,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { workerId } = parsed.data;
+      if (!MOBILE_STAFF_ROSTER.some(entry => entry.id === workerId)) {
+        return res.status(401).json({ message: "Invalid worker" });
+      }
       const worker = await storage.getWorker(workerId);
       if (!worker) {
         return res.status(401).json({ message: "Invalid worker" });
@@ -1854,18 +1859,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         db.select().from(adminUsers).where(eq(adminUsers.isActive, true)),
       ]);
       const departmentNames = new Map(departments.map(department => [department.id, department.name]));
-      const canonicalMobileNames = new Map(FALLBACK_MOBILE_STAFF.map(worker => [worker.id, worker.name]));
+      const canonicalMobileIds = new Set(MOBILE_STAFF_ROSTER.map(worker => worker.id));
       const staff = allWorkers
         .filter(worker =>
+          canonicalMobileIds.has(worker.id as typeof MOBILE_STAFF_ROSTER[number]["id"]) &&
           worker.isActive &&
           worker.mobileAccessEnabled === true &&
            String(worker.role ?? "").trim().toLowerCase() === "technician",
         )
         .map(worker => ({
+          ...MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id),
           id: worker.id,
-          name: canonicalMobileNames.get(worker.id) || worker.name,
+          name: MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id)?.name || worker.name,
           role: "Technician",
-          department: departmentNames.get(worker.departmentId) || "Field Service",
+          department: MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id)?.team || departmentNames.get(worker.departmentId) || "Field Service",
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
       const admins = buildOfficeLoginDirectory(allWorkers, activeAdmins, departmentNames);

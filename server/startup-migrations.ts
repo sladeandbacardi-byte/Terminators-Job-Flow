@@ -25,6 +25,20 @@ export async function runStartupMigrations(): Promise<void> {
     }
   };
 
+  await run(
+    "office_worker_sessions",
+    `CREATE TABLE IF NOT EXISTS office_worker_sessions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      worker_id varchar NOT NULL REFERENCES workers(id),
+      session_token varchar UNIQUE NOT NULL,
+      expires_at timestamp NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS office_worker_sessions_worker_id_idx ON office_worker_sessions(worker_id);
+    CREATE INDEX IF NOT EXISTS office_worker_sessions_expires_at_idx ON office_worker_sessions(expires_at);`,
+    true,
+  );
+
   // ── quote_submissions columns ──────────────────────────────────────────────
   await run(
     "quote_submissions.site_visit_done",

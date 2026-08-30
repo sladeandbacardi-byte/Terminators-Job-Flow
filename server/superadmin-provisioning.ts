@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "./db";
-import { activityLogs, adminUsers, workers } from "@shared/schema";
+import { activityLogs, adminUsers, userSessions, workers } from "@shared/schema";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import {
   passwordHashNeedsReconciliation,
+  normalizeDeploymentSecret,
   selectCanonicalSuperAdminTarget,
 } from "./office-account-policy";
 
@@ -44,7 +45,9 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
 
     const configuredUsername = process.env.ADMIN_USERNAME?.trim() || SOLE_SUPERADMIN.username;
     const configuredEmail = process.env.ADMIN_EMAIL?.trim() || worker.email?.trim() || "worker-1@jobflow.local";
-    const configuredPassword = process.env.ADMIN_PASSWORD;
+    const configuredPassword = process.env.ADMIN_PASSWORD
+      ? normalizeDeploymentSecret(process.env.ADMIN_PASSWORD) || undefined
+      : undefined;
     const existingAdmins = await tx.select().from(adminUsers);
     const target = selectCanonicalSuperAdminTarget(existingAdmins, configuredUsername);
 
@@ -120,6 +123,7 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
       .where(eq(adminUsers.id, target.id));
 
     if (passwordChanged) {
+      await tx.delete(userSessions).where(eq(userSessions.userId, target.id));
       await tx.insert(activityLogs).values({
         userId: target.id,
         action: "credential_reconciled",

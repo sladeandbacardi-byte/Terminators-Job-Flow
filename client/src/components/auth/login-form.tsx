@@ -11,6 +11,8 @@ import {
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
+import { getOfficeOrganogramBranch, OFFICE_ORGANOGRAM_BRANCHES } from "@shared/officeOrganogram";
+import { MOBILE_STAFF_TEAMS } from "@shared/organogram";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
 
@@ -27,8 +29,7 @@ interface Administrator {
   username?: string;
   role: string;
   department: string;
-  authMethod: "password";
-  credentialStatus?: "ready" | "missing";
+  authMethod: "password" | "passwordless";
 }
 
 interface LoginDirectory {
@@ -52,7 +53,6 @@ const FALLBACK_DIRECTORY: LoginDirectory = {
       role: SOLE_SUPERADMIN.roleLabel,
       department: SOLE_SUPERADMIN.department,
       authMethod: "password",
-      credentialStatus: "missing",
     },
   ],
 };
@@ -99,11 +99,14 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     mutationFn: async (
       credentials:
         | { mode: "mobile"; workerId: string }
-        | { mode: "admin"; username: string; password: string },
+        | { mode: "admin"; username: string; password: string }
+        | { mode: "office"; workerId: string },
     ) => {
       const response = await fetch(
         credentials.mode === "mobile"
           ? "/api/auth/mobile-login"
+          : credentials.mode === "office"
+            ? "/api/auth/office-login"
           : credentials.mode === "admin"
             ? "/api/auth/admin-login"
             : "/api/auth/admin-login",
@@ -113,6 +116,8 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           body: JSON.stringify(
             credentials.mode === "mobile"
               ? { workerId: credentials.workerId }
+              : credentials.mode === "office"
+                ? { workerId: credentials.workerId }
               : { username: credentials.username, password: credentials.password },
           ),
         },
@@ -156,9 +161,13 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   };
 
   const selectAdmin = (administrator: Administrator) => {
-    if (administrator.credentialStatus === "missing" || !administrator.username) return;
     resetCredentials();
     setSelectedAdmin(administrator);
+    if (administrator.authMethod === "passwordless") {
+      loginMutation.mutate({ mode: "office", workerId: administrator.id });
+      return;
+    }
+    if (!administrator.username) return;
     setStep("admin-credentials");
   };
 
@@ -202,15 +211,13 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     onClick: () => void,
     type: "staff" | "admin",
   ) => {
-    const credentialsMissing =
-      type === "admin" &&
-      ((user as Administrator).credentialStatus === "missing" || !(user as Administrator).username);
     return (
     <button
       key={user.id}
       type="button"
       onClick={onClick}
-      disabled={loginMutation.isPending || credentialsMissing}
+      disabled={loginMutation.isPending}
+      aria-label={`${user.name}, ${user.role}, ${user.department}`}
       className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <div className="flex items-start gap-3">
@@ -218,26 +225,71 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           {type === "staff" ? <UserRound className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
         </div>
         <div className="min-w-0">
-          <p className="truncate font-semibold text-gray-900">{user.name}</p>
-          <p className="mt-0.5 text-sm text-gray-600">{user.role}</p>
+          <p className="break-words font-semibold text-gray-900">{user.name}</p>
+          <p className="mt-0.5 break-words text-sm text-gray-600">{user.role}</p>
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-gray-400">{user.department}</p>
-          {credentialsMissing && (
-            <p className="mt-2 text-xs font-semibold text-amber-700">Credentials required</p>
-          )}
         </div>
       </div>
     </button>
     );
   };
 
+  const officeOrganogram = () => {
+    const julien = directory.admins.find(person => person.id === SOLE_SUPERADMIN.workerId);
+    const branches = OFFICE_ORGANOGRAM_BRANCHES.map(branch => ({
+      branch,
+      people: directory.admins
+        .filter(person => person.id !== SOLE_SUPERADMIN.workerId && getOfficeOrganogramBranch(person) === branch)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    })).filter(group => group.people.length > 0);
+    const branchClasses = {
+      "Administration Team": "border-sky-200 bg-sky-50/70 text-sky-950",
+      "Finance / HR": "border-amber-200 bg-amber-50/70 text-amber-950",
+      "Marketing & Sales": "border-emerald-200 bg-emerald-50/70 text-emerald-950",
+    } as const;
+
+    return (
+      <div className="office-organogram space-y-5" data-testid="office-organogram">
+        {julien && (
+          <div className="mx-auto max-w-xs rounded-2xl border-2 border-red-200 bg-red-50/70 p-2">
+            <div className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.18em] text-red-600">Operations</div>
+            {userCard(julien, () => selectAdmin(julien), "admin")}
+          </div>
+        )}
+        <div className="mx-auto hidden h-7 w-px bg-indigo-300 md:block" aria-hidden="true" />
+        <div className="relative grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="absolute -top-4 left-[16.67%] right-[16.67%] hidden border-t border-indigo-300 xl:block" aria-hidden="true" />
+          {branches.map(({ branch, people }) => (
+            <section key={branch} className={`relative rounded-2xl border p-3 ${branchClasses[branch]}`} aria-labelledby={`office-branch-${branch}`}>
+              <div className="absolute -top-4 left-1/2 hidden h-4 border-l border-indigo-300 xl:block" aria-hidden="true" />
+              <h2 id={`office-branch-${branch}`} className="mb-3 text-center text-sm font-bold text-indigo-950">{branch}</h2>
+              <div className="space-y-2">
+                {people.map(person => userCard(person, () => selectAdmin(person), "admin"))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const mobileStaffGroups = MOBILE_STAFF_TEAMS.map(team => ({
+    team,
+    people: directory.staff.filter(person => person.department === team),
+  })).filter(group => group.people.length > 0);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 px-4 py-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center space-y-6">
+      <div className={`mx-auto flex min-h-[calc(100vh-4rem)] w-full flex-col justify-center space-y-6 ${
+        step === "admin-list" ? "max-w-md md:max-w-4xl xl:max-w-6xl" : "max-w-md"
+      }`}>
         <div className="flex justify-center">
           <JobFlowBrandLockup size="lg" className="max-w-full" data-testid="login-brand-lockup" />
         </div>
 
-        <main className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg sm:p-6">
+        <main className={`rounded-2xl border border-gray-200 bg-white p-5 shadow-lg sm:p-6 ${
+          step === "admin-list" ? "md:p-7 xl:p-8" : ""
+        }`}>
           {step === "choose-type" && (
             <div className="space-y-4">
               <div className="text-center">
@@ -256,9 +308,9 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">{step === "staff-list" ? "Staff Login" : "Admin Login"}</h1>
+                  <h1 className="text-xl font-bold text-gray-900">{step === "staff-list" ? "Staff Login" : "Admin / Office Login"}</h1>
                   <p className="mt-1 text-sm text-gray-600">
-                     {step === "staff-list" ? "Select your profile to open the technician dashboard." : "Select a protected administrator account."}
+                     {step === "staff-list" ? "Select your profile to open the technician dashboard." : "Select your name to open the office workspace."}
                   </p>
                 </div>
               </div>
@@ -275,10 +327,21 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                       Opening {selectedTechnician?.name ?? selectedAdmin?.name ?? "your"} dashboard…
                     </div>
                   )}
-                  <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
+                  <div className={`space-y-3 pr-1 ${
+                    step === "admin-list"
+                      ? "max-h-[64vh] overflow-y-auto md:max-h-none md:overflow-visible"
+                      : "max-h-[52vh] overflow-y-auto"
+                  }`}>
                     {step === "staff-list"
-                      ? directory.staff.map(technician => userCard(technician, () => selectTechnician(technician), "staff"))
-                      : directory.admins.map(administrator => userCard(administrator, () => selectAdmin(administrator), "admin"))}
+                      ? mobileStaffGroups.map(group => (
+                        <section key={group.team} aria-labelledby={`staff-team-${group.team}`} className="space-y-2">
+                          <h2 id={`staff-team-${group.team}`} className="border-b border-red-100 pb-1 text-xs font-bold uppercase tracking-wide text-red-700">
+                            {group.team}
+                          </h2>
+                          {group.people.map(technician => userCard(technician, () => selectTechnician(technician), "staff"))}
+                        </section>
+                      ))
+                      : officeOrganogram()}
                   </div>
                 </div>
               )}
