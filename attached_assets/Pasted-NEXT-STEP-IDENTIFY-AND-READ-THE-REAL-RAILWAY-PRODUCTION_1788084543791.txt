@@ -1,0 +1,307 @@
+NEXT STEP: IDENTIFY AND READ THE REAL RAILWAY PRODUCTION DATABASE SAFELY
+
+Current confirmed state:
+
+- Development PostgreSQL:
+  Host/service: helium
+  Database: heliumdb
+  Fleet tables empty
+  One orphan vehicle assignment exists
+
+- Neon:
+  Database: neondb
+  Not the FleetGuard source
+  Connected organization has zero projects
+
+- Railway repository config expects:
+  DATABASE_URL=${{Postgres.DATABASE_URL}}
+
+- pnpm run build passes
+
+- No production changes have been made
+
+The application remains NOT READY FOR USE.
+
+The next task is ONLY to identify and inspect the actual Railway production PostgreSQL database.
+
+DO NOT MIGRATE, UPDATE, DELETE, INSERT OR ALTER ANY PRODUCTION DATA YET.
+
+==================================================
+1. INSPECT RAILWAY PROJECT SERVICES
+==================================================
+
+Using the existing Railway project/configuration, identify:
+
+- Railway project name / identifier
+- JobFlow app service
+- PostgreSQL service
+- any additional database services
+- environment being used by production
+
+Do not print passwords or secret DATABASE_URL values.
+
+Report only safe identifiers such as:
+
+Service name
+Database type
+Database name
+Host/service name
+Environment
+Whether linked to JobFlow
+
+==================================================
+2. VERIFY THE POSTGRES REFERENCE
+==================================================
+
+The repository configuration expects:
+
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+
+Verify which Railway service named:
+
+Postgres
+
+this actually refers to.
+
+Confirm whether that Postgres service:
+
+- exists
+- is active
+- is linked to the JobFlow production app
+- contains the real production JobFlow database
+
+Do not assume the reference is correct merely because it exists in config.
+
+==================================================
+3. CONNECT READ-ONLY
+==================================================
+
+If Railway production Postgres is reachable, perform READ-ONLY inspection only.
+
+Do NOT run migrations.
+
+Do NOT run schema changes.
+
+Do NOT insert test records.
+
+Do NOT repair the orphan yet.
+
+Use safe SELECT queries only.
+
+==================================================
+4. IDENTIFY PRODUCTION DATABASE
+==================================================
+
+Report:
+
+Database provider:
+PostgreSQL
+
+Database name:
+[safe value]
+
+Host/service identifier:
+[safe value]
+
+Schema(s):
+[list]
+
+Relevant JobFlow tables:
+[list]
+
+Relevant Fleet/FleetGuard tables:
+[list]
+
+Do not expose credentials.
+
+==================================================
+5. READ PRODUCTION RECORD COUNTS
+==================================================
+
+Count real production records for:
+
+Employees / users
+Clients
+Jobs
+Vehicles
+Vehicle assignments
+Fuel entries
+Inspections
+Faults
+Service records
+Odometer history
+Attendance
+Overtime
+Authorised Time Off
+
+Report counts only.
+
+Example:
+
+Users: 28
+Clients: 315
+Jobs: 1,482
+Vehicles: 10
+Fuel entries: 226
+Inspections: 412
+Faults: 31
+Service records: 46
+Odometer records: 598
+
+==================================================
+6. DETERMINE WHETHER FLEETGUARD DATA IS THERE
+==================================================
+
+Based on the real production counts, state clearly one of:
+
+A. FleetGuard data IS in the Railway production database
+
+B. FleetGuard data is NOT in the Railway production database
+
+C. FleetGuard data exists only partially
+
+Do not guess.
+
+==================================================
+7. SAMPLE DATA CHECK
+==================================================
+
+If Fleet records exist, retrieve a small READ-ONLY sample sufficient to confirm identity.
+
+For example:
+
+Vehicle registration
+Make/model
+Assigned employee/driver
+Latest odometer date
+Latest fuel date
+Latest inspection date
+
+Do not dump sensitive or unnecessary data.
+
+The purpose is only to confirm this is the real Terminators FleetGuard dataset.
+
+==================================================
+8. CHECK KNOWN VEHICLES
+==================================================
+
+Verify whether production contains expected Fleet vehicles / registrations already used by Terminators.
+
+Do not create them if missing.
+
+Simply report which expected records exist and which do not.
+
+==================================================
+9. CHECK THE ORPHAN ASSIGNMENT
+==================================================
+
+Do not modify it yet.
+
+Identify:
+
+- vehicle ID
+- vehicle registration
+- assignment ID
+- referenced employee/driver ID
+- whether that user exists
+- why the relationship is orphaned
+
+Report the exact cause.
+
+==================================================
+10. CHECK JOBFLOW PRODUCTION DATA TOO
+==================================================
+
+Confirm this Railway database actually contains live JobFlow business records.
+
+Check non-fleet record counts such as:
+
+Clients
+Jobs
+Invoices
+Purchase Orders
+Contracts
+Users
+
+This is important to make sure we have not connected to an unused/test Postgres instance.
+
+==================================================
+11. NO AUTOMATIC MIGRATIONS
+==================================================
+
+Do NOT run:
+
+drizzle migrations
+schema push
+seed scripts
+repair scripts
+foreign-key alterations
+
+against production during this inspection.
+
+READ ONLY.
+
+==================================================
+12. IF RAILWAY CANNOT BE REACHED
+==================================================
+
+If you cannot access the production Railway database from the current environment, stop.
+
+Do NOT fall back to helium.
+
+Do NOT use Neon.
+
+Do NOT invent a source.
+
+Instead report exactly what is required to access the Railway database, for example:
+
+- missing Railway CLI authentication
+- missing project link
+- missing production variable access
+- missing public database connection
+- internal networking limitation
+
+Tell me the minimum safe action needed to make read-only inspection possible.
+
+==================================================
+13. FINAL REPORT
+==================================================
+
+Return:
+
+A. RAILWAY PROJECT
+Project/service identifiers
+
+B. PRODUCTION DATABASE
+Database/service identity
+
+C. JOBFLOW COUNTS
+Users
+Clients
+Jobs
+Invoices
+POs
+Contracts
+
+D. FLEET COUNTS
+Vehicles
+Assignments
+Fuel
+Inspections
+Faults
+Services
+Odometer records
+
+E. FLEETGUARD SOURCE
+FOUND / NOT FOUND / PARTIAL
+
+F. ORPHAN
+Exact orphan details
+
+G. SAFETY
+Confirm no production data was changed
+
+H. NEXT STEP
+Recommend the next single safe step only
+
+Do not attempt migration or fixes until this report is complete.
