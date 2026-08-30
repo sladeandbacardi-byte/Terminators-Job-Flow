@@ -1,0 +1,714 @@
+CONTINUE FLEETGUARD INTEGRATION: CLEAR ALL NOT-READY BLOCKERS
+
+You concluded:
+
+FINAL VERDICT: NOT READY FOR USE
+
+Do not stop at the report.
+
+Now resolve the outstanding blockers systematically and bring the system to READY FOR USE.
+
+Work through the following items IN THIS ORDER.
+
+Do not make unrelated feature changes.
+
+==================================================
+PHASE 1 - IDENTIFY THE REAL DATABASES
+==================================================
+
+First determine exactly where the current production data lives.
+
+Identify:
+
+1. JobFlow production database
+2. FleetGuard production database
+3. Railway database connection
+4. Replit development database connection
+
+For each environment report:
+
+- database provider
+- database name
+- host/service identifier
+- schema
+- relevant tables
+- approximate record counts
+
+Do NOT print passwords, tokens or DATABASE_URL secrets.
+
+I need to know whether:
+
+A. FleetGuard and JobFlow already use the same PostgreSQL database
+
+OR
+
+B. FleetGuard currently uses a separate database.
+
+Do not guess.
+
+Inspect the actual configured environment and application code.
+
+==================================================
+PHASE 2 - INVENTORY EXISTING FLEET DATA
+==================================================
+
+Locate the REAL existing FleetGuard production data.
+
+Count and report:
+
+Vehicles
+Drivers / assignments
+Fuel entries
+Inspections
+Faults
+Service records
+Odometer records
+Fuel slip/photo references
+
+Example:
+
+FleetGuard source database:
+
+Vehicles: 10
+Assignments: 10
+Fuel records: 148
+Inspections: 224
+Faults: 19
+Service records: 31
+Odometer records: 312
+
+Do not migrate anything yet.
+
+First prove where the existing data is.
+
+==================================================
+PHASE 3 - RECONCILE VEHICLES AND STAFF
+==================================================
+
+Use JobFlow as the master user/staff database.
+
+Fleet vehicles must link to existing JobFlow employees.
+
+Do NOT create duplicate staff accounts.
+
+For each existing FleetGuard driver assignment, try to match:
+
+FleetGuard Driver
+→ JobFlow Employee
+
+Match using:
+
+- exact employee name
+- existing identifiers where available
+
+Produce a reconciliation table.
+
+Example:
+
+FleetGuard        JobFlow       Result
+Garth             Garth         MATCHED
+Leon              Leon          MATCHED
+Re-Althon         Re-Althon     MATCHED
+Unknown record    —             ORPHAN
+
+Resolve the currently identified orphan assignment.
+
+Do not silently delete an orphan.
+
+If the correct employee can be identified safely, link it.
+
+If it cannot, report exactly:
+
+- vehicle
+- old driver value
+- old ID
+- reason it cannot be matched
+
+==================================================
+PHASE 4 - FOREIGN KEY STRATEGY
+==================================================
+
+Establish the correct relational structure.
+
+The preferred structure is:
+
+JobFlow Employee
+    ↓
+Vehicle Assignment
+    ↓
+Vehicle
+    ↓
+Fuel
+    ↓
+Inspections
+    ↓
+Faults
+    ↓
+Service History
+    ↓
+Odometer History
+
+Use stable IDs.
+
+Do not rely on employee names as relational keys.
+
+Foreign keys should use existing JobFlow employee/user IDs and Fleet vehicle IDs.
+
+Before changing constraints:
+
+- inspect existing data
+- resolve orphan records
+- confirm migrations are safe
+
+Do not add a foreign key that will break existing production records.
+
+==================================================
+PHASE 5 - MIGRATE / CONNECT REAL FLEET DATA
+==================================================
+
+Once the database and relationships are understood:
+
+Make the JobFlow Fleet module use the REAL FleetGuard data.
+
+Preferred outcome:
+
+ONE production PostgreSQL database containing JobFlow and Fleet data.
+
+If FleetGuard currently has a separate database:
+
+create a safe migration that preserves all records.
+
+Do NOT:
+
+- destroy the old FleetGuard database
+- overwrite production data
+- duplicate vehicle records blindly
+
+Use upsert/reconciliation logic where required.
+
+Before migration:
+
+take/report a record count.
+
+After migration:
+
+take/report the record count again.
+
+The counts should reconcile.
+
+==================================================
+PHASE 6 - VERIFY VEHICLE DATA IN JOBFLOW
+==================================================
+
+Once the data is connected, open:
+
+Operations > Fleet > Vehicles
+
+Confirm the real Terminators fleet appears.
+
+Each vehicle must show its existing:
+
+- registration
+- make/model
+- driver
+- current odometer
+- fuel history
+- inspections
+- faults
+- service history
+
+Do not proceed with empty/demo vehicle pages.
+
+==================================================
+PHASE 7 - TEST ADMIN FLEET WORKFLOWS
+==================================================
+
+Using the populated Fleet data test:
+
+Fleet Dashboard
+
+Vehicles
+
+Fuel
+
+Inspections
+
+Faults
+
+Service History
+
+Reports
+
+For each feature test:
+
+READ
+CREATE
+EDIT
+SAVE
+RELOAD
+
+where the user's permissions allow it.
+
+Check browser console and backend logs.
+
+Fix any:
+
+404
+500
+React error
+database error
+foreign key error
+undefined field
+broken route
+
+==================================================
+PHASE 8 - FUEL END-TO-END TEST
+==================================================
+
+Test a complete Fuel entry.
+
+Confirm:
+
+Vehicle selection
+Driver
+Odometer
+Litres
+Cost
+Fuel slip image
+Date
+Time
+Save
+History
+L/100km
+
+Confirm the record remains after page reload.
+
+Confirm it is linked to the correct vehicle.
+
+==================================================
+PHASE 9 - INSPECTION END-TO-END TEST
+==================================================
+
+Test:
+
+PASS inspection
+
+Then test:
+
+FAIL inspection
+
+For FAIL confirm:
+
+- inspection saves
+- fault is created
+- vehicle is linked
+- employee is linked
+- management email is triggered
+- fault appears in Fleet > Faults
+
+==================================================
+PHASE 10 - FAULT END-TO-END TEST
+==================================================
+
+Test:
+
+Create Fault
+
+Open
+→ In Progress
+→ Resolved
+
+Confirm:
+
+vehicle
+employee
+description
+dates
+status
+resolution
+cost
+
+all persist correctly.
+
+==================================================
+PHASE 11 - SERVICE HISTORY TEST
+==================================================
+
+Test service history with:
+
+vehicle
+date
+odometer
+service provider
+work done
+cost
+next service km/date
+
+Confirm save and reload.
+
+==================================================
+PHASE 12 - REPORTS TEST
+==================================================
+
+Test with the now populated data:
+
+Vehicle KM
+Driver KM
+Fuel
+Fuel economy
+Faults
+Inspections
+Services
+
+Verify filters.
+
+Verify totals.
+
+Verify export if currently implemented.
+
+==================================================
+PHASE 13 - ATTENDANCE + VEHICLE TEST
+==================================================
+
+Now test the mobile workflow.
+
+START WORK
+
+Mobile user presses Start Work.
+
+Required:
+
+- assigned vehicle loads
+- Start KM entered
+- attendance start saves
+- server time saves
+- vehicle ID saves
+- odometer record updates
+
+Then END WORK.
+
+Required:
+
+- same vehicle loads
+- Start KM shown
+- End KM entered
+- daily km calculated
+- attendance end saves
+- odometer history updates
+
+Example:
+
+Start KM:
+183420
+
+End KM:
+183487
+
+Expected:
+
+67 km
+
+There must be no duplicate km capture required in Fleet.
+
+==================================================
+PHASE 14 - ATTENDANCE EMAIL TEST
+==================================================
+
+Actually test BOTH email phases.
+
+START WORK email must go to:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+END WORK email must go to:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+Do not simply confirm that recipient configuration exists.
+
+Confirm the actual mail send function is invoked for both recipients.
+
+Log send success/failure per recipient.
+
+==================================================
+PHASE 15 - OVERTIME / TIME OFF REGRESSION
+==================================================
+
+Test existing functionality again.
+
+OVERTIME:
+
+16:00 - 17:00
+Expected:
+1 hr
+
+TIME OFF:
+
+12:00 - 16:00
+Expected:
+4 hrs
+
+Confirm both still send email to:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+Confirm Time Balance report still works.
+
+==================================================
+PHASE 16 - EMAIL BRANDING
+==================================================
+
+Add BOTH existing approved logos to JobFlow email templates:
+
+TERMINATORS LOGO
+JOBFLOW LOGO
+
+Use the real existing logo assets.
+
+Do NOT recreate or generate either logo.
+
+Apply to:
+
+Attendance Start
+Attendance End
+Overtime
+Time Off
+Fleet notifications
+Inspection/fault notifications where appropriate
+
+Use email-safe image delivery such as:
+
+CID embedded images
+
+or
+
+valid public HTTPS assets.
+
+Test in Outlook.
+
+No broken-image icons.
+
+==================================================
+PHASE 17 - INTERNAL FLEET ACCESS
+==================================================
+
+Verify again:
+
+Logged-in JobFlow mobile user
+→ Fleet
+
+must NOT see another login.
+
+Logged-in JobFlow admin
+→ Operations > Fleet
+
+must NOT see another login.
+
+Fleet must operate as a JobFlow module.
+
+==================================================
+PHASE 18 - PRODUCTION BUILD
+==================================================
+
+Run:
+
+pnpm run build
+
+It must PASS.
+
+If any error occurs:
+
+fix the FIRST actual source error
+run again
+
+Continue until clean.
+
+==================================================
+PHASE 19 - RAILWAY DATABASE VERIFICATION
+==================================================
+
+Before deploying, confirm Railway is configured to use the intended production database.
+
+Do not assume the Railway DATABASE_URL is correct.
+
+Verify using:
+
+- database host identity
+- schema
+- record counts
+
+Do not expose the secret URL.
+
+The populated Fleet records expected in production must exist in the database Railway is using.
+
+==================================================
+PHASE 20 - DEPLOY TO RAILWAY
+==================================================
+
+Only after:
+
+- data reconciliation succeeds
+- local tests succeed
+- pnpm run build passes
+
+commit and deploy.
+
+Then check Railway deployment logs.
+
+Expected:
+
+BUILD PASSED
+DEPLOYMENT SUCCESSFUL
+
+==================================================
+PHASE 21 - PRODUCTION SMOKE TEST
+==================================================
+
+Test the actual Railway production application.
+
+Test:
+
+Admin login
+
+Mobile login
+
+Fleet Dashboard
+
+Vehicles
+
+Fuel
+
+Inspection
+
+Fault
+
+Service History
+
+Reports
+
+Start Work
+
+Start KM
+
+End Work
+
+End KM
+
+Overtime
+
+Time Off
+
+Email notifications
+
+Do not rely on local testing alone.
+
+==================================================
+PHASE 22 - DO NOT DESTROY OLD FLEETGUARD YET
+==================================================
+
+Keep the old standalone FleetGuard available until the integrated JobFlow Fleet module is proven in production.
+
+Do not delete:
+
+- old database
+- old deployment
+- old historical files
+
+until production JobFlow Fleet has been verified.
+
+==================================================
+FINAL REPORT
+==================================================
+
+When complete, give me:
+
+A. DATABASES
+
+Where JobFlow data lives
+Where FleetGuard data lived
+What migration/connection was performed
+
+B. DATA RECONCILIATION
+
+Before and after counts for:
+
+Vehicles
+Fuel
+Inspections
+Faults
+Services
+Odometer records
+
+C. ORPHANS
+
+What orphan assignment existed
+How it was resolved
+
+D. FUNCTIONAL TESTS
+
+PASS / FAIL for:
+
+Fleet Dashboard
+Vehicles
+Fuel
+Inspections
+Faults
+Service History
+Reports
+Attendance Start
+Attendance End
+Start KM
+End KM
+Overtime
+Time Off
+
+E. EMAIL TESTS
+
+PASS / FAIL:
+
+Start Work -> Accounts
+Start Work -> Julien
+
+End Work -> Accounts
+End Work -> Julien
+
+Overtime -> Accounts
+Overtime -> Julien
+
+Time Off -> Accounts
+Time Off -> Julien
+
+F. BRANDING
+
+Terminators logo in emails: PASS / FAIL
+JobFlow logo in emails: PASS / FAIL
+
+G. BUILD
+
+pnpm run build:
+PASS / FAIL
+
+H. RAILWAY
+
+Deployment:
+PASS / FAIL
+
+Production database verified:
+YES / NO
+
+I. FINAL VERDICT
+
+Only use:
+
+READY FOR USE
+
+if the populated production system has actually been tested successfully.
+
+Otherwise:
+
+NOT READY FOR USE
+
+and list exactly what remains.
