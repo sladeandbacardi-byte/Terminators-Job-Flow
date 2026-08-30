@@ -125,7 +125,7 @@ export default function Reports() {
   const [location] = useLocation();
   const isFinanceReportsPage = location === "/finance-reports";
   const { user } = useAuth();
-  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const role = getDashboardRole({ departmentId: (user as any)?.departmentId, role: user?.role });
   const canSeeFinancials = role !== "manager";
 
   // ── Existing overview / staff / contract state ────────────────────────────

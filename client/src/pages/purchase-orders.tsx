@@ -110,10 +110,11 @@ export default function PurchaseOrdersPage() {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       // Create the purchase order first
-      const po = await apiRequest("/api/purchase-orders", "POST", {
+      const poResponse = await apiRequest("POST", "/api/purchase-orders", {
         ...data,
         items: undefined, // Don't send items in the main request
       });
+      const po = await poResponse.json() as PurchaseOrder;
 
       // Then create each item
       for (const item of data.items) {
