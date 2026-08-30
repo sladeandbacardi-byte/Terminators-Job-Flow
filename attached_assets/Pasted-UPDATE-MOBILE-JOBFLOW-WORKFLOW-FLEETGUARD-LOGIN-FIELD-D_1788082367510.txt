@@ -1,0 +1,730 @@
+UPDATE MOBILE JOBFLOW WORKFLOW: FLEETGUARD LOGIN, FIELD DIARY AND ATTENDANCE VEHICLE KM
+
+Make the following changes to the JobFlow mobile user experience.
+
+Do not create duplicate systems.
+
+The goal is to connect:
+
+Attendance
+Jobs
+Vehicle usage
+FleetGuard
+Daily activity
+
+into one coherent mobile workflow.
+
+==================================================
+1. FIX FLEETGUARD SHORTCUT
+==================================================
+
+CURRENT PROBLEM:
+
+A mobile user is already logged into JobFlow.
+
+When they click the FleetGuard shortcut, FleetGuard opens its own login screen again.
+
+This is incorrect.
+
+The user must NOT have to log in twice.
+
+--------------------------------------------------
+REQUIRED BEHAVIOUR
+--------------------------------------------------
+
+If a mobile user is already authenticated in JobFlow and clicks:
+
+FLEETGUARD
+
+open FleetGuard directly as that same authenticated user.
+
+Use the existing JobFlow session/user identity.
+
+Do not show the FleetGuard login screen again.
+
+The system already knows:
+
+- employee/user
+- role
+- mobile user identity
+
+Use that information to identify the FleetGuard user.
+
+--------------------------------------------------
+SECURITY
+--------------------------------------------------
+
+Do not bypass authentication generally.
+
+Only bypass the second FleetGuard login when there is already a valid authenticated JobFlow session.
+
+If there is no valid JobFlow session, the normal login process may still be shown.
+
+Do not expose FleetGuard publicly.
+
+==================================================
+2. FIELD DIARIES
+==================================================
+
+Review the existing Field Diaries feature.
+
+The current purpose is unclear and it may duplicate:
+
+- Jobs
+- Calendar
+- Attendance
+- Overtime
+- Time Off
+
+Do not keep duplicate functionality unnecessarily.
+
+--------------------------------------------------
+NEW PURPOSE
+--------------------------------------------------
+
+If Field Diaries are retained, convert them into a:
+
+MY DAY / DAILY ACTIVITY
+
+view.
+
+This should NOT require the employee to manually rewrite all their jobs.
+
+Instead, automatically build the day's diary from existing JobFlow records.
+
+Include:
+
+- Attendance Start Work
+- Starting vehicle km
+- Scheduled jobs
+- Completed jobs
+- Client/job notes
+- Travel where applicable
+- Authorised Time Off
+- Overtime
+- Attendance End Work
+- Ending vehicle km
+- Total km travelled
+
+The daily diary becomes a timeline of what happened that day.
+
+--------------------------------------------------
+EXAMPLE
+--------------------------------------------------
+
+MY DAY
+30 August 2026
+
+07:48
+START WORK
+Vehicle: HDF872EC
+Start KM: 183,420
+
+08:00
+ABC Motors
+Pest Control
+Completed
+
+10:30
+Summerbreeze
+Inspection
+Completed
+
+12:00 - 14:00
+AUTHORISED TIME OFF
+
+14:30
+Roman Pizza
+Job completed
+
+16:00 - 17:00
+OVERTIME
+
+17:05
+END WORK
+End KM: 183,487
+
+TOTAL VEHICLE KM
+67 km
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+Do not require the employee to manually create duplicate diary entries for jobs that already exist in JobFlow.
+
+Automatically populate the diary from existing records.
+
+If the existing Field Diary cannot provide useful functionality beyond this, rename it:
+
+MY DAY
+
+and use it as the consolidated daily timeline.
+
+==================================================
+3. START WORK MUST ASK FOR VEHICLE KM
+==================================================
+
+Update Attendance > START WORK.
+
+CURRENT:
+
+Employee presses:
+START WORK
+
+JobFlow records the start time.
+
+NEW:
+
+When employee presses:
+
+START WORK
+
+open a small mobile modal BEFORE completing Start Work.
+
+--------------------------------------------------
+START WORK MODAL
+--------------------------------------------------
+
+Show:
+
+START WORK
+
+Vehicle
+[vehicle selector]
+
+Start Vehicle KM
+[________]
+
+[ CANCEL ]
+[ START WORK ]
+
+--------------------------------------------------
+VEHICLE
+--------------------------------------------------
+
+If the employee has a normally assigned vehicle, automatically preselect it.
+
+Example:
+
+Garth
+JPC031EC - VW Caddy
+
+Allow vehicle selection because employees may occasionally use another vehicle.
+
+Use the existing FleetGuard vehicle database.
+
+DO NOT create another vehicle list.
+
+If the employee selects a different vehicle, record which vehicle was actually used that day.
+
+--------------------------------------------------
+START KM
+--------------------------------------------------
+
+Start Vehicle KM is REQUIRED if a vehicle is selected.
+
+Numeric input only.
+
+Whole kilometres.
+
+Example:
+
+183420
+
+Display after saving:
+
+183,420 km
+
+Do not allow:
+
+- negative numbers
+- letters
+- decimals
+- obviously invalid values
+
+--------------------------------------------------
+FLEETGUARD INTEGRATION
+--------------------------------------------------
+
+Where possible, show the latest recorded km for the selected vehicle.
+
+Example:
+
+Last recorded:
+183,396 km
+
+The new Start KM must normally be equal to or greater than the previous recorded km.
+
+If lower, show:
+
+"Start km is lower than the vehicle's previous recorded odometer reading."
+
+Prevent submission unless Admin override is used.
+
+==================================================
+4. START WORK SEQUENCE
+==================================================
+
+When employee presses START WORK:
+
+1. Show Start Work modal
+2. Select/prepopulate vehicle
+3. Employee enters Start KM
+4. Validate odometer
+5. Save Attendance start
+6. Save vehicle used
+7. Save Start KM
+8. Send existing Start Work notification email
+9. Update My Day
+10. Update FleetGuard vehicle history
+
+The start timestamp must still use SERVER TIME.
+
+Employee must NOT manually choose their Start Work time.
+
+==================================================
+5. START WORK EMAIL
+==================================================
+
+Update the existing Start Work email.
+
+Send to BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+Include:
+
+Employee
+Date
+Start Time
+Vehicle
+Registration
+Start Vehicle KM
+
+Example:
+
+JOBFLOW - WORK STARTED
+
+Employee:
+Garth
+
+Date:
+30/08/2026
+
+Start Time:
+07:48
+
+Vehicle:
+VW Caddy
+
+Registration:
+JPC031EC
+
+Start Vehicle KM:
+183,420 km
+
+==================================================
+6. END WORK MUST ASK FOR END VEHICLE KM
+==================================================
+
+When employee presses:
+
+END WORK
+
+do NOT immediately end attendance.
+
+Open a modal:
+
+END WORK
+
+Vehicle:
+JPC031EC - VW Caddy
+
+Start KM:
+183,420 km
+
+End Vehicle KM:
+[________]
+
+[ CANCEL ]
+[ END WORK ]
+
+--------------------------------------------------
+END KM
+--------------------------------------------------
+
+End Vehicle KM is required.
+
+It must be:
+
+greater than or equal to Start Vehicle KM.
+
+Example:
+
+Start:
+183,420
+
+End:
+183,487
+
+Automatically calculate:
+
+Distance Travelled:
+67 km
+
+--------------------------------------------------
+VALIDATION
+--------------------------------------------------
+
+Reject:
+
+End KM lower than Start KM.
+
+Show:
+
+"End vehicle km cannot be lower than the Start Work odometer reading."
+
+Also flag unusually high daily km.
+
+Example:
+
+If difference is more than a configurable threshold such as 500 km:
+
+"Vehicle travelled 612 km today. Please confirm this reading."
+
+Allow user to confirm if genuinely correct.
+
+Do not automatically reject a legitimate long-distance trip.
+
+==================================================
+7. END WORK SEQUENCE
+==================================================
+
+When employee presses END WORK:
+
+1. Show End Work modal
+2. Show today's selected vehicle
+3. Show Start KM
+4. Employee enters End KM
+5. Validate
+6. Calculate daily km
+7. Save End KM
+8. Record End Work server time
+9. Calculate attendance span
+10. Send End Work email
+11. Update My Day
+12. Update FleetGuard odometer/history
+
+==================================================
+8. END WORK EMAIL
+==================================================
+
+Send to BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+Include:
+
+Employee
+Date
+Start Time
+End Time
+Vehicle
+Registration
+Start KM
+End KM
+Total Vehicle KM
+Attendance Span
+
+Example:
+
+JOBFLOW - WORK FINISHED
+
+Employee:
+Garth
+
+Date:
+30/08/2026
+
+Start:
+07:48
+
+Finish:
+17:05
+
+Vehicle:
+VW Caddy
+
+Registration:
+JPC031EC
+
+Start KM:
+183,420 km
+
+End KM:
+183,487 km
+
+Vehicle Distance:
+67 km
+
+Attendance Span:
+9 hrs 17 min
+
+==================================================
+9. DO NOT DOUBLE CAPTURE KM
+==================================================
+
+Very important:
+
+If Start KM and End KM are captured through Attendance, do not make the employee capture the same odometer readings again in FleetGuard.
+
+The values must be shared.
+
+Attendance Start KM should become a FleetGuard odometer record.
+
+Attendance End KM should become the latest FleetGuard odometer record.
+
+Use ONE source of truth.
+
+==================================================
+10. VEHICLE SWAPPING
+==================================================
+
+Employees may use different vehicles.
+
+Record the vehicle actually selected at Start Work.
+
+The End Work screen should default to that same vehicle.
+
+If the employee genuinely changes vehicle during the day, allow:
+
+CHANGE / ADD VEHICLE
+
+Then support multiple vehicle usage segments.
+
+Example:
+
+Vehicle 1:
+JPC031EC
+183,420 → 183,452
+32 km
+
+Vehicle 2:
+HDF872EC
+221,105 → 221,128
+23 km
+
+Total Daily KM:
+55 km
+
+Do not build this into the first screen if it makes the normal workflow complicated.
+
+The normal workflow should remain:
+
+one vehicle
+one start reading
+one end reading
+
+with an optional vehicle-change function.
+
+==================================================
+11. ATTENDANCE DATABASE
+==================================================
+
+Extend the existing attendance record with:
+
+vehicle_id
+start_vehicle_km
+end_vehicle_km
+vehicle_distance_km
+
+If multiple vehicle support is needed, preferably create:
+
+attendance_vehicle_usage
+
+id
+attendance_record_id
+vehicle_id
+start_km
+end_km
+distance_km
+created_at
+
+This avoids forcing multiple vehicles into one attendance row.
+
+Use existing vehicle IDs from FleetGuard.
+
+==================================================
+12. ADMIN ATTENDANCE VIEW
+==================================================
+
+Update:
+
+Operations > Time & Overtime > Attendance
+
+Show:
+
+Employee
+Date
+Start
+Finish
+Vehicle
+Start KM
+End KM
+KM Travelled
+Attendance
+Status
+
+Example:
+
+Garth
+30/08/26
+07:48
+17:05
+JPC031EC
+183,420
+183,487
+67 km
+9 hrs 17 min
+Finished
+
+==================================================
+13. EMPLOYEE MONTHLY REPORT
+==================================================
+
+Extend the employee Time Report.
+
+Show:
+
+Attendance Days
+Average Start
+Late Starts
+Early Finishes
+Overtime
+Time Off
+Net Time Balance
+Vehicle KM Travelled
+
+Example:
+
+GARTH
+AUGUST 2026
+
+Attendance Days:
+21
+
+Average Start:
+07:56
+
+Overtime:
+8 hrs
+
+Time Off:
+4 hrs
+
+Net Time Balance:
++4 hrs
+
+Vehicle KM:
+1,486 km
+
+==================================================
+14. MOBILE UX
+==================================================
+
+Keep the workflow extremely simple.
+
+MORNING:
+
+MY TIME
+
+[ START WORK ]
+
+tap
+
+START WORK
+
+Vehicle
+JPC031EC - VW Caddy
+
+Start KM
+[ 183420 ]
+
+[ START WORK ]
+
+DONE.
+
+--------------------------------------------------
+
+AFTERNOON:
+
+MY TIME
+
+Working since 07:48
+
+Vehicle
+JPC031EC
+
+Start KM
+183,420 km
+
+[ END WORK ]
+
+tap
+
+END WORK
+
+Start KM
+183,420 km
+
+End KM
+[ 183487 ]
+
+Distance
+67 km
+
+[ END WORK ]
+
+DONE.
+
+==================================================
+15. IMPORTANT
+==================================================
+
+Do not create separate copies of:
+
+- vehicles
+- employees
+- attendance
+- odometer records
+
+Reuse the existing JobFlow and FleetGuard data.
+
+The desired flow is:
+
+JOBFLOW LOGIN
+      ↓
+MY TIME
+      ↓
+START WORK
+      ↓
+SELECT VEHICLE + START KM
+      ↓
+ATTENDANCE + FLEETGUARD UPDATE
+      ↓
+WORK DAY / JOBS
+      ↓
+END WORK
+      ↓
+END KM
+      ↓
+ATTENDANCE + FLEETGUARD UPDATE
+      ↓
+EMAIL MANAGEMENT
+      ↓
+DAILY / MONTHLY REPORT
+
+Also fix the FleetGuard shortcut so the logged-in JobFlow user is not asked to log in again.
