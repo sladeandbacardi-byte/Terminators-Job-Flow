@@ -92,6 +92,11 @@ type TimeBalanceExportReport = {
     pendingOvertimeMinutes: number;
     pendingTimeOffMinutes: number;
     netMinutes: number;
+    attendanceDays: number;
+    averageStart: string | null;
+    lateStarts: number;
+    earlyFinishes: number;
+    vehicleKmTravelled: number;
   }>;
   totals: {
     approvedOvertimeMinutes: number;
@@ -141,9 +146,10 @@ export function exportTimeBalanceReport(report: TimeBalanceExportReport) {
     ["Period from", report.period.from, "Period to", report.period.to],
     [],
     ["EMPLOYEE SUMMARY"],
-    ["Employee ID", "Employee", "Department", "Approved Overtime Minutes", "Approved Overtime Display", "Approved Time Off Minutes", "Approved Time Off Display", "Pending Overtime Minutes", "Pending Overtime Display", "Pending Time Off Minutes", "Pending Time Off Display", "Net Balance Minutes", "Net Balance Display"],
+    ["Employee ID", "Employee", "Department", "Attendance Days", "Average Start", "Late Starts", "Early Finishes", "Vehicle KM", "Approved Overtime Minutes", "Approved Overtime Display", "Approved Time Off Minutes", "Approved Time Off Display", "Pending Overtime Minutes", "Pending Overtime Display", "Pending Time Off Minutes", "Pending Time Off Display", "Net Balance Minutes", "Net Balance Display"],
     ...report.rows.map(row => [
       row.employeeId, row.name, row.departmentName,
+      row.attendanceDays, row.averageStart || "", row.lateStarts, row.earlyFinishes, row.vehicleKmTravelled,
       row.approvedOvertimeMinutes, displayMinutes(row.approvedOvertimeMinutes),
       row.approvedTimeOffMinutes, displayMinutes(row.approvedTimeOffMinutes),
       row.pendingOvertimeMinutes, displayMinutes(row.pendingOvertimeMinutes),

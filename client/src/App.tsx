@@ -250,6 +250,14 @@ function AuthenticatedApp() {
                 <Route path="/fleet/vehicles/:id" component={FleetVehicleProfile} />
                 <Route path="/fleet/maintenance/:vehicleId" component={FleetVehicleMaintenance} />
                 <Route path="/fleet/maintenance" component={FleetMaintenance} />
+                 <Route path="/operations/fleet" component={Fleet} />
+                 <Route path="/operations/fleet/vehicles" component={Fleet} />
+                 <Route path="/operations/fleet/daily-check" component={FleetInspection} />
+                 <Route path="/operations/fleet/fuel" component={FleetFuel} />
+                 <Route path="/operations/fleet/inspections" component={Fleet} />
+                 <Route path="/operations/fleet/faults" component={FleetMaintenance} />
+                 <Route path="/operations/fleet/service-history" component={FleetMaintenance} />
+                 <Route path="/operations/fleet/reports" component={Fleet} />
                 <Route path="/attendance" component={Attendance} />
                 <Route path="/team-management" component={TeamManagement} />
                 <Route path="/testing-checklist" component={TestingChecklist} />

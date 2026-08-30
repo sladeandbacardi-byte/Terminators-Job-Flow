@@ -3116,12 +3116,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         starts.push(attendanceDateParts(record.startAt).minutes);
         attendanceStarts.set(record.employeeId, starts);
       }
-      for (const [id, starts] of attendanceStarts) {
+      attendanceStarts.forEach((starts: number[], id: string) => {
         const summary = byEmployee.get(id);
         if (summary && starts.length) {
-          summary.averageStartMinutes = Math.round(starts.reduce((total, value) => total + value, 0) / starts.length);
+          summary.averageStartMinutes = Math.round(starts.reduce((total: number, value: number) => total + value, 0) / starts.length);
         }
-      }
+      });
 
       const rows = Array.from(byEmployee.entries()).map(([id, summary]) => {
         const worker = workerMap.get(id);

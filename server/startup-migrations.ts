@@ -25,35 +25,6 @@ export async function runStartupMigrations(): Promise<void> {
     }
   };
 
-  // ── Employee attendance vehicle usage ─────────────────────────────────────
-  // Attendance remains separate from team sheets. These fields connect a
-  // personal workday to the existing Fleet vehicle and kilometre records.
-  await run(
-    "employee_attendance_records.vehicle_id",
-    `ALTER TABLE employee_attendance_records ADD COLUMN IF NOT EXISTS vehicle_id varchar`,
-    true,
-  );
-  await run(
-    "employee_attendance_records.start_vehicle_km",
-    `ALTER TABLE employee_attendance_records ADD COLUMN IF NOT EXISTS start_vehicle_km integer`,
-    true,
-  );
-  await run(
-    "employee_attendance_records.end_vehicle_km",
-    `ALTER TABLE employee_attendance_records ADD COLUMN IF NOT EXISTS end_vehicle_km integer`,
-    true,
-  );
-  await run(
-    "employee_attendance_records.vehicle_distance_km",
-    `ALTER TABLE employee_attendance_records ADD COLUMN IF NOT EXISTS vehicle_distance_km integer`,
-    true,
-  );
-  await run(
-    "employee_attendance_records.vehicle_km_log_id",
-    `ALTER TABLE employee_attendance_records ADD COLUMN IF NOT EXISTS vehicle_km_log_id varchar`,
-    true,
-  );
-
   // ── quote_submissions columns ──────────────────────────────────────────────
   await run(
     "quote_submissions.site_visit_done",
@@ -654,6 +625,18 @@ export async function runStartupMigrations(): Promise<void> {
       corrected_by varchar,
       correction_reason text
     )`,
+    true
+  );
+  // Attendance remains separate from team sheets. These fields connect a
+  // personal workday to the existing Fleet vehicle and kilometre records.
+  await run(
+    "employee attendance vehicle usage",
+    `ALTER TABLE employee_attendance_records
+       ADD COLUMN IF NOT EXISTS vehicle_id varchar,
+       ADD COLUMN IF NOT EXISTS start_vehicle_km integer,
+       ADD COLUMN IF NOT EXISTS end_vehicle_km integer,
+       ADD COLUMN IF NOT EXISTS vehicle_distance_km integer,
+       ADD COLUMN IF NOT EXISTS vehicle_km_log_id varchar`,
     true
   );
   await run(

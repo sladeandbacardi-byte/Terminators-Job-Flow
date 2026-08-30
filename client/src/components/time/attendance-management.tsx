@@ -23,6 +23,10 @@ type AttendanceRecord = {
   earlyFinishMinutes: number;
   status: "WORKING" | "FINISHED";
   isMissingEnd: boolean;
+  vehicle: { id: string; name: string; registration: string } | null;
+  startVehicleKm: number | null;
+  endVehicleKm: number | null;
+  vehicleDistanceKm: number | null;
 };
 
 type AttendanceResponse = {
@@ -93,15 +97,17 @@ export function AttendanceManagement() {
           isError ? <p className="p-6 text-sm text-red-700">Could not load attendance.</p> :
           data?.records.length ? (
             <Table>
-              <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Start</TableHead><TableHead>Finish</TableHead><TableHead>Total</TableHead><TableHead>Late</TableHead><TableHead>Early finish</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Start</TableHead><TableHead>Finish</TableHead><TableHead>Vehicle</TableHead><TableHead>Start KM</TableHead><TableHead>End KM</TableHead><TableHead>KM Travelled</TableHead><TableHead>Attendance</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>{data.records.map(record => (
                 <TableRow key={record.id}>
                   <TableCell><p className="font-medium">{record.employeeName}</p>{record.employeeNumber && <p className="text-xs text-slate-500">{record.employeeNumber}</p>}</TableCell>
                   <TableCell>{record.startTime}</TableCell>
                   <TableCell>{record.finishTime || <span className="font-medium text-amber-700">Missing end time</span>}</TableCell>
+                   <TableCell>{record.vehicle ? <><p className="font-medium">{record.vehicle.registration}</p><p className="text-xs text-slate-500">{record.vehicle.name}</p></> : "—"}</TableCell>
+                   <TableCell>{record.startVehicleKm == null ? "—" : record.startVehicleKm.toLocaleString("en-ZA")}</TableCell>
+                   <TableCell>{record.endVehicleKm == null ? "—" : record.endVehicleKm.toLocaleString("en-ZA")}</TableCell>
+                   <TableCell>{record.vehicleDistanceKm == null ? "—" : `${record.vehicleDistanceKm.toLocaleString("en-ZA")} km`}</TableCell>
                   <TableCell>{record.totalMinutes === null ? "—" : formatOvertimeMinutes(record.totalMinutes)}</TableCell>
-                  <TableCell>{formatOvertimeMinutes(record.lateStartMinutes)}</TableCell>
-                  <TableCell>{record.finishTime ? formatOvertimeMinutes(record.earlyFinishMinutes) : "—"}</TableCell>
                   <TableCell><Badge className={record.status === "WORKING" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}>{record.status}</Badge></TableCell>
                   <TableCell><Button size="sm" variant="outline" onClick={() => openCorrection(record)}><Pencil className="mr-1 h-3.5 w-3.5" /> Correct</Button></TableCell>
                 </TableRow>

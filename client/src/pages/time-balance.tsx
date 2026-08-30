@@ -27,6 +27,12 @@ type BalanceRow = {
   pendingTimeOffMinutes: number;
   transactionCount: number;
   netMinutes: number;
+  attendanceDays: number;
+  averageStartMinutes: number | null;
+  averageStart: string | null;
+  lateStarts: number;
+  earlyFinishes: number;
+  vehicleKmTravelled: number;
 };
 
 type Transaction = {
@@ -272,18 +278,23 @@ export default function TimeBalance() {
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
           <DialogHeader><DialogTitle className="flex items-center justify-between gap-3 pr-6"><span>{detail?.name || "Employee"} — Time Details</span><Badge variant="outline">{from} – {to}</Badge></DialogTitle></DialogHeader>
           {detailLoading || !detail ? <p className="py-10 text-center text-sm text-slate-500">Loading employee time details…</p> : <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               <DetailMetric label="Approved Overtime" value={formatOvertimeMinutes(detail.approvedOvertimeMinutes)} className="text-emerald-700" />
               <DetailMetric label="Approved Time Off" value={formatOvertimeMinutes(detail.approvedTimeOffMinutes)} className="text-red-700" />
               <DetailMetric label="Pending Overtime" value={formatOvertimeMinutes(detail.pendingOvertimeMinutes)} className="text-amber-700" />
               <DetailMetric label="Pending Time Off" value={formatOvertimeMinutes(detail.pendingTimeOffMinutes)} className="text-amber-700" />
+                <DetailMetric label="Attendance Days" value={String(detail.attendanceDays)} />
+                <DetailMetric label="Average Start" value={detail.averageStart || "—"} />
+                <DetailMetric label="Late Starts" value={String(detail.lateStarts)} />
+                <DetailMetric label="Early Finishes" value={String(detail.earlyFinishes)} />
+                <DetailMetric label="Vehicle KM" value={`${detail.vehicleKmTravelled.toLocaleString("en-ZA")} km`} />
               <label className="rounded-lg border bg-white p-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Opening balance (minutes)
                 <input type="number" step="1" value={openingBalance} onChange={event => setOpeningBalance(event.target.value)} placeholder="Not set" className="mt-1 h-8 w-full rounded border border-slate-300 px-2 text-base font-bold normal-case text-slate-900" />
               </label>
               <DetailMetric label="Closing balance" value={formatNetTimeDifference(closingBalanceMinutes)} className={netClass(closingBalanceMinutes)} />
             </div>
-            <p className="text-xs text-slate-500">Opening balance is an optional display-only value and is not saved or carried forward automatically. Closing balance equals the entered opening balance plus approved transactions in this period.</p>
+            <p className="text-xs text-slate-500">Attendance, late starts, early finishes and vehicle kilometres are informational only. Net balance remains approved Overtime less approved Authorised Time Off. Opening balance is display-only.</p>
             <div className="rounded-lg border">
               <div className="border-b bg-slate-50 px-4 py-3"><h3 className="font-semibold">Chronological transactions</h3><p className="text-xs text-slate-500">Pending entries are shown but have zero balance impact.</p></div>
               {!detailTransactions.length ? <p className="p-6 text-center text-sm text-slate-500">No approved or pending transactions in this period.</p> : <div className="overflow-x-auto">
