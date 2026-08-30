@@ -1,0 +1,117 @@
+RAILWAY ACCESS RECOVERY ONLY
+
+The FleetGuard integration work is blocked because the Railway MCP server currently reports:
+
+Failed to reach MCP server 'Railway'
+
+Do NOT make any JobFlow code changes.
+
+Do NOT run migrations.
+
+Do NOT use helium or Neon as substitutes.
+
+The task is ONLY to restore or diagnose Railway access.
+
+==================================================
+1. RECHECK RAILWAY INTEGRATION
+==================================================
+
+Check whether the Railway integration/connection is:
+
+- enabled
+- authenticated
+- attached to the current workspace
+- pointing to the correct Railway account
+- pointing to the correct project if a project selection exists
+
+Attempt to reconnect/refresh the Railway integration.
+
+Do not expose credentials.
+
+==================================================
+2. RETRY CAPABILITY DISCOVERY
+==================================================
+
+After reconnecting, retry Railway capability discovery.
+
+Expected minimum capabilities:
+
+- list projects
+- list environments
+- list services
+- inspect variables safely
+- identify Postgres service
+- inspect database connection metadata
+
+If Railway becomes reachable, STOP troubleshooting and continue with the previously requested READ-ONLY production inspection.
+
+==================================================
+3. IF MCP STILL FAILS
+==================================================
+
+If the Railway MCP still reports:
+
+Failed to reach MCP server 'Railway'
+
+determine whether the failure is:
+
+- authentication
+- integration connection
+- Railway service outage
+- workspace/plugin configuration
+- unsupported MCP capability
+- network/connectivity issue
+
+Report the exact failure if available.
+
+==================================================
+4. DO NOT USE UNSUPPORTED WORKAROUNDS
+==================================================
+
+Do not:
+
+- guess Railway project IDs
+- scrape credentials
+- print DATABASE_URL
+- alter repository variables
+- deploy
+- run production migrations
+- connect to helium instead
+- connect to Neon instead
+
+==================================================
+5. FALLBACK INFORMATION NEEDED
+==================================================
+
+If Railway MCP cannot be restored, tell me exactly what I need to obtain manually from the Railway dashboard so that you can perform a safe READ-ONLY production inspection.
+
+Prefer the minimum information required.
+
+For example, tell me whether you need:
+
+- Railway project/service name
+- production environment name
+- Postgres service name
+- database public endpoint enabled
+- a temporary read-only database credential
+- another supported integration connection
+
+Do not ask for passwords or secrets in chat if there is a safer integration method.
+
+==================================================
+6. FINAL RESPONSE
+==================================================
+
+Return only:
+
+RAILWAY MCP:
+CONNECTED / FAILED
+
+CAUSE:
+[exact reason if known]
+
+IF CONNECTED:
+Continue immediately with the read-only production database inspection.
+
+IF FAILED:
+Give me the exact manual steps I need to perform in Railway to restore safe production read access.
