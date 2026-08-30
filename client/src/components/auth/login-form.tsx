@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
+import { SOLE_SUPERADMIN } from "@shared/superadmin";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
 
@@ -43,7 +44,14 @@ const FALLBACK_DIRECTORY: LoginDirectory = {
     ["mobile-tech-09", "Reece"],
   ].map(([id, name]) => ({ id, name, role: "Technician", department: "Field Service" })),
   admins: [
-    { id: "fallback-admin", name: "Administrator", username: "admin", role: "Administrator", department: "Administration", authMethod: "password" },
+    {
+      id: SOLE_SUPERADMIN.workerId,
+      name: SOLE_SUPERADMIN.name,
+      username: SOLE_SUPERADMIN.username,
+      role: SOLE_SUPERADMIN.roleLabel,
+      department: SOLE_SUPERADMIN.department,
+      authMethod: "password",
+    },
   ],
 };
 

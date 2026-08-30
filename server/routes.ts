@@ -62,6 +62,7 @@ import { AuthService, requireAuth, requireMobileTechnician, logActivity, type Au
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
+import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import {
@@ -390,7 +391,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { id: "mobile-tech-09", name: "Reece", role: "Technician", department: "Field Service" },
   ];
   const FALLBACK_ADMINS = [
-    { id: "fallback-admin", name: "Administrator", username: "admin", role: "Administrator", department: "Administration", authMethod: "password" as const },
+    {
+      id: SOLE_SUPERADMIN.workerId,
+      name: SOLE_SUPERADMIN.name,
+      username: process.env.ADMIN_USERNAME?.trim() || SOLE_SUPERADMIN.username,
+      role: SOLE_SUPERADMIN.roleLabel,
+      department: SOLE_SUPERADMIN.department,
+      authMethod: "password" as const,
+    },
   ];
 
   const failedMobileLogins = new Map<string, { count: number; blockedUntil: number }>();
@@ -7480,7 +7488,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const { insertContractOccurrenceExceptionSchema } = await import("@shared/schema");
       const { canMoveCalendarEvent } = await import("@shared/dashboardRole");
       const data = insertContractOccurrenceExceptionSchema.parse(req.body);
-      const role = req.user!.role as any;
+      const role = getDashboardRole(req.user!);
       const sourceType = data.contractKind === "rental" ? "rentalContractOccurrence" : "serviceContractOccurrence";
       const allowed = canMoveCalendarEvent(role, req.user!.id, {
         sourceType,
@@ -7497,7 +7505,7 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
   app.delete("/api/contract-occurrence-exceptions/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const role = req.user!.role as any;
+      const role = getDashboardRole(req.user!);
       if (role !== "admin" && role !== "manager" && role !== "coordinator") {
         return res.status(403).json({ error: "Not permitted to remove this occurrence override" });
       }

@@ -5,6 +5,7 @@ import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
 import { storage } from "./storage";
 import { runDailyBackupEmail } from "./email-backup";
 import { runStartupMigrations } from "./startup-migrations";
+import { ensureSoleSuperAdmin } from "./superadmin-provisioning";
 
 console.log("[startup] Job Flow server starting");
 
@@ -60,6 +61,9 @@ app.use((req, res, next) => {
   // DbStorage is constructed during module loading, before migrations run. Provision
   // mobile technicians here so the new worker columns are guaranteed to exist.
   await (storage as any).ensureMobileTechnicians?.();
+  // Office sessions reference admin_users, so reconcile the one credential-backed
+  // super administrator only after the schema and canonical worker are available.
+  await ensureSoleSuperAdmin();
 
   const server = await registerRoutes(app);
 

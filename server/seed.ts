@@ -56,7 +56,7 @@ async function seedDefaultUsers() {
   // IDs match the login screen's HARDCODED_STAFF allowlist in server/routes.ts
   // (worker-1..worker-6) so these accounts show up in the profile picker.
   const rows = [
-    { id: "worker-1", name: "Managing Member", email: "managing.member@terminators.local", phone: "+27 00 000 0001", departmentId: "div-6", role: "Managing Member" },
+    { id: "worker-1", name: "Julien Botha", email: "managing.member@terminators.local", phone: "+27 00 000 0001", departmentId: "div-6", role: "Operations Manager" },
     { id: "worker-2", name: "Sales Rep",       email: "sales.rep@terminators.local",        phone: "+27 00 000 0002", departmentId: "div-5", role: "Sales Rep" },
     { id: "worker-3", name: "Service Manager", email: "service.manager@terminators.local",  phone: "+27 00 000 0003", departmentId: "div-6", role: "Service Manager" },
     { id: "worker-4", name: "Finance User",    email: "finance.user@terminators.local",     phone: "+27 00 000 0004", departmentId: "div-7", role: "Finance User" },

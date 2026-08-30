@@ -66,7 +66,7 @@ export class AuthService {
   }
 
   // Create admin user
-  static async createAdminUser(userData: InsertAdminUser & { password: string }): Promise<AdminUser> {
+  static async createAdminUser(userData: Omit<InsertAdminUser, "passwordHash"> & { password: string }): Promise<AdminUser> {
     const { password, ...userDataWithoutPassword } = userData;
     const passwordHash = await this.hashPassword(password);
     

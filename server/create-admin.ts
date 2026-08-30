@@ -1,4 +1,5 @@
 import { AuthService } from './auth-service';
+import { SOLE_SUPERADMIN } from '@shared/superadmin';
 
 async function createDefaultAdmin() {
   try {
@@ -12,9 +13,9 @@ async function createDefaultAdmin() {
     const adminUser = await AuthService.createAdminUser({
       username: ADMIN_USERNAME,
       email: ADMIN_EMAIL,
-      firstName: 'System',
-      lastName: 'Administrator',
-      role: 'superadmin',
+      firstName: SOLE_SUPERADMIN.firstName,
+      lastName: SOLE_SUPERADMIN.lastName,
+      role: SOLE_SUPERADMIN.role,
       password: ADMIN_PASSWORD,
     });
 
