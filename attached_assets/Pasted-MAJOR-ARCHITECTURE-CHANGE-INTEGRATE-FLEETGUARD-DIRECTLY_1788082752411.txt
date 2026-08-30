@@ -1,0 +1,609 @@
+MAJOR ARCHITECTURE CHANGE: INTEGRATE FLEETGUARD DIRECTLY INTO JOBFLOW
+
+CURRENT SITUATION
+
+Terminators currently has:
+
+1. JobFlow
+2. FleetGuard
+
+They are separate applications.
+
+JobFlow currently contains a shortcut/link to FleetGuard, but this causes problems because FleetGuard opens separately and has its own login/session.
+
+I no longer want FleetGuard to operate as a separate application from the user's perspective.
+
+JOBFLOW MUST BECOME THE MAIN APPLICATION.
+
+FleetGuard must become an integrated MODULE inside JobFlow.
+
+==================================================
+1. TARGET ARCHITECTURE
+==================================================
+
+The desired structure is:
+
+JOBFLOW
+│
+├── Sales
+├── Service
+├── Finance
+├── Operations
+│   ├── HR
+│   ├── Attendance
+│   ├── Time & Overtime
+│   ├── Fleet
+│   │   ├── Dashboard
+│   │   ├── Vehicles
+│   │   ├── Daily Check
+│   │   ├── Fuel
+│   │   ├── Inspections
+│   │   ├── Faults
+│   │   ├── Service History
+│   │   └── Reports
+│   └── Stock
+└── Reports
+
+FleetGuard should now live under:
+
+Operations > Fleet
+
+Do not send the user to a separate FleetGuard application.
+
+==================================================
+2. DO NOT USE AN EXTERNAL SHORTCUT
+==================================================
+
+Remove the current FleetGuard shortcut that opens another application/login.
+
+Operations > Fleet must open an internal JobFlow route.
+
+Examples:
+
+/operations/fleet
+
+/operations/fleet/vehicles
+
+/operations/fleet/fuel
+
+/operations/fleet/inspections
+
+/operations/fleet/faults
+
+Use routes that match the existing JobFlow routing conventions.
+
+==================================================
+3. MIGRATE FLEETGUARD INTO JOBFLOW
+==================================================
+
+Review the existing FleetGuard codebase.
+
+Identify:
+
+- frontend pages
+- reusable components
+- backend routes
+- database tables
+- vehicle logic
+- driver logic
+- fuel logic
+- inspection logic
+- fault logic
+- service records
+- email notifications
+- reports
+- uploaded photos/slips
+
+Migrate these features INTO the JobFlow codebase.
+
+Do not blindly copy/paste the whole standalone application.
+
+Refactor the useful FleetGuard functionality into JobFlow modules/components.
+
+==================================================
+4. REMOVE FLEETGUARD LOGIN
+==================================================
+
+FleetGuard must NOT have a separate login once integrated.
+
+Use the existing JobFlow authenticated user/session.
+
+If:
+
+Garth
+
+is logged into JobFlow as a mobile user, the Fleet module must already know:
+
+Employee:
+Garth
+
+Role:
+Mobile User
+
+Assigned vehicle:
+where applicable
+
+Do not ask Garth to log in again.
+
+==================================================
+5. ONE USER DATABASE
+==================================================
+
+Use the existing JobFlow users/employees.
+
+Do NOT maintain a separate FleetGuard driver account database.
+
+Link vehicles to existing JobFlow employee IDs.
+
+For example:
+
+employee_id
+vehicle_id
+
+Use existing staff records.
+
+==================================================
+6. ONE VEHICLE DATABASE
+==================================================
+
+There must only be ONE authoritative vehicle list.
+
+Review the existing FleetGuard vehicle data.
+
+Migrate/link it into the JobFlow database.
+
+Do not create:
+
+JobFlow vehicles
+
+AND
+
+FleetGuard vehicles
+
+as separate duplicate records.
+
+Use one fleet vehicle table for the entire system.
+
+==================================================
+7. PRESERVE EXISTING FLEETGUARD DATA
+==================================================
+
+Do NOT lose existing FleetGuard history.
+
+Preserve/migrate:
+
+- vehicle records
+- odometer history
+- fuel fill-ups
+- fuel slip photos
+- inspections
+- faults
+- daily checks
+- service history
+- costs
+- driver history
+- fleet reports
+
+Create a migration plan before deleting or replacing any FleetGuard tables.
+
+==================================================
+8. FLEET DASHBOARD
+==================================================
+
+Create:
+
+Operations > Fleet > Dashboard
+
+Use the normal JobFlow theme.
+
+Show summary cards such as:
+
+VEHICLES
+[number]
+
+FAULTS OPEN
+[number]
+
+SERVICES DUE
+[number]
+
+INSPECTIONS FAILED
+[number]
+
+FUEL THIS MONTH
+[litres/cost]
+
+KM THIS MONTH
+[km]
+
+Then show recent fleet activity.
+
+==================================================
+9. VEHICLES
+==================================================
+
+Operations > Fleet > Vehicles
+
+Show all vehicles.
+
+Each vehicle profile should include:
+
+Registration
+Make
+Model
+Year
+Current driver
+Current odometer
+Last service
+Next service
+Fuel history
+Inspection history
+Fault history
+Service history
+KM history
+Costs
+
+Use existing FleetGuard data.
+
+==================================================
+10. MOBILE USER FLEET VIEW
+==================================================
+
+Mobile users must see a simplified fleet interface.
+
+From their mobile JobFlow:
+
+MY DAY
+MY JOBS
+MY TIME
+FLEET
+
+Under Fleet:
+
+My Vehicle
+Daily Check
+Fuel
+Inspection
+Report Fault
+
+The mobile user should normally see their assigned vehicle first.
+
+==================================================
+11. ATTENDANCE + FLEET INTEGRATION
+==================================================
+
+Integrate the new Attendance system directly with Fleet.
+
+START WORK:
+
+When employee presses:
+
+START WORK
+
+prompt for:
+
+Vehicle
+Start Odometer KM
+
+Use the existing Fleet vehicle database.
+
+Save:
+
+employee
+vehicle
+date
+server start time
+start km
+
+The Start KM must also update Fleet odometer history.
+
+END WORK:
+
+When employee presses:
+
+END WORK
+
+prompt for:
+
+End Odometer KM
+
+Calculate:
+
+Daily Vehicle KM =
+End KM - Start KM
+
+Save this to:
+
+Attendance
+Fleet odometer history
+Employee daily activity
+
+Do not make the employee capture the same km twice.
+
+==================================================
+12. MY DAY INTEGRATION
+==================================================
+
+Build/retain a consolidated My Day timeline.
+
+Example:
+
+GARTH
+30 AUGUST 2026
+
+07:48
+Started Work
+
+Vehicle:
+JPC031EC
+
+Start KM:
+183,420
+
+08:00
+ABC Motors
+Job Completed
+
+10:30
+Summerbreeze
+Job Completed
+
+12:00 - 14:00
+Authorised Time Off
+
+16:00 - 17:00
+Overtime
+
+17:05
+Ended Work
+
+End KM:
+183,487
+
+Distance:
+67 km
+
+This information should come automatically from existing JobFlow records.
+
+Do not make the employee manually create duplicate diary entries.
+
+==================================================
+13. FUEL
+==================================================
+
+Move the existing FleetGuard Fuel feature into:
+
+Operations > Fleet > Fuel
+
+Preserve:
+
+- litres
+- fuel cost
+- odometer
+- fuel slip photo
+- OCR where currently used
+- driver
+- vehicle
+- date/time
+- L/100km calculation
+
+Keep existing email notifications.
+
+==================================================
+14. INSPECTIONS
+==================================================
+
+Move inspections into:
+
+Operations > Fleet > Inspections
+
+Preserve:
+
+Daily checks
+Monthly checks
+Inspection failures
+Fault reporting
+Photos
+Notes
+
+Inspection failures must continue triggering the appropriate management notifications.
+
+==================================================
+15. FAULTS
+==================================================
+
+Create:
+
+Operations > Fleet > Faults
+
+Show:
+
+Vehicle
+Driver
+Fault
+Date reported
+Severity
+Status
+Assigned to
+Resolution
+Cost
+
+Statuses:
+
+Open
+In Progress
+Resolved
+
+Faults raised from inspections must automatically appear here.
+
+==================================================
+16. SERVICE HISTORY
+==================================================
+
+Create:
+
+Operations > Fleet > Service History
+
+Track:
+
+Vehicle
+Date
+Odometer
+Service provider
+Work performed
+Cost
+Next service km/date
+Notes
+
+==================================================
+17. REPORTS
+==================================================
+
+Fleet reports should live inside JobFlow.
+
+Include:
+
+Vehicle KM
+Fuel usage
+Fuel economy
+Driver KM
+Private KM
+Faults
+Services
+Vehicle cost
+Inspections
+
+Allow date range filters and export.
+
+==================================================
+18. EMAIL NOTIFICATIONS
+==================================================
+
+Reuse the existing working JobFlow/FleetGuard email service.
+
+Do not create another email system.
+
+Preserve existing notifications.
+
+Use the configured recipients where appropriate.
+
+==================================================
+19. BRANDING
+==================================================
+
+All migrated Fleet screens must use the existing JobFlow design system.
+
+Show BOTH:
+
+Terminators logo
+JobFlow logo
+
+FleetGuard may remain as the module name/branding underneath.
+
+Example:
+
+[TERMINATORS LOGO] [JOBFLOW LOGO]
+
+FLEETGUARD
+Fleet Management
+
+Do not make the Fleet module visually look like a separate application.
+
+==================================================
+20. PERMISSIONS
+==================================================
+
+Mobile users:
+
+May:
+- View their vehicle
+- Start/end work km
+- Complete checks
+- Log fuel
+- Complete inspections
+- Report faults
+
+Admin/Management:
+
+May:
+- View all vehicles
+- Edit vehicles
+- View all fleet activity
+- Manage faults
+- Manage service records
+- View reports
+- Correct data
+- Export
+
+Use existing JobFlow role permissions.
+
+==================================================
+21. MIGRATION SAFETY
+==================================================
+
+IMPORTANT:
+
+Do not immediately delete or disable the standalone FleetGuard application.
+
+Migration sequence:
+
+PHASE 1
+Identify FleetGuard functionality and database dependencies.
+
+PHASE 2
+Build Fleet module inside JobFlow.
+
+PHASE 3
+Connect/migrate existing FleetGuard data.
+
+PHASE 4
+Test all Fleet functions inside JobFlow.
+
+PHASE 5
+Run JobFlow and old FleetGuard in parallel temporarily.
+
+PHASE 6
+Confirm data and functionality.
+
+PHASE 7
+Only then retire the standalone FleetGuard interface.
+
+Do NOT risk losing existing production FleetGuard data.
+
+==================================================
+22. PRODUCTION BUILD
+==================================================
+
+Before deployment run:
+
+pnpm run build
+
+Fix any build errors before committing.
+
+Do not deploy a broken build to Railway.
+
+==================================================
+23. FINAL RESULT
+==================================================
+
+The user experience must become:
+
+LOGIN TO JOBFLOW
+        ↓
+DASHBOARD
+        ↓
+OPERATIONS
+        ↓
+FLEET
+        ↓
+FLEET DASHBOARD / VEHICLES / FUEL / INSPECTIONS / FAULTS
+
+There must be:
+
+NO second FleetGuard login
+NO external FleetGuard redirect
+NO duplicate user database
+NO duplicate vehicle database
+NO duplicate odometer entry
+
+JobFlow must be the central application and FleetGuard must operate as an integrated JobFlow module.

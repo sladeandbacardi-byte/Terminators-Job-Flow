@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays, ClipboardPenLine, ExternalLink,
+  CalendarDays, ClipboardPenLine,
   LayoutDashboard, ListChecks, RefreshCw, Truck, Lightbulb, Camera, Clock3,
+  Fuel, ClipboardCheck, AlertTriangle, Gauge,
 } from "lucide-react";
 import type { Client, Job, Worker } from "@shared/schema";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "@shared/opportunities";
 import { MobileTreatmentReport } from "./mobile-treatment-report";
 import { MobileShell, type MobileNavItem } from "./mobile-shell";
 
-type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "km" | "fuel" | "inspection" | "issue" | "opportunities";
+type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "fleet" | "km" | "fuel" | "inspection" | "issue" | "opportunities";
 type MobileJob = Job & { client: Client };
 type Opportunity = {
   id: string; clientName: string; description: string; opportunityType: string; typeLabel: string;
@@ -28,6 +29,26 @@ type DashboardData = {
     weekJobs: MobileJob[];
   };
 };
+type FleetVehicle = {
+  id: string;
+  name: string;
+  registration: string;
+  latestOdometer: number | null;
+  isAssigned: boolean;
+};
+type MyDayData = {
+  workDate: string;
+  events: Array<{
+    id: string;
+    type: "attendance" | "job" | "time_off" | "overtime" | "note";
+    time: string;
+    endTime?: string | null;
+    title: string;
+    subtitle?: string | null;
+    status?: string | null;
+  }>;
+  totals: { vehicleDistanceKm: number; attendanceMinutes: number };
+};
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
@@ -44,13 +65,24 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [opportunityPhotos, setOpportunityPhotos] = useState<Array<{ fileUrl: string; fileName: string }>>([]);
   const [treatmentJobId, setTreatmentJobId] = useState<string | null>(null);
+  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
+  const [myDay, setMyDay] = useState<MyDayData | null>(null);
+  const [myDayDate, setMyDayDate] = useState(() => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()));
 
   const load = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/mobile/dashboard", { headers: authHeaders() });
-      if (!response.ok) throw new Error(response.status === 401 ? "Your mobile session has expired. Please sign in again." : "Unable to load your mobile dashboard.");
-      setData(await response.json());
+      const [response, fleetResponse] = await Promise.all([
+        fetch("/api/mobile/dashboard", { headers: authHeaders() }),
+        fetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
+      ]);
+      if (!response.ok || !fleetResponse.ok) throw new Error(response.status === 401 || fleetResponse.status === 401 ? "Your mobile session has expired. Please sign in again." : "Unable to load your mobile dashboard.");
+      const [dashboardData, fleetData] = await Promise.all([response.json(), fleetResponse.json()]);
+      setData(dashboardData);
+      setFleetVehicles(fleetData.vehicles ?? []);
+      setForm(current => current.vehicleId ? current : { ...current, vehicleId: fleetData.assignedVehicleId || "" });
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load your mobile dashboard.");
@@ -65,6 +97,12 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     const response = await fetch("/api/mobile/opportunities", { headers: authHeaders() });
     if (!response.ok) throw new Error("Unable to load your submitted opportunities.");
     setOpportunities(await response.json());
+  };
+  const loadMyDay = async (date = myDayDate) => {
+    const response = await fetch(`/api/mobile/my-day?date=${encodeURIComponent(date)}`, { headers: authHeaders() });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Unable to load My Day.");
+    setMyDay(result);
   };
 
   const jobs = data?.jobs ?? [];
@@ -142,10 +180,13 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     if (target === "opportunities") {
       loadOpportunities().catch(err => setError(err instanceof Error ? err.message : "Unable to load your opportunities."));
     }
+    if (target === "diaries") {
+      loadMyDay().catch(err => setError(err instanceof Error ? err.message : "Unable to load My Day."));
+    }
   };
 
   const screenTitle: Record<Screen, string> = {
-    dashboard: "Dashboard", jobs: "My Jobs", diaries: "Field Diaries", calendar: "Calendar",
+    dashboard: "Dashboard", jobs: "My Jobs", diaries: "My Day", calendar: "Calendar", fleet: "Fleet",
     km: "Log KMs", fuel: "Fuel Fill-up", inspection: "Vehicle Inspection", issue: "Report Issue", opportunities: "Additional Opportunities",
   };
 
@@ -153,12 +194,18 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, onSelect: () => nav("dashboard") },
     { id: "jobs", label: "My Jobs", icon: ListChecks, onSelect: () => nav("jobs") },
     { id: "my-time", label: "My Time", icon: Clock3, href: "/my-overtime" },
-    { id: "diaries", label: "Field Diaries", icon: ClipboardPenLine, onSelect: () => nav("diaries") },
+    { id: "diaries", label: "My Day", icon: ClipboardPenLine, onSelect: () => nav("diaries") },
     { id: "calendar", label: "Calendar", icon: CalendarDays, onSelect: () => nav("calendar") },
     { id: "opportunities", label: "Additional Opportunities", icon: Lightbulb, onSelect: () => nav("opportunities") },
-    { id: "fleet", label: "Fleet Actions", icon: Truck, href: "/fleet" },
+    { id: "fleet", label: "Fleet", icon: Truck, onSelect: () => nav("fleet") },
   ];
-  const openFleetGuard = () => { window.location.href = "/fleet"; };
+  const openFleetGuard = () => nav("fleet");
+  const vehicleSelect = (
+    <select required value={form.vehicleId ?? ""} onChange={event => setForm(current => ({ ...current, vehicleId: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+      <option value="">Select vehicle</option>
+      {fleetVehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration} — {vehicle.name}{vehicle.isAssigned ? " (assigned)" : ""}</option>)}
+    </select>
+  );
 
   const jobRows = (list: MobileJob[]) => (
     <div className="space-y-3">
@@ -191,23 +238,36 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     if (screen === "jobs") return jobRows(jobs);
     if (screen === "calendar") return <div className="space-y-3">{jobRows([...jobs].sort((a, b) => +new Date(a.scheduledDate) - +new Date(b.scheduledDate)))}</div>;
     if (screen === "diaries") return (
-      <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => {
-        event.preventDefault();
-        submit("/api/mobile/field-diaries", { ...form, serviceDate: form.serviceDate || today }, "Field diary submitted.");
-      }}>
-        <p className="text-sm text-slate-600">Submit a diary only for a job assigned to you or your team.</p>
-        <select required value={form.jobId ?? ""} onChange={event => setForm(current => ({ ...current, jobId: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
-          <option value="">Select job</option>
-          {jobs.map(job => <option key={job.id} value={job.id}>{job.client?.name ?? job.title}</option>)}
-        </select>
-        {input("serviceDate", "Service date", "date", true)}
-        {input("arrivalTime", "Arrival time", "time")}
-        {input("departureTime", "Departure time", "time")}
-        <textarea required placeholder="Work completed" value={form.workCompleted ?? ""} onChange={event => setForm(current => ({ ...current, workCompleted: event.target.value }))} className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-        <textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-        <button className="w-full rounded-lg bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700">Submit field diary</button>
-      </form>
+      <div className="space-y-4">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <label className="text-sm font-semibold text-slate-700">Day
+            <input type="date" value={myDayDate} onChange={event => {
+              setMyDayDate(event.target.value);
+              loadMyDay(event.target.value).catch(err => setError(err.message));
+            }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal" />
+          </label>
+        </section>
+        {!myDay ? <p className="rounded-xl bg-white p-5 text-sm text-slate-500">Loading your day…</p> : myDay.events.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">No JobFlow activity is recorded for this day.</p> :
+          <div className="relative space-y-3 before:absolute before:bottom-4 before:left-[2.15rem] before:top-4 before:w-px before:bg-slate-200">
+            {myDay.events.map(event => <article key={`${event.type}:${event.id}`} className="relative flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-xs font-bold text-red-700">{event.time || "—"}</div>
+              <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{event.title}</p>{event.status && <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase text-slate-600">{event.status.replace("_", " ")}</span>}</div>{event.endTime && <p className="text-xs text-slate-500">{event.time}–{event.endTime}</p>}{event.subtitle && <p className="mt-1 text-sm text-slate-600">{event.subtitle}</p>}</div>
+            </article>)}
+          </div>}
+        {myDay && <section className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-slate-900 p-4 text-white"><p className="text-xs text-slate-300">Attendance</p><p className="mt-1 font-bold">{Math.floor(myDay.totals.attendanceMinutes / 60)}h {myDay.totals.attendanceMinutes % 60}m</p></div><div className="rounded-xl bg-red-600 p-4 text-white"><p className="text-xs text-red-100">Vehicle KM</p><p className="mt-1 font-bold">{myDay.totals.vehicleDistanceKm.toLocaleString("en-ZA")} km</p></div></section>}
+      </div>
     );
+    if (screen === "fleet") return <div className="space-y-4">
+      <section className="rounded-xl bg-slate-900 p-5 text-white"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-300">FleetGuard</p><h2 className="mt-1 text-xl font-bold">Fleet Management</h2><p className="mt-2 text-sm text-slate-300">{vehicleLabel}</p></section>
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          ["km", "Log KMs", Gauge],
+          ["fuel", "Fuel", Fuel],
+          ["inspection", "Daily Check", ClipboardCheck],
+          ["issue", "Report Fault", AlertTriangle],
+        ].map(([target, label, Icon]) => <button key={String(target)} onClick={() => nav(target as Screen)} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-red-200 hover:bg-red-50"><Icon className="h-5 w-5 text-red-600" /><p className="mt-3 font-semibold text-slate-900">{String(label)}</p></button>)}
+      </div>
+    </div>;
     if (screen === "opportunities") return (
       <div className="space-y-4">
         <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submitOpportunity(); }}>
@@ -233,26 +293,26 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
       </div>
     );
     if (screen === "km") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/km-logs", form, "Kilometres logged."); }}>
-      <p className="text-sm text-slate-600">{vehicleLabel}</p>{input("startOdometer", "Start odometer", "number", true)}{input("endOdometer", "End odometer", "number", true)}{input("businessKm", "Business KMs", "number")}{input("privateKm", "Private KMs", "number")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log KMs</button>
+      {vehicleSelect}{input("startOdometer", "Start odometer", "number", true)}{input("endOdometer", "End odometer", "number", true)}{input("businessKm", "Business KMs", "number")}{input("privateKm", "Private KMs", "number")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log KMs</button>
     </form>;
     if (screen === "fuel") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/fuel-fillups", form, "Fuel fill-up logged."); }}>
-      <p className="text-sm text-slate-600">{vehicleLabel}</p>{input("litres", "Litres", "number", true)}{input("cost", "Total cost", "number", true)}{input("odometer", "Odometer (optional)", "number")}{input("fuelStation", "Fuel station")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log fuel fill-up</button>
+      {vehicleSelect}{input("litres", "Litres", "number", true)}{input("cost", "Total cost", "number", true)}{input("odometer", "Odometer (optional)", "number")}{input("fuelStation", "Fuel station")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log fuel fill-up</button>
     </form>;
     if (screen === "inspection") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/inspections", { ...form, items: [] }, "Vehicle inspection submitted."); }}>
-      <p className="text-sm text-slate-600">{vehicleLabel}</p><select value={form.overallResult ?? "pass"} onChange={event => setForm(current => ({ ...current, overallResult: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="pass">Vehicle passed inspection</option><option value="fail">Vehicle has a fault</option></select><textarea required placeholder="Inspection comments and any faults found" value={form.comments ?? ""} onChange={event => setForm(current => ({ ...current, comments: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Submit inspection</button>
+      {vehicleSelect}<select value={form.overallResult ?? "pass"} onChange={event => setForm(current => ({ ...current, overallResult: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="pass">Vehicle passed inspection</option><option value="fail">Vehicle has a fault</option></select><textarea required placeholder="Inspection comments and any faults found" value={form.comments ?? ""} onChange={event => setForm(current => ({ ...current, comments: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Submit inspection</button>
     </form>;
     if (screen === "issue") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/issues", form, "Vehicle issue reported."); }}>
-      <p className="text-sm text-slate-600">{vehicleLabel}</p><select value={form.category ?? "other"} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="other">Other</option><option value="tyres">Tyres</option><option value="engine">Engine</option><option value="brakes">Brakes</option><option value="electrical">Electrical</option><option value="lights">Lights</option></select><select value={form.urgency ?? "medium"} onChange={event => setForm(current => ({ ...current, urgency: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="not_safe">Not safe to drive</option></select><textarea required placeholder="Describe the issue" value={form.description ?? ""} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-red-600 px-4 py-3 font-semibold text-white">Report issue</button>
+      {vehicleSelect}<select value={form.category ?? "other"} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="other">Other</option><option value="tyres">Tyres</option><option value="engine">Engine</option><option value="brakes">Brakes</option><option value="electrical">Electrical</option><option value="lights">Lights</option></select><select value={form.urgency ?? "medium"} onChange={event => setForm(current => ({ ...current, urgency: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="not_safe">Not safe to drive</option></select><textarea required placeholder="Describe the issue" value={form.description ?? ""} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-red-600 px-4 py-3 font-semibold text-white">Report issue</button>
     </form>;
     const metrics = data.metrics;
     return <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
-        {[["Jobs Today", metrics.jobsToday], ["Completed Today", metrics.completedToday], ["In Progress", metrics.inProgress], ["Field Diaries Due", metrics.fieldDiariesDue]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}
+        {[["Jobs Today", metrics.jobsToday], ["Completed Today", metrics.completedToday], ["In Progress", metrics.inProgress], ["My Day Jobs", metrics.jobsToday]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}
       </div>
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Current Job</h2>{metrics.currentJob ? jobRows([metrics.currentJob]) : <p className="rounded-xl bg-slate-100 p-4 text-sm text-slate-600">No job is currently in progress.</p>}</section>
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My Jobs Today</h2>{jobRows(data.todayJobs)}</section>
       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My Week</h2><p className="rounded-xl bg-white p-4 text-sm text-slate-600">{metrics.weekJobs.length} jobs scheduled for the next seven days.</p></section>
-       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Fleet</h2><button onClick={openFleetGuard} className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left font-semibold text-slate-700 shadow-sm hover:bg-red-50"><Truck className="h-5 w-5 text-red-600" /><span className="flex-1">FleetGuard</span><ExternalLink className="h-4 w-4 text-slate-400" /></button></section>
+       <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Fleet</h2><button onClick={openFleetGuard} className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left font-semibold text-slate-700 shadow-sm hover:bg-red-50"><Truck className="h-5 w-5 text-red-600" /><span className="flex-1">FleetGuard · Fleet Management</span></button></section>
     </div>;
   }, [data, form, screen, opportunities, opportunityPhotos]);
 

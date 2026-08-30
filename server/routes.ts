@@ -33,6 +33,8 @@ import {
   overtimeAuditEntries,
   employeeAttendanceRecords,
   employeeAttendanceAudits,
+  vehicles,
+  kmLogs,
   adminUsers,
   opportunities,
   opportunityPhotos,
@@ -68,6 +70,7 @@ import {
 } from "@shared/opportunities";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { randomUUID } from "crypto";
 
 const execAsync = promisify(exec);
 
@@ -128,8 +131,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if ([
       "GET /api/mobile/dashboard",
       "GET /api/mobile/field-diaries",
+      "GET /api/mobile/my-day",
       "POST /api/mobile/field-diaries",
       "GET /api/mobile/fleet/assignment",
+      "GET /api/mobile/fleet/vehicles",
       "POST /api/mobile/fleet/km-logs",
       "POST /api/mobile/fleet/fuel-fillups",
       "POST /api/mobile/fleet/inspections",
@@ -623,7 +628,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     phase: "start" | "finish",
   ) => {
     try {
-      const deliveries = await sendAttendanceNotification(record, employeeName, phase);
+       const vehicle = record.vehicleId ? await storage.getVehicle(record.vehicleId) : undefined;
+       const deliveries = await sendAttendanceNotification({
+         ...record,
+         vehicle: vehicle ? { name: vehicle.name, registration: vehicle.registration } : null,
+       }, employeeName, phase);
       const attemptedDeliveries = deliveries.length
         ? deliveries
         : TIME_NOTIFICATION_RECIPIENTS.map(recipient => ({ recipient, sent: false, error: "No delivery result returned" }));
@@ -666,13 +675,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const attendanceRecordForResponse = (
     record: typeof employeeAttendanceRecords.$inferSelect,
     employee?: { name?: string | null; employeeId?: string | null },
+    vehicle?: { name?: string | null; registration?: string | null },
   ) => ({
     ...record,
     employeeName: employee?.name || record.employeeId,
     employeeNumber: employee?.employeeId || null,
+    vehicle: record.vehicleId ? {
+      id: record.vehicleId,
+      name: vehicle?.name || "Vehicle",
+      registration: vehicle?.registration || "",
+    } : null,
     ...attendanceMetrics(record.startAt, record.endAt),
     isMissingEnd: record.status === "WORKING",
   });
+
+  const latestVehicleOdometer = async (vehicleId: string, executor: any = db) => {
+    const [latest] = await executor.select({
+      endOdometer: kmLogs.endOdometer,
+      logDate: kmLogs.logDate,
+    }).from(kmLogs)
+      .where(eq(kmLogs.vehicleId, vehicleId))
+      .orderBy(desc(kmLogs.logDate), desc(kmLogs.createdAt))
+      .limit(1);
+    return latest ?? null;
+  };
 
   const mobileTimeSubmissionFailure = (
     error: unknown,
@@ -879,10 +905,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const getMobileVehicle = async (workerId: string, requestedVehicleId?: string) => {
+    if (requestedVehicleId) {
+      const vehicle = await storage.getVehicle(requestedVehicleId);
+      return vehicle?.isActive ? vehicle.id : null;
+    }
     const assignment = await storage.getActiveAssignmentForWorker(workerId);
-    if (!assignment) return null;
-    if (requestedVehicleId && assignment.vehicleId !== requestedVehicleId) return null;
-    return assignment.vehicleId;
+    return assignment?.vehicleId ?? null;
   };
 
   // ── Additional opportunities: technician mobile workflow ──────────────────
@@ -1503,6 +1531,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/mobile/my-day", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const requestedDate = typeof req.query.date === "string" ? req.query.date : "";
+      const workDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
+        ? requestedDate
+        : attendanceDateParts(new Date()).date;
+      const worker = req.mobileWorker!;
+      const [attendanceRows, mobileJobs, timeEntries, diaries, allVehicles] = await Promise.all([
+        db.select().from(employeeAttendanceRecords).where(and(
+          eq(employeeAttendanceRecords.employeeId, worker.id),
+          eq(employeeAttendanceRecords.workDate, workDate),
+        )).limit(1),
+        storage.getMobileJobsForWorker(worker.id),
+        db.select().from(overtimeEntries).where(and(
+          eq(overtimeEntries.employeeId, worker.id),
+          eq(overtimeEntries.workDate, workDate),
+        )),
+        storage.getFieldDiariesByWorker(worker.id),
+        storage.getVehicles(),
+      ]);
+      const attendance = attendanceRows[0] ?? null;
+      const vehicle = attendance?.vehicleId
+        ? allVehicles.find(item => item.id === attendance.vehicleId) ?? null
+        : null;
+      const dateOf = (value: Date | string | null) =>
+        value ? new Date(value).toISOString().slice(0, 10) : "";
+      const events: Array<{
+        id: string;
+        type: "attendance" | "job" | "time_off" | "overtime" | "note";
+        time: string;
+        endTime?: string | null;
+        title: string;
+        subtitle?: string | null;
+        status?: string | null;
+        sortMinutes: number;
+      }> = [];
+      if (attendance) {
+        const metrics = attendanceMetrics(attendance.startAt, attendance.endAt);
+        events.push({
+          id: `${attendance.id}:start`,
+          type: "attendance",
+          time: metrics.startTime,
+          title: "Started Work",
+          subtitle: vehicle
+            ? `${vehicle.registration} · Start ${Number(attendance.startVehicleKm || 0).toLocaleString("en-ZA")} km`
+            : "No vehicle selected",
+          status: "WORKING",
+          sortMinutes: attendanceDateParts(attendance.startAt).minutes,
+        });
+        if (attendance.endAt) {
+          events.push({
+            id: `${attendance.id}:end`,
+            type: "attendance",
+            time: metrics.finishTime || "",
+            title: "Ended Work",
+            subtitle: vehicle
+              ? `${vehicle.registration} · End ${Number(attendance.endVehicleKm || 0).toLocaleString("en-ZA")} km · ${Number(attendance.vehicleDistanceKm || 0).toLocaleString("en-ZA")} km travelled`
+              : `${attendance.totalMinutes || 0} attendance minutes`,
+            status: "FINISHED",
+            sortMinutes: attendanceDateParts(attendance.endAt).minutes,
+          });
+        }
+      }
+      for (const job of mobileJobs.filter(item => dateOf(item.scheduledDate) === workDate)) {
+        const time = job.scheduledTime || "00:00";
+        events.push({
+          id: job.id,
+          type: "job",
+          time,
+          title: job.client?.name || job.title,
+          subtitle: [job.serviceType, job.notes || job.completionNotes].filter(Boolean).join(" · "),
+          status: job.status,
+          sortMinutes: timeToMinutes(time) ?? 0,
+        });
+      }
+      for (const entry of timeEntries) {
+        const isTimeOff = (entry.entryType || "OVERTIME") === "AUTHORISED_TIME_OFF";
+        events.push({
+          id: entry.id,
+          type: isTimeOff ? "time_off" : "overtime",
+          time: entry.startTime,
+          endTime: entry.finishTime,
+          title: isTimeOff ? "Authorised Time Off" : "Overtime",
+          subtitle: entry.notes || null,
+          status: entry.status,
+          sortMinutes: timeToMinutes(entry.startTime) ?? 0,
+        });
+      }
+      for (const diary of diaries.filter(item => item.serviceDate === workDate && (item.notes || item.workCompleted))) {
+        events.push({
+          id: diary.id,
+          type: "note",
+          time: diary.arrivalTime || diary.departureTime || "00:00",
+          endTime: diary.departureTime,
+          title: diary.clientName || "Field note",
+          subtitle: [diary.workCompleted, diary.notes].filter(Boolean).join(" · "),
+          status: diary.status,
+          sortMinutes: timeToMinutes(diary.arrivalTime || diary.departureTime || "00:00") ?? 0,
+        });
+      }
+      events.sort((a, b) => a.sortMinutes - b.sortMinutes || a.title.localeCompare(b.title));
+      res.json({
+        workDate,
+        employee: { id: worker.id, name: worker.name },
+        attendance: attendance ? attendanceRecordForResponse(attendance, worker, vehicle || undefined) : null,
+        events,
+        totals: {
+          vehicleDistanceKm: attendance?.vehicleDistanceKm || 0,
+          attendanceMinutes: attendance?.totalMinutes || 0,
+        },
+      });
+    } catch (error) {
+      console.error("Could not load mobile My Day:", error);
+      res.status(500).json({ error: "Could not load My Day. Please try again." });
+    }
+  });
+
   app.post("/api/mobile/field-diaries", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
       const worker = req.mobileWorker!;
@@ -1547,6 +1692,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const assignment = await storage.getActiveAssignmentForWorker(req.mobileWorker!.id);
     const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : undefined;
     res.json({ assignment: assignment ?? null, vehicle: vehicle ?? null });
+  });
+
+  app.get("/api/mobile/fleet/vehicles", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const [activeVehicles, assignment] = await Promise.all([
+        storage.getActiveVehicles(),
+        storage.getActiveAssignmentForWorker(req.mobileWorker!.id),
+      ]);
+      const items = await Promise.all(activeVehicles.map(async vehicle => ({
+        ...vehicle,
+        latestOdometer: (await latestVehicleOdometer(vehicle.id))?.endOdometer ?? null,
+        isAssigned: assignment?.vehicleId === vehicle.id,
+      })));
+      res.json({ vehicles: items, assignedVehicleId: assignment?.vehicleId || null });
+    } catch (error) {
+      console.error("Could not load mobile Fleet vehicles:", error);
+      res.status(500).json({ error: "Could not load vehicles. Please try again." });
+    }
   });
 
   app.post("/api/mobile/fleet/km-logs", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
@@ -1866,9 +2029,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(employeeAttendanceRecords.workDate, workDate),
         ))
         .limit(1);
+      const vehicle = record?.vehicleId ? await storage.getVehicle(record.vehicleId) : undefined;
       res.json({
         workDate,
-        attendance: record ? attendanceRecordForResponse(record, req.mobileWorker!) : null,
+        attendance: record ? attendanceRecordForResponse(record, req.mobileWorker!, vehicle) : null,
       });
     } catch (error) {
       console.error("Could not load today's employee attendance:", error);
@@ -1879,6 +2043,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/mobile/attendance/start", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     const now = new Date();
     const workDate = attendanceDateParts(now).date;
+    const parsed = z.object({
+      vehicleId: z.string().trim().min(1).nullable().optional(),
+      startVehicleKm: z.coerce.number().int().min(0).max(10_000_000).nullable().optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message || "Enter a valid whole-number odometer reading." });
+    }
+    const vehicleId = parsed.data.vehicleId || null;
+    const startVehicleKm = parsed.data.startVehicleKm ?? null;
+    if (vehicleId && startVehicleKm === null) {
+      return res.status(400).json({ error: "Start Vehicle KM is required when a vehicle is selected." });
+    }
+    if (!vehicleId && startVehicleKm !== null) {
+      return res.status(400).json({ error: "Select a vehicle for this odometer reading." });
+    }
     try {
       const result = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${req.mobileWorker!.id}:${workDate}`}))`);
@@ -1890,17 +2069,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .limit(1);
         if (existing) return { record: existing, created: false };
 
+        let selectedVehicle: typeof vehicles.$inferSelect | null = null;
+        let vehicleKmLogId: string | null = null;
+        if (vehicleId) {
+          [selectedVehicle] = await tx.select().from(vehicles)
+            .where(and(eq(vehicles.id, vehicleId), eq(vehicles.isActive, true)))
+            .limit(1);
+          if (!selectedVehicle) {
+            throw Object.assign(new Error("Select an active Fleet vehicle."), { status: 400 });
+          }
+          const latest = await latestVehicleOdometer(vehicleId, tx);
+          if (latest && startVehicleKm! < latest.endOdometer) {
+            throw Object.assign(new Error("Start km is lower than the vehicle's previous recorded odometer reading."), {
+              status: 409,
+              code: "ODOMETER_LOWER_THAN_PREVIOUS",
+              previousOdometer: latest.endOdometer,
+            });
+          }
+          vehicleKmLogId = randomUUID();
+          await tx.insert(kmLogs).values({
+            id: vehicleKmLogId,
+            vehicleId,
+            workerId: req.mobileWorker!.id,
+            logDate: now,
+            startOdometer: startVehicleKm!,
+            endOdometer: startVehicleKm!,
+            totalKm: 0,
+            businessKm: 0,
+            privateKm: 0,
+            notes: `Attendance workday ${workDate}`,
+            createdAt: now,
+          });
+        }
         const metrics = attendanceMetrics(now);
         const [record] = await tx.insert(employeeAttendanceRecords).values({
           employeeId: req.mobileWorker!.id,
           workDate,
           startAt: now,
+          vehicleId,
+          startVehicleKm,
+          vehicleKmLogId,
           lateStartMinutes: metrics.lateStartMinutes,
           earlyFinishMinutes: 0,
           status: "WORKING",
           updatedAt: now,
         }).returning();
-        return { record, created: true };
+        return { record, created: true, vehicle: selectedVehicle };
       });
 
       if (result.created) {
@@ -1911,7 +2125,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actorId: req.mobileWorker!.id,
             actorName: req.mobileWorker!.name,
             action: "START_WORK",
-            newValues: { workDate, startAt: result.record.startAt.toISOString() },
+            newValues: {
+              workDate,
+              startAt: result.record.startAt.toISOString(),
+              vehicleId: result.record.vehicleId,
+              startVehicleKm: result.record.startVehicleKm,
+            },
           });
         } catch (auditError) {
           console.error(`[ATTENDANCE] Could not audit start ${result.record.id}:`, auditError);
@@ -1920,10 +2139,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.status(result.created ? 201 : 200).json({
-        attendance: attendanceRecordForResponse(result.record, req.mobileWorker!),
+        attendance: attendanceRecordForResponse(
+          result.record,
+          req.mobileWorker!,
+          result.created ? result.vehicle || undefined : result.record.vehicleId ? await storage.getVehicle(result.record.vehicleId) : undefined,
+        ),
         alreadyStarted: !result.created,
       });
     } catch (error) {
+      const status = typeof error === "object" && error !== null && "status" in error
+        ? Number((error as any).status)
+        : 500;
+      if (status !== 500) {
+        return res.status(status).json({
+          error: error instanceof Error ? error.message : "Could not start work.",
+          code: (error as any).code,
+          previousOdometer: (error as any).previousOdometer,
+        });
+      }
       console.error("Could not start employee attendance:", error);
       res.status(500).json({ error: "Could not start work. Please try again." });
     }
@@ -1932,6 +2165,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/mobile/attendance/end", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     const now = new Date();
     const workDate = attendanceDateParts(now).date;
+    const parsed = z.object({
+      endVehicleKm: z.coerce.number().int().min(0).max(10_000_000).nullable().optional(),
+      confirmHighDistance: z.boolean().optional().default(false),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message || "Enter a valid whole-number odometer reading." });
+    }
     try {
       const result = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${req.mobileWorker!.id}:${workDate}`}))`);
@@ -1946,9 +2186,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (existing.endAt) return { record: existing, updated: false };
 
+        const endVehicleKm = parsed.data.endVehicleKm ?? null;
+        let distance: number | null = null;
+        if (existing.vehicleId) {
+          if (existing.startVehicleKm === null || endVehicleKm === null) {
+            throw Object.assign(new Error("End Vehicle KM is required for today's selected vehicle."), { status: 400 });
+          }
+          if (endVehicleKm < existing.startVehicleKm) {
+            throw Object.assign(new Error("End vehicle km cannot be lower than the Start Work odometer reading."), { status: 400 });
+          }
+          distance = endVehicleKm - existing.startVehicleKm;
+          const threshold = Math.max(1, Number(process.env.ATTENDANCE_HIGH_KM_THRESHOLD || 500));
+          if (distance > threshold && !parsed.data.confirmHighDistance) {
+            throw Object.assign(new Error(`Vehicle travelled ${distance.toLocaleString("en-ZA")} km today. Please confirm this reading.`), {
+              status: 409,
+              code: "HIGH_DAILY_DISTANCE_CONFIRMATION_REQUIRED",
+              distance,
+            });
+          }
+          if (existing.vehicleKmLogId) {
+            await tx.update(kmLogs).set({
+              endOdometer: endVehicleKm,
+              totalKm: distance,
+              businessKm: distance,
+            }).where(eq(kmLogs.id, existing.vehicleKmLogId));
+          } else {
+            const vehicleKmLogId = randomUUID();
+            await tx.insert(kmLogs).values({
+              id: vehicleKmLogId,
+              vehicleId: existing.vehicleId,
+              workerId: req.mobileWorker!.id,
+              logDate: existing.startAt,
+              startOdometer: existing.startVehicleKm,
+              endOdometer: endVehicleKm,
+              totalKm: distance,
+              businessKm: distance,
+              privateKm: 0,
+              notes: `Attendance workday ${workDate}`,
+              createdAt: now,
+            });
+            existing.vehicleKmLogId = vehicleKmLogId;
+          }
+        } else if (endVehicleKm !== null) {
+          throw Object.assign(new Error("No vehicle was selected at Start Work."), { status: 400 });
+        }
         const metrics = attendanceMetrics(existing.startAt, now);
         const [record] = await tx.update(employeeAttendanceRecords).set({
           endAt: now,
+          endVehicleKm,
+          vehicleDistanceKm: distance,
+          vehicleKmLogId: existing.vehicleKmLogId,
           totalMinutes: metrics.totalMinutes,
           lateStartMinutes: metrics.lateStartMinutes,
           earlyFinishMinutes: metrics.earlyFinishMinutes,
@@ -1971,6 +2258,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               totalMinutes: result.record.totalMinutes,
               lateStartMinutes: result.record.lateStartMinutes,
               earlyFinishMinutes: result.record.earlyFinishMinutes,
+              endVehicleKm: result.record.endVehicleKm,
+              vehicleDistanceKm: result.record.vehicleDistanceKm,
             },
           });
         } catch (auditError) {
@@ -1980,12 +2269,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({
-        attendance: attendanceRecordForResponse(result.record, req.mobileWorker!),
+        attendance: attendanceRecordForResponse(
+          result.record,
+          req.mobileWorker!,
+          result.record.vehicleId ? await storage.getVehicle(result.record.vehicleId) : undefined,
+        ),
         alreadyFinished: !result.updated,
       });
     } catch (error) {
-      if (typeof error === "object" && error !== null && (error as any).status === 409) {
-        return res.status(409).json({ error: error instanceof Error ? error.message : "Start Work must be recorded first." });
+      if (typeof error === "object" && error !== null && (error as any).status) {
+        return res.status(Number((error as any).status)).json({
+          error: error instanceof Error ? error.message : "Could not end work.",
+          code: (error as any).code,
+          distance: (error as any).distance,
+        });
       }
       console.error("Could not finish employee attendance:", error);
       res.status(500).json({ error: "Could not end work. Please try again." });
@@ -2709,8 +3006,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "A valid date range is required" });
       }
 
-      const [allEntries, allWorkers, departments, clients, allJobs] = await Promise.all([
+      const [allEntries, allAttendance, allWorkers, departments, clients, allJobs] = await Promise.all([
         db.select().from(overtimeEntries).orderBy(overtimeEntries.workDate, overtimeEntries.startTime),
+        db.select().from(employeeAttendanceRecords)
+          .where(and(
+            gte(employeeAttendanceRecords.workDate, from),
+            lte(employeeAttendanceRecords.workDate, to),
+          ))
+          .orderBy(employeeAttendanceRecords.workDate, employeeAttendanceRecords.startAt),
         storage.getWorkers(),
         storage.getDepartments(),
         storage.getClients(),
@@ -2728,6 +3031,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (!employeeId || entry.employeeId === employeeId) &&
         (!departmentId || workerMap.get(entry.employeeId)?.departmentId === departmentId),
       );
+      const attendanceInScope = allAttendance.filter(record =>
+        (!employeeId || record.employeeId === employeeId) &&
+        (!departmentId || workerMap.get(record.employeeId)?.departmentId === departmentId),
+      );
 
       const scopedWorkers = allWorkers.filter(worker =>
         (worker.isActive !== false || inScope.some(entry => entry.employeeId === worker.id)) &&
@@ -2737,6 +3044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employeeIds = new Set([
         ...scopedWorkers.map(worker => worker.id),
         ...inScope.map(entry => entry.employeeId),
+        ...attendanceInScope.map(record => record.employeeId),
       ]);
 
       const durationLabel = (minutes: number) => {
@@ -2762,6 +3070,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingOvertimeMinutes: number;
         pendingTimeOffMinutes: number;
         transactionCount: number;
+        attendanceDays: number;
+        averageStartMinutes: number | null;
+        lateStarts: number;
+        earlyFinishes: number;
+        vehicleKmTravelled: number;
       }>();
       for (const id of Array.from(employeeIds)) {
         byEmployee.set(id, {
@@ -2770,6 +3083,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pendingOvertimeMinutes: 0,
           pendingTimeOffMinutes: 0,
           transactionCount: 0,
+          attendanceDays: 0,
+          averageStartMinutes: null,
+          lateStarts: 0,
+          earlyFinishes: 0,
+          vehicleKmTravelled: 0,
         });
       }
       for (const entry of inScope) {
@@ -2786,6 +3104,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           summary.pendingOvertimeMinutes += minutes;
         }
       }
+      const attendanceStarts = new Map<string, number[]>();
+      for (const record of attendanceInScope) {
+        const summary = byEmployee.get(record.employeeId);
+        if (!summary) continue;
+        summary.attendanceDays++;
+        summary.lateStarts += record.lateStartMinutes > 0 ? 1 : 0;
+        summary.earlyFinishes += record.endAt && record.earlyFinishMinutes > 0 ? 1 : 0;
+        summary.vehicleKmTravelled += Math.max(0, record.vehicleDistanceKm || 0);
+        const starts = attendanceStarts.get(record.employeeId) || [];
+        starts.push(attendanceDateParts(record.startAt).minutes);
+        attendanceStarts.set(record.employeeId, starts);
+      }
+      for (const [id, starts] of attendanceStarts) {
+        const summary = byEmployee.get(id);
+        if (summary && starts.length) {
+          summary.averageStartMinutes = Math.round(starts.reduce((total, value) => total + value, 0) / starts.length);
+        }
+      }
 
       const rows = Array.from(byEmployee.entries()).map(([id, summary]) => {
         const worker = workerMap.get(id);
@@ -2795,6 +3131,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           departmentId: worker?.departmentId || null,
           departmentName: worker?.departmentId ? (departmentMap.get(worker.departmentId) || "Unknown department") : "Office / Management",
           ...summary,
+          averageStart: summary.averageStartMinutes === null
+            ? null
+            : `${String(Math.floor(summary.averageStartMinutes / 60)).padStart(2, "0")}:${String(summary.averageStartMinutes % 60).padStart(2, "0")}`,
           netMinutes: summary.approvedOvertimeMinutes - summary.approvedTimeOffMinutes,
         };
       }).sort((a, b) => a.name.localeCompare(b.name));
@@ -6925,14 +7264,20 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         lte(employeeAttendanceRecords.workDate, to),
         ...(employeeId ? [eq(employeeAttendanceRecords.employeeId, employeeId)] : []),
       ];
-      const [records, allWorkers] = await Promise.all([
+      const [records, allWorkers, allVehicles] = await Promise.all([
         db.select().from(employeeAttendanceRecords)
           .where(and(...conditions))
           .orderBy(desc(employeeAttendanceRecords.workDate), desc(employeeAttendanceRecords.startAt)),
         storage.getWorkers(),
+        storage.getVehicles(),
       ]);
       const workerMap = new Map(allWorkers.map(worker => [worker.id, worker]));
-      const decorated = records.map(record => attendanceRecordForResponse(record, workerMap.get(record.employeeId)));
+      const vehicleMap = new Map(allVehicles.map(vehicle => [vehicle.id, vehicle]));
+      const decorated = records.map(record => attendanceRecordForResponse(
+        record,
+        workerMap.get(record.employeeId),
+        record.vehicleId ? vehicleMap.get(record.vehicleId) : undefined,
+      ));
       const todayRecords = records.filter(record => record.workDate === date);
       res.json({
         records: decorated,

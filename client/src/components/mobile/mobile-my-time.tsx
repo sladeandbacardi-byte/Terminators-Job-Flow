@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileShell, type MobileNavItem } from "./mobile-shell";
 
 type TimeEntry = {
@@ -39,6 +40,19 @@ type Attendance = {
   lateStartMinutes: number;
   earlyFinishMinutes: number;
   status: "WORKING" | "FINISHED";
+  vehicle: { id: string; name: string; registration: string } | null;
+  startVehicleKm: number | null;
+  endVehicleKm: number | null;
+  vehicleDistanceKm: number | null;
+};
+type FleetVehicle = {
+  id: string;
+  name: string;
+  registration: string;
+  make?: string | null;
+  model?: string | null;
+  latestOdometer: number | null;
+  isAssigned: boolean;
 };
 
 const authHeaders = () => ({
@@ -81,6 +95,13 @@ export default function MobileMyTime() {
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
+  const [startOpen, setStartOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState("none");
+  const [startVehicleKm, setStartVehicleKm] = useState("");
+  const [endVehicleKm, setEndVehicleKm] = useState("");
+  const [confirmHighDistance, setConfirmHighDistance] = useState(false);
 
   const worker = useMemo(() => {
     try {
@@ -93,13 +114,15 @@ export default function MobileMyTime() {
   const load = async () => {
     setLoading(true);
     try {
-      const [timeResponse, attendanceResponse] = await Promise.all([
+      const [timeResponse, attendanceResponse, vehicleResponse] = await Promise.all([
         fetch("/api/mobile/time", { headers: authHeaders() }),
         fetch("/api/mobile/attendance/today", { headers: authHeaders() }),
+        fetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
       ]);
-      const [data, attendanceData] = await Promise.all([
+      const [data, attendanceData, vehicleData] = await Promise.all([
         timeResponse.json().catch(() => ({})),
         attendanceResponse.json().catch(() => ({})),
+        vehicleResponse.json().catch(() => ({})),
       ]);
       if (!timeResponse.ok) {
         throw new Error(timeResponse.status === 401
@@ -111,9 +134,21 @@ export default function MobileMyTime() {
           ? "Your mobile session has expired. Please sign in again."
           : attendanceData.error || attendanceData.message || "Unable to load today's attendance.");
       }
+      if (!vehicleResponse.ok) {
+        throw new Error(vehicleResponse.status === 401
+          ? "Your mobile session has expired. Please sign in again."
+          : vehicleData.error || "Unable to load Fleet vehicles.");
+      }
       setEntries(data.entries ?? []);
       setSummary(data.summary ?? {});
       setAttendance(attendanceData.attendance ?? null);
+      setVehicles(vehicleData.vehicles ?? []);
+      if (!attendanceData.attendance) {
+        const preferredId = vehicleData.assignedVehicleId || "none";
+        setSelectedVehicleId(preferredId);
+        const preferred = (vehicleData.vehicles ?? []).find((item: FleetVehicle) => item.id === preferredId);
+        setStartVehicleKm(preferred?.latestOdometer == null ? "" : String(preferred.latestOdometer));
+      }
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load your time.");
@@ -123,7 +158,10 @@ export default function MobileMyTime() {
   };
   useEffect(() => { load(); }, []);
 
-  const updateAttendance = async (action: "start" | "end") => {
+  const updateAttendance = async (
+    action: "start" | "end",
+    payload: Record<string, unknown>,
+  ) => {
     setAttendanceSaving(true);
     setError("");
     setMessage("");
@@ -131,7 +169,7 @@ export default function MobileMyTime() {
       const response = await fetch(`/api/mobile/attendance/${action}`, {
         method: "POST",
         headers: authHeaders(),
-        body: "{}",
+        body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -140,14 +178,39 @@ export default function MobileMyTime() {
           : data.error || `Unable to ${action} work.`);
       }
       setAttendance(data.attendance ?? null);
+      if (action === "start") setStartOpen(false);
+      else setEndOpen(false);
       setMessage(action === "start"
         ? `Work started at ${data.attendance?.startTime}.`
         : `Work ended at ${data.attendance?.finishTime}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Unable to ${action} work.`);
+      const nextError = err instanceof Error ? err.message : `Unable to ${action} work.`;
+      setError(nextError);
+      if (action === "end" && /Please confirm this reading/.test(nextError)) {
+        setConfirmHighDistance(true);
+      }
     } finally {
       setAttendanceSaving(false);
     }
+  };
+  const selectedVehicle = vehicles.find(vehicle => vehicle.id === selectedVehicleId) || null;
+  const startKmNumber = startVehicleKm === "" ? null : Number(startVehicleKm);
+  const endKmNumber = endVehicleKm === "" ? null : Number(endVehicleKm);
+  const distance = attendance?.startVehicleKm != null && endKmNumber != null
+    ? endKmNumber - attendance.startVehicleKm
+    : null;
+  const openStart = () => {
+    setError("");
+    const preferred = vehicles.find(vehicle => vehicle.isAssigned) || null;
+    setSelectedVehicleId(preferred?.id || "none");
+    setStartVehicleKm(preferred?.latestOdometer == null ? "" : String(preferred.latestOdometer));
+    setStartOpen(true);
+  };
+  const openEnd = () => {
+    setError("");
+    setConfirmHighDistance(false);
+    setEndVehicleKm(attendance?.startVehicleKm == null ? "" : String(attendance.startVehicleKm));
+    setEndOpen(true);
   };
 
   const overtime = useMemo(() => calculateOvertimeBreakdown(form.startTime, form.finishTime), [form.startTime, form.finishTime]);
@@ -244,7 +307,7 @@ export default function MobileMyTime() {
 
         {!attendance ? (
           <Button
-            onClick={() => updateAttendance("start")}
+            onClick={openStart}
             disabled={attendanceSaving || loading}
             className="mt-4 h-14 w-full bg-red-600 text-base font-bold hover:bg-red-700"
           >
@@ -255,9 +318,10 @@ export default function MobileMyTime() {
           <div className="mt-4 space-y-4">
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
               Started at <strong>{attendance.startTime}</strong>
+              {attendance.vehicle && <div className="mt-1">{attendance.vehicle.registration} · Start {attendance.startVehicleKm?.toLocaleString("en-ZA")} km</div>}
             </div>
             <Button
-              onClick={() => updateAttendance("end")}
+              onClick={openEnd}
               disabled={attendanceSaving}
               className="h-14 w-full bg-gray-900 text-base font-bold hover:bg-gray-800"
             >
@@ -266,10 +330,11 @@ export default function MobileMyTime() {
             </Button>
           </div>
         ) : (
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Started</p><p className="mt-1 font-bold text-gray-900">{attendance.startTime}</p></div>
             <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Finished</p><p className="mt-1 font-bold text-gray-900">{attendance.finishTime}</p></div>
             <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Total</p><p className="mt-1 font-bold text-gray-900">{formatOvertimeMinutes(attendance.totalMinutes || 0)}</p></div>
+            <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">Vehicle KM</p><p className="mt-1 font-bold text-gray-900">{attendance.vehicleDistanceKm == null ? "—" : `${attendance.vehicleDistanceKm.toLocaleString("en-ZA")} km`}</p></div>
           </div>
         )}
       </section>
@@ -312,6 +377,73 @@ export default function MobileMyTime() {
            <Button type="submit" disabled={saving || !canSubmit} className={mode === "overtime" ? "bg-red-600 hover:bg-red-700" : "bg-gray-900 hover:bg-gray-800"}>{saving ? "Saving…" : mode === "timeoff" ? "Submit Time Off" : "Submit Overtime"}</Button>
         </form>
       )}
+
+      <Dialog open={startOpen} onOpenChange={setStartOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Start Work</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-700">Vehicle
+              <Select value={selectedVehicleId} onValueChange={value => {
+                setSelectedVehicleId(value);
+                const next = vehicles.find(vehicle => vehicle.id === value);
+                setStartVehicleKm(next?.latestOdometer == null ? "" : String(next.latestOdometer));
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No vehicle today</SelectItem>
+                  {vehicles.map(vehicle => <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.registration} — {vehicle.name}{vehicle.isAssigned ? " (assigned)" : ""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+            {selectedVehicle && <>
+              <label className="block text-sm font-medium text-gray-700">Start Vehicle KM
+                <Input className="mt-1" inputMode="numeric" min="0" step="1" type="number" value={startVehicleKm} onChange={event => setStartVehicleKm(event.target.value)} placeholder="183420" />
+              </label>
+              <p className="text-xs text-gray-500">Last recorded: {selectedVehicle.latestOdometer == null ? "No previous reading" : `${selectedVehicle.latestOdometer.toLocaleString("en-ZA")} km`}</p>
+            </>}
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setStartOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700"
+                disabled={attendanceSaving || (selectedVehicleId !== "none" && (!Number.isInteger(startKmNumber) || startKmNumber! < 0))}
+                onClick={() => updateAttendance("start", {
+                  vehicleId: selectedVehicleId === "none" ? null : selectedVehicleId,
+                  startVehicleKm: selectedVehicleId === "none" ? null : startKmNumber,
+                })}
+              >{attendanceSaving ? "Starting…" : "Start Work"}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={endOpen} onOpenChange={setEndOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>End Work</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {attendance?.vehicle ? <>
+              <div className="rounded-lg bg-gray-50 p-3 text-sm"><strong>{attendance.vehicle.registration}</strong> — {attendance.vehicle.name}<br /><span className="text-gray-500">Start KM: {attendance.startVehicleKm?.toLocaleString("en-ZA")} km</span></div>
+              <label className="block text-sm font-medium text-gray-700">End Vehicle KM
+                <Input className="mt-1" inputMode="numeric" min={attendance.startVehicleKm || 0} step="1" type="number" value={endVehicleKm} onChange={event => { setEndVehicleKm(event.target.value); setConfirmHighDistance(false); }} placeholder="183487" />
+              </label>
+              <div className={`rounded-lg border p-3 text-sm ${distance != null && distance < 0 ? "border-red-200 bg-red-50 text-red-700" : "border-blue-200 bg-blue-50 text-blue-900"}`}>
+                Distance: <strong>{distance == null ? "—" : `${distance.toLocaleString("en-ZA")} km`}</strong>
+              </div>
+              {confirmHighDistance && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">This is an unusually high daily distance. Press End Work again to confirm the reading is correct.</div>}
+            </> : <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">No vehicle was selected when work started.</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setEndOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-gray-900 hover:bg-gray-800"
+                disabled={attendanceSaving || Boolean(attendance?.vehicle && (!Number.isInteger(endKmNumber) || distance === null || distance < 0))}
+                onClick={() => updateAttendance("end", {
+                  endVehicleKm: attendance?.vehicle ? endKmNumber : null,
+                  confirmHighDistance,
+                })}
+              >{attendanceSaving ? "Ending…" : "End Work"}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section>
         <div className="mb-3 flex items-center gap-2"><History className="h-4 w-4 text-gray-400" /><div><h2 className="text-sm font-semibold text-gray-900">Recent activity</h2><p className="text-xs text-gray-500">Approved entries are locked.</p></div></div>

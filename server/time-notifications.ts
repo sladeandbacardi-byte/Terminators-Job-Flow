@@ -49,6 +49,13 @@ type AttendanceNotificationRecord = {
   startAt: Date;
   endAt?: Date | null;
   totalMinutes?: number | null;
+  startVehicleKm?: number | null;
+  endVehicleKm?: number | null;
+  vehicleDistanceKm?: number | null;
+  vehicle?: {
+    name?: string | null;
+    registration?: string | null;
+  } | null;
 };
 
 // Keep one shared recipient list so Overtime and Time Off cannot drift apart.
@@ -218,13 +225,25 @@ export async function sendAttendanceNotification(
   const finished = phase === "finish";
   const subject = `JobFlow - Work ${finished ? "Finished" : "Started"} - ${employeeName} - ${currentTime}`;
   const status = finished ? "Finished" : "Working";
+  const vehicleName = record.vehicle?.name || "No vehicle selected";
+  const registration = record.vehicle?.registration || "—";
+  const km = (value: number | null | undefined) =>
+    value === null || value === undefined ? "—" : `${value.toLocaleString("en-ZA")} km`;
   const text = [
     `WORK ${finished ? "FINISHED" : "STARTED"}`,
     "",
     `Employee: ${employeeName}`,
     `Date: ${formatAttendanceDate(record.workDate)}`,
     `Start Time: ${startTime}`,
-    ...(finished ? [`Finish Time: ${finishTime}`, `Total Attendance: ${formatAttendanceMinutes(record.totalMinutes)}`] : []),
+    `Vehicle: ${vehicleName}`,
+    `Registration: ${registration}`,
+    `Start Vehicle KM: ${km(record.startVehicleKm)}`,
+    ...(finished ? [
+      `Finish Time: ${finishTime}`,
+      `End Vehicle KM: ${km(record.endVehicleKm)}`,
+      `Vehicle Distance: ${km(record.vehicleDistanceKm)}`,
+      `Attendance Span: ${formatAttendanceMinutes(record.totalMinutes)}`,
+    ] : []),
     `Status: ${status}`,
     "",
     "Sent automatically by JobFlow.",
@@ -233,7 +252,15 @@ export async function sendAttendanceNotification(
     ["Employee", employeeName],
     ["Date", formatAttendanceDate(record.workDate)],
     ["Start Time", startTime],
-    ...(finished ? [["Finish Time", finishTime || "—"], ["Total Attendance", formatAttendanceMinutes(record.totalMinutes)]] : []),
+    ["Vehicle", vehicleName],
+    ["Registration", registration],
+    ["Start Vehicle KM", km(record.startVehicleKm)],
+    ...(finished ? [
+      ["Finish Time", finishTime || "—"],
+      ["End Vehicle KM", km(record.endVehicleKm)],
+      ["Vehicle Distance", km(record.vehicleDistanceKm)],
+      ["Attendance Span", formatAttendanceMinutes(record.totalMinutes)],
+    ] : []),
     ["Status", status],
   ];
   const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.5"><h2 style="color:#dc2626">${escapeHtml(subject)}</h2><p><strong>WORK ${finished ? "FINISHED" : "STARTED"}</strong></p><table style="border-collapse:collapse;width:100%;max-width:640px">${rows.map(([label, value]) => `<tr><td style="padding:7px 12px 7px 0;font-weight:bold;border-bottom:1px solid #e5e7eb">${escapeHtml(label)}</td><td style="padding:7px 0;border-bottom:1px solid #e5e7eb">${escapeHtml(value)}</td></tr>`).join("")}</table><p style="font-size:12px;color:#6b7280">Sent automatically by JobFlow.</p></body></html>`;
