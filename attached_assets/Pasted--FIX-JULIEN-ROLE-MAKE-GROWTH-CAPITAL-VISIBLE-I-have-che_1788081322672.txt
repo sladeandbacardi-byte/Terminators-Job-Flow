@@ -1,0 +1,165 @@
+## FIX JULIEN ROLE + MAKE GROWTH & CAPITAL VISIBLE
+
+I have checked the live JobFlow interface.
+
+The **Growth & Capital** section is NOT visible anywhere in the sidebar.
+
+Current sidebar shows only:
+
+- Dashboard
+- Sales
+- Service
+- Finance
+- Operations
+- Admin
+
+Also, the logged-in user is:
+
+**Julien Botha**
+
+but the interface displays:
+
+**Operations Manager**
+
+This may be preventing owner-only features from appearing.
+
+### Fix this properly.
+
+1. Inspect the existing Julien Botha user account.
+
+Do NOT create a duplicate user.
+
+Determine:
+- current user ID
+- current role
+- current permissions
+- why the UI labels Julien as Operations Manager
+
+2. Julien must remain able to access all current admin/operations functions, but he must ALSO have a specific owner-level permission.
+
+Add something like:
+
+`isOwner = true`
+
+or:
+
+`canViewGrowthAndCapital = true`
+
+Use whichever approach best matches the existing permissions architecture.
+
+Do NOT simply make all Operations Managers able to see Growth & Capital.
+
+Only Julien must have access.
+
+3. Add the missing sidebar item.
+
+Add:
+
+**Growth & Capital**
+
+to the existing left navigation.
+
+Place it directly below:
+
+**Dashboard**
+
+So the sidebar should become:
+
+Dashboard  
+Growth & Capital  
+Sales  
+Service  
+Finance  
+Operations  
+Admin
+
+Use a suitable growth/chart icon.
+
+Only Julien should see Growth & Capital.
+
+4. Ensure the page route exists.
+
+Use:
+
+`/growth-capital`
+
+Clicking the sidebar item must open the existing Growth & Capital dashboard.
+
+5. If the Growth & Capital page/component/API from the previous work already exists, REUSE IT.
+
+Do not rebuild the whole dashboard unless it is genuinely missing.
+
+Search the existing project for:
+
+- GrowthAndCapital
+- growth-capital
+- Growth & Capital
+- Jan Capital
+- Property Fund
+- canViewGrowthAndCapital
+
+6. The page must display at minimum:
+
+Original Jan Capital:
+R8,550,000
+
+Total Paid:
+R3,450,000
+
+Outstanding:
+R5,100,000
+
+Paid:
+40.35%
+
+Extra Payments:
+R900,000
+
+Position Date:
+25 August 2026
+
+7. IMPORTANT: fix the visible role label.
+
+Julien should not simply be presented as a normal Operations Manager if he is effectively the owner/admin of JobFlow.
+
+Prefer displaying:
+
+**Owner / Administrator**
+
+or:
+
+**Owner**
+
+for Julien.
+
+Do NOT rename the general Operations Manager role for other users.
+
+This should apply only to Julien's account/profile display.
+
+8. Security must still be enforced server-side.
+
+Another user must not be able to manually navigate to:
+
+`/growth-capital`
+
+and retrieve the private information.
+
+9. After fixing it, test specifically while logged in as Julien Botha.
+
+Confirm:
+
+- Growth & Capital appears directly under Dashboard
+- clicking it works
+- Jan capital figures show
+- browser refresh works
+- Julien still has access to Sales, Service, Finance, Operations and Admin
+- another admin/non-owner does not see Growth & Capital
+
+10. Give me a short report at the end:
+
+- Julien's actual role before the fix
+- permission/change made
+- navigation file changed
+- route used
+- whether Growth & Capital already existed or had to be created
+- confirmation that it is now visible to Julien
