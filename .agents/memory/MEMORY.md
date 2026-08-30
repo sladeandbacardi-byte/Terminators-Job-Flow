@@ -23,3 +23,4 @@
 - [Post-merge package manager](post-merge-package-manager.md) — post-merge dependency setup must use the repository's declared pnpm manager; npm cannot resolve workspace:* dependencies here.
 - [Time submission audit boundary](time-submission-audit-boundary.md) — secondary audit writes must not roll back valid mobile time submissions; overtime schema migrations are startup-critical.
 - [Employee vs team attendance](employee-vs-team-attendance.md) — server-timestamped personal start/end records stay separate from supervisor team attendance sheets; never repurpose either table.
+- [GitHub connector push fallback](github-connector-push-fallback.md) — when HTTPS Git auth is stale, recreate commits through the OAuth Git Data API in small SHA-verified batches, then fast-forward once.
