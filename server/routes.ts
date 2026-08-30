@@ -105,7 +105,6 @@ const attendanceMetrics = (startAt: Date, endAt?: Date | null) => {
 export async function registerRoutes(app: Express): Promise<Server> {
 
   const publicApiRoutes = new Set([
-    "POST /api/auth/login",
     "POST /api/auth/admin-login",
     "POST /api/auth/mobile-login",
     "GET /api/auth/staff",
@@ -372,38 +371,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Hardcoded staff list — used as fallback when DB is empty (e.g. fresh Railway deploy)
-  const HARDCODED_STAFF = [
-    { id: "worker-1", name: "Julien Botha",       role: "Operations Manager",             departmentId: "div-6" },
-    { id: "worker-2", name: "Maryka Venter",      role: "Pest Control Services Manager",  departmentId: "div-6" },
-    { id: "worker-3", name: "Mariette Koekemoer", role: "Hygiene Services Manager",       departmentId: "div-6" },
-    { id: "worker-4", name: "Juli Holtshausen",   role: "Finance & HR Manager",           departmentId: "div-7" },
-    { id: "worker-5", name: "Sheryl-Lyn Lee",     role: "Existing Clients Sales & Admin", departmentId: "div-5" },
-    { id: "worker-6", name: "Sales 2",             role: "Sales Rep",                      departmentId: "div-5" },
-  ];
-
-  // These values are only used to keep the login chooser useful while a
-  // development database is being created. They do not grant access: the
-  // mobile-login route still verifies the selected employee's PIN.
+  // These values only keep the login chooser useful while a development
+  // database is being created. They cannot authenticate without a matching
+  // database worker and PIN.
   const FALLBACK_MOBILE_STAFF = [
-    { id: "mobile-tech-01", name: "Re-Althon", role: "Technician", department: "Field Service", employeeId: "MT-001" },
-    { id: "mobile-tech-02", name: "Leon", role: "Technician", department: "Field Service", employeeId: "MT-002" },
-    { id: "mobile-tech-03", name: "Garth", role: "Technician", department: "Field Service", employeeId: "MT-003" },
-    { id: "mobile-tech-04", name: "Jackie", role: "Technician", department: "Field Service", employeeId: "MT-004" },
-    { id: "mobile-tech-06", name: "Zain", role: "Technician", department: "Field Service", employeeId: "MT-006" },
-    { id: "mobile-tech-07", name: "Mike", role: "Technician", department: "Field Service", employeeId: "MT-007" },
-    { id: "mobile-tech-08", name: "X", role: "Technician", department: "Field Service", employeeId: "MT-008" },
-    { id: "mobile-tech-09", name: "Reece", role: "Technician", department: "Field Service", employeeId: "MT-009" },
+    { id: "mobile-tech-01", name: "Re-Althon", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-02", name: "Leon", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-03", name: "Garth", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-04", name: "Jackie", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-06", name: "Zain", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-07", name: "Mike", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-08", name: "X", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-09", name: "Reece", role: "Technician", department: "Field Service" },
   ];
   const FALLBACK_ADMINS = [
     { id: "fallback-admin", name: "Administrator", username: "admin", role: "Administrator", department: "Administration", authMethod: "password" as const },
-    { id: "worker-1", name: "Julien Botha", role: "Operations Manager", department: "Admin", authMethod: "profile_picker" as const },
-    { id: "worker-2", name: "Maryka Venter", role: "Pest Control Services Manager", department: "Admin", authMethod: "profile_picker" as const },
-    { id: "worker-3", name: "Mariette Koekemoer", role: "Hygiene Services Manager", department: "Admin", authMethod: "profile_picker" as const },
-    { id: "worker-4", name: "Juli Holtshausen", role: "Finance & HR Manager", department: "Accounts", authMethod: "profile_picker" as const },
-    { id: "worker-5", name: "Sheryl-Lyn Lee", role: "Existing Clients Sales & Admin", department: "Sales", authMethod: "profile_picker" as const },
-    { id: "worker-6", name: "Sales 2", role: "Sales Rep", department: "Sales", authMethod: "profile_picker" as const },
   ];
+
+  const failedMobileLogins = new Map<string, { count: number; blockedUntil: number }>();
+  const mobileLoginKey = (req: any, workerId: string) => `${req.ip || req.socket?.remoteAddress || "unknown"}:${workerId}`;
+  const mobileLoginBlocked = (key: string) => {
+    const attempt = failedMobileLogins.get(key);
+    if (!attempt) return false;
+    if (attempt.blockedUntil <= Date.now()) {
+      failedMobileLogins.delete(key);
+      return false;
+    }
+    return attempt.count >= 5;
+  };
+  const recordFailedMobileLogin = (key: string) => {
+    const current = failedMobileLogins.get(key);
+    const count = current && current.blockedUntil > Date.now() ? current.count + 1 : 1;
+    failedMobileLogins.set(key, { count, blockedUntil: Date.now() + 15 * 60 * 1000 });
+  };
 
   const OVERTIME_WORK_TYPES = ["client_job", "internal", "workshop", "stock_warehouse", "travel", "other"] as const;
 
@@ -813,71 +813,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Authentication routes
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ message: "User ID is required" });
-      }
-
-      // Get the worker/user by ID — fall back to hardcoded list if DB is empty or throws
-      let worker: any = null;
-      try {
-        worker = await storage.getWorker(userId);
-      } catch (dbErr) {
-        console.warn("DB unavailable during login, using hardcoded fallback:", dbErr);
-      }
-
-      if (!worker) {
-        const fallback = HARDCODED_STAFF.find(s => s.id === userId);
-        if (fallback) {
-          worker = { ...fallback, email: null, phone: null, isActive: true, createdAt: new Date(), employeeId: null };
-        }
-      }
-
-      if (!worker) {
-        return res.status(401).json({ message: "User not found" });
-      }
-      if (worker.isActive === false) {
-        return res.status(403).json({ message: "This profile is inactive" });
-      }
-
-      const token = AuthService.generateWorkerToken(worker.id);
-
-      // Log successful login using worker info
-      const activityLog = {
-        userId: worker.id,
-        action: "login" as const,
-        details: "User logged in successfully",
-        ipAddress: req.ip || req.connection.remoteAddress || null,
-        userAgent: req.headers['user-agent'] || null,
-        timestamp: new Date()
-      };
-
-      // Store the activity log (simplified version)
-      console.log("Login activity:", activityLog);
-
-      res.json({
-        token: token,
-        user: {
-          id: worker.id,
-          username: worker.name,
-          email: worker.email,
-          firstName: worker.name.split(' ')[0],
-          lastName: worker.name.split(' ').slice(1).join(' '),
-          role: worker.role || 'worker',
-          departmentId: worker.departmentId,
-          authenticationMethod: "profile_picker",
-           userType: "admin",
-        }
-      });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
   app.post("/api/auth/admin-login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -901,33 +836,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mobile authentication routes
   app.post("/api/auth/mobile-login", async (req, res) => {
     try {
-      const { employeeId } = req.body;
-      
-      if (!employeeId) {
-        return res.status(400).json({ message: "Employee ID is required" });
+      const parsed = z.object({
+        workerId: z.string().trim().min(1),
+        pin: z.string().regex(/^\d{4}$/, "PIN must be 4 digits"),
+      }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Worker and PIN are required" });
       }
 
-      const worker = await storage.getWorkerByEmployeeId(employeeId.trim());
-      
+      const { workerId, pin } = parsed.data;
+      const loginKey = mobileLoginKey(req, workerId);
+      if (mobileLoginBlocked(loginKey)) {
+        return res.status(429).json({ message: "Too many failed sign-in attempts. Try again in 15 minutes." });
+      }
+
+      const worker = await storage.getWorker(workerId);
       if (!worker) {
-        return res.status(401).json({ message: "Invalid employee ID" });
-      }
-
-      if (!worker.isActive) {
-        return res.status(401).json({ message: "Account is inactive" });
+        recordFailedMobileLogin(loginKey);
+        return res.status(401).json({ message: "Invalid worker or PIN" });
       }
 
       if (
+        !worker.isActive ||
         worker.mobileAccessEnabled !== true ||
         String(worker.role ?? "").trim().toLowerCase() !== "technician"
       ) {
-        return res.status(403).json({ message: "This account is not enabled for mobile technician access" });
+        recordFailedMobileLogin(loginKey);
+        return res.status(401).json({ message: "Invalid worker or PIN" });
       }
 
-      // Temporary mode: PIN verification is intentionally disabled while
-      // technician PINs are being reset. Access still requires an active
-      // technician with mobile access enabled and receives a signed,
-      // expiring mobile session.
+      const storedPin = worker.pin || "";
+      const isBcryptHash = /^\$2[aby]\$\d{2}\$/.test(storedPin);
+      const pinMatches = isBcryptHash
+        ? await AuthService.verifyPassword(pin, storedPin)
+        : storedPin.length > 0 && storedPin === pin;
+      if (!pinMatches) {
+        recordFailedMobileLogin(loginKey);
+        return res.status(401).json({ message: "Invalid worker or PIN" });
+      }
+      if (!isBcryptHash) {
+        await storage.updateWorker(worker.id, { pin: await AuthService.hashPassword(pin) });
+      }
+      failedMobileLogins.delete(loginKey);
+
       const token = AuthService.generateMobileWorkerToken(worker.id);
 
       res.json({
@@ -939,7 +890,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: worker.phone,
           departmentId: worker.departmentId,
           role: worker.role,
-          employeeId: worker.employeeId,
         }
       });
     } catch (error) {
@@ -1725,15 +1675,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(worker =>
           worker.isActive &&
           worker.mobileAccessEnabled === true &&
-          String(worker.role ?? "").trim().toLowerCase() === "technician" &&
-          !!worker.employeeId,
+           String(worker.role ?? "").trim().toLowerCase() === "technician",
         )
         .map(worker => ({
           id: worker.id,
           name: worker.name,
           role: "Technician",
           department: departmentNames.get(worker.departmentId) || "Field Service",
-          employeeId: worker.employeeId!,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
       const admins = activeAdmins
@@ -1746,26 +1694,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           authMethod: "password" as const,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      const officeUsers = allWorkers
-        .filter(worker =>
-          worker.isActive &&
-          (["div-5", "div-6", "div-7"].includes(worker.departmentId) ||
-            /manager|admin|finance|accounts|sales|hr/i.test(worker.role ?? "")),
-        )
-        .map(worker => ({
-          id: worker.id,
-          name: worker.name,
-          role: worker.role || "Office Staff",
-          department: departmentNames.get(worker.departmentId) || "Office",
-          authMethod: "profile_picker" as const,
-        }))
-        .filter(worker => !admins.some(admin => admin.name === worker.name));
-
       res.json({
         staff: staff.length > 0 ? staff : FALLBACK_MOBILE_STAFF,
-        admins: admins.length > 0
-          ? [...admins, ...officeUsers].sort((a, b) => a.name.localeCompare(b.name))
-          : FALLBACK_ADMINS,
+         admins: admins.length > 0 ? admins : FALLBACK_ADMINS,
       });
     } catch (err) {
       console.error("[auth/staff] DB error, using login chooser fallback:", err);

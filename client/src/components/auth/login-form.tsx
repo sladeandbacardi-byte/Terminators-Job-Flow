@@ -8,7 +8,6 @@ import {
   AlertCircle, ArrowLeft, BriefcaseBusiness, Eye, EyeOff, Loader2,
   ShieldCheck, Smartphone, UserRound, ChevronRight, FlaskConical,
 } from "lucide-react";
-import { AUTH_MODE } from "@shared/auth";
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
 
@@ -19,7 +18,6 @@ interface Technician {
   name: string;
   role: string;
   department: string;
-  employeeId: string;
 }
 
 interface Administrator {
@@ -28,7 +26,7 @@ interface Administrator {
   username?: string;
   role: string;
   department: string;
-  authMethod: "password" | "profile_picker";
+  authMethod: "password";
 }
 
 interface LoginDirectory {
@@ -38,20 +36,14 @@ interface LoginDirectory {
 
 const FALLBACK_DIRECTORY: LoginDirectory = {
   staff: [
-    ["mobile-tech-01", "Re-Althon", "MT-001"], ["mobile-tech-02", "Leon", "MT-002"],
-    ["mobile-tech-03", "Garth", "MT-003"], ["mobile-tech-04", "Jackie", "MT-004"],
-    ["mobile-tech-06", "Zain", "MT-006"],
-    ["mobile-tech-07", "Mike", "MT-007"], ["mobile-tech-08", "X", "MT-008"],
-    ["mobile-tech-09", "Reece", "MT-009"],
-  ].map(([id, name, employeeId]) => ({ id, name, employeeId, role: "Technician", department: "Field Service" })),
+    ["mobile-tech-01", "Re-Althon"], ["mobile-tech-02", "Leon"],
+    ["mobile-tech-03", "Garth"], ["mobile-tech-04", "Jackie"],
+    ["mobile-tech-06", "Zain"],
+    ["mobile-tech-07", "Mike"], ["mobile-tech-08", "X"],
+    ["mobile-tech-09", "Reece"],
+  ].map(([id, name]) => ({ id, name, role: "Technician", department: "Field Service" })),
   admins: [
     { id: "fallback-admin", name: "Administrator", username: "admin", role: "Administrator", department: "Administration", authMethod: "password" },
-    { id: "worker-1", name: "Julien Botha", role: "Operations Manager", department: "Admin", authMethod: "profile_picker" },
-    { id: "worker-2", name: "Maryka Venter", role: "Pest Control Services Manager", department: "Admin", authMethod: "profile_picker" },
-    { id: "worker-3", name: "Mariette Koekemoer", role: "Hygiene Services Manager", department: "Admin", authMethod: "profile_picker" },
-    { id: "worker-4", name: "Juli Holtshausen", role: "Finance & HR Manager", department: "Accounts", authMethod: "profile_picker" },
-    { id: "worker-5", name: "Sheryl-Lyn Lee", role: "Existing Clients Sales & Admin", department: "Sales", authMethod: "profile_picker" },
-    { id: "worker-6", name: "Sales 2", role: "Sales Rep", department: "Sales", authMethod: "profile_picker" },
   ],
 };
 
@@ -72,6 +64,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const [selectedTechnician, setSelectedTechnician] = useState<Technician | null>(null);
   const [selectedAdmin, setSelectedAdmin] = useState<Administrator | null>(null);
   const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
 
@@ -95,25 +88,22 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const loginMutation = useMutation({
     mutationFn: async (
       credentials:
-        | { mode: "mobile"; employeeId: string }
-        | { mode: "admin"; username: string; password: string }
-        | { mode: "profile"; userId: string },
+        | { mode: "mobile"; workerId: string; pin: string }
+        | { mode: "admin"; username: string; password: string },
     ) => {
       const response = await fetch(
         credentials.mode === "mobile"
           ? "/api/auth/mobile-login"
           : credentials.mode === "admin"
             ? "/api/auth/admin-login"
-            : "/api/auth/login",
+            : "/api/auth/admin-login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             credentials.mode === "mobile"
-              ? { employeeId: credentials.employeeId }
-              : credentials.mode === "admin"
-                ? { username: credentials.username, password: credentials.password }
-                : { userId: credentials.userId },
+              ? { workerId: credentials.workerId, pin: credentials.pin }
+              : { username: credentials.username, password: credentials.password },
           ),
         },
       );
@@ -144,6 +134,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
 
   const resetCredentials = () => {
     setPassword("");
+    setPin("");
     setShowPassword(false);
     setLoginError("");
   };
@@ -151,21 +142,13 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const selectTechnician = (technician: Technician) => {
     resetCredentials();
     setSelectedTechnician(technician);
-    if (AUTH_MODE === "quickLogin") {
-      loginMutation.mutate({ mode: "mobile", employeeId: technician.employeeId });
-    } else {
-      setStep("staff-credentials");
-    }
+    setStep("staff-credentials");
   };
 
   const selectAdmin = (administrator: Administrator) => {
     resetCredentials();
     setSelectedAdmin(administrator);
-    if (AUTH_MODE === "quickLogin" && administrator.authMethod === "profile_picker") {
-      loginMutation.mutate({ mode: "profile", userId: administrator.id });
-    } else {
-      setStep("admin-credentials");
-    }
+    setStep("admin-credentials");
   };
 
   const goBack = () => {
@@ -223,9 +206,6 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           <p className="truncate font-semibold text-gray-900">{user.name}</p>
           <p className="mt-0.5 text-sm text-gray-600">{user.role}</p>
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-gray-400">{user.department}</p>
-          {type === "admin" && (user as Administrator).authMethod === "profile_picker" && (
-            <p className="mt-1 text-xs text-gray-500">Office profile</p>
-          )}
         </div>
       </div>
     </button>
@@ -259,7 +239,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">{step === "staff-list" ? "Staff Login" : "Admin Login"}</h1>
                   <p className="mt-1 text-sm text-gray-600">
-                    {step === "staff-list" ? "Select your profile to open the technician dashboard." : "Select an office profile or protected administrator account."}
+                    {step === "staff-list" ? "Select your profile and enter your PIN." : "Select a protected administrator account."}
                   </p>
                 </div>
               </div>
@@ -291,7 +271,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
               className="space-y-5"
               onSubmit={event => {
                 event.preventDefault();
-                loginMutation.mutate({ mode: "mobile", employeeId: selectedTechnician.employeeId });
+                loginMutation.mutate({ mode: "mobile", workerId: selectedTechnician.id, pin });
               }}
             >
               <div className="flex items-start gap-3">
@@ -300,13 +280,12 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 </Button>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Welcome, {selectedTechnician.name}</h1>
-                  <p className="mt-1 text-sm text-gray-600">Confirm your employee ID to open the technician dashboard.</p>
+                  <p className="mt-1 text-sm text-gray-600">Enter your 4-digit PIN to open the technician dashboard.</p>
                 </div>
               </div>
 
               <div className="rounded-xl bg-red-50 p-4 text-sm">
                 <p className="font-medium text-red-900">{selectedTechnician.role} · {selectedTechnician.department}</p>
-                <p className="mt-1 text-red-700">Employee ID: {selectedTechnician.employeeId}</p>
               </div>
               {loginError && (
                 <Alert variant="destructive">
@@ -314,47 +293,14 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                   <AlertDescription>{loginError}</AlertDescription>
                 </Alert>
               )}
-              <p className="text-xs text-gray-500">Keep your employee ID private.</p>
-              <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending}>
+              <div className="space-y-2">
+                <label htmlFor="technician-pin" className="text-sm font-medium text-gray-700">PIN</label>
+                <Input id="technician-pin" type="password" inputMode="numeric" autoComplete="current-password" pattern="[0-9]{4}" maxLength={4} value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} className="h-12 text-center text-lg tracking-[0.5em]" required autoFocus />
+              </div>
+              <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending || pin.length !== 4}>
                 {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><Smartphone className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
               </Button>
               <Button type="button" variant="link" className="w-full" onClick={() => { resetCredentials(); setStep("staff-list"); }}>
-                Switch user
-              </Button>
-            </form>
-          )}
-
-          {step === "admin-credentials" && selectedAdmin && selectedAdmin.authMethod === "profile_picker" && (
-            <form
-              className="space-y-5"
-              onSubmit={event => {
-                event.preventDefault();
-                loginMutation.mutate({ mode: "profile", userId: selectedAdmin.id });
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <Button type="button" variant="ghost" size="icon" onClick={goBack} aria-label="Back to office user list">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Welcome, {selectedAdmin.name}</h1>
-                  <p className="mt-1 text-sm text-gray-600">Continue to your office workspace.</p>
-                </div>
-              </div>
-              <div className="rounded-xl bg-indigo-50 p-4 text-sm">
-                <p className="font-medium text-indigo-900">{selectedAdmin.role} · {selectedAdmin.department}</p>
-                <p className="mt-2 text-indigo-700">This office profile provides staff-level access. Administrator actions still require the protected administrator account.</p>
-              </div>
-              {loginError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{loginError}</AlertDescription>
-                </Alert>
-              )}
-              <Button type="submit" className="h-12 w-full bg-indigo-600 text-base hover:bg-indigo-700" disabled={loginMutation.isPending}>
-                {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><UserRound className="mr-2 h-4 w-4" /> Continue to workspace</>}
-              </Button>
-              <Button type="button" variant="link" className="w-full" onClick={() => { resetCredentials(); setStep("admin-list"); }}>
                 Switch user
               </Button>
             </form>

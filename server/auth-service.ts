@@ -5,7 +5,6 @@ import { db } from './db';
 import { adminUsers, userSessions, activityLogs } from '@shared/schema';
 import { eq, and, gt } from 'drizzle-orm';
 import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/schema';
-import { getDashboardRole } from '@shared/dashboardRole';
 import { storage } from './storage';
 
 const configuredSecret = process.env.JWT_SECRET?.trim() || process.env.SESSION_SECRET?.trim();
@@ -23,59 +22,14 @@ export type AuthenticatedUser = AdminUser & {
   authenticationMethod?: "profile_picker";
 };
 
-type WorkerSessionClaims = {
-  workerId: string;
-  tokenType: "worker";
-};
-
 type MobileWorkerSessionClaims = {
   workerId: string;
-  tokenType: "mobile_worker";
+  tokenType: "mobile_worker_v2";
 };
 
 export type MobileAuthenticatedRequest = Request & {
   mobileWorker?: Awaited<ReturnType<typeof storage.getWorker>>;
 };
-
-async function resolveWorkerToken(token: string): Promise<AuthenticatedUser | null> {
-  let claims: WorkerSessionClaims;
-  try {
-    claims = jwt.verify(token, JWT_SECRET) as WorkerSessionClaims;
-  } catch {
-    return null;
-  }
-  if (claims.tokenType !== "worker" || !claims.workerId) return null;
-
-  try {
-    const worker = await storage.getWorker(claims.workerId);
-    if (!worker || worker.isActive === false) return null;
-
-    const effectiveRole = getDashboardRole({ departmentId: worker.departmentId, role: worker.role });
-    const [firstName, ...rest] = (worker.name || '').split(' ');
-
-    return {
-      id: worker.id,
-      username: worker.name,
-      email: worker.email || '',
-      passwordHash: '',
-      firstName: firstName || worker.name,
-      lastName: rest.join(' '),
-      role: effectiveRole,
-      // Some server-side permission checks must distinguish an explicitly
-      // privileged worker role from getDashboardRole's legacy admin fallback.
-      sourceWorkerRole: worker.role,
-      sourceWorkerDepartmentId: worker.departmentId,
-      authenticationMethod: "profile_picker",
-      isActive: true,
-      lastLoginAt: null,
-      createdAt: worker.createdAt ?? new Date(),
-      updatedAt: new Date(),
-    } as AuthenticatedUser;
-  } catch (error) {
-    console.error('Worker token resolution error:', error);
-    return null;
-  }
-}
 
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
@@ -98,12 +52,8 @@ export class AuthService {
     return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '24h' });
   }
 
-  static generateWorkerToken(workerId: string): string {
-    return jwt.sign({ workerId, tokenType: "worker" }, JWT_SECRET, { expiresIn: "24h" });
-  }
-
   static generateMobileWorkerToken(workerId: string): string {
-    return jwt.sign({ workerId, tokenType: "mobile_worker" }, JWT_SECRET, { expiresIn: "12h" });
+    return jwt.sign({ workerId, tokenType: "mobile_worker_v2" }, JWT_SECRET, { expiresIn: "12h" });
   }
 
   // Verify JWT token
@@ -264,14 +214,6 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
       return res.status(401).json({ message: 'Authentication token required' });
     }
 
-    // Tokens from the app's real login screen (worker profile picker) use a
-    // different format than the JWT-based admin session — check that first.
-    const workerUser = await resolveWorkerToken(token);
-    if (workerUser) {
-      req.user = workerUser;
-      return next();
-    }
-
     const user = await AuthService.validateSession(token);
     if (!user) {
       return res.status(401).json({ message: 'Invalid or expired token' });
@@ -292,7 +234,7 @@ export const requireMobileTechnician = async (req: MobileAuthenticatedRequest, r
     if (!token) return res.status(401).json({ message: "Mobile session token required" });
 
     const claims = jwt.verify(token, JWT_SECRET) as MobileWorkerSessionClaims;
-    if (claims.tokenType !== "mobile_worker" || !claims.workerId) {
+    if (claims.tokenType !== "mobile_worker_v2" || !claims.workerId) {
       return res.status(401).json({ message: "Invalid mobile session" });
     }
 
