@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with PostgreSQL storage using connect-pg-simple
 - **User System**: Basic user authentication with username/password credentials
 - **Authorization**: Role-based access control (currently admin-level access)
+- **Superadmin Bootstrap**: Deployments with no matching office admin row must provide `ADMIN_PASSWORD` as a secret; `ADMIN_USERNAME` and `ADMIN_EMAIL` are optional identity overrides. Never commit or log these values.
 
 ### External Dependencies
 - **Database Hosting**: Neon Database for managed PostgreSQL hosting
