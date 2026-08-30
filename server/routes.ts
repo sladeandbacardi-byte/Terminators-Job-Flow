@@ -2128,10 +2128,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "No overtime detected. Normal working hours are 08:00 to 16:00." });
     }
 
-    // Admins may create on behalf of another employee
-    const targetEmployeeId = (isOvertimeApprover(req) && data.employeeId) ? data.employeeId : req.user!.id;
+    // Administrators and managers may create on behalf of another active employee.
+    const creatingOnBehalf = Boolean(isOvertimeApprover(req) && data.employeeId);
+    const targetEmployeeId = creatingOnBehalf ? data.employeeId! : req.user!.id;
 
     try {
+      const targetEmployee = creatingOnBehalf ? await storage.getWorker(targetEmployeeId) : null;
+      if (creatingOnBehalf && (!targetEmployee || !targetEmployee.isActive)) {
+        return res.status(400).json({ error: "Select an active employee" });
+      }
       await ensureOvertimeRelations(data.clientId, data.jobId);
       const entry = await db.transaction(async (tx) => {
         // Serialize submissions for the same overtime signature so two
@@ -2177,6 +2182,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await logOvertimeAudit(created.id, req, "submitted", {
           workDate: created.workDate,
           overtimeMinutes: created.overtimeMinutes,
+          ...(creatingOnBehalf ? {
+            submittedBy: overtimeActorName(req),
+            onBehalfOf: targetEmployee!.name,
+          } : {}),
         }, tx);
         return created;
       });
