@@ -1,8 +1,12 @@
 import bcrypt from "bcryptjs";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "./db";
-import { adminUsers, workers } from "@shared/schema";
+import { activityLogs, adminUsers, workers } from "@shared/schema";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
+import {
+  passwordHashNeedsReconciliation,
+  selectCanonicalSuperAdminTarget,
+} from "./office-account-policy";
 
 export async function ensureSoleSuperAdmin(): Promise<void> {
   await db.transaction(async tx => {
@@ -42,9 +46,7 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
     const configuredEmail = process.env.ADMIN_EMAIL?.trim() || worker.email?.trim() || "worker-1@jobflow.local";
     const configuredPassword = process.env.ADMIN_PASSWORD;
     const existingAdmins = await tx.select().from(adminUsers);
-    const target =
-      existingAdmins.find(admin => admin.id === SOLE_SUPERADMIN.workerId) ||
-      existingAdmins.find(admin => admin.username === configuredUsername);
+    const target = selectCanonicalSuperAdminTarget(existingAdmins, configuredUsername);
 
     if (!target) {
       if (!configuredPassword) {
@@ -96,6 +98,13 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
         ? target.email
         : configuredEmail;
 
+    const passwordChanged = configuredPassword
+      ? await passwordHashNeedsReconciliation(configuredPassword, target.passwordHash)
+      : false;
+    if (!configuredPassword && process.env.NODE_ENV === "production") {
+      throw new Error("[superadmin] ADMIN_PASSWORD is required to reconcile the office super administrator");
+    }
+
     await tx
       .update(adminUsers)
       .set({
@@ -105,9 +114,23 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
         lastName: SOLE_SUPERADMIN.lastName,
         role: SOLE_SUPERADMIN.role,
         isActive: true,
+        ...(passwordChanged ? { passwordHash: await bcrypt.hash(configuredPassword!, 12) } : {}),
         updatedAt: new Date(),
       })
       .where(eq(adminUsers.id, target.id));
+
+    if (passwordChanged) {
+      await tx.insert(activityLogs).values({
+        userId: target.id,
+        action: "credential_reconciled",
+        resource: "admin_users",
+        resourceId: target.id,
+        details: JSON.stringify({
+          reason: "ADMIN_PASSWORD changed",
+          source: "startup_reconciliation",
+        }),
+      });
+    }
 
     await tx
       .update(adminUsers)
@@ -120,6 +143,10 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
         ),
       );
 
-    console.log(`[superadmin] Confirmed ${SOLE_SUPERADMIN.name} as the sole active super administrator`);
+    console.log(
+      passwordChanged
+        ? `[superadmin] Reconciled ${SOLE_SUPERADMIN.name}'s credential from the configured deployment secret`
+        : `[superadmin] Confirmed ${SOLE_SUPERADMIN.name} as the sole active super administrator`,
+    );
   });
 }

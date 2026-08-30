@@ -65,6 +65,7 @@ import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { hasUnrestrictedAccess } from "@shared/accessPolicy";
 import { getOfficeApiAllowedRoles } from "@shared/officeApiPolicy";
+import { buildOfficeLoginDirectory } from "./office-account-policy";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
@@ -442,6 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       role: SOLE_SUPERADMIN.roleLabel,
       department: SOLE_SUPERADMIN.department,
       authMethod: "password" as const,
+      credentialStatus: "missing" as const,
     },
   ];
 
@@ -1866,21 +1868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           department: departmentNames.get(worker.departmentId) || "Field Service",
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      const enrichedAdmins = await Promise.all(activeAdmins.map(admin => AuthService.enrichAdminUser(admin)));
-      const admins = enrichedAdmins
-        .map(admin => ({
-          id: admin.id,
-          name: admin.sourceWorkerName || `${admin.firstName} ${admin.lastName}`.trim(),
-          username: admin.username,
-          role: admin.role === "superadmin"
-            ? "Super Administrator"
-            : admin.sourceWorkerRole || "Office User",
-          department: admin.sourceWorkerDepartmentId
-            ? departmentNames.get(admin.sourceWorkerDepartmentId) || "Office"
-            : "Administration",
-          authMethod: "password" as const,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      const admins = buildOfficeLoginDirectory(allWorkers, activeAdmins, departmentNames);
       res.json({
         staff: staff.length > 0 ? staff : FALLBACK_MOBILE_STAFF,
          admins: admins.length > 0 ? admins : FALLBACK_ADMINS,

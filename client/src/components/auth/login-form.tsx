@@ -28,6 +28,7 @@ interface Administrator {
   role: string;
   department: string;
   authMethod: "password";
+  credentialStatus?: "ready" | "missing";
 }
 
 interface LoginDirectory {
@@ -51,6 +52,7 @@ const FALLBACK_DIRECTORY: LoginDirectory = {
       role: SOLE_SUPERADMIN.roleLabel,
       department: SOLE_SUPERADMIN.department,
       authMethod: "password",
+      credentialStatus: "missing",
     },
   ],
 };
@@ -154,6 +156,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   };
 
   const selectAdmin = (administrator: Administrator) => {
+    if (administrator.credentialStatus === "missing" || !administrator.username) return;
     resetCredentials();
     setSelectedAdmin(administrator);
     setStep("admin-credentials");
@@ -198,13 +201,17 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     user: Technician | Administrator,
     onClick: () => void,
     type: "staff" | "admin",
-  ) => (
+  ) => {
+    const credentialsMissing =
+      type === "admin" &&
+      ((user as Administrator).credentialStatus === "missing" || !(user as Administrator).username);
+    return (
     <button
       key={user.id}
       type="button"
       onClick={onClick}
-      disabled={loginMutation.isPending}
-      className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+      disabled={loginMutation.isPending || credentialsMissing}
+      className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <div className="flex items-start gap-3">
         <div className={`rounded-full p-2.5 ${type === "staff" ? "bg-red-100 text-red-700" : "bg-indigo-100 text-indigo-700"}`}>
@@ -214,10 +221,14 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           <p className="truncate font-semibold text-gray-900">{user.name}</p>
           <p className="mt-0.5 text-sm text-gray-600">{user.role}</p>
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-gray-400">{user.department}</p>
+          {credentialsMissing && (
+            <p className="mt-2 text-xs font-semibold text-amber-700">Credentials required</p>
+          )}
         </div>
       </div>
     </button>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 px-4 py-8">
