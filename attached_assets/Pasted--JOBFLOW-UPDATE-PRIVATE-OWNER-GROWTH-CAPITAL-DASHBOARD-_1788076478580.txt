@@ -1,0 +1,1024 @@
+## JOBFLOW UPDATE: PRIVATE OWNER "GROWTH & CAPITAL" DASHBOARD
+
+Create a new private section in JobFlow called:
+
+# Growth & Capital
+
+This is an **OWNER-ONLY dashboard**.
+
+It is specifically for Julien to track:
+
+* Terminators growth
+* cash generation
+* revenue leakage
+* Jan capital repayment
+* accelerated repayments
+* property investment capital
+* progress toward becoming debt-free
+* the amount of capital being created for future property purchases/development
+
+This page contains confidential owner-level financial information.
+
+---
+
+# 1. SECURITY / ACCESS CONTROL
+
+This section must ONLY be visible and accessible to the existing **Julien user account**.
+
+Do NOT give access automatically to:
+
+* other Admin users
+* Finance users
+* Juli
+* Jean
+* sales users
+* mobile users
+* supervisors
+* technicians
+
+Create a specific permission such as:
+
+`canViewGrowthAndCapital`
+
+Assign this permission ONLY to Julien.
+
+Do not rely only on hiding the menu item.
+
+The following must all be protected:
+
+* navigation item
+* page route
+* API endpoints
+* database queries
+* Jan capital information
+* property fund information
+* growth/capital settings
+
+If another user manually enters the URL, the backend must reject access.
+
+Do not expose this information in any general Finance API response used elsewhere in JobFlow.
+
+---
+
+# 2. NAVIGATION
+
+For Julien only, add:
+
+**Growth & Capital**
+
+Preferably near the main Dashboard/Finance area.
+
+Use a suitable growth/chart icon.
+
+No other user should even see that this menu item exists.
+
+---
+
+# 3. PAGE PURPOSE
+
+This must NOT look like a normal accounting report.
+
+It should look like an **owner's business cockpit**.
+
+The page should answer these questions immediately:
+
+1. How much cash is Terminators generating?
+2. Where are we losing or failing to collect revenue?
+3. How much is still owed to Jan?
+4. How quickly are we paying Jan off?
+5. How much extra have we paid?
+6. When will Jan be fully paid at the current payment rate?
+7. How much capital have we accumulated for property?
+8. Are sales and profit growing?
+9. How much additional monthly cash has been created?
+10. How much money could potentially be recovered from revenue leakage?
+
+Keep the design simple, visual and executive-level.
+
+---
+
+# 4. TOP OWNER SCORECARDS
+
+At the top show large cards.
+
+## BUSINESS
+
+### Monthly Income
+
+Use actual JobFlow Finance/invoice data for the current month.
+
+Show:
+
+**Income This Month**
+R XXX,XXX
+
+Also show percentage up/down compared with previous month.
+
+---
+
+### Monthly Expenses
+
+**Expenses This Month**
+R XXX,XXX
+
+Use existing Finance data.
+
+---
+
+### Monthly Operating Surplus
+
+Calculate:
+
+`Income - Expenses`
+
+Show:
+
+**Operating Surplus**
+R XXX,XXX
+
+Green if positive.
+
+Red if negative.
+
+---
+
+### Cash Margin
+
+Calculate:
+
+`Operating Surplus / Income × 100`
+
+Show as percentage.
+
+---
+
+# 5. REVENUE RECOVERY
+
+This is an IMPORTANT part of the dashboard.
+
+Create a section called:
+
+# Revenue Recovery
+
+Subtitle:
+
+**Money Terminators may already have earned or should be earning**
+
+This section must automatically use information already contained in JobFlow.
+
+Do not create fake/sample financial values.
+
+---
+
+## Revenue Recovery cards
+
+Show:
+
+### Completed Jobs Not Invoiced
+
+Number of completed jobs with no invoice.
+
+Also calculate estimated Rand value where pricing is available.
+
+Example:
+
+**7 jobs**
+**R42,500 potentially unbilled**
+
+Clicking the card opens the affected jobs.
+
+---
+
+### Contracts Missing Price Increase
+
+Find active contracts where:
+
+* an increase date has passed
+* but the contract price has not been increased
+
+Show:
+
+**Contracts overdue for increase**
+
+Also show estimated additional monthly revenue if the recorded increase percentage were applied.
+
+Example:
+
+**12 contracts**
+**Potential increase: R8,450/month**
+
+Click to see the contracts.
+
+---
+
+### Quotes Awaiting Follow-up
+
+Show quotes that are:
+
+* Sent
+* not accepted
+* not rejected
+* and have had no follow-up within the required period
+
+Show:
+
+* quote count
+* quote value
+* age
+
+Create age groups:
+
+0–7 days
+8–14 days
+15–30 days
+30+ days
+
+---
+
+### Overdue Debtors Still Receiving Service
+
+Identify customers who:
+
+* have overdue invoices/debt
+* AND still have active recurring services
+
+Show:
+
+**Outstanding debtors currently receiving service**
+
+Display:
+
+* customer
+* overdue balance
+* age
+* active contract/service
+
+Do NOT automatically suspend the customer.
+
+This is an owner warning only.
+
+---
+
+### Expiring Contracts
+
+Show active contracts expiring within:
+
+30 days
+60 days
+90 days
+
+Show contract value and monthly recurring revenue at risk.
+
+---
+
+### Old / Underpriced Contracts
+
+Where sufficient historical data exists, identify very old contracts with no recent increase.
+
+For example:
+
+**No price increase in 18+ months**
+
+Do not automatically alter prices.
+
+Flag them for review.
+
+---
+
+# 6. REVENUE RECOVERY TOTAL
+
+At the top of the Revenue Recovery section show:
+
+# POTENTIAL REVENUE OPPORTUNITY
+
+R XXX,XXX
+
+Do NOT incorrectly add recurring monthly revenue to once-off revenue.
+
+Break it into:
+
+**Potential once-off recovery**
+R XXX,XXX
+
+and
+
+**Potential additional monthly recurring revenue**
+R XX,XXX / month
+
+This distinction is important.
+
+---
+
+# 7. JAN CAPITAL ACCOUNT
+
+Create a major section called:
+
+# Jan Capital Repayment
+
+This tracks the purchase capital still owed to Jan.
+
+Use the following confirmed starting/current information.
+
+## Original Capital Amount
+
+**R8,550,000.00**
+
+## Total Paid to Date
+
+**R3,450,000.00**
+
+## Current Balance
+
+**R5,100,000.00**
+
+## Recorded Extra Payments
+
+**R900,000.00**
+
+Current position date:
+
+**25 August 2026**
+
+The fundamental reconciliation must always remain:
+
+`Original Capital - Total Payments = Current Balance`
+
+Therefore:
+
+R8,550,000
+minus R3,450,000
+= **R5,100,000 outstanding**
+
+The Extra Payments figure is an additional informational classification.
+
+Do NOT subtract the Extra Payments again from the balance.
+
+---
+
+# 8. JAN PAYMENT HISTORY
+
+Seed the following historical payments into the Jan Capital account:
+
+| Date        |  Payment |
+| ----------- | -------: |
+| 25 Feb 2025 | R150,000 |
+| 25 Mar 2025 | R150,000 |
+| 25 Apr 2025 | R150,000 |
+| 25 May 2025 | R150,000 |
+| 25 Jun 2025 | R150,000 |
+| 25 Jul 2025 | R150,000 |
+| 25 Aug 2025 | R150,000 |
+| 25 Sep 2025 | R150,000 |
+| 25 Oct 2025 | R150,000 |
+| 25 Nov 2025 | R150,000 |
+| 25 Dec 2025 | R150,000 |
+| 25 Jan 2026 | R150,000 |
+| 25 Feb 2026 | R150,000 |
+| 25 Mar 2026 | R300,000 |
+| 25 Apr 2026 |       R0 |
+| 25 May 2026 | R450,000 |
+| 25 Jun 2026 | R300,000 |
+| 25 Jul 2026 | R300,000 |
+| 25 Aug 2026 | R150,000 |
+
+Total actual payments must equal:
+
+# R3,450,000
+
+---
+
+# 9. JAN PAYMENT CHART
+
+Create a chart showing the declining Jan balance over time.
+
+X-axis:
+
+Month/date
+
+Y-axis:
+
+Outstanding capital
+
+The graph should start at:
+
+**R8.55 million**
+
+and currently end at:
+
+**R5.10 million**
+
+Historical payments should use actual data.
+
+Projected payments should use a different visual style from actual payments.
+
+---
+
+# 10. JAN PAYOFF PROJECTION
+
+Add:
+
+## Planned Monthly Payment
+
+This must be editable by Julien.
+
+Default it to:
+
+**R300,000 per month**
+
+The system must calculate automatically:
+
+* months remaining
+* projected final payment
+* projected payoff date
+
+At a R5,100,000 outstanding balance and R300,000/month, this is currently approximately:
+
+**17 payments remaining**
+
+Projected payoff around:
+
+**January 2028**
+
+This projection must update immediately when Julien changes the planned monthly payment.
+
+For example provide selectable scenarios:
+
+R150,000/month
+R200,000/month
+R250,000/month
+R300,000/month
+R350,000/month
+R400,000/month
+R500,000/month
+
+Also allow Custom.
+
+---
+
+# 11. PAYOFF SCENARIO TOOL
+
+Create a simple interactive section:
+
+# What if we pay more?
+
+Allow Julien to enter:
+
+**Normal monthly payment**
+R ______
+
+**Additional monthly payment**
+R ______
+
+Then show:
+
+### Total monthly payment
+
+R ______
+
+### Estimated payoff date
+
+Month / Year
+
+### Months saved
+
+XX months
+
+This allows Julien to see the direct effect of additional Terminators cash generation.
+
+Example:
+
+Current balance: R5,100,000
+
+At:
+R150,000/month
+
+versus:
+R300,000/month
+
+versus:
+R400,000/month
+
+Show the different payoff dates clearly.
+
+No complicated financial modelling is required at this stage.
+
+This is capital repayment only unless an interest component is later specifically added.
+
+---
+
+# 12. PAYMENT ENTRY
+
+Julien must be able to click:
+
+**+ Record Jan Payment**
+
+Fields:
+
+Date
+Amount
+Notes
+Payment Type
+
+Payment Type options:
+
+* Normal
+* Extra
+* Mixed / Combined
+
+When saved:
+
+* add payment to payment history
+* increase Total Paid
+* decrease Current Balance
+* update payoff projection
+* update chart
+* update percentage paid
+
+Payments must be editable/deletable by Julien only.
+
+Maintain an audit trail.
+
+---
+
+# 13. JAN PROGRESS DISPLAY
+
+Show a large progress indicator:
+
+**Original: R8,550,000**
+
+**Paid: R3,450,000**
+
+**Outstanding: R5,100,000**
+
+Percentage paid:
+
+`3,450,000 / 8,550,000`
+
+≈ **40.35% PAID**
+
+Percentage outstanding:
+
+≈ **59.65%**
+
+Show this as a progress bar.
+
+Also show:
+
+**R5.1m remaining until debt-free**
+
+---
+
+# 14. PROPERTY FUND
+
+Create another major section:
+
+# Property Fund
+
+Purpose:
+
+Track capital being accumulated specifically for future property investment.
+
+This is NOT an accounting bank balance unless it is eventually linked to an actual account.
+
+It is initially a management/capital allocation tracker.
+
+Display:
+
+### Property Fund Balance
+
+R ______
+
+### Added This Month
+
+R ______
+
+### Added This Year
+
+R ______
+
+### Property Capital Target
+
+R ______
+
+### % of Target Reached
+
+XX%
+
+Julien can manually set the target.
+
+Examples might later be:
+
+R1,000,000
+R2,000,000
+R3,000,000
+etc.
+
+Do not seed a fake property balance.
+
+Start at R0 unless there is already real property capital data in JobFlow.
+
+---
+
+# 15. PROPERTY FUND TRANSACTIONS
+
+Allow:
+
+**+ Add Property Fund Transaction**
+
+Fields:
+
+Date
+Amount
+Type
+Description / Notes
+
+Types:
+
+* Allocation from Terminators
+* Additional contribution
+* Withdrawal
+* Property expense
+* Other
+
+Show transaction history.
+
+---
+
+# 16. CAPITAL ALLOCATION
+
+Create a simple owner tool:
+
+# Additional Cash Allocation
+
+Julien enters:
+
+**Additional Free Cash Available**
+R ______
+
+Then allow allocation between:
+
+### Jan Repayment
+
+XX%
+
+### Property Fund
+
+XX%
+
+Default suggestion:
+
+**70% Jan**
+**30% Property Fund**
+
+But this must be fully editable.
+
+Then show:
+
+If additional free cash = R200,000:
+
+Jan:
+R140,000
+
+Property:
+R60,000
+
+Also calculate:
+
+**New projected Jan payoff date**
+
+and
+
+**Annual property capital accumulation**
+
+Example:
+
+R60,000/month property allocation
+= R720,000/year
+
+Do not automatically create payments from this calculator.
+
+It is a planning tool only.
+
+---
+
+# 17. GROWTH SECTION
+
+Create:
+
+# Business Growth
+
+Use real JobFlow information.
+
+Show monthly trends for:
+
+### Sales / Invoiced Revenue
+
+Current month
+Previous month
+Year-to-date
+
+---
+
+### New Recurring Revenue
+
+Value of new recurring contracts added this month.
+
+Display:
+
+**New Monthly Recurring Revenue**
+R XX,XXX/month
+
+This is an important metric.
+
+---
+
+### Lost Recurring Revenue
+
+Value of recurring contracts cancelled/terminated this month.
+
+---
+
+### Net Recurring Revenue Growth
+
+Calculate:
+
+`New recurring revenue - Lost recurring revenue`
+
+Show green if positive.
+
+Red if negative.
+
+---
+
+# 18. SALES PERFORMANCE
+
+Where JobFlow already stores the salesperson/user responsible for leads and quotes, show:
+
+# Sales Growth
+
+Include Anzel Marais as the Terminators business sales representative.
+
+Show:
+
+* new leads
+* quotes created
+* quote value
+* quotes won
+* won value
+* conversion %
+* new customers
+* new recurring contract revenue
+* existing-client cross-sales
+
+Do not give Anzel access to the owner Growth & Capital page.
+
+Her activity can feed data INTO the dashboard, but she must not be able to VIEW the dashboard.
+
+---
+
+# 19. EXISTING CUSTOMER CROSS-SELLING
+
+Create a useful owner/sales analysis behind the dashboard.
+
+For each customer determine which services they currently buy from Terminators.
+
+Service categories include:
+
+* Pest Control
+* Washroom
+* Sanitary Bins
+* Dustmats
+* Deep Cleaning
+* Bird Proofing
+* other current JobFlow service categories
+
+Create an opportunity view showing customers who buy one service but not others.
+
+Example:
+
+| Customer | Pest | Washroom | Sanitary | Mats | Deep Cleaning |
+| -------- | ---- | -------- | -------- | ---- | ------------- |
+| ABC Ltd  | ✓    | ✕        | ✕        | ✓    | ✕             |
+
+This helps identify existing-customer sales opportunities.
+
+The Growth & Capital dashboard should show:
+
+**Cross-Sell Opportunities**
+XX customers
+
+Clicking it should open the detailed list.
+
+---
+
+# 20. MONTHLY OWNER TARGET
+
+Create:
+
+# Monthly Cash Growth Target
+
+Julien can set a target for additional sustainable monthly cash generation.
+
+Initial target:
+
+**R100,000/month additional cash**
+
+Show:
+
+Target:
+R100,000
+
+Achieved:
+R______
+
+Remaining:
+R______
+
+Progress:
+XX%
+
+Once reached, Julien can change the target to the next level.
+
+This is NOT simply turnover.
+
+Where possible it should be based on increased operating surplus/free operating cash.
+
+If accurate cash data is not yet available, clearly label the metric being used instead of pretending it is cash.
+
+---
+
+# 21. OWNER SUMMARY
+
+At the very top of the page include a short automatically generated summary such as:
+
+**OWNER POSITION**
+
+Terminators generated R___ operating surplus this month.
+
+R___ of potential once-off revenue requires attention.
+
+R___/month of potential recurring revenue has been identified.
+
+Jan balance is R5,100,000.
+
+40.35% of the original capital has been repaid.
+
+At the current planned repayment rate, Jan is projected to be fully paid by ______.
+
+The Property Fund currently contains R______.
+
+Additional sustainable monthly cash created against target: R______.
+
+Keep this summary concise and dynamic.
+
+---
+
+# 22. ALERTS
+
+Create owner-only alerts where appropriate.
+
+Examples:
+
+**Revenue Alert**
+R85,000 of completed work has not yet been invoiced.
+
+**Contract Alert**
+14 contracts are overdue for annual increases.
+
+**Debtors Alert**
+8 overdue customers continue to receive active services.
+
+**Growth Alert**
+Net recurring revenue declined this month.
+
+**Capital Milestone**
+Jan balance has fallen below R5 million.
+
+**Capital Milestone**
+50% of original Jan capital has been paid.
+
+**Property Milestone**
+Property Fund exceeded R1 million.
+
+Alerts appear inside the Growth & Capital page only initially.
+
+Do not email them unless that is added later.
+
+---
+
+# 23. IMPORTANT DATA RULES
+
+Reuse the existing JobFlow database wherever possible.
+
+Do NOT create duplicate copies of:
+
+* invoices
+* jobs
+* quotes
+* clients
+* contracts
+* expenses
+* debtors
+* users
+
+The Growth & Capital dashboard must QUERY this existing information.
+
+Only create new database tables where needed for private owner information such as:
+
+* Jan capital account
+* Jan payments
+* property fund transactions
+* owner targets
+* capital allocation settings
+
+---
+
+# 24. NO MOCK DATA
+
+Do not populate revenue, expenses, debtors, quotes, contracts or growth figures with demo/sample data.
+
+If real information does not yet exist, display:
+
+**No data available**
+
+or
+
+**Not yet linked**
+
+rather than inventing values.
+
+The Jan Capital Account data supplied above IS real data and should be seeded.
+
+---
+
+# 25. DESIGN
+
+Keep the page clean and modern.
+
+Suggested structure:
+
+### Row 1
+
+Income | Expenses | Operating Surplus | Cash Margin
+
+### Row 2
+
+Jan Balance | Jan Paid % | Projected Payoff | Property Fund
+
+### Section
+
+Revenue Recovery
+
+### Section
+
+Jan Capital Repayment + balance graph
+
+### Section
+
+Payoff Scenario Calculator
+
+### Section
+
+Property Fund
+
+### Section
+
+Additional Cash Allocation
+
+### Section
+
+Business Growth
+
+### Section
+
+Sales Growth
+
+### Section
+
+Cross-Sell Opportunities
+
+Avoid clutter.
+
+Use expandable detail tables rather than putting every transaction on the main dashboard.
+
+---
+
+# 26. MOST IMPORTANT BUSINESS PRINCIPLE
+
+This dashboard is intended to help the owner convert:
+
+**better operations**
+↓
+**recovered revenue**
+↓
+**higher recurring income**
+↓
+**higher free cash generation**
+↓
+**faster Jan repayment**
+↓
+**property investment capital**
+
+Therefore the page should emphasise CASH GENERATION and CAPITAL PROGRESS rather than simply celebrating increased turnover.
+
+A larger business that does not generate additional cash is not considered successful growth on this dashboard.
