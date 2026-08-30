@@ -142,6 +142,17 @@ function AuthenticatedApp() {
     );
   }
 
+  // A mobile technician can follow a FleetGuard link without being sent
+  // through the office profile-picker flow. Keep office-authenticated users
+  // on the existing desktop FleetGuard route.
+  if (location === "/fleet" && !isLoading && !isAuthenticated && localStorage.getItem("mobile_session_token")) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Mobile />
+      </Suspense>
+    );
+  }
+
   // Mobile technicians use a separate signed token and must be able to follow
   // the shared overtime URL without being sent through the office login flow.
   if (location === "/my-overtime" && localStorage.getItem("mobile_session_token") && !isAuthenticated) {

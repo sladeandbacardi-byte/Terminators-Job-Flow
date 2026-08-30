@@ -58,7 +58,7 @@ const authHeaders = () => ({
 export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker; onLogout: () => void }) {
   const [screen, setScreen] = useState<Screen>(() => {
     const requested = new URLSearchParams(window.location.search).get("screen");
-    return requested === "fleet" ? "fleet" : "dashboard";
+    return requested === "fleet" || window.location.pathname === "/fleet" ? "fleet" : "dashboard";
   });
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
