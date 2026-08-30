@@ -2003,7 +2003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/time", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can review time" });
     try {
-      const { employeeId, status, type, departmentId, from, to } = req.query as Record<string, string | undefined>;
+      const { employeeId, status, type, departmentId, clientId, jobId, from, to } = req.query as Record<string, string | undefined>;
       const [entries, allWorkers] = await Promise.all([
         db.select().from(overtimeEntries).orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt)),
         storage.getWorkers(),
@@ -2014,10 +2014,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (!status || status === "all" || entry.status === status) &&
         (!type || type === "all" || (entry.entryType || "OVERTIME") === type) &&
         (!departmentId || departmentId === "all" || workerMap.get(entry.employeeId)?.departmentId === departmentId) &&
+        (!clientId || clientId === "all" || entry.clientId === clientId) &&
+        (!jobId || jobId === "all" || entry.jobId === jobId) &&
         (!from || entry.workDate >= from) && (!to || entry.workDate <= to)
       );
       const month = new Date().toISOString().slice(0, 7);
-      res.json({ entries: await enrichOvertimeEntries(filtered), summary: calculateTimeSummary(entries, month) });
+      const monthSummary = calculateTimeSummary(entries, month);
+      const allTimeSummary = calculateTimeSummary(entries);
+      res.json({
+        entries: await enrichOvertimeEntries(filtered),
+        summary: {
+          pendingOvertimeMinutes: allTimeSummary.pendingOvertimeMinutes,
+          pendingTimeOffMinutes: allTimeSummary.pendingTimeOffMinutes,
+          approvedOvertimeMinutes: monthSummary.approvedOvertimeMinutes,
+          approvedTimeOffMinutes: monthSummary.approvedTimeOffMinutes,
+        },
+      });
     } catch (error) {
       console.error("Could not load management time:", error);
       res.status(500).json({ error: "Could not load time entries" });
