@@ -137,18 +137,30 @@ test("selecting Julien follows the password route and accepts the normalized lea
   });
 });
 
-test("restricted passwordless office role cannot reach an admin API while an authoritative supervisor can", async () => {
+test("department managers can reach their operations API but cannot reach admin, finance or profit APIs", async () => {
   const app = express();
   app.use((req: any, _res, next) => {
-    req.user = req.headers["x-test-role"] === "supervisor"
-      ? officeUser("supervisor", "Washroom Supervisor", "div-3")
-      : officeUser("sales", "Sales Rep", "div-5");
+    req.user = officeUser("worker-3", "Hygiene Services Manager", "div-6");
+    req.user.sourceWorkerId = "worker-3";
+    req.user.sourceWorkerName = "Mariette Koekemoer";
     next();
   });
   app.get("/api/backup/logs", enforceOfficeApiAccess, (_req, res) => res.json({ ok: true }));
+  app.get("/api/invoices", enforceOfficeApiAccess, (_req, res) => res.json({ ok: true }));
+  app.get("/api/dashboard/revenue-chart", enforceOfficeApiAccess, (_req, res) => res.json({ ok: true }));
+  app.get("/api/jobs", enforceOfficeApiAccess, (_req, res) => res.json([
+    { id: "hygiene", departmentId: "div-2" },
+    { id: "pest", departmentId: "div-1" },
+  ]));
 
   await withServer(app, async baseUrl => {
     assert.equal((await fetch(`${baseUrl}/api/backup/logs`)).status, 403);
-    assert.equal((await fetch(`${baseUrl}/api/backup/logs`, { headers: { "x-test-role": "supervisor" } })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/api/invoices`)).status, 403);
+    assert.equal((await fetch(`${baseUrl}/api/dashboard/revenue-chart`)).status, 403);
+    const jobs = await fetch(`${baseUrl}/api/jobs`);
+    assert.equal(jobs.status, 200);
+    assert.deepEqual(await jobs.json(), [{ id: "hygiene", departmentId: "div-2" }]);
+    assert.equal((await fetch(`${baseUrl}/api/jobs?departmentId=div-1`)).status, 403);
+    assert.equal((await fetch(`${baseUrl}/api/jobs?departmentId=div-2`)).status, 200);
   });
 });

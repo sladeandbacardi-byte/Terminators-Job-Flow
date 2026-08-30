@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LoginForm } from "@/components/auth/login-form";
 import { getDefaultDashboardRoute, getDashboardRole, type DashboardRole } from "@/lib/dashboardRole";
+import { canAccessUiPath } from "@shared/permissionMatrix";
 import { ShieldOff } from "lucide-react";
 import AppShell from "@/components/layout/app-shell";
 
@@ -114,8 +115,9 @@ function AccessDenied() {
 
 function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles: DashboardRole[] }) {
   const { user } = useAuth();
-  const role = getDashboardRole(user ?? {});
-  if (!roles.includes(role)) return <AccessDenied />;
+  const [location] = useLocation();
+  void roles;
+  if (!canAccessUiPath(user ?? {}, location)) return <AccessDenied />;
   return <Component />;
 }
 

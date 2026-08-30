@@ -67,6 +67,15 @@ import { hasUnrestrictedAccess } from "@shared/accessPolicy";
 import { buildOfficeLoginDirectory } from "./office-account-policy";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { MOBILE_STAFF_ROSTER } from "@shared/organogram";
+import {
+  canAccessDepartment,
+  canAccessUiPath,
+  canManageWorker,
+  filterOperationalPayload,
+  hasOperationalDepartmentScope,
+  hasPermission,
+  scopedDepartmentIds,
+} from "@shared/permissionMatrix";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import { createMemoryRateLimiter } from "./request-limits";
@@ -310,13 +319,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const officeTreatmentManager = (req: AuthenticatedRequest) =>
     req.user?.authenticationMethod !== "profile_picker" &&
-    ["admin", "manager", "coordinator"].includes(getDashboardRole(req.user ?? {}));
+    hasPermission(req.user ?? {}, "treatment-reports");
 
   // Product library access is intentionally separate from treatment-report
   // management: authorised office managers/coordinators and service managers
   // may view it, while Sales and Finance users cannot.
   const productLibraryViewer = (req: AuthenticatedRequest) =>
-    ["admin", "manager", "coordinator", "service"].includes(getDashboardRole(req.user ?? {}));
+    hasPermission(req.user ?? {}, "treatment-reports");
+
+  const rejectOutsideDepartment = (
+    req: AuthenticatedRequest,
+    res: Response,
+    departmentId: string | null | undefined,
+  ) => {
+    if (req.user && hasOperationalDepartmentScope(req.user) && !canAccessDepartment(req.user, departmentId)) {
+      res.status(403).json({ error: "You can only access records in your assigned departments" });
+      return true;
+    }
+    return false;
+  };
+
+  const rejectOutsideWorker = (
+    req: AuthenticatedRequest,
+    res: Response,
+    workerId: string | null | undefined,
+  ) => {
+    if (req.user && hasOperationalDepartmentScope(req.user) && !canManageWorker(req.user, workerId)) {
+      res.status(403).json({ error: "You can only access staff in your assigned departments" });
+      return true;
+    }
+    return false;
+  };
+
+  const rejectChecklistScope = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    checklist: { technicianId?: string | null; jobId?: string | null },
+  ) => {
+    if (!req.user || !hasOperationalDepartmentScope(req.user)) return false;
+    if (checklist.jobId) {
+      const job = await storage.getJob(checklist.jobId);
+      if (!job || rejectOutsideDepartment(req, res, job.departmentId)) return true;
+    }
+    return rejectOutsideWorker(req, res, checklist.technicianId);
+  };
+
+  const canManageEmployeeRecord = (req: AuthenticatedRequest, employeeId: string) =>
+    !req.user || !hasOperationalDepartmentScope(req.user) || canManageWorker(req.user, employeeId);
+
+  const rejectTeamScope = async (req: AuthenticatedRequest, res: Response, teamId: string) => {
+    const team = await storage.getTeam(teamId);
+    if (!team) {
+      res.status(404).json({ error: "Team not found" });
+      return true;
+    }
+    return rejectOutsideDepartment(req, res, team.departmentId);
+  };
+
+  const rejectAttendanceScope = async (req: AuthenticatedRequest, res: Response, attendanceId: string) => {
+    const record = await storage.getAttendanceRecord(attendanceId);
+    if (!record) {
+      res.status(404).json({ error: "Attendance record not found" });
+      return true;
+    }
+    return rejectTeamScope(req, res, record.teamId);
+  };
+
+  const rejectOccurrenceScope = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    data: { contractId: string; contractKind?: string | null },
+  ) => {
+    const contract = data.contractKind === "rental"
+      ? await storage.getContract(data.contractId)
+      : await storage.getServiceContract(data.contractId);
+    if (!contract) {
+      res.status(404).json({ error: "Contract not found" });
+      return true;
+    }
+    return rejectOutsideDepartment(req, res, contract.departmentId);
+  };
 
   const reportCompletionErrors = (input: z.infer<typeof treatmentReportInput>) => {
     const errors: string[] = [];
@@ -419,10 +501,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     return requireAuth(req as AuthenticatedRequest, res, () => {
       const authenticated = req as AuthenticatedRequest;
-      if (
-        authenticated.user?.authenticationMethod === "profile_picker" &&
-        !profilePickerSelfService(req.method, pathname)
-      ) {
+      if (authenticated.user?.authenticationMethod === "profile_picker") {
+        if (profilePickerSelfService(req.method, pathname)) return next();
         return res.status(403).json({ error: "Profile sign-in can only access personal staff functions" });
       }
       return enforceOfficeApiAccess(authenticated, res, next);
@@ -433,7 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // database is being created. They cannot authenticate without a matching
   // database worker and PIN.
   const FALLBACK_MOBILE_STAFF = MOBILE_STAFF_ROSTER.map(worker => ({
-    id: worker.id, name: worker.name, role: "Technician", department: worker.team,
+    id: worker.id, name: worker.name, role: worker.title, department: worker.team,
   }));
   const FALLBACK_ADMINS = [
     {
@@ -535,10 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return false;
     }
 
-    if (req.user && hasUnrestrictedAccess(req.user)) return true;
-
-    // Restricted managers retain their role-appropriate time-management responsibility.
-    return getDashboardRole(req.user ?? {}) === "manager";
+    return hasPermission(req.user ?? {}, "time:manage");
   };
 
   const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
@@ -940,6 +1017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const token = AuthService.generateMobileWorkerToken(worker.id);
+      const rosterEntry = MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id);
 
       res.json({
         token,
@@ -949,7 +1027,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: worker.email,
           phone: worker.phone,
           departmentId: worker.departmentId,
-          role: worker.role,
+          role: rosterEntry?.title || worker.role,
+          department: rosterEntry?.team,
         }
       });
     } catch (error) {
@@ -1313,9 +1392,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(list);
   });
 
-  app.get("/api/equipment-checklists/stats/today", async (req, res) => {
+  app.get("/api/equipment-checklists/stats/today", async (req: AuthenticatedRequest, res) => {
     const today = new Date().toISOString().slice(0, 10);
-    const all = await storage.getEquipmentChecklists(today);
+    const all = filterOperationalPayload(
+      req.user ?? {},
+      await storage.getEquipmentChecklists(today),
+    ) as Awaited<ReturnType<typeof storage.getEquipmentChecklists>>;
     res.json({
       total: all.length,
       passed: all.filter(c => c.status === "passed").length,
@@ -1326,28 +1408,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/equipment-checklists/:id", async (req, res) => {
+  app.get("/api/equipment-checklists/:id", async (req: AuthenticatedRequest, res) => {
     const c = await storage.getEquipmentChecklist(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
+    if (await rejectChecklistScope(req, res, c)) return;
     res.json(c);
   });
 
-  app.post("/api/equipment-checklists", async (req, res) => {
+  app.post("/api/equipment-checklists", async (req: AuthenticatedRequest, res) => {
+    if (await rejectChecklistScope(req, res, req.body)) return;
     const c = await storage.createEquipmentChecklist(req.body);
     res.status(201).json(c);
   });
 
-  app.patch("/api/equipment-checklists/:id", async (req, res) => {
+  app.patch("/api/equipment-checklists/:id", async (req: AuthenticatedRequest, res) => {
+    const existing = await storage.getEquipmentChecklist(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (await rejectChecklistScope(req, res, existing)) return;
+    if (await rejectChecklistScope(req, res, { ...existing, ...req.body })) return;
     const c = await storage.updateEquipmentChecklist(req.params.id, req.body);
     res.json(c);
   });
 
-  app.get("/api/equipment-checklists/:id/items", async (req, res) => {
+  app.get("/api/equipment-checklists/:id/items", async (req: AuthenticatedRequest, res) => {
+    const checklist = await storage.getEquipmentChecklist(req.params.id);
+    if (!checklist) return res.status(404).json({ error: "Not found" });
+    if (await rejectChecklistScope(req, res, checklist)) return;
     const items = await storage.getEquipmentChecklistItems(req.params.id);
     res.json(items);
   });
 
-  app.post("/api/equipment-checklists/:id/items", async (req, res) => {
+  app.post("/api/equipment-checklists/:id/items", async (req: AuthenticatedRequest, res) => {
+    const checklist = await storage.getEquipmentChecklist(req.params.id);
+    if (!checklist) return res.status(404).json({ error: "Not found" });
+    if (await rejectChecklistScope(req, res, checklist)) return;
     const items = await storage.replaceEquipmentChecklistItems(req.params.id, req.body);
     res.json(items);
   });
@@ -1871,7 +1965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id),
           id: worker.id,
           name: MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id)?.name || worker.name,
-          role: "Technician",
+          role: MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id)?.title || "Field Worker",
           department: MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id)?.team || departmentNames.get(worker.departmentId) || "Field Service",
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -2598,6 +2692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entries = await db.select().from(overtimeEntries)
         .orderBy(desc(overtimeEntries.workDate), desc(overtimeEntries.createdAt));
       const filtered = entries.filter(entry =>
+        canManageEmployeeRecord(req, entry.employeeId) &&
         (!employeeId || entry.employeeId === employeeId) &&
         (!status || status === "all" || entry.status === status) &&
         (!from || entry.workDate >= from) &&
@@ -2648,6 +2743,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const targetEmployee = creatingOnBehalf ? await storage.getWorker(targetEmployeeId) : null;
+      if (creatingOnBehalf && !canManageEmployeeRecord(req, targetEmployeeId)) {
+        return res.status(403).json({ error: "You can only submit time for staff in your assigned departments" });
+      }
       if (creatingOnBehalf && (!targetEmployee || !targetEmployee.isActive)) {
         return res.status(400).json({ error: "Select an active employee" });
       }
@@ -2730,6 +2828,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(overtimeEntries.id, req.params.id))
         .limit(1);
       if (!existing) return res.status(404).json({ error: "Overtime entry not found" });
+      if (!canManageEmployeeRecord(req, existing.employeeId) && existing.employeeId !== req.user!.id) {
+        return res.status(403).json({ error: "You can only manage staff in your assigned departments" });
+      }
       // Admins can edit any pending entry; employees only their own
       if (!isOvertimeApprover(req) && existing.employeeId !== req.user!.id) {
         return res.status(403).json({ error: "You can only edit your own overtime" });
@@ -2797,6 +2898,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(overtimeEntries.id, req.params.id))
         .limit(1);
       if (!entry) return res.status(404).json({ error: "Overtime entry not found" });
+      if (!canManageEmployeeRecord(req, entry.employeeId) && entry.employeeId !== req.user!.id) {
+        return res.status(403).json({ error: "You cannot view this audit history" });
+      }
       if (entry.employeeId !== req.user!.id && !isOvertimeApprover(req)) {
         return res.status(403).json({ error: "You cannot view this audit history" });
       }
@@ -2817,6 +2921,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(overtimeEntries)
         .where(eq(overtimeEntries.id, req.params.id))
         .limit(1);
+      if (!target) return res.status(404).json({ error: "Overtime entry not found" });
+      if (!canManageEmployeeRecord(req, target.employeeId)) {
+        return res.status(403).json({ error: "You can only manage staff in your assigned departments" });
+      }
       if (target?.employeeId === req.user!.id) {
         return res.status(403).json({ error: "You cannot approve your own overtime entry" });
       }
@@ -2850,6 +2958,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can reject overtime" });
     const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
     try {
+      const [target] = await db.select({ employeeId: overtimeEntries.employeeId }).from(overtimeEntries)
+        .where(eq(overtimeEntries.id, req.params.id)).limit(1);
+      if (!target) return res.status(404).json({ error: "Overtime entry not found" });
+      if (!canManageEmployeeRecord(req, target.employeeId)) {
+        return res.status(403).json({ error: "You can only manage staff in your assigned departments" });
+      }
       const entry = await db.transaction(async (tx) => {
         const rejectedAt = new Date();
         const [updated] = await tx.update(overtimeEntries).set({
@@ -2875,6 +2989,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/overtime/:id/reopen", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can reopen overtime" });
     try {
+      const [target] = await db.select({ employeeId: overtimeEntries.employeeId }).from(overtimeEntries)
+        .where(eq(overtimeEntries.id, req.params.id)).limit(1);
+      if (!target) return res.status(404).json({ error: "Overtime entry not found" });
+      if (!canManageEmployeeRecord(req, target.employeeId)) {
+        return res.status(403).json({ error: "You can only manage staff in your assigned departments" });
+      }
       const entry = await db.transaction(async (tx) => {
         const [updated] = await tx.update(overtimeEntries).set({
           status: "pending",
@@ -2900,6 +3020,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/overtime/worker/:workerId", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req) && req.user!.id !== req.params.workerId) {
       return res.status(403).json({ error: "You can only view your own overtime summary" });
+    }
+    if (req.user!.id !== req.params.workerId && !canManageEmployeeRecord(req, req.params.workerId)) {
+      return res.status(403).json({ error: "You can only view staff in your assigned departments" });
     }
     try {
       const entries = await db.select().from(overtimeEntries)
@@ -3306,13 +3429,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (q.length < 2) return res.json({ results: [] });
 
     const pattern = `%${q}%`;
-    const role = getDashboardRole(req.user ?? {});
-    const canSeeLeads    = ["admin","manager","sales"].includes(role);
-    const canSeeQuotes   = ["admin","manager","sales"].includes(role);
-    const canSeeInvoices = ["admin","accounts","manager"].includes(role);
-    const canSeeContracts  = ["admin","manager","coordinator","accounts"].includes(role);
-    const canSeeFieldDiary = ["admin","manager","coordinator","service"].includes(role);
-    const canSeeStaff    = ["admin","manager","coordinator","accounts"].includes(role);
+    const identity = req.user ?? {};
+    const canSeeLeads = canAccessUiPath(identity, "/leads");
+    const canSeeQuotes = canAccessUiPath(identity, "/quotes");
+    const canSeeInvoices = hasPermission(identity, "finance");
+    const canSeeServiceContracts = canAccessUiPath(identity, "/service-contracts");
+    const canSeeRentalContracts = canAccessUiPath(identity, "/contracts");
+    const canSeeFieldDiary = canAccessUiPath(identity, "/field-diaries");
+    const canSeeStaff = canAccessUiPath(identity, "/workers");
 
     try {
       const [cRows, jRows, qRows, iRows, scRows, rcRows, fdRows, wRows] = await Promise.all([
@@ -3433,7 +3557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/invoices?open=${r.id}`,
         });
       }
-      if (canSeeContracts) for (const r of scRows.rows as any[]) {
+      if (canSeeServiceContracts) for (const r of scRows.rows as any[]) {
         results.push({
           type: "service_contract",
           id: r.id,
@@ -3442,7 +3566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: `/service-contracts?open=${r.id}`,
         });
       }
-      if (canSeeContracts) for (const r of rcRows.rows as any[]) {
+      if (canSeeRentalContracts) for (const r of rcRows.rows as any[]) {
         results.push({
           type: "rental_contract",
           id: r.id,
@@ -3513,11 +3637,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/workers/:id", async (req, res) => {
+  app.get("/api/workers/:id", async (req: AuthenticatedRequest, res) => {
     const worker = await storage.getWorker(req.params.id);
     if (!worker) {
       return res.status(404).json({ error: "Worker not found" });
     }
+    if (rejectOutsideDepartment(req, res, worker.departmentId)) return;
     const { pin: _pin, ...safeWorker } = worker;
     res.json(safeWorker);
   });
@@ -3538,6 +3663,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/workers/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can update staff profiles" });
     try {
+      const existing = await storage.getWorker(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Worker not found" });
+      if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
       const updateData = insertWorkerSchema.partial().parse(req.body);
       if (updateData.pin) updateData.pin = await AuthService.hashPassword(updateData.pin);
       const updated = await storage.updateWorker(req.params.id, updateData);
@@ -3550,6 +3678,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/workers/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can delete staff profiles" });
+    const existing = await storage.getWorker(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Worker not found" });
+    if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
     const deleted = await storage.deleteWorker(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Worker not found" });
@@ -4317,11 +4448,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(jobs);
   });
 
-  app.get("/api/jobs/:id", async (req, res) => {
+  app.get("/api/jobs/:id", async (req: AuthenticatedRequest, res) => {
     const job = await storage.getJob(req.params.id);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+    if (rejectOutsideDepartment(req, res, job.departmentId)) return;
     res.json(job);
   });
 
@@ -4352,8 +4484,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/jobs/:id", async (req, res) => {
+  app.put("/api/jobs/:id", async (req: AuthenticatedRequest, res) => {
     try {
+      const existing = await storage.getJob(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Job not found" });
+      if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
       // Convert date strings to Date objects
       const jobData = {
         ...req.body,
@@ -4372,8 +4507,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH route for calendar drag and drop
-  app.patch("/api/jobs/:id", async (req, res) => {
+  app.patch("/api/jobs/:id", async (req: AuthenticatedRequest, res) => {
     try {
+      const existing = await storage.getJob(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Job not found" });
+      if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
       // Convert date strings to Date objects
       const jobData = {
         ...req.body,
@@ -4391,12 +4529,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/jobs/:id/card", async (req, res) => {
+  app.get("/api/jobs/:id/card", async (req: AuthenticatedRequest, res) => {
     try {
       const jobCardData = await storage.getJobCardData(req.params.id);
       if (!jobCardData) {
         return res.status(404).json({ error: "Job not found" });
       }
+      if (rejectOutsideDepartment(req, res, jobCardData.departmentId)) return;
       res.json(jobCardData);
     } catch (error) {
       console.error("Job card data error:", error);
@@ -4423,7 +4562,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/jobs/:id", async (req, res) => {
+  app.delete("/api/jobs/:id", async (req: AuthenticatedRequest, res) => {
+    const existing = await storage.getJob(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Job not found" });
+    if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
     const deleted = await storage.deleteJob(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Job not found" });
@@ -4742,7 +4884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar Events Routes
-  app.get("/api/calendar/events/:month?", async (req, res) => {
+  app.get("/api/calendar/events/:month?", async (req: AuthenticatedRequest, res) => {
     try {
       // Return existing calendar events from storage
       const calendarEvents = await storage.getCalendarEvents();
@@ -4756,6 +4898,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/calendar/events", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const eventData = req.body;
+      if (rejectOutsideDepartment(req, res, eventData.departmentId)) return;
+      if (eventData.workerId && rejectOutsideWorker(req, res, eventData.workerId)) return;
       const event = await storage.createCalendarEvent(eventData);
       
       await AuthService.logActivity({
@@ -4775,6 +4919,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updateData = req.body;
+      const existing = await storage.getCalendarEvent(id);
+      if (!existing) return res.status(404).json({ error: "Calendar event not found" });
+      if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
+      if (updateData.departmentId && rejectOutsideDepartment(req, res, updateData.departmentId)) return;
+      if (updateData.workerId && rejectOutsideWorker(req, res, updateData.workerId)) return;
       const event = await storage.updateCalendarEvent(id, updateData);
       
       await AuthService.logActivity({
@@ -4791,7 +4940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard Analytics
-  app.get("/api/dashboard/metrics", async (req, res) => {
+  app.get("/api/dashboard/metrics", async (req: AuthenticatedRequest, res) => {
     try {
       const [activeJobs, allWorkers, expiringContracts, allJobs, departments] = await Promise.all([
         storage.getJobsByStatus('in_progress'),
@@ -4801,8 +4950,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getDepartments()
       ]);
 
-      const activeWorkers = allWorkers.filter(w => w.isActive);
-      const completedJobsThisMonth = allJobs.filter(job => {
+      const departmentScope = req.user && hasOperationalDepartmentScope(req.user)
+        ? new Set(scopedDepartmentIds(req.user))
+        : null;
+      const visibleJobs = departmentScope
+        ? allJobs.filter(job => departmentScope.has(job.departmentId))
+        : allJobs;
+      const visibleActiveJobs = departmentScope
+        ? activeJobs.filter(job => departmentScope.has(job.departmentId))
+        : activeJobs;
+      const visibleWorkers = departmentScope
+        ? allWorkers.filter(worker => departmentScope.has(worker.departmentId))
+        : allWorkers;
+      const visibleDepartments = departmentScope
+        ? departments.filter(department => departmentScope.has(department.id))
+        : departments;
+      const visibleExpiringContracts = departmentScope
+        ? expiringContracts.filter(contract => departmentScope.has((contract as any).departmentId))
+        : expiringContracts;
+
+      const activeWorkers = visibleWorkers.filter(w => w.isActive);
+      const completedJobsThisMonth = visibleJobs.filter(job => {
         const jobDate = new Date(job.createdAt);
         const now = new Date();
         return job.status === 'completed' && 
@@ -4811,7 +4979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Calculate department performance
-      const departmentStats = await Promise.all(departments.map(async (department) => {
+      const departmentStats = await Promise.all(visibleDepartments.map(async (department) => {
         const [todayJobs, workers] = await Promise.all([
           storage.getJobsByDepartment(department.id),
           storage.getWorkersByDepartment(department.id)
@@ -4834,10 +5002,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       const metrics = {
-        activeJobs: activeJobs.length,
+        activeJobs: visibleActiveJobs.length,
         activeWorkers: activeWorkers.length,
-        expiringContracts: expiringContracts.length,
-        monthlyRevenue: 45680, // This would be calculated from contracts
+        expiringContracts: visibleExpiringContracts.length,
+        ...(hasPermission(req.user ?? {}, "company-profit") ? { monthlyRevenue: 45680 } : {}),
         completedJobsThisMonth: completedJobsThisMonth.length,
         departments: departmentStats
       };
@@ -7277,61 +7445,81 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/teams/:id", async (req, res) => {
+  app.get("/api/teams/:id", async (req: AuthenticatedRequest, res) => {
     try {
       const team = await storage.getTeam(req.params.id);
       if (!team) return res.status(404).json({ error: "Team not found" });
+      if (rejectOutsideDepartment(req, res, team.departmentId)) return;
       res.json(team);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.post("/api/teams", async (req, res) => {
+  app.post("/api/teams", async (req: AuthenticatedRequest, res) => {
     try {
+      if (rejectOutsideDepartment(req, res, req.body.departmentId)) return;
+      if (req.body.supervisorId && rejectOutsideWorker(req, res, req.body.supervisorId)) return;
       const team = await storage.createTeam(req.body);
       res.status(201).json(team);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  app.patch("/api/teams/:id", async (req, res) => {
+  app.patch("/api/teams/:id", async (req: AuthenticatedRequest, res) => {
     try {
+      if (await rejectTeamScope(req, res, req.params.id)) return;
+      if (req.body.departmentId && rejectOutsideDepartment(req, res, req.body.departmentId)) return;
+      if (req.body.supervisorId && rejectOutsideWorker(req, res, req.body.supervisorId)) return;
       const team = await storage.updateTeam(req.params.id, req.body);
       res.json(team);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  app.delete("/api/teams/:id", async (req, res) => {
+  app.delete("/api/teams/:id", async (req: AuthenticatedRequest, res) => {
     try {
+      if (await rejectTeamScope(req, res, req.params.id)) return;
       await storage.deleteTeam(req.params.id);
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/teams/:id/members", async (req, res) => {
-    try { res.json(await storage.getTeamMembers(req.params.id)); }
+  app.get("/api/teams/:id/members", async (req: AuthenticatedRequest, res) => {
+    try {
+      if (await rejectTeamScope(req, res, req.params.id)) return;
+      res.json(await storage.getTeamMembers(req.params.id));
+    }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.post("/api/teams/:id/members", async (req, res) => {
+  app.post("/api/teams/:id/members", async (req: AuthenticatedRequest, res) => {
     try {
+      if (await rejectTeamScope(req, res, req.params.id)) return;
+      if (rejectOutsideWorker(req, res, req.body.workerId)) return;
       const member = await storage.addTeamMember({ teamId: req.params.id, workerId: req.body.workerId });
       res.status(201).json(member);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
-  app.delete("/api/teams/:id/members/:workerId", async (req, res) => {
+  app.delete("/api/teams/:id/members/:workerId", async (req: AuthenticatedRequest, res) => {
     try {
+      if (await rejectTeamScope(req, res, req.params.id)) return;
+      if (rejectOutsideWorker(req, res, req.params.workerId)) return;
       await storage.removeTeamMember(req.params.id, req.params.workerId);
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/teams/by-worker/:workerId", async (req, res) => {
-    try { res.json(await storage.getTeamsForWorker(req.params.workerId)); }
+  app.get("/api/teams/by-worker/:workerId", async (req: AuthenticatedRequest, res) => {
+    try {
+      if (rejectOutsideWorker(req, res, req.params.workerId)) return;
+      res.json(await storage.getTeamsForWorker(req.params.workerId));
+    }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/teams/by-supervisor/:supervisorId", async (req, res) => {
-    try { res.json(await storage.getTeamsForSupervisor(req.params.supervisorId)); }
+  app.get("/api/teams/by-supervisor/:supervisorId", async (req: AuthenticatedRequest, res) => {
+    try {
+      if (rejectOutsideWorker(req, res, req.params.supervisorId)) return;
+      res.json(await storage.getTeamsForSupervisor(req.params.supervisorId));
+    }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
@@ -7361,23 +7549,28 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         storage.getWorkers(),
         storage.getVehicles(),
       ]);
-      const workerMap = new Map(allWorkers.map(worker => [worker.id, worker]));
+      const scopedWorkers = req.user && hasOperationalDepartmentScope(req.user)
+        ? allWorkers.filter(worker => canManageWorker(req.user!, worker.id))
+        : allWorkers;
+      const scopedWorkerIds = new Set(scopedWorkers.map(worker => worker.id));
+      const scopedRecords = records.filter(record => scopedWorkerIds.has(record.employeeId));
+      const workerMap = new Map(scopedWorkers.map(worker => [worker.id, worker]));
       const vehicleMap = new Map(allVehicles.map(vehicle => [vehicle.id, vehicle]));
-      const decorated = records.map(record => attendanceRecordForResponse(
+      const decorated = scopedRecords.map(record => attendanceRecordForResponse(
         record,
         workerMap.get(record.employeeId),
         record.vehicleId ? vehicleMap.get(record.vehicleId) : undefined,
       ));
-      const todayRecords = records.filter(record => record.workDate === date);
+      const todayRecords = scopedRecords.filter(record => record.workDate === date);
       res.json({
         records: decorated,
         summary: {
           date,
-          totalEmployees: allWorkers.filter(worker => worker.isActive !== false).length,
+          totalEmployees: scopedWorkers.filter(worker => worker.isActive !== false).length,
           started: todayRecords.length,
           working: todayRecords.filter(record => record.status === "WORKING").length,
           finished: todayRecords.filter(record => record.status === "FINISHED").length,
-          notStarted: Math.max(0, allWorkers.filter(worker => worker.isActive !== false).length - todayRecords.length),
+          notStarted: Math.max(0, scopedWorkers.filter(worker => worker.isActive !== false).length - todayRecords.length),
         },
       });
     } catch (error) {
@@ -7388,6 +7581,12 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
   app.get("/api/attendance/employee/:id/audit", async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Management access required" });
+    const [record] = await db.select({ employeeId: employeeAttendanceRecords.employeeId })
+      .from(employeeAttendanceRecords).where(eq(employeeAttendanceRecords.id, req.params.id)).limit(1);
+    if (!record) return res.status(404).json({ error: "Attendance record not found" });
+    if (!canManageEmployeeRecord(req, record.employeeId)) {
+      return res.status(403).json({ error: "You can only manage staff in your assigned departments" });
+    }
     const audit = await db.select().from(employeeAttendanceAudits)
       .where(eq(employeeAttendanceAudits.attendanceId, req.params.id))
       .orderBy(desc(employeeAttendanceAudits.createdAt));
@@ -7403,6 +7602,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
         .where(eq(employeeAttendanceRecords.id, req.params.id))
         .limit(1);
       if (!existing) return res.status(404).json({ error: "Attendance record not found" });
+      if (!canManageEmployeeRecord(req, existing.employeeId)) {
+        return res.status(403).json({ error: "You can only manage staff in your assigned departments" });
+      }
 
       const startAt = new Date(`${existing.workDate}T${parsed.data.startTime}:00+02:00`);
       const endAt = parsed.data.finishTime ? new Date(`${existing.workDate}T${parsed.data.finishTime}:00+02:00`) : null;
@@ -7449,33 +7651,40 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/attendance/:id", async (req, res) => {
+  app.get("/api/attendance/:id", async (req: AuthenticatedRequest, res) => {
     try {
       const record = await storage.getAttendanceRecord(req.params.id);
       if (!record) return res.status(404).json({ error: "Attendance record not found" });
+      if (await rejectTeamScope(req, res, record.teamId)) return;
       res.json(record);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/attendance/:id/members", async (req, res) => {
-    try { res.json(await storage.getAttendanceMemberRecords(req.params.id)); }
+  app.get("/api/attendance/:id/members", async (req: AuthenticatedRequest, res) => {
+    try {
+      if (await rejectAttendanceScope(req, res, req.params.id)) return;
+      res.json(await storage.getAttendanceMemberRecords(req.params.id));
+    }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
   // Get or create attendance for a team on a specific date
-  app.post("/api/attendance/open", async (req, res) => {
+  app.post("/api/attendance/open", async (req: AuthenticatedRequest, res) => {
     try {
       const { teamId, date } = req.body;
       if (!teamId || !date) return res.status(400).json({ error: "teamId and date required" });
+      if (await rejectTeamScope(req, res, teamId)) return;
       const record = await storage.getOrCreateAttendance(teamId, date);
       res.json(record);
     } catch (err: any) { res.status(400).json({ error: err.message }); }
   });
 
   // Update a single member's status
-  app.patch("/api/attendance/:id/member", async (req, res) => {
+  app.patch("/api/attendance/:id/member", async (req: AuthenticatedRequest, res) => {
     try {
       const { workerId, employeeName, role, status, absenceReason, notes } = req.body;
+      if (await rejectAttendanceScope(req, res, req.params.id)) return;
+      if (rejectOutsideWorker(req, res, workerId)) return;
       const updated = await storage.upsertAttendanceMemberRecord({
         attendanceId: req.params.id,
         workerId,
@@ -7490,8 +7699,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   });
 
   // Submit attendance
-  app.post("/api/attendance/:id/submit", async (req, res) => {
+  app.post("/api/attendance/:id/submit", async (req: AuthenticatedRequest, res) => {
     try {
+      if (await rejectAttendanceScope(req, res, req.params.id)) return;
       const submittedBy = req.body.submittedBy ?? "supervisor";
       const record = await storage.submitAttendance(req.params.id, submittedBy);
       res.json(record);
@@ -7503,10 +7713,11 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     res.json(await storage.getServiceContracts());
   });
 
-  app.post("/api/service-contracts", async (req, res) => {
+  app.post("/api/service-contracts", async (req: AuthenticatedRequest, res) => {
     try {
       const { insertServiceContractSchema } = await import("@shared/schema");
       const data = insertServiceContractSchema.parse(req.body);
+      if (rejectOutsideDepartment(req, res, data.departmentId)) return;
       const created = await storage.createServiceContract(data);
       res.status(201).json(created);
     } catch (err: any) {
@@ -7515,10 +7726,14 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
-  app.put("/api/service-contracts/:id", async (req, res) => {
+  app.put("/api/service-contracts/:id", async (req: AuthenticatedRequest, res) => {
     try {
+      const existing = await storage.getServiceContract(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contract not found" });
+      if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
       const { insertServiceContractSchema } = await import("@shared/schema");
       const data = insertServiceContractSchema.partial().parse(req.body);
+      if (data.departmentId && rejectOutsideDepartment(req, res, data.departmentId)) return;
       const updated = await storage.updateServiceContract(req.params.id, data);
       if (!updated) return res.status(404).json({ error: "Contract not found" });
       res.json(updated);
@@ -7527,7 +7742,10 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     }
   });
 
-  app.delete("/api/service-contracts/:id", async (req, res) => {
+  app.delete("/api/service-contracts/:id", async (req: AuthenticatedRequest, res) => {
+    const existing = await storage.getServiceContract(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Contract not found" });
+    if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
     const ok = await storage.deleteServiceContract(req.params.id);
     if (!ok) return res.status(404).json({ error: "Contract not found" });
     res.status(204).send();
@@ -7555,11 +7773,25 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
 
   // Per-occurrence overrides for recurring contract occurrences (reschedule / reassign /
   // cancel a single instance without touching the master contract's recurrence rule).
-  app.get("/api/contract-occurrence-exceptions", async (req, res) => {
+  app.get("/api/contract-occurrence-exceptions", async (req: AuthenticatedRequest, res) => {
     try {
       const contractId = req.query.contractId ? String(req.query.contractId) : undefined;
+      if (contractId && await rejectOccurrenceScope(req, res, {
+        contractId,
+        contractKind: typeof req.query.contractKind === "string" ? req.query.contractKind : undefined,
+      })) return;
       const rows = await storage.getContractOccurrenceExceptions(contractId);
-      res.json(rows);
+      if (!req.user || !hasOperationalDepartmentScope(req.user) || contractId) {
+        return res.json(rows);
+      }
+      const visibleRows = [];
+      for (const row of rows) {
+        const contract = row.contractKind === "rental"
+          ? await storage.getContract(row.contractId)
+          : await storage.getServiceContract(row.contractId);
+        if (contract && canAccessDepartment(req.user, contract.departmentId)) visibleRows.push(row);
+      }
+      res.json(visibleRows);
     } catch (err: any) {
       res.status(500).json({ error: "Failed to fetch contract occurrence exceptions", details: err?.message });
     }
@@ -7570,6 +7802,8 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const { insertContractOccurrenceExceptionSchema } = await import("@shared/schema");
       const { canMoveCalendarEvent } = await import("@shared/dashboardRole");
       const data = insertContractOccurrenceExceptionSchema.parse(req.body);
+      if (await rejectOccurrenceScope(req, res, data)) return;
+      if (data.assignedTechnicianId && rejectOutsideWorker(req, res, data.assignedTechnicianId)) return;
       const role = getDashboardRole(req.user!);
       const sourceType = data.contractKind === "rental" ? "rentalContractOccurrence" : "serviceContractOccurrence";
       const allowed = canMoveCalendarEvent(role, req.user!.id, {
@@ -7591,6 +7825,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       if (role !== "admin" && role !== "manager" && role !== "coordinator") {
         return res.status(403).json({ error: "Not permitted to remove this occurrence override" });
       }
+      const exception = (await storage.getContractOccurrenceExceptions()).find(row => row.id === req.params.id);
+      if (!exception) return res.status(404).json({ error: "Exception not found" });
+      if (await rejectOccurrenceScope(req, res, exception)) return;
       const ok = await storage.deleteContractOccurrenceException(req.params.id);
       if (!ok) return res.status(404).json({ error: "Exception not found" });
       res.status(204).send();

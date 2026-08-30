@@ -24,13 +24,8 @@ export function identityDisplayName(identity: AccessIdentity): string {
 }
 
 export function roleQualifiesForUnrestrictedAccess(role: string | null | undefined): boolean {
-  const normalizedRole = normalize(role);
-  return (
-    /\badmin\b/.test(normalizedRole) ||
-    /\bsupervisor\b/.test(normalizedRole) ||
-    /\bpco(?:s)?\b/.test(normalizedRole) ||
-    /\bpest control operators?\b/.test(normalizedRole)
-  );
+  void normalize(role);
+  return false;
 }
 
 export function hasUnrestrictedAccess(identity: AccessIdentity): boolean {
@@ -41,12 +36,5 @@ export function hasUnrestrictedAccess(identity: AccessIdentity): boolean {
     return true;
   }
 
-  // Password-authenticated office accounts derive organogram access from their
-  // linked worker. A generic role in admin_users is a credential class, not an
-  // authoritative job title.
-  if (identity.authenticationMethod === "password") {
-    return roleQualifiesForUnrestrictedAccess(identity.sourceWorkerRole);
-  }
-
-  return roleQualifiesForUnrestrictedAccess(identity.sourceWorkerRole ?? identity.role);
+  return false;
 }

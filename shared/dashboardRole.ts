@@ -11,7 +11,8 @@ export function getDashboardRole(user: DashboardIdentity): DashboardRole {
   const dept = user.sourceWorkerDepartmentId ?? user.departmentId ?? "";
   const role = (user.sourceWorkerRole ?? user.role ?? "").toLowerCase();
 
-  // The authoritative organogram rule is the only path to unrestricted access.
+  // Only canonical Julien is unrestricted. Department managers, supervisors,
+  // PCOs and titles containing "Admin" stay within the permission matrix.
   if (hasUnrestrictedAccess(user)) return "admin";
 
   // Coordinator — must be checked BEFORE department routing so div-1/2/3/4 coordinators don't fall into "service"

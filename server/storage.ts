@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getCanonicalWorkerName } from "@shared/organogram";
+import { canExpandMobileTeamJobs } from "@shared/permissionMatrix";
 import { 
   type User, type InsertUser,
   type Department, type InsertDepartment,
@@ -2964,10 +2965,12 @@ export class MemStorage implements IStorage {
   }
 
   async getMobileJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]> {
-    const teams = await this.getTeamsForWorker(workerId);
     const memberIds = new Set<string>([workerId]);
-    for (const team of teams) {
-      for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+    if (canExpandMobileTeamJobs(workerId)) {
+      const teams = await this.getTeamsForWorker(workerId);
+      for (const team of teams) {
+        for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+      }
     }
     const workerJobs = Array.from(this.jobs.values()).filter(job => job.workerId && memberIds.has(job.workerId));
     return workerJobs

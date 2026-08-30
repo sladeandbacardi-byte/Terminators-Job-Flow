@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardRole, getDefaultDashboardRoute } from "@/lib/dashboardRole";
+import { canAccessUiPath } from "@shared/permissionMatrix";
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
 
 type NavItem = {
@@ -259,16 +260,16 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
       ...s,
       items: s.items
         .map(entry => {
-          if (!entry.roles.includes(role)) return null;
           if (isNavGroup(entry)) {
-            const items = entry.items.filter(item => item.roles.includes(role));
+            const items = entry.items.filter(item => canAccessUiPath(user ?? {}, item.href));
             return items.length > 0 ? { ...entry, items } : null;
           }
+          if (!canAccessUiPath(user ?? {}, entry.href)) return null;
           return entry;
         })
         .filter((entry): entry is NavEntry => entry !== null),
     }))
-    .filter(s => s.roles.includes(role) && s.items.length > 0);
+    .filter(s => s.items.length > 0);
 
   const initialOpen = sectionKeyForPath(visibleSections, location) ?? visibleSections[0]?.key ?? null;
   const [openKey, setOpenKey] = useState<string | null>(initialOpen);

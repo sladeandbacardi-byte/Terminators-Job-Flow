@@ -13,6 +13,6 @@ test("desktop office hierarchy places authoritative roles under their correct br
 });
 
 test("office role authorization remains independent from organogram placement", () => {
-  assert.equal(hasUnrestrictedAccess({ sourceWorkerId: "worker-5", sourceWorkerRole: "Existing Clients Sales & Admin" }), true);
+  assert.equal(hasUnrestrictedAccess({ sourceWorkerId: "worker-5", sourceWorkerRole: "Existing Clients Sales & Admin" }), false);
   assert.equal(hasUnrestrictedAccess({ sourceWorkerId: "worker-6", sourceWorkerRole: "Sales Rep" }), false);
 });

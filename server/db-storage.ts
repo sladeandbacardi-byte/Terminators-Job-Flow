@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { getCanonicalWorkerName } from "@shared/organogram";
+import { canExpandMobileTeamJobs } from "@shared/permissionMatrix";
 import {
   eq, and, gte, lte, lt, desc, asc, sql, or, ilike, isNull, isNotNull, ne, inArray,
 } from "drizzle-orm";
@@ -837,10 +838,12 @@ export class DbStorage implements IStorage {
   }
 
   async getMobileJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]> {
-    const technicianTeams = await this.getTeamsForWorker(workerId);
     const memberIds = new Set<string>([workerId]);
-    for (const team of technicianTeams) {
-      for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+    if (canExpandMobileTeamJobs(workerId)) {
+      const technicianTeams = await this.getTeamsForWorker(workerId);
+      for (const team of technicianTeams) {
+        for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+      }
     }
     const rows = await db.select({ job: jobs, client: clients })
       .from(jobs)

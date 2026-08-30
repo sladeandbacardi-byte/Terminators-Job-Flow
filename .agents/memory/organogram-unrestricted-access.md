@@ -3,8 +3,8 @@ name: Organogram unrestricted access
 description: The authoritative worker-role rule that separates unrestricted JobFlow access from ordinary role-based access.
 ---
 
-Grant unrestricted JobFlow access only to the canonical Julien worker identity and active workers whose authoritative role explicitly contains Admin or Supervisor, or identifies a Pest Control Operator/PCO. Generic Manager and Technician roles remain restricted. Unclassified office API namespaces fail closed to this unrestricted tier.
+Grant unrestricted JobFlow access only to the canonical Julien worker identity. Titles containing Admin or Supervisor, Pest Control Operators/PCOs, Managers, and Technicians never imply unrestricted access. Every other named identity receives explicit module permissions and, where relevant, department/team/own-work scope. Unclassified UI and API namespaces fail closed.
 
-**Why:** Credential-table roles describe office authentication, not the authoritative organogram. Trusting generic admin/manager credentials or broad title/department heuristics grants more access than the approved 2026 organogram allows.
+**Why:** Credential-table roles and job-title words describe authentication or duties, not authority. Broad title/department heuristics granted cross-department, finance, payroll, scheduling, and administration access beyond the approved organogram.
 
-**How to apply:** Enrich password-authenticated office sessions from one deterministic active worker match, then use the worker ID/title classifier for server gates, API modules, client routes, and navigation. Classify nested client finance/payment routes separately from general client reads. Keep mobile tokens separate and never edit worker roles to make an identity qualify.
+**How to apply:** Resolve the canonical worker identity, then use the centralized named permission profile for navigation, direct routes, APIs, search, reports, and exports. For every direct-record endpoint, load the resource and derive its department/worker/team before reading or mutating it; never trust caller-supplied scope or response filtering alone. Keep mobile tokens separate and enforce own-work versus supervisor team expansion explicitly.
