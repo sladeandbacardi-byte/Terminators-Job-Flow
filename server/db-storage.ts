@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { getCanonicalWorkerName } from "@shared/organogram";
 import {
   eq, and, gte, lte, lt, desc, asc, sql, or, ilike, isNull, isNotNull, ne, inArray,
 } from "drizzle-orm";
@@ -300,12 +301,13 @@ export class DbStorage implements IStorage {
   }
 
   private async runDataMigrations(): Promise<void> {
-    // Fix worker-6 name if it was seeded with the old display name
+    // Correct the worker-6 display name without touching related records.
     const [w] = await db.select({ id: workers.id, name: workers.name })
       .from(workers).where(eq(workers.id, "worker-6")).limit(1);
-    if (w && w.name !== "Sales 2") {
-      await db.update(workers).set({ name: "Sales 2" }).where(eq(workers.id, "worker-6"));
-      console.log(`[DbStorage] Migrated worker-6 name: "${w.name}" → "Sales 2"`);
+    const canonicalWorker6Name = getCanonicalWorkerName("worker-6");
+    if (w && canonicalWorker6Name && w.name !== canonicalWorker6Name) {
+      await db.update(workers).set({ name: canonicalWorker6Name }).where(eq(workers.id, "worker-6"));
+      console.log(`[DbStorage] Migrated worker-6 display name: "${w.name}" → "${canonicalWorker6Name}"`);
     }
 
     // Fix the associated vehicle name
@@ -352,7 +354,7 @@ export class DbStorage implements IStorage {
       { name: "Mariette Koekemoer", email: "service@terminators.co.za",   phone: "+27 78 982 6249", departmentId: "div-6", role: "Hygiene Services Manager" },
       { name: "Juli Holtshausen",   email: "accounts@terminators.co.za",  phone: "+27 82 618 9711", departmentId: "div-7", role: "Finance & HR Manager" },
       { name: "Sheryl-Lyn Lee",     email: "sales@terminators.co.za",     phone: "+27 82 889 2453", departmentId: "div-5", role: "Existing Clients Sales & Admin" },
-      { name: "Sales 2",             email: "sales2@terminators.co.za",    phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
+      { name: getCanonicalWorkerName("worker-6")!, email: "sales2@terminators.co.za", phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
       { name: "Zuki Sandi",         email: "zuki@terminators.co.za",      phone: "+27 82 123 0007", departmentId: "div-4", role: "Ablution Deep Cleaning Supervisor" },
       { name: "Reece Ebrahim",      email: "reece@terminators.co.za",     phone: "+27 82 123 0008", departmentId: "div-1", role: "Pest Control Operator" },
       { name: "Garth du Preez",     email: "garth@terminators.co.za",     phone: "+27 82 123 0009", departmentId: "div-1", role: "Pest Control Operator" },

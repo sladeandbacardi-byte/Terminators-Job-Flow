@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { getCanonicalWorkerName } from "@shared/organogram";
 import { 
   type User, type InsertUser,
   type Department, type InsertDepartment,
@@ -965,7 +966,7 @@ export class MemStorage implements IStorage {
 
       // Sales — worker-5, worker-6
       { name: "Sheryl-Lyn Lee",     email: "sales@terminators.co.za",     phone: "+27 82 889 2453", departmentId: "div-5", role: "Existing Clients Sales & Admin" },
-      { name: "Sales 2",             email: "sales2@terminators.co.za",    phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
+      { name: getCanonicalWorkerName("worker-6")!, email: "sales2@terminators.co.za", phone: "+27 82 770 0028", departmentId: "div-5", role: "Sales Rep" },
 
       // Ablution Deep Cleaning — worker-7
       { name: "Zuki Sandi",         email: "zuki@terminators.co.za",      phone: "+27 82 123 0007", departmentId: "div-4", role: "Ablution Deep Cleaning Supervisor" },
@@ -1003,7 +1004,7 @@ export class MemStorage implements IStorage {
     // worker-3  = Mariette Koekemoer    (div-6 / Hygiene Services Manager)
     // worker-4  = Juli Holtshausen      (div-7 / Finance & HR Manager)
     // worker-5  = Sheryl-Lyn Lee        (div-5 / Existing Clients Sales & Admin)
-    // worker-6  = Sales 2                (div-5 / Sales Rep)
+    // worker-6  = Anzel Marais           (div-5 / Sales Rep)
     // worker-7  = Zuki Sandi            (div-4 / Ablution Deep Cleaning Supervisor)
     // worker-8  = Reece Ebrahim         (div-1 / Pest Control Operator)
     // worker-9  = Garth du Preez        (div-1 / Pest Control Operator)
