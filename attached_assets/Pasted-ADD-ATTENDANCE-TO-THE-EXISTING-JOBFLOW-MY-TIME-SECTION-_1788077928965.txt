@@ -1,0 +1,645 @@
+ADD ATTENDANCE TO THE EXISTING JOBFLOW MY TIME SECTION
+
+Extend the current JobFlow Time & Overtime system with a mobile Attendance feature.
+
+The purpose is for mobile users to record:
+
+- Start of work
+- End of work
+
+and for JobFlow to send management an email notification.
+
+Do not create a separate attendance app.
+
+Attendance must be part of the existing:
+
+MY TIME
+TIME & OVERTIME
+
+system.
+
+--------------------------------------------------
+1. MOBILE MY TIME
+--------------------------------------------------
+
+Update the mobile My Time screen.
+
+At the top show:
+
+MY TIME
+
+TODAY
+
+If employee has NOT started work:
+
+[ START WORK ]
+
+After Start Work has been logged:
+
+Started:
+07:52
+
+[ END WORK ]
+
+After End Work:
+
+Started:
+07:52
+
+Finished:
+16:18
+
+Total Attendance:
+8 hrs 26 min
+
+Then keep the existing actions:
+
+[ + LOG OVERTIME ]
+[ + LOG TIME OFF ]
+
+--------------------------------------------------
+2. START WORK
+--------------------------------------------------
+
+When the mobile user presses:
+
+START WORK
+
+JobFlow must automatically record:
+
+- Employee
+- Current date
+- Current server time
+- Attendance status
+- Created timestamp
+
+Do NOT ask the employee to manually type the time.
+
+Use the server timestamp, not the employee's device-entered value.
+
+After saving successfully show:
+
+"Work started at 07:52"
+
+The Start Work button must then become disabled/hidden for that day.
+
+Do not allow multiple Start Work records for the same employee on the same day.
+
+--------------------------------------------------
+3. START WORK EMAIL
+--------------------------------------------------
+
+Immediately after the Start Work record saves successfully, send an email to BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+Use the SAME reliable JobFlow email system already used for Overtime and Time Off.
+
+Subject:
+
+JobFlow - Work Started - [Employee Name] - [Time]
+
+Example:
+
+JobFlow - Work Started - Garth - 07:52
+
+Email body:
+
+[TERMINATORS LOGO] [JOBFLOW LOGO]
+
+WORK STARTED
+
+Employee:
+Garth
+
+Date:
+30/08/2026
+
+Start Time:
+07:52
+
+Status:
+Working
+
+Sent automatically by JobFlow.
+
+--------------------------------------------------
+4. END WORK
+--------------------------------------------------
+
+Once an employee has started work, show:
+
+END WORK
+
+When pressed, automatically record:
+
+- Current server time as finish time
+- Updated timestamp
+
+Do NOT ask employee to manually enter the end time.
+
+Calculate:
+
+TOTAL ATTENDANCE TIME =
+End Time - Start Time
+
+Store the total internally as minutes.
+
+Example:
+
+Start:
+07:52
+
+End:
+16:18
+
+Total Attendance:
+8 hrs 26 min
+
+--------------------------------------------------
+5. END WORK EMAIL
+--------------------------------------------------
+
+Immediately after End Work saves successfully, send an email to BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+Subject:
+
+JobFlow - Work Finished - [Employee Name] - [Time]
+
+Example:
+
+JobFlow - Work Finished - Garth - 16:18
+
+Email body:
+
+[TERMINATORS LOGO] [JOBFLOW LOGO]
+
+WORK FINISHED
+
+Employee:
+Garth
+
+Date:
+30/08/2026
+
+Start Time:
+07:52
+
+Finish Time:
+16:18
+
+Total Attendance:
+8 hrs 26 min
+
+Status:
+Finished
+
+Sent automatically by JobFlow.
+
+--------------------------------------------------
+6. EMAIL DELIVERY
+--------------------------------------------------
+
+Do not create another mail system.
+
+Reuse the same working notification service used for:
+
+- Overtime
+- Authorised Time Off
+
+Send Attendance notifications to BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+If sending to two recipients in one message is unreliable, send two separate emails.
+
+Attendance must still save even if the email fails.
+
+Log email success/failure.
+
+--------------------------------------------------
+7. NORMAL WORKING HOURS
+--------------------------------------------------
+
+Normal Terminators working hours are:
+
+08:00 to 16:00
+
+Attendance should compare actual start/end times against these working hours.
+
+Examples:
+
+Start 07:52
+Display:
+Started 8 min early
+
+Start 08:14
+Display:
+Started 14 min late
+
+Finish 15:45
+Display:
+Finished 15 min early
+
+Finish 16:20
+Display:
+Finished 20 min after normal hours
+
+IMPORTANT:
+
+Do NOT automatically convert these differences into Overtime or Time Off.
+
+Attendance is evidence of when the employee started and finished.
+
+Overtime and Authorised Time Off remain separate approved records.
+
+--------------------------------------------------
+8. LATE START / EARLY FINISH
+--------------------------------------------------
+
+Calculate and display:
+
+Late Start Minutes
+Early Finish Minutes
+
+Example:
+
+08:23 start
+= 23 min late
+
+15:30 finish
+= 30 min early
+
+Admin should be able to see these values in Attendance reports.
+
+Do not automatically deduct these minutes from payroll or Time Balance.
+
+--------------------------------------------------
+9. ATTENDANCE WITH TIME OFF
+--------------------------------------------------
+
+Attendance must work together with Authorised Time Off.
+
+Example:
+
+Start Work:
+08:00
+
+Employee works until:
+12:00
+
+Authorised Time Off:
+12:00 - 16:00
+
+Employee then attends another job:
+16:00 - 17:00
+
+End Work:
+17:00
+
+Attendance:
+08:00 - 17:00
+
+Authorised Time Off:
+12:00 - 16:00
+
+Overtime:
+16:00 - 17:00
+
+Do NOT calculate that the employee physically worked continuously from 08:00 to 17:00.
+
+The Time Balance system must continue using approved Overtime and approved Time Off records separately.
+
+--------------------------------------------------
+10. ADMIN ATTENDANCE VIEW
+--------------------------------------------------
+
+Under:
+
+Operations > Time & Overtime
+
+add a tab:
+
+ATTENDANCE
+
+Tabs should now include:
+
+ALL
+ATTENDANCE
+OVERTIME
+TIME OFF
+PENDING APPROVAL
+APPROVED
+REJECTED
+
+Attendance table:
+
+Employee
+Date
+Start
+Finish
+Total Span
+Late Start
+Early Finish
+Status
+
+Example:
+
+Garth
+30/08/26
+07:52
+16:18
+8 hrs 26 min
+0 min late
+0 min early
+Finished
+
+Zain
+30/08/26
+08:17
+15:45
+7 hrs 28 min
+17 min late
+15 min early
+Finished
+
+--------------------------------------------------
+11. ATTENDANCE STATUS
+--------------------------------------------------
+
+Possible statuses:
+
+NOT STARTED
+WORKING
+FINISHED
+
+If employee has started but has not ended work:
+
+WORKING
+
+If employee has not ended work by the end of the day, clearly flag:
+
+MISSING END TIME
+
+Admin must be able to correct this.
+
+--------------------------------------------------
+12. ADMIN CORRECTIONS
+--------------------------------------------------
+
+Normal mobile users must NOT manually edit their attendance timestamps.
+
+Admin/Management can correct:
+
+- Start Time
+- End Time
+
+Any correction must require:
+
+Reason for correction
+
+Example:
+
+"Employee forgot to press End Work."
+
+Record the original and corrected times in the audit trail.
+
+--------------------------------------------------
+13. AUDIT TRAIL
+--------------------------------------------------
+
+Record:
+
+START_WORK
+END_WORK
+ATTENDANCE_EDITED
+ATTENDANCE_EMAIL_SENT
+ATTENDANCE_EMAIL_FAILED
+
+Store:
+
+- Employee
+- User performing action
+- Date/time
+- Original values
+- New values
+- Correction reason where applicable
+
+--------------------------------------------------
+14. DATABASE
+--------------------------------------------------
+
+Create/use an attendance table linked to the existing employee records.
+
+Suggested:
+
+attendance_records
+
+id
+employee_id
+work_date
+start_time
+end_time nullable
+total_minutes nullable
+late_start_minutes
+early_finish_minutes
+status
+created_at
+updated_at
+corrected_by nullable
+correction_reason nullable
+
+Add a unique constraint so an employee can only have ONE attendance record per work date.
+
+Do not create duplicate employee records.
+
+--------------------------------------------------
+15. STAFF TIME REPORT
+--------------------------------------------------
+
+Extend the existing Staff Time Balance report.
+
+For each employee show:
+
+Employee
+Days Attended
+Average Start Time
+Late Starts
+Total Late Minutes
+Early Finishes
+Total Early Finish Minutes
+Approved Overtime
+Approved Time Off
+Net Time Balance
+
+Example:
+
+GARTH - AUGUST 2026
+
+Days Attended:
+21
+
+Average Start:
+07:56
+
+Late Starts:
+2
+
+Total Late:
+23 min
+
+Early Finishes:
+1
+
+Total Early:
+15 min
+
+Approved Overtime:
+8 hrs
+
+Approved Time Off:
+4 hrs
+
+Time Balance:
++4 hrs
+
+IMPORTANT:
+
+Attendance lateness/early finish figures are management information.
+
+Do NOT automatically add or subtract them from the employee Time Balance.
+
+--------------------------------------------------
+16. DAILY MANAGEMENT VIEW
+--------------------------------------------------
+
+Add an Attendance Today summary.
+
+Show:
+
+STAFF TODAY
+
+Started
+8
+
+Not Started
+2
+
+Working
+7
+
+Finished
+1
+
+Missing End Time
+0
+
+Then list:
+
+Garth       Started 07:52
+Leon        Started 08:01
+Zain        Started 08:17
+Jackie      Not Started
+
+This should make it very easy to see who has logged attendance.
+
+--------------------------------------------------
+17. MOBILE DESIGN
+--------------------------------------------------
+
+Make this extremely simple.
+
+The employee should not have to fill in a form.
+
+Before starting:
+
+MY TIME
+
+Good morning, Garth
+
+[ START WORK ]
+
+After starting:
+
+MY TIME
+
+Working since
+07:52
+
+[ END WORK ]
+
+[ + LOG OVERTIME ]
+[ + LOG TIME OFF ]
+
+After finishing:
+
+MY TIME
+
+TODAY
+
+Start
+07:52
+
+Finish
+16:18
+
+Total
+8 hrs 26 min
+
+[ + LOG OVERTIME ]
+[ + LOG TIME OFF ]
+
+Use the existing Terminators + JobFlow branding and mobile theme.
+
+--------------------------------------------------
+18. DO NOT BREAK EXISTING FEATURES
+--------------------------------------------------
+
+Do not change or break:
+
+- Overtime calculation
+- Authorised Time Off
+- Time Balance Report
+- email notifications
+- mobile login
+- JobFlow branding
+- employee permissions
+- existing attendance/team data
+- FleetGuard
+
+Integrate Attendance into the current Time system.
+
+--------------------------------------------------
+19. TEST
+--------------------------------------------------
+
+Test with a mobile user.
+
+TEST START:
+
+Press Start Work.
+
+Confirm:
+- attendance record saved
+- actual server time recorded
+- button changes to End Work
+- email sent to accounts@terminators.co.za
+- email sent to julien@terminators.co.za
+
+TEST END:
+
+Press End Work.
+
+Confirm:
+- end time saved
+- total attendance calculated
+- status becomes Finished
+- email sent to accounts@terminators.co.za
+- email sent to julien@terminators.co.za
+
+Do not report complete until both recipients receive both Start Work and End Work notifications.
