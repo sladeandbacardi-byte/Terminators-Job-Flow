@@ -32,6 +32,16 @@ interface EmailParams {
   attachments?: EmailAttachment[];
 }
 
+// Values supplied by users may be included in trusted HTML email templates.
+// Escape every HTML-sensitive character so those values remain text in the
+// recipient's email client.
+export const escapeHtml = (value: unknown) => String(value ?? "—")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#039;");
+
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   if (!mailService) {
     console.log('Email simulation (SendGrid not configured):', params.subject, 'to', params.to);

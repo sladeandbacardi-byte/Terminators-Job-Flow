@@ -54,7 +54,7 @@ import {
    insertPestControlProductSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
+import { escapeHtml, sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
 import { createSageService } from "./sage-integration";
 import { AuthService, requireAuth, requireMobileTechnician, logActivity, type AuthenticatedRequest, type MobileAuthenticatedRequest } from "./auth-service";
 import multer from "multer";
@@ -520,15 +520,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
-  const notifyTimeEntry = async (entry: any, employeeName: string, req: any, approvedByName?: string | null) => {
+  const notifyTimeEntry = async (entry: any, employeeName: string, approvedByName?: string | null) => {
     const isTimeOff = entry.entryType === "AUTHORISED_TIME_OFF";
     const notificationType = isTimeOff ? "AUTHORISED_TIME_OFF" : "OVERTIME";
     console.info(`[TIME NOTIFICATION] Sending ${notificationType} notification for entry: ${entry.id}`);
     try {
-      const protocol = req.headers?.["x-forwarded-proto"] || req.protocol || "http";
-      const host = req.get?.("host") || "";
       const deliveries = await sendTimeAdjustmentNotification(entry, employeeName, {
-        baseUrl: `${String(protocol).split(",")[0]}://${host}`,
         approvedByName,
       });
       const attemptedDeliveries = deliveries.length
@@ -1841,7 +1838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error(`[TIME AUDIT] Could not audit submitted overtime ${created.id}:`, auditError);
       }
       const enriched = (await enrichOvertimeEntries([created]))[0];
-      void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
+      void notifyTimeEntry(enriched, req.mobileWorker!.name);
       res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit mobile overtime:", error);
@@ -2063,7 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.info(`[TIME OFF] Entry created: ${created.id}`);
       const enriched = (await enrichOvertimeEntries([created]))[0];
-      void notifyTimeEntry(enriched, req.mobileWorker!.name, req);
+      void notifyTimeEntry(enriched, req.mobileWorker!.name);
       res.status(201).json(enriched);
     } catch (error) {
       if (typeof error === "object" && error !== null && (error as any).status === 409) {
@@ -2121,7 +2118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.info(`[TIME OFF] Entry created: ${entry.id}`);
       const enriched = (await enrichOvertimeEntries([entry]))[0];
-      void notifyTimeEntry(enriched, target.name, req, directManagementEntry ? overtimeActorName(req) : null);
+      void notifyTimeEntry(enriched, target.name, directManagementEntry ? overtimeActorName(req) : null);
       res.status(201).json(enriched);
     } catch (error) {
       console.error("Could not submit time off:", error);
@@ -2175,7 +2172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!entry || entry.entryType !== "AUTHORISED_TIME_OFF") return res.status(404).json({ error: "Time Off entry not found" });
       const employee = await storage.getWorker(entry.employeeId);
       const enriched = (await enrichOvertimeEntries([entry]))[0];
-      const deliveries = await notifyTimeEntry(enriched, employee?.name || "Unknown employee", req, entry.approvedByName);
+      const deliveries = await notifyTimeEntry(enriched, employee?.name || "Unknown employee", entry.approvedByName);
       if (!deliveries.length || deliveries.some((delivery: any) => !delivery.sent)) {
         return res.status(502).json({ error: "Time Off notification could not be delivered to all management recipients" });
       }
@@ -2389,7 +2386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const enriched = (await enrichOvertimeEntries([entry]))[0];
       const employee = await storage.getWorker(entry.employeeId);
-      void notifyTimeEntry(enriched, employee?.name || "Unknown employee", req);
+      void notifyTimeEntry(enriched, employee?.name || "Unknown employee");
       res.status(201).json(enriched);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not submit overtime";
@@ -5245,16 +5242,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subject: `New Quote Request - ${serviceTypes[submission.serviceType]}`,
         html: `
           <h2>New Quote Request Received</h2>
-          <p><strong>Company:</strong> ${submission.companyName}</p>
-          <p><strong>Contact Person:</strong> ${submission.contactPerson}</p>
-          <p><strong>Email:</strong> ${submission.email}</p>
-          <p><strong>Phone:</strong> ${submission.phone}</p>
-          <p><strong>Service Type:</strong> ${serviceTypes[submission.serviceType]}</p>
-          <p><strong>Preferred Contact:</strong> ${submission.preferredContactMethod}</p>
-          ${submission.address ? `<p><strong>Address:</strong> ${submission.address}</p>` : ''}
+          <p><strong>Company:</strong> ${escapeHtml(submission.companyName)}</p>
+          <p><strong>Contact Person:</strong> ${escapeHtml(submission.contactPerson)}</p>
+          <p><strong>Email:</strong> ${escapeHtml(submission.email)}</p>
+          <p><strong>Phone:</strong> ${escapeHtml(submission.phone)}</p>
+          <p><strong>Service Type:</strong> ${escapeHtml(serviceTypes[submission.serviceType])}</p>
+          <p><strong>Preferred Contact:</strong> ${escapeHtml(submission.preferredContactMethod)}</p>
+          ${submission.address ? `<p><strong>Address:</strong> ${escapeHtml(submission.address)}</p>` : ''}
           <p><strong>Description:</strong></p>
-          <p>${submission.description}</p>
-          <p><strong>Submitted:</strong> ${submission.submittedAt.toLocaleString()}</p>
+          <p>${escapeHtml(submission.description)}</p>
+          <p><strong>Submitted:</strong> ${escapeHtml(submission.submittedAt.toLocaleString())}</p>
           <hr>
           <p>Login to your dashboard to view and respond to this quote request.</p>
         `

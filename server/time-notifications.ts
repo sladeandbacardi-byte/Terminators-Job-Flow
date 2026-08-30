@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { sendEmail } from "./email-service";
+import { escapeHtml, sendEmail } from "./email-service";
 import {
   EMAIL_BRANDING_SENDGRID_ATTACHMENTS,
   EMAIL_BRANDING_SMTP_ATTACHMENTS,
@@ -102,24 +102,36 @@ async function deliverEmail(params: { to: string; from: string; subject: string;
   };
 }
 
-const escapeHtml = (value: unknown) => String(value ?? "—")
-  .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-
 const formatDate = (value: string) =>
   new Date(`${value}T00:00:00`).toLocaleDateString("en-ZA", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-const entryUrl = (entry: TimeEntry, baseUrl?: string) => {
+const trustedAppBaseUrl = () => {
+  const configuredBaseUrl = process.env.APP_BASE_URL?.trim();
+  if (!configuredBaseUrl) return "";
+
+  try {
+    const url = new URL(configuredBaseUrl);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      throw new Error("APP_BASE_URL must be an HTTP(S) origin without credentials, query parameters, or fragments");
+    }
+    return `${url.origin}${url.pathname.replace(/\/$/, "")}`;
+  } catch (error) {
+    console.error("[EMAIL] Ignoring invalid APP_BASE_URL; using a relative notification link:", error);
+    return "";
+  }
+};
+
+const entryUrl = (entry: TimeEntry) => {
   const path = entry.entryType === "AUTHORISED_TIME_OFF"
     ? `/overtime-approval?entry=${encodeURIComponent(entry.id)}&type=AUTHORISED_TIME_OFF`
     : `/overtime-approval?entry=${encodeURIComponent(entry.id)}&type=OVERTIME`;
-  return `${(baseUrl || "").replace(/\/$/, "")}${path}`;
+  return `${trustedAppBaseUrl()}${path}`;
 };
 
 export async function sendTimeAdjustmentNotification(
   entry: TimeEntry,
   employeeName: string,
-  options: { baseUrl?: string; approvedByName?: string | null } = {},
+  options: { approvedByName?: string | null } = {},
 ): Promise<TimeNotificationDelivery[]> {
   const isTimeOff = entry.entryType === "AUTHORISED_TIME_OFF";
   const isApproved = isTimeOff && entry.status === "approved";
@@ -128,7 +140,7 @@ export async function sendTimeAdjustmentNotification(
   const reason = entry.timeOffReason === "other"
     ? entry.timeOffOtherReason || "Other"
     : (TIME_OFF_REASON_LABELS[entry.timeOffReason as TimeOffReason] || entry.timeOffReason || "—");
-  const link = entryUrl(entry, options.baseUrl);
+  const link = entryUrl(entry);
   const subject = isApproved
     ? `JobFlow - Time Off Authorised - ${employeeName}`
     : isTimeOff
