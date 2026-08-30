@@ -1,0 +1,694 @@
+FULL SYSTEM VERIFICATION: JOBFLOW + FLEETGUARD INTEGRATION
+
+You have now integrated FleetGuard into JobFlow as a module.
+
+Before making any further feature changes, perform a COMPLETE REVIEW AND TEST of everything that has been changed.
+
+Do not assume it works because the code compiles.
+
+I want a full technical and functional verification.
+
+==================================================
+1. FIRST: REVIEW THE IMPLEMENTATION
+==================================================
+
+Review all files changed for the FleetGuard integration.
+
+Confirm:
+
+- FleetGuard now opens inside JobFlow
+- No second FleetGuard login is required
+- Existing JobFlow authentication is used
+- Mobile users remain authenticated
+- Admin users remain authenticated
+- Fleet routes are internal JobFlow routes
+- No broken external FleetGuard redirect remains
+- No duplicate login system was introduced
+- No duplicate user database was introduced
+- No duplicate vehicle database was introduced
+
+List every route and file involved in the integration.
+
+==================================================
+2. BUILD TEST
+==================================================
+
+Run:
+
+pnpm run build
+
+The production build MUST pass with zero errors.
+
+If it fails:
+
+- find the FIRST real source error
+- fix it
+- run the build again
+- continue until the build succeeds
+
+Do not proceed to deployment until the production build passes.
+
+==================================================
+3. DATABASE CHECK
+==================================================
+
+Review all Fleet-related database tables and migrations.
+
+Confirm that existing FleetGuard data has NOT been lost.
+
+Check:
+
+- vehicles
+- assigned drivers
+- odometer history
+- fuel entries
+- inspection records
+- faults
+- service history
+- fuel slip/photos
+- attendance vehicle data
+
+Confirm foreign keys correctly reference existing JobFlow:
+
+- users/employees
+- vehicles
+- jobs where relevant
+
+Check for duplicate vehicle records.
+
+Check for duplicate employee/driver records.
+
+Do not delete production data during testing.
+
+==================================================
+4. JOBFLOW LOGIN TEST
+==================================================
+
+Test Admin login.
+
+Expected:
+
+- Admin logs into JobFlow
+- Dashboard loads
+- Operations > Fleet opens internally
+- No second login appears
+
+Test Mobile User login.
+
+Expected:
+
+- Mobile user logs into JobFlow
+- Mobile dashboard loads
+- Fleet opens directly
+- No second FleetGuard login appears
+
+If a second login appears anywhere, fix it.
+
+==================================================
+5. DESKTOP FLEET NAVIGATION
+==================================================
+
+Test:
+
+Operations > Fleet
+
+Then test every Fleet route:
+
+- Fleet Dashboard
+- Vehicles
+- Fuel
+- Inspections
+- Faults
+- Service History
+- Reports
+
+For each page confirm:
+
+- page loads
+- no console errors
+- no API errors
+- no blank screen
+- correct JobFlow theme
+- Terminators + JobFlow logos visible
+- correct navigation state
+- Back/navigation functions work
+
+==================================================
+6. MOBILE FLEET NAVIGATION
+==================================================
+
+Test mobile layout for:
+
+- My Vehicle
+- Daily Check
+- Fuel
+- Inspection
+- Report Fault
+- My Time
+- My Day
+
+Confirm:
+
+- pages are responsive
+- no desktop-width tables
+- buttons are usable
+- text is readable
+- navigation matches JobFlow theme
+- no separate FleetGuard branding/theme takes over
+
+==================================================
+7. START WORK TEST
+==================================================
+
+Test a mobile user pressing:
+
+START WORK
+
+Expected flow:
+
+1. Start Work modal opens
+2. Correct employee is known automatically
+3. Assigned vehicle is preselected where applicable
+4. User can change vehicle if required
+5. Start KM is required
+6. Start KM is numeric
+7. Previous vehicle odometer is shown
+8. Lower KM is rejected
+9. Server time is recorded
+10. Attendance record is created
+11. Vehicle ID is saved
+12. Start KM is saved
+13. Fleet odometer history updates
+14. My Day updates
+15. Start Work email sends
+
+Confirm email is sent to BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+==================================================
+8. START WORK EMAIL CHECK
+==================================================
+
+Verify the email contains:
+
+- Terminators logo
+- JobFlow logo
+- Employee
+- Date
+- Start Time
+- Vehicle
+- Registration
+- Start KM
+
+Confirm both recipients are actually passed to the mail provider.
+
+Do not just check settings.
+
+Log actual send result for each recipient.
+
+==================================================
+9. END WORK TEST
+==================================================
+
+Test the same employee pressing:
+
+END WORK
+
+Expected:
+
+1. End Work modal opens
+2. Same vehicle is shown
+3. Start KM is shown
+4. End KM is required
+5. End KM lower than Start KM is rejected
+6. Distance is calculated correctly
+7. End server time is recorded
+8. Attendance status becomes Finished
+9. End KM is saved
+10. Fleet odometer history updates
+11. Daily KM is calculated
+12. My Day updates
+13. End Work email sends
+
+Example:
+
+Start KM:
+183420
+
+End KM:
+183487
+
+Expected:
+67 km
+
+==================================================
+10. END WORK EMAIL CHECK
+==================================================
+
+Verify email contains:
+
+- Terminators logo
+- JobFlow logo
+- Employee
+- Start Time
+- End Time
+- Vehicle
+- Registration
+- Start KM
+- End KM
+- Daily KM
+- Attendance duration
+
+Confirm email reaches BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+==================================================
+11. ATTENDANCE VALIDATION
+==================================================
+
+Test:
+
+- user cannot Start Work twice
+- user cannot End Work before Start Work
+- user cannot End Work twice
+- missing Start KM
+- invalid KM
+- negative KM
+- End KM lower than Start KM
+- unusually high KM warning
+- missing End Work
+
+Confirm missing End Work is flagged for Admin.
+
+==================================================
+12. OVERTIME REGRESSION TEST
+==================================================
+
+Make sure Fleet integration has NOT broken Overtime.
+
+Test:
+
+16:00 - 17:30
+
+Expected:
+1 hr 30 min overtime
+
+Test:
+
+07:00 - 09:00
+
+Expected:
+1 hr overtime
+
+Test:
+
+07:00 - 17:00
+
+Expected:
+2 hrs overtime
+
+Confirm email sends to both recipients.
+
+==================================================
+13. TIME OFF REGRESSION TEST
+==================================================
+
+Make sure Time Off still works.
+
+Test:
+
+12:00 - 16:00
+
+Expected:
+4 hrs Time Off
+
+Confirm:
+
+- save works
+- approval status works
+- email sends to both recipients
+- Time Balance report updates correctly
+
+==================================================
+14. TIME BALANCE REPORT TEST
+==================================================
+
+Test per employee:
+
+Approved Overtime
+minus
+Approved Time Off
+
+Example:
+
+Overtime:
+4 hrs 30 min
+
+Time Off:
+3 hrs
+
+Expected:
++1 hr 30 min
+
+Confirm pending entries do NOT affect the balance.
+
+Confirm rejected entries do NOT affect the balance.
+
+==================================================
+15. FUEL TEST
+==================================================
+
+Test adding a fuel entry from inside JobFlow Fleet.
+
+Confirm:
+
+- correct vehicle
+- correct driver
+- odometer
+- litres
+- cost
+- fuel slip/photo
+- date/time
+- L/100km calculation
+- email behaviour
+- record appears in vehicle history
+
+Confirm no duplicate entry is required elsewhere.
+
+==================================================
+16. DAILY CHECK TEST
+==================================================
+
+Test Daily Check.
+
+Confirm:
+
+- assigned vehicle loads
+- checklist saves
+- timestamp saves
+- driver saves
+- faults can be raised
+- failures trigger existing notifications
+- record appears in Fleet history
+
+==================================================
+17. INSPECTION TEST
+==================================================
+
+Test a passing inspection.
+
+Confirm it saves correctly.
+
+Test a failed inspection.
+
+Confirm:
+
+- failure saves
+- fault is automatically created where required
+- email notification sends
+- fault appears under Fleet > Faults
+
+==================================================
+18. FAULT TEST
+==================================================
+
+Test:
+
+- create fault
+- edit fault
+- assign status
+- change Open -> In Progress -> Resolved
+- add resolution notes
+- add cost if supported
+
+Confirm fault remains linked to:
+
+- vehicle
+- employee/driver
+- inspection where applicable
+
+==================================================
+19. VEHICLE PROFILE TEST
+==================================================
+
+Open each vehicle profile.
+
+Confirm it shows:
+
+- registration
+- make/model
+- assigned driver
+- odometer
+- fuel history
+- inspection history
+- faults
+- services
+- km history
+
+Check for missing or duplicate data.
+
+==================================================
+20. SERVICE HISTORY TEST
+==================================================
+
+Test creating/viewing a service entry.
+
+Confirm:
+
+- vehicle
+- date
+- odometer
+- supplier/service provider
+- work performed
+- cost
+- next service
+- notes
+
+all save and display correctly.
+
+==================================================
+21. REPORTS TEST
+==================================================
+
+Test Fleet reports:
+
+- Vehicle KM
+- Fuel
+- Fuel Economy
+- Driver KM
+- Faults
+- Services
+- Inspections
+
+Test:
+
+- date filters
+- vehicle filters
+- employee filters
+- export
+
+Confirm reports use the same Fleet data.
+
+==================================================
+22. MY DAY TEST
+==================================================
+
+Test that My Day automatically assembles:
+
+- Start Work
+- Start KM
+- Jobs
+- Time Off
+- Overtime
+- End Work
+- End KM
+- Daily KM
+
+Do NOT require duplicate manual diary entries.
+
+==================================================
+23. EMAIL SYSTEM REGRESSION
+==================================================
+
+Verify ALL current JobFlow notification types still work:
+
+- Work Started
+- Work Finished
+- Overtime Logged
+- Time Off Logged
+- Inspection Failure
+- Fleet/Fault notifications where applicable
+
+Confirm recipient handling.
+
+For Time/Attendance notifications confirm BOTH:
+
+accounts@terminators.co.za
+julien@terminators.co.za
+
+==================================================
+24. BRANDING TEST
+==================================================
+
+Check:
+
+- desktop
+- mobile
+- login
+- Fleet
+- My Time
+- emails
+
+Confirm BOTH logos appear where required:
+
+Terminators logo
+JobFlow logo
+
+No broken images.
+
+No old standalone FleetGuard theme on integrated screens.
+
+==================================================
+25. BROWSER CONSOLE / API TEST
+==================================================
+
+Open the app and inspect browser console.
+
+Fix:
+
+- React errors
+- failed fetches
+- 404 API calls
+- 500 API calls
+- missing assets
+- route errors
+- hydration errors
+- unhandled promise rejections
+
+Check backend logs for errors during each test.
+
+==================================================
+26. PERMISSIONS TEST
+==================================================
+
+Test Mobile User permissions.
+
+Must NOT be able to:
+
+- view all staff data
+- edit fleet admin records
+- approve overtime
+- edit other employees
+- access admin-only reports
+
+Test Admin permissions.
+
+Admin must be able to:
+
+- view all
+- edit/correct
+- approve/reject
+- manage fleet
+- run reports
+
+==================================================
+27. DATA SAFETY
+==================================================
+
+Do not delete production records during testing.
+
+If test records are created:
+
+mark them clearly as TEST
+
+and delete only those test records afterwards where safe.
+
+Do not remove real FleetGuard history.
+
+==================================================
+28. PRODUCTION DEPLOYMENT CHECK
+==================================================
+
+Only after ALL local tests pass:
+
+1. Run pnpm run build
+2. Confirm success
+3. Commit
+4. Push
+5. Deploy to Railway
+
+Then test the deployed Railway version again.
+
+Do not assume local success guarantees production success.
+
+==================================================
+29. PRODUCTION SMOKE TEST
+==================================================
+
+After deployment, test on production:
+
+- Admin login
+- Mobile login
+- Fleet opens internally
+- Start Work
+- End Work
+- Start KM
+- End KM
+- Fleet dashboard
+- Fuel
+- Inspection
+- Fault
+- Overtime
+- Time Off
+- emails
+
+Confirm no second FleetGuard login appears.
+
+==================================================
+30. FINAL REPORT
+==================================================
+
+After testing, give me a structured report with:
+
+A. PASSED
+List everything tested successfully.
+
+B. FIXED
+List every issue found and what was changed.
+
+C. STILL NEEDS ATTENTION
+List anything not fully working.
+
+D. DATABASE
+Confirm whether existing FleetGuard data is preserved.
+
+E. EMAILS
+Confirm which notification types were tested and which recipients received them.
+
+F. BUILD
+Confirm:
+
+pnpm run build = PASS
+
+G. RAILWAY
+Confirm production deployment status.
+
+H. TEST USERS / TEST DATA
+List any test records created.
+
+I. FINAL VERDICT
+State clearly:
+
+READY FOR USE
+
+or
+
+NOT READY FOR USE
+
+Do not simply say "everything works."
+
+Prove it with the results of the tests above.

@@ -275,7 +275,7 @@ export default function MobileMyTime() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/mobile" },
     { id: "jobs", label: "My Jobs", icon: ListChecks, href: "/mobile" },
     { id: "my-time", label: "My Time", icon: Clock3 },
-    { id: "fleet", label: "Fleet Actions", icon: Truck, href: "/fleet" },
+    { id: "fleet", label: "Fleet", icon: Truck, href: "/mobile?screen=fleet" },
   ];
 
   return (
