@@ -18,6 +18,9 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const app = express();
+// Trust the single hosting proxy so request limits and audit logs use the
+// originating client address instead of collapsing all callers into one proxy.
+app.set("trust proxy", 1);
 // Opportunity photos are submitted from the technician camera/gallery as
 // compact data URLs. Keep the API limit explicit so photo uploads work without
 // opening the server to unbounded request bodies.

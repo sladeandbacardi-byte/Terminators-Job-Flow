@@ -25,3 +25,5 @@
 - [Employee vs team attendance](employee-vs-team-attendance.md) — server-timestamped personal start/end records stay separate from supervisor team attendance sheets; never repurpose either table.
 - [GitHub connector push fallback](github-connector-push-fallback.md) — when HTTPS Git auth is stale, recreate commits through the OAuth Git Data API in small SHA-verified batches, then fast-forward once.
 - [Sole superadmin provisioning](sole-superadmin-provisioning.md) — serialize startup reconciliation and preserve credentials only from a deterministic canonical account; never relabel an arbitrary active admin.
+- [Organogram unrestricted access](organogram-unrestricted-access.md) — only canonical Julien, explicit Admin/Supervisor roles, and PCO roles get every module; generic Manager/Technician stay restricted.
+- [Spreadsheet export integrity](spreadsheet-export-integrity.md) — inventory every client and server CSV writer; neutralize formula-like strings after leading whitespace while preserving numeric values.

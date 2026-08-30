@@ -6,7 +6,8 @@ import type {
 import { ORIGINATION_LABELS } from "@shared/schema";
 import JSZip from 'jszip';
 
-// Helper function to generate CSV content
+// Spreadsheet applications may evaluate formula-like cell values when opening a
+// CSV. Prefix untrusted strings with an apostrophe so they remain plain text.
 function generateCSVContent(data: any[]): string {
   if (data.length === 0) {
     return '';
@@ -25,11 +26,7 @@ function generateCSVContent(data: any[]): string {
       headers.map(header => {
         const value = item[header];
         if (value === null || value === undefined) return '';
-        const stringValue = String(value);
-        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-          return `"${stringValue.replace(/"/g, '""')}"`;
-        }
-        return stringValue;
+        return escapeCSVValue(value);
       }).join(',')
     )
   ].join('\n');
@@ -59,12 +56,7 @@ export function exportToCSV(data: any[], filename: string) {
         const value = item[header];
         // Handle null/undefined values
         if (value === null || value === undefined) return '';
-        // Escape quotes and wrap in quotes if necessary
-        const stringValue = String(value);
-        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-          return `"${stringValue.replace(/"/g, '""')}"`;
-        }
-        return stringValue;
+        return escapeCSVValue(value);
       }).join(',')
     )
   ].join('\n');
@@ -129,10 +121,6 @@ type TimeBalanceExportReport = {
 };
 
 export function exportTimeBalanceReport(report: TimeBalanceExportReport) {
-  const escape = (value: unknown) => {
-    const text = value === null || value === undefined ? "" : String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
   const displayMinutes = (minutes: number, signed = false) => {
     const absolute = Math.abs(Math.round(minutes || 0));
     const hours = Math.floor(absolute / 60);
@@ -177,7 +165,7 @@ export function exportTimeBalanceReport(report: TimeBalanceExportReport) {
       transaction.notes, transaction.runningBalanceMinutes,
     ]),
   ];
-  const csvContent = summaryRows.map(row => row.map(escape).join(",")).join("\n");
+  const csvContent = summaryRows.map(row => row.map(escapeCSVValue).join(",")).join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
@@ -694,4 +682,20 @@ You can open these CSV files with Excel, Google Sheets, or any spreadsheet appli
     console.error('Failed to export all data:', error);
     throw error;
   }
+}
+
+function sanitizeSpreadsheetValue(value: unknown): string {
+  const stringValue = String(value);
+  if (typeof value === 'string' && /^[\s\x00-\x1F]*[=+\-@]/.test(stringValue)) {
+    return `'${stringValue}`;
+  }
+  return stringValue;
+}
+
+export function escapeCSVValue(value: unknown): string {
+  const stringValue = sanitizeSpreadsheetValue(value);
+  if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
 }

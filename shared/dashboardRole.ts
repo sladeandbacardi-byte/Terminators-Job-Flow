@@ -1,19 +1,18 @@
+import { hasUnrestrictedAccess, type AccessIdentity } from "./accessPolicy";
+
 export type DashboardRole = "admin" | "manager" | "sales" | "service" | "accounts" | "coordinator";
 
-export function getDashboardRole(user: { departmentId?: string | null; role?: string | null; authenticationMethod?: string | null }): DashboardRole {
-  const dept = user.departmentId ?? "";
-  const role = (user.role ?? "").toLowerCase();
+type DashboardIdentity = AccessIdentity & {
+  departmentId?: string | null;
+  sourceWorkerDepartmentId?: string | null;
+};
 
-  // Owner/director keywords take priority over department
-  if (
-    role.includes("managing member") ||
-    role.includes("operations manager") ||
-    role.includes("owner") ||
-    role.includes("director") ||
-    role === "md" ||
-    role === "ceo" ||
-    role === "coo"
-  ) return "admin";
+export function getDashboardRole(user: DashboardIdentity): DashboardRole {
+  const dept = user.sourceWorkerDepartmentId ?? user.departmentId ?? "";
+  const role = (user.sourceWorkerRole ?? user.role ?? "").toLowerCase();
+
+  // The authoritative organogram rule is the only path to unrestricted access.
+  if (hasUnrestrictedAccess(user)) return "admin";
 
   // Coordinator — must be checked BEFORE department routing so div-1/2/3/4 coordinators don't fall into "service"
   if (role.includes("coordinator")) return "coordinator";
@@ -23,10 +22,10 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
   if (dept === "div-7") return "accounts";
   if (["div-1", "div-2", "div-3", "div-4"].includes(dept)) return "service";
 
-  // div-6: differentiate manager vs admin by role string
+  // Administration/management workers who do not explicitly qualify remain
+  // restricted managers rather than inheriting unrestricted access by department.
   if (dept === "div-6") {
-    if (role.includes("manager") || role.includes("operational") || role.includes("operations")) return "manager";
-    return "admin";
+    return "manager";
   }
 
   // Role string fallback (no department match)
@@ -44,7 +43,8 @@ export function getDashboardRole(user: { departmentId?: string | null; role?: st
     role.includes("pest")
   ) return "service";
 
-  return "admin";
+  // Unknown roles fail closed into the restricted service view.
+  return "service";
 }
 
 export const dashboardRoleLabels: Record<DashboardRole, string> = {
@@ -60,7 +60,7 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
  * Returns the URL the user should land on after login / clicking Dashboard.
  * Never returns "/" to avoid a redirect loop with the RoleDashboard guard.
  */
-export function getDefaultDashboardRoute(user: { departmentId?: string | null; role?: string | null; authenticationMethod?: string | null }): string {
+export function getDefaultDashboardRoute(user: DashboardIdentity): string {
   const role = getDashboardRole(user);
   switch (role) {
     case "sales":    return "/sales-dashboard";

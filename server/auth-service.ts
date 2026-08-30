@@ -17,9 +17,11 @@ const JWT_SECRET: string = configuredSecret;
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 export type AuthenticatedUser = AdminUser & {
+  sourceWorkerId?: string | null;
+  sourceWorkerName?: string | null;
   sourceWorkerRole?: string | null;
   sourceWorkerDepartmentId?: string | null;
-  authenticationMethod?: "profile_picker";
+  authenticationMethod?: "profile_picker" | "password";
 };
 
 type MobileWorkerSessionClaims = {
@@ -36,6 +38,29 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export class AuthService {
+  static async enrichAdminUser(user: AdminUser): Promise<AuthenticatedUser> {
+    const allWorkers = await storage.getWorkers();
+    const normalizedEmail = user.email.trim().toLowerCase();
+    const normalizedName = `${user.firstName} ${user.lastName}`.trim().replace(/\s+/g, " ").toLowerCase();
+    const matches = allWorkers.filter(worker =>
+      worker.isActive !== false && (
+        worker.id === user.id ||
+        worker.email.trim().toLowerCase() === normalizedEmail ||
+        worker.name.trim().replace(/\s+/g, " ").toLowerCase() === normalizedName
+      ),
+    );
+    const worker = matches.length === 1 ? matches[0] : undefined;
+
+    return {
+      ...user,
+      sourceWorkerId: worker?.id ?? null,
+      sourceWorkerName: worker?.name ?? null,
+      sourceWorkerRole: worker?.role ?? null,
+      sourceWorkerDepartmentId: worker?.departmentId ?? null,
+      authenticationMethod: "password",
+    };
+  }
+
   // Hash password
   static async hashPassword(password: string): Promise<string> {
     const saltRounds = 12;
@@ -79,7 +104,7 @@ export class AuthService {
   }
 
   // Authenticate user login
-  static async authenticateUser(username: string, password: string): Promise<{ user: AdminUser; token: string } | null> {
+  static async authenticateUser(username: string, password: string): Promise<{ user: AuthenticatedUser; token: string } | null> {
     try {
       const [user] = await db
         .select()
@@ -114,8 +139,8 @@ export class AuthService {
         expiresAt,
       });
 
-      return { 
-        user: { ...user, lastLoginAt: new Date() }, 
+      return {
+        user: await this.enrichAdminUser({ ...user, lastLoginAt: new Date() }),
         token 
       };
     } catch (error) {
@@ -125,7 +150,7 @@ export class AuthService {
   }
 
   // Get user by ID
-  static async getUserById(userId: string): Promise<AdminUser | null> {
+  static async getUserById(userId: string): Promise<AuthenticatedUser | null> {
     try {
       const [user] = await db
         .select()
@@ -135,7 +160,7 @@ export class AuthService {
           eq(adminUsers.isActive, true)
         ));
       
-      return user || null;
+      return user ? await this.enrichAdminUser(user) : null;
     } catch (error) {
       console.error('Get user error:', error);
       return null;
@@ -143,7 +168,7 @@ export class AuthService {
   }
 
   // Validate session
-  static async validateSession(token: string): Promise<AdminUser | null> {
+  static async validateSession(token: string): Promise<AuthenticatedUser | null> {
     try {
       const decoded = this.verifyToken(token);
       if (!decoded) {

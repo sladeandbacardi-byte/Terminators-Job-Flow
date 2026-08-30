@@ -187,9 +187,9 @@ function AuthenticatedApp() {
       <Switch>
         {/* Standalone views — no shell */}
         <Route path="/mobile" component={Mobile} />
-        <Route path="/jobs/:id/card" component={JobCard} />
-        <Route path="/treatment-reports/:id/print" component={TreatmentReportPrint} />
-        <Route path="/daily-department-card" component={DailyDepartmentCard} />
+        <Route path="/jobs/:id/card">{() => <ProtectedRoute component={JobCard} roles={["admin","manager","coordinator","service","accounts"]} />}</Route>
+        <Route path="/treatment-reports/:id/print">{() => <ProtectedRoute component={TreatmentReportPrint} roles={["admin","manager","coordinator","service"]} />}</Route>
+        <Route path="/daily-department-card">{() => <ProtectedRoute component={DailyDepartmentCard} roles={["admin","manager","coordinator","service"]} />}</Route>
 
         {/* All other authenticated routes wrapped in AppShell */}
         <Route>{() => (
@@ -198,18 +198,18 @@ function AuthenticatedApp() {
               <Switch>
                 <Route path="/" component={RoleDashboard} />
                 <Route path="/dashboard" component={Dashboard} />
-                <Route path="/jobs" component={Jobs} />
-                <Route path="/once-off-jobs" component={Jobs} />
-                <Route path="/contract-jobs" component={ContractJobs} />
-                <Route path="/clients" component={Clients} />
-                <Route path="/clients/:id" component={ClientProfile} />
-                <Route path="/inventory" component={Inventory} />
-                <Route path="/contracts" component={Contracts} />
-                <Route path="/emails" component={Emails} />
-                <Route path="/reports" component={Reports} />
-                <Route path="/finance-reports" component={Reports} />
-                <Route path="/custom-reports" component={CustomReports} />
-                <Route path="/calendar" component={Calendar} />
+                <Route path="/jobs">{() => <ProtectedRoute component={Jobs} roles={["admin","manager","coordinator","service","accounts"]} />}</Route>
+                <Route path="/once-off-jobs">{() => <ProtectedRoute component={Jobs} roles={["admin","manager","coordinator","service","accounts"]} />}</Route>
+                <Route path="/contract-jobs">{() => <ProtectedRoute component={ContractJobs} roles={["admin","manager","coordinator","service","accounts"]} />}</Route>
+                <Route path="/clients">{() => <ProtectedRoute component={Clients} roles={["admin","manager","sales","coordinator","service","accounts"]} />}</Route>
+                <Route path="/clients/:id">{() => <ProtectedRoute component={ClientProfile} roles={["admin","manager","sales","coordinator","service","accounts"]} />}</Route>
+                <Route path="/inventory">{() => <ProtectedRoute component={Inventory} roles={["admin","manager","coordinator","service","accounts"]} />}</Route>
+                <Route path="/contracts">{() => <ProtectedRoute component={Contracts} roles={["admin","manager","sales"]} />}</Route>
+                <Route path="/emails">{() => <ProtectedRoute component={Emails} roles={["admin","manager","sales"]} />}</Route>
+                <Route path="/reports">{() => <ProtectedRoute component={Reports} roles={["admin","manager","coordinator"]} />}</Route>
+                <Route path="/finance-reports">{() => <ProtectedRoute component={Reports} roles={["admin","accounts"]} />}</Route>
+                <Route path="/custom-reports">{() => <ProtectedRoute component={CustomReports} roles={["admin"]} />}</Route>
+                <Route path="/calendar">{() => <ProtectedRoute component={Calendar} roles={["admin","manager","sales","coordinator","service","accounts"]} />}</Route>
 
                 {/* ── Sales ────────────────────────────────────────────── */}
                 <Route path="/leads">{() => <ProtectedRoute component={Leads} roles={["admin","manager","sales"]} />}</Route>
@@ -235,13 +235,13 @@ function AuthenticatedApp() {
                 <Route path="/sage-export">{() => <ProtectedRoute component={SageExport} roles={["admin","accounts"]} />}</Route>
 
                 {/* ── Admin-only ───────────────────────────────────────── */}
-                <Route path="/backup">{() => <ProtectedRoute component={Backup} roles={["admin","manager"]} />}</Route>
-                <Route path="/users-roles">{() => <ProtectedRoute component={UsersRoles} roles={["admin","manager"]} />}</Route>
-                <Route path="/permissions">{() => <ProtectedRoute component={Permissions} roles={["admin","manager"]} />}</Route>
-                <Route path="/settings">{() => <ProtectedRoute component={Settings} roles={["admin","manager"]} />}</Route>
-                <Route path="/system-logs">{() => <ProtectedRoute component={SystemLogs} roles={["admin","manager"]} />}</Route>
-                <Route path="/data-integrity">{() => <ProtectedRoute component={DataIntegrity} roles={["admin","manager"]} />}</Route>
-                <Route path="/pricing-library">{() => <ProtectedRoute component={PricingLibraryPage} roles={["admin","manager"]} />}</Route>
+                <Route path="/backup">{() => <ProtectedRoute component={Backup} roles={["admin"]} />}</Route>
+                <Route path="/users-roles">{() => <ProtectedRoute component={UsersRoles} roles={["admin"]} />}</Route>
+                <Route path="/permissions">{() => <ProtectedRoute component={Permissions} roles={["admin"]} />}</Route>
+                <Route path="/settings">{() => <ProtectedRoute component={Settings} roles={["admin"]} />}</Route>
+                <Route path="/system-logs">{() => <ProtectedRoute component={SystemLogs} roles={["admin"]} />}</Route>
+                <Route path="/data-integrity">{() => <ProtectedRoute component={DataIntegrity} roles={["admin"]} />}</Route>
+                <Route path="/pricing-library">{() => <ProtectedRoute component={PricingLibraryPage} roles={["admin"]} />}</Route>
 
                 {/* ── Suppliers / Purchase Orders ──────────────────────── */}
                 <Route path="/suppliers">{() => <ProtectedRoute component={Suppliers} roles={["admin","manager","coordinator"]} />}</Route>
@@ -252,37 +252,37 @@ function AuthenticatedApp() {
                 <Route path="/field-diaries">{() => { window.location.replace("/calendar"); return null; }}</Route>
                 <Route path="/stock-management">{() => { window.location.replace("/inventory"); return null; }}</Route>
                 <Route path="/treatment-reports">{() => <ProtectedRoute component={TreatmentReports} roles={["admin","manager","coordinator","service"]} />}</Route>
-                <Route path="/fleet" component={Fleet} />
-                <Route path="/fleet/vehicles" component={Fleet} />
-                <Route path="/fleet/km-log" component={FleetKmLog} />
-                <Route path="/fleet/inspection" component={FleetInspection} />
-                <Route path="/fleet/fuel" component={FleetFuel} />
-                <Route path="/fleet/report-issue" component={FleetReportIssue} />
-                <Route path="/fleet/vehicles/:id" component={FleetVehicleProfile} />
-                <Route path="/fleet/maintenance/:vehicleId" component={FleetVehicleMaintenance} />
-                <Route path="/fleet/maintenance" component={FleetMaintenance} />
-                 <Route path="/operations/fleet" component={Fleet} />
-                 <Route path="/operations/fleet/vehicles" component={Fleet} />
-                 <Route path="/operations/fleet/daily-check" component={FleetInspection} />
-                 <Route path="/operations/fleet/fuel" component={FleetFuel} />
-                 <Route path="/operations/fleet/inspections" component={Fleet} />
-                 <Route path="/operations/fleet/faults" component={FleetMaintenance} />
-                 <Route path="/operations/fleet/service-history" component={FleetMaintenance} />
-                 <Route path="/operations/fleet/reports" component={Fleet} />
-                <Route path="/attendance" component={Attendance} />
-                <Route path="/team-management" component={TeamManagement} />
-                <Route path="/testing-checklist" component={TestingChecklist} />
-                <Route path="/overtime-time-off" component={OvertimeTimeOff} />
-                <Route path="/stock-dashboard" component={StockDashboard} />
-                <Route path="/stock-reports" component={StockReports} />
-                <Route path="/stock-usage" component={Inventory} />
-                <Route path="/stock-adjustments" component={Inventory} />
+                <Route path="/fleet">{() => <ProtectedRoute component={Fleet} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/vehicles">{() => <ProtectedRoute component={Fleet} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/km-log">{() => <ProtectedRoute component={FleetKmLog} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/inspection">{() => <ProtectedRoute component={FleetInspection} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/fuel">{() => <ProtectedRoute component={FleetFuel} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/report-issue">{() => <ProtectedRoute component={FleetReportIssue} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/vehicles/:id">{() => <ProtectedRoute component={FleetVehicleProfile} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/maintenance/:vehicleId">{() => <ProtectedRoute component={FleetVehicleMaintenance} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/fleet/maintenance">{() => <ProtectedRoute component={FleetMaintenance} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet">{() => <ProtectedRoute component={Fleet} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/vehicles">{() => <ProtectedRoute component={Fleet} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/daily-check">{() => <ProtectedRoute component={FleetInspection} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/fuel">{() => <ProtectedRoute component={FleetFuel} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/inspections">{() => <ProtectedRoute component={Fleet} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/faults">{() => <ProtectedRoute component={FleetMaintenance} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/service-history">{() => <ProtectedRoute component={FleetMaintenance} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/operations/fleet/reports">{() => <ProtectedRoute component={Fleet} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/attendance">{() => <ProtectedRoute component={Attendance} roles={["admin","manager","coordinator","accounts"]} />}</Route>
+                <Route path="/team-management">{() => <ProtectedRoute component={TeamManagement} roles={["admin","manager"]} />}</Route>
+                <Route path="/testing-checklist">{() => <ProtectedRoute component={TestingChecklist} roles={["admin"]} />}</Route>
+                <Route path="/overtime-time-off">{() => <ProtectedRoute component={OvertimeTimeOff} roles={["admin","manager","coordinator","accounts","service","sales"]} />}</Route>
+                <Route path="/stock-dashboard">{() => <ProtectedRoute component={StockDashboard} roles={["admin","manager","coordinator","accounts","service"]} />}</Route>
+                <Route path="/stock-reports">{() => <ProtectedRoute component={StockReports} roles={["admin","manager","coordinator","accounts","service"]} />}</Route>
+                <Route path="/stock-usage">{() => <ProtectedRoute component={Inventory} roles={["admin","manager","coordinator","accounts","service"]} />}</Route>
+                <Route path="/stock-adjustments">{() => <ProtectedRoute component={Inventory} roles={["admin","manager","coordinator","accounts","service"]} />}</Route>
                 <Route path="/service-contracts">{() => <ProtectedRoute component={ServiceContracts} roles={["admin","manager","coordinator"]} />}</Route>
-                <Route path="/contracts-pending" component={ContractsPendingPage} />
-                <Route path="/hr-dashboard" component={HRDashboard} />
-                <Route path="/service-scheduling" component={ServiceScheduling} />
-                <Route path="/equipment-checklists" component={EquipmentChecklists} />
-                 <Route path="/my-overtime" component={MyOvertime} />
+                <Route path="/contracts-pending">{() => <ProtectedRoute component={ContractsPendingPage} roles={["admin","manager","coordinator"]} />}</Route>
+                <Route path="/hr-dashboard">{() => <ProtectedRoute component={HRDashboard} roles={["admin","manager","accounts"]} />}</Route>
+                <Route path="/service-scheduling">{() => <ProtectedRoute component={ServiceScheduling} roles={["admin","manager","coordinator","service"]} />}</Route>
+                <Route path="/equipment-checklists">{() => <ProtectedRoute component={EquipmentChecklists} roles={["admin","manager","coordinator","service"]} />}</Route>
+                 <Route path="/my-overtime">{() => <ProtectedRoute component={MyOvertime} roles={["admin","manager","coordinator","accounts","service","sales"]} />}</Route>
                  <Route path="/overtime-approval">{() => <ProtectedRoute component={OvertimeApproval} roles={["admin","manager"]} />}</Route>
                  <Route path="/time-balance">{() => <ProtectedRoute component={TimeBalance} roles={["admin","manager"]} />}</Route>
                 <Route component={NotFound} />

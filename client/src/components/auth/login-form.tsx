@@ -37,11 +37,11 @@ interface LoginDirectory {
 
 const FALLBACK_DIRECTORY: LoginDirectory = {
   staff: [
-    ["mobile-tech-01", "Re-Althon"], ["mobile-tech-02", "Leon"],
-    ["mobile-tech-03", "Garth"], ["mobile-tech-04", "Jackie"],
-    ["mobile-tech-06", "Zain"],
-    ["mobile-tech-07", "Mike"], ["mobile-tech-08", "X"],
-    ["mobile-tech-09", "Reece"],
+    ["mobile-tech-01", "Re-Althon"], ["mobile-tech-02", "Leon Coltman"],
+    ["mobile-tech-03", "Garth du Preez"], ["mobile-tech-04", "Jackie Roelfse"],
+    ["mobile-tech-06", "Zain Abdol"],
+    ["mobile-tech-07", "Michael Meyer"], ["mobile-tech-08", "Xolani Ndzotoyi"],
+    ["mobile-tech-09", "Reece Ebrahim"],
   ].map(([id, name]) => ({ id, name, role: "Technician", department: "Field Service" })),
   admins: [
     {

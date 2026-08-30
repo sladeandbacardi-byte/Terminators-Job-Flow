@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Download, BarChart3, DollarSign, Users, TrendingUp, CheckCircle } from "lucide-react";
 import type { QuoteSubmission, Worker } from "@shared/schema";
 import { LEAD_STAGES } from "@shared/schema";
+import { escapeCSVValue } from "@/lib/data-export";
 
 // Stages that count as "closed won"
 const WON_STAGES = [
@@ -122,7 +123,7 @@ export default function CommissionReportsPage() {
         l.repName,
       ]),
     ];
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = rows.map(r => r.map(escapeCSVValue).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

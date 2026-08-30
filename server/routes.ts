@@ -5,6 +5,7 @@ import { db } from "./db";
 import { sql, and, desc, eq, gte, inArray, lte, ne, isNull } from "drizzle-orm";
 import { runDailyBackupEmail, getBackupEmailConfig, sendBackupFailureAlert } from "./email-backup";
 import { sendBrevoTestEmail } from "./smtp-service";
+import { buildCsvFromObjectRows, buildCsvFromRows } from "./csv-utils";
 import { 
   insertDepartmentSchema, insertWorkerSchema, insertClientSchema,
   insertInventoryItemSchema, insertRentalContractSchema, insertJobSchema,
@@ -62,9 +63,11 @@ import { AuthService, requireAuth, requireMobileTechnician, logActivity, type Au
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
+import { hasUnrestrictedAccess } from "@shared/accessPolicy";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
+import { createMemoryRateLimiter } from "./request-limits";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -115,6 +118,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "POST /api/public/quote-request",
   ]);
 
+  const requestClientKey = (req: any) =>
+    req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || "unknown";
+  const quoteRequestRateLimiter = createMemoryRateLimiter({
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 5,
+  });
+  const inventoryImportUserRateLimiter = createMemoryRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 10,
+  });
+  const inventoryImportIpRateLimiter = createMemoryRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 20,
+  });
+
+  const sendRateLimitResponse = (res: any, retryAfterSeconds: number) => {
+    res.set("Retry-After", String(retryAfterSeconds));
+    return res.status(429).json({
+      error: "Too many requests. Please try again later.",
+      retryAfterSeconds,
+    });
+  };
+
+  const inventoryImportRateLimit = (req: any, res: any, next: any) => {
+    const authenticated = req as AuthenticatedRequest;
+    const userKey = authenticated.user?.id
+      ? `user:${authenticated.user.id}`
+      : `ip:${requestClientKey(req)}`;
+    const userDecision = inventoryImportUserRateLimiter(userKey);
+    const ipDecision = inventoryImportIpRateLimiter(`ip:${requestClientKey(req)}`);
+    const decision = userDecision.allowed ? ipDecision : userDecision;
+
+    if (!decision.allowed) return sendRateLimitResponse(res, decision.retryAfterSeconds);
+    next();
+  };
+
   const profilePickerSelfService = (method: string, path: string) => {
     if (["GET /api/auth/me", "POST /api/auth/logout", "GET /api/overtime/my", "POST /api/overtime", "GET /api/time/my", "POST /api/time-off"].includes(`${method} ${path}`)) {
       return true;
@@ -164,9 +203,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   };
 
+  const pathHasApiPrefix = (path: string, prefix: string) =>
+    path === `/api/${prefix}` || path.startsWith(`/api/${prefix}/`);
+
+  const officeApiRoles = (method: string, path: string): ReturnType<typeof getDashboardRole>[] | null => {
+    if (
+      method !== "GET" &&
+      (pathHasApiPrefix(path, "legal-entities") || pathHasApiPrefix(path, "settings"))
+    ) {
+      return ["admin"];
+    }
+    if (method !== "GET" && pathHasApiPrefix(path, "departments")) {
+      return ["admin", "manager"];
+    }
+
+    const policies: Array<{ prefixes: string[]; roles: ReturnType<typeof getDashboardRole>[] }> = [
+      {
+        prefixes: ["admin", "backup", "settings", "pricing-library", "custom-reports", "auth/activity-logs", "auth/cleanup-sessions"],
+        roles: ["admin"],
+      },
+      {
+        prefixes: ["quote-submissions", "sales-appointments", "sales-follow-ups", "accepted-workflows", "opportunities", "email-templates", "email-logs", "send-customer-email", "whatsapp"],
+        roles: ["admin", "manager", "sales"],
+      },
+      {
+        prefixes: ["invoices", "invoice-items", "expenses", "sage", "sage-export", "client-payments", "payments"],
+        roles: ["admin", "manager", "accounts"],
+      },
+      {
+        prefixes: ["fleet", "treatment-reports", "pest-control-products", "field-diaries", "equipment-checklists"],
+        roles: ["admin", "manager", "coordinator", "service"],
+      },
+      {
+        prefixes: ["workers", "attendance"],
+        roles: ["admin", "manager", "coordinator", "accounts"],
+      },
+      {
+        prefixes: ["teams", "team-members"],
+        roles: ["admin", "manager"],
+      },
+      {
+        prefixes: ["inventory", "job-inventory", "stock-checks", "stock-locations", "stock-movements", "stock-transfers", "stock-balances", "picking-lists", "suppliers", "purchase-orders"],
+        roles: ["admin", "manager", "coordinator", "accounts", "service"],
+      },
+      {
+        prefixes: ["jobs"],
+        roles: ["admin", "manager", "coordinator", "accounts", "service"],
+      },
+      {
+        prefixes: ["contracts", "contract-items", "department-defaults"],
+        roles: ["admin", "manager", "sales"],
+      },
+      {
+        prefixes: ["service-contracts", "service-schedule", "contract-occurrence-exceptions"],
+        roles: ["admin", "manager", "coordinator"],
+      },
+      {
+        prefixes: ["reports"],
+        roles: ["admin", "manager", "coordinator", "accounts"],
+      },
+    ];
+    return policies.find(policy => policy.prefixes.some(prefix => pathHasApiPrefix(path, prefix)))?.roles ?? null;
+  };
+
   const officeOpportunityManager = (req: AuthenticatedRequest) =>
     req.user?.authenticationMethod !== "profile_picker" &&
-    ["admin", "superadmin", "manager", "sales"].includes(req.user?.role ?? "");
+    ["admin", "manager", "sales"].includes(getDashboardRole(req.user ?? {}));
 
   const opportunityInput = z.object({
     siteId: z.string().optional().nullable(),
@@ -258,13 +360,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const officeTreatmentManager = (req: AuthenticatedRequest) =>
     req.user?.authenticationMethod !== "profile_picker" &&
-    ["admin", "superadmin", "manager", "coordinator"].includes(String(req.user?.role ?? "").toLowerCase());
+    ["admin", "manager", "coordinator"].includes(getDashboardRole(req.user ?? {}));
 
   // Product library access is intentionally separate from treatment-report
   // management: authorised office managers/coordinators and service managers
   // may view it, while Sales and Finance users cannot.
   const productLibraryViewer = (req: AuthenticatedRequest) =>
-    ["admin", "superadmin", "manager", "coordinator", "service"].includes(String(req.user?.role ?? "").toLowerCase());
+    ["admin", "manager", "coordinator", "service"].includes(getDashboardRole(req.user ?? {}));
 
   const reportCompletionErrors = (input: z.infer<typeof treatmentReportInput>) => {
     const errors: string[] = [];
@@ -373,6 +475,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         return res.status(403).json({ error: "Profile sign-in can only access personal staff functions" });
       }
+      const allowedRoles = officeApiRoles(req.method, pathname);
+      if (allowedRoles && !allowedRoles.includes(getDashboardRole(authenticated.user ?? {}))) {
+        return res.status(403).json({ error: "Your role does not have access to this module" });
+      }
       next();
     });
   });
@@ -382,13 +488,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // database worker and PIN.
   const FALLBACK_MOBILE_STAFF = [
     { id: "mobile-tech-01", name: "Re-Althon", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-02", name: "Leon", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-03", name: "Garth", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-04", name: "Jackie", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-06", name: "Zain", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-07", name: "Mike", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-08", name: "X", role: "Technician", department: "Field Service" },
-    { id: "mobile-tech-09", name: "Reece", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-02", name: "Leon Coltman", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-03", name: "Garth du Preez", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-04", name: "Jackie Roelfse", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-06", name: "Zain Abdol", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-07", name: "Michael Meyer", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-08", name: "Xolani Ndzotoyi", role: "Technician", department: "Field Service" },
+    { id: "mobile-tech-09", name: "Reece Ebrahim", role: "Technician", department: "Field Service" },
   ];
   const FALLBACK_ADMINS = [
     {
@@ -485,21 +591,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const isOvertimeApprover = (req: AuthenticatedRequest) => {
-    if (req.user?.authenticationMethod === "profile_picker" || req.user?.sourceWorkerRole !== undefined) {
+    if (req.user?.authenticationMethod === "profile_picker") {
       return false;
     }
 
-    // Only separately authenticated administrator accounts can approve overtime.
-    const storedRole = String(req.user?.role ?? "").trim().toLowerCase();
-    return storedRole === "admin" || storedRole === "manager" || storedRole === "superadmin";
+    if (req.user && hasUnrestrictedAccess(req.user)) return true;
+
+    // Restricted managers retain their role-appropriate time-management responsibility.
+    return getDashboardRole(req.user ?? {}) === "manager";
   };
 
   const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
-    const role = String(req.user?.role ?? "").trim().toLowerCase();
     if (
       req.user?.authenticationMethod === "profile_picker" ||
-      req.user?.sourceWorkerRole !== undefined ||
-      !["admin", "superadmin"].includes(role)
+      !req.user ||
+      !hasUnrestrictedAccess(req.user)
     ) {
       return res.status(403).json({ error: "Admin access required" });
     }
@@ -1805,18 +1911,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [allWorkers, departments, activeAdmins] = await Promise.all([
         storage.getWorkers(),
         storage.getDepartments(),
-        db
-          .select({
-            id: adminUsers.id,
-            username: adminUsers.username,
-            firstName: adminUsers.firstName,
-            lastName: adminUsers.lastName,
-            role: adminUsers.role,
-          })
-          .from(adminUsers)
-          .where(eq(adminUsers.isActive, true)),
+        db.select().from(adminUsers).where(eq(adminUsers.isActive, true)),
       ]);
       const departmentNames = new Map(departments.map(department => [department.id, department.name]));
+      const canonicalMobileNames = new Map(FALLBACK_MOBILE_STAFF.map(worker => [worker.id, worker.name]));
       const staff = allWorkers
         .filter(worker =>
           worker.isActive &&
@@ -1825,18 +1923,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .map(worker => ({
           id: worker.id,
-          name: worker.name,
+          name: canonicalMobileNames.get(worker.id) || worker.name,
           role: "Technician",
           department: departmentNames.get(worker.departmentId) || "Field Service",
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      const admins = activeAdmins
+      const enrichedAdmins = await Promise.all(activeAdmins.map(admin => AuthService.enrichAdminUser(admin)));
+      const admins = enrichedAdmins
         .map(admin => ({
           id: admin.id,
-          name: `${admin.firstName} ${admin.lastName}`.trim(),
+          name: admin.sourceWorkerName || `${admin.firstName} ${admin.lastName}`.trim(),
           username: admin.username,
-          role: admin.role === "superadmin" ? "Super Administrator" : "Administrator",
-          department: "Administration",
+          role: admin.role === "superadmin"
+            ? "Super Administrator"
+            : admin.sourceWorkerRole || "Office User",
+          department: admin.sourceWorkerDepartmentId
+            ? departmentNames.get(admin.sourceWorkerDepartmentId) || "Office"
+            : "Administration",
           authMethod: "password" as const,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -2932,12 +3035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Notes: entry.notes,
       }));
 
-      // Build CSV
-      const headers = Object.keys(rows[0] ?? {});
-      const csv = [
-        headers.join(","),
-        ...rows.map(row => headers.map(h => `"${String((row as any)[h] ?? "").replace(/"/g, '""')}"`).join(",")),
-      ].join("\n");
+      const csv = buildCsvFromObjectRows(rows);
 
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="overtime-export-${new Date().toISOString().slice(0, 10)}.csv"`);
@@ -3275,10 +3373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (q.length < 2) return res.json({ results: [] });
 
     const pattern = `%${q}%`;
-    const role = getDashboardRole({
-      departmentId: (req.user as any)?.departmentId as string | undefined,
-      role: req.user?.role,
-    });
+    const role = getDashboardRole(req.user ?? {});
     const canSeeLeads    = ["admin","manager","sales"].includes(role);
     const canSeeQuotes   = ["admin","manager","sales"].includes(role);
     const canSeeInvoices = ["admin","accounts","manager"].includes(role);
@@ -3973,20 +4068,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Excel Import for Inventory
-  const upload = multer({ storage: multer.memoryStorage() });
-  
-  app.post("/api/inventory/import", upload.single('file'), async (req, res) => {
+  // Excel Import for Inventory. Keep both the multipart request and the
+  // worksheet bounded before XLSX can materialize attacker-controlled data.
+  const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+  const MAX_IMPORT_ROWS = 10_000;
+  const MAX_IMPORT_COLUMNS = 50;
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: MAX_IMPORT_FILE_BYTES,
+      files: 1,
+      fields: 0,
+      parts: 1,
+      fieldNameSize: 100,
+      fieldSize: 1024,
+      headerPairs: 200,
+    },
+  });
+  const inventoryUpload = (req: any, res: any, next: any) => {
+    upload.single("file")(req, res, (error: any) => {
+      if (!error) return next();
+      if (error instanceof multer.MulterError) {
+        if (error.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({ error: "Inventory import file must be 5 MB or smaller" });
+        }
+        if (error.code === "LIMIT_FILE_COUNT" || error.code === "LIMIT_PART_COUNT") {
+          return res.status(400).json({ error: "Only one inventory file may be uploaded" });
+        }
+        return res.status(400).json({ error: "Invalid inventory upload" });
+      }
+      next(error);
+    });
+  };
+
+  app.post("/api/inventory/import", inventoryImportRateLimit, inventoryUpload, async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
       // Parse Excel file
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const workbook = XLSX.read(req.file.buffer, {
+        type: "buffer",
+        sheets: [0],
+        sheetRows: MAX_IMPORT_ROWS + 1,
+      });
       const sheetName = workbook.SheetNames[0];
+      if (!sheetName) {
+        return res.status(400).json({ error: "The uploaded workbook has no worksheets" });
+      }
       const worksheet = workbook.Sheets[sheetName];
+      const range = worksheet?.["!ref"];
+      if (range) {
+        const decodedRange = XLSX.utils.decode_range(range);
+        const columnCount = decodedRange.e.c - decodedRange.s.c + 1;
+        if (columnCount > MAX_IMPORT_COLUMNS) {
+          return res.status(413).json({
+            error: `Inventory imports may contain no more than ${MAX_IMPORT_COLUMNS} columns`,
+          });
+        }
+      }
       const data = XLSX.utils.sheet_to_json(worksheet);
+      if (data.length > MAX_IMPORT_ROWS) {
+        return res.status(413).json({
+          error: `Inventory imports may contain no more than ${MAX_IMPORT_ROWS} data rows`,
+        });
+      }
 
       const results = {
         total: data.length,
@@ -4610,10 +4757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]);
       }
       
-      // Convert to CSV format
-      const csvContent = csvRows.map(row => 
-        row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
-      ).join('\n');
+      const csvContent = buildCsvFromRows(csvRows);
       
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="invoices_export.csv"');
@@ -5550,6 +5694,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public endpoint for quote submission (no auth required)
   app.post("/api/public/quote-request", async (req, res) => {
     try {
+      const rateLimit = quoteRequestRateLimiter(requestClientKey(req));
+      if (!rateLimit.allowed) {
+        return sendRateLimitResponse(res, rateLimit.retryAfterSeconds);
+      }
+
       const submissionData = insertQuoteSubmissionSchema.parse({ ...req.body, origination: req.body?.origination ?? "website" });
       const submission = await storage.createQuoteSubmission(submissionData);
       
@@ -7926,14 +8075,11 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     try {
       const clients = await storage.getClients();
       const headers = ["id","name","email","phone","address","businessType","status","createdAt"];
-      const escape  = (v: any) => {
-        const s = String(v ?? "").replace(/"/g, '""');
-        return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s}"` : s;
-      };
-      const rows = clients.map(c =>
-        [c.id, c.name, c.email, c.phone, c.address, (c as any).businessType, c.status, c.createdAt].map(escape).join(",")
-      );
-      const csv = [headers.join(","), ...rows].join("\n");
+      const rows = clients.map(c => [
+        c.id, c.name, c.email, c.phone, c.address,
+        (c as any).businessType, c.status, c.createdAt,
+      ]);
+      const csv = buildCsvFromRows([headers, ...rows]);
       const filename = `clients-backup-${new Date().toISOString().split("T")[0]}.csv`;
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

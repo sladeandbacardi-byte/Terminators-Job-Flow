@@ -1,13 +1,5 @@
 import { storage } from "./storage";
-
-function escapeCsv(v: any): string {
-  const s = String(v ?? "").replace(/"/g, '""');
-  return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s}"` : s;
-}
-
-function rowToCsv(cells: any[]): string {
-  return cells.map(escapeCsv).join(",");
-}
+import { buildCsvRow } from "./csv-utils";
 
 export async function generateCsvBackupBuffer(): Promise<{
   buffer: Buffer;
@@ -28,17 +20,17 @@ export async function generateCsvBackupBuffer(): Promise<{
 
   // ── Clients ──────────────────────────────────────────────────────────────
   sections.push("# CLIENTS");
-  sections.push(rowToCsv(["Name", "Phone", "Email", "Business Type", "Address", "Status"]));
+  sections.push(buildCsvRow(["Name", "Phone", "Email", "Business Type", "Address", "Status"]));
   for (const c of backup.clients as any[]) {
-    sections.push(rowToCsv([c.name, c.phone, c.email, c.businessType, c.address, c.status]));
+    sections.push(buildCsvRow([c.name, c.phone, c.email, c.businessType, c.address, c.status]));
   }
 
   // ── Jobs ─────────────────────────────────────────────────────────────────
   sections.push("");
   sections.push("# JOBS");
-  sections.push(rowToCsv(["Job #", "Date", "Client", "Worker", "Department", "Status", "Priority", "Notes"]));
+  sections.push(buildCsvRow(["Job #", "Date", "Client", "Worker", "Department", "Status", "Priority", "Notes"]));
   for (const j of backup.jobs as any[]) {
-    sections.push(rowToCsv([
+    sections.push(buildCsvRow([
       j.jobNumber ?? j.id,
       dateStr(j.scheduledDate ?? j.date),
       clientMap.get(j.clientId) ?? j.clientId,
@@ -51,9 +43,9 @@ export async function generateCsvBackupBuffer(): Promise<{
   // ── Invoices ─────────────────────────────────────────────────────────────
   sections.push("");
   sections.push("# INVOICES");
-  sections.push(rowToCsv(["Invoice #", "Issue Date", "Due Date", "Client", "Total (ZAR)", "Status"]));
+  sections.push(buildCsvRow(["Invoice #", "Issue Date", "Due Date", "Client", "Total (ZAR)", "Status"]));
   for (const inv of backup.invoices as any[]) {
-    sections.push(rowToCsv([
+    sections.push(buildCsvRow([
       inv.invoiceNumber ?? inv.id,
       dateStr(inv.issueDate ?? inv.date),
       dateStr(inv.dueDate),
@@ -66,9 +58,9 @@ export async function generateCsvBackupBuffer(): Promise<{
   // ── Workers ───────────────────────────────────────────────────────────────
   sections.push("");
   sections.push("# STAFF");
-  sections.push(rowToCsv(["Name", "Role", "Email", "Phone", "Department", "Active"]));
+  sections.push(buildCsvRow(["Name", "Role", "Email", "Phone", "Department", "Active"]));
   for (const w of backup.workers as any[]) {
-    sections.push(rowToCsv([
+    sections.push(buildCsvRow([
       w.name, w.role ?? "", w.email ?? "", w.phone ?? "",
       deptMap.get(w.departmentId) ?? "", w.isActive ? "Yes" : "No",
     ]));
