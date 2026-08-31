@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Building2, CircleDollarSign, Lightbulb, Landmark, Plus, Target, Trash2, TrendingUp } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Archive, Building2, CircleDollarSign, Edit3, Lightbulb, Landmark, Plus, RotateCcw, Target, Trash2, TrendingUp } from "lucide-react";
 
 const rand = (value: unknown) => `R${Math.round(Number(value ?? 0)).toLocaleString("en-ZA")}`;
 const num = (value: unknown) => Number(value ?? 0) || 0;
@@ -18,6 +20,11 @@ type Dashboard = {
   recovery: Record<string, any>;
   future: Record<string, any>;
   ideas: any[];
+  categories: any[];
+  relationships: any[];
+  internalTransactions: any[];
+  propertyPlans: any[];
+  linkedRecords: any[];
   payments: any[];
   propertyTransactions: any[];
   settings: Record<string, any>;
@@ -30,9 +37,38 @@ const emptyIdea = {
   propertyFundAllocation: 0, priorityScore: 0,
 };
 
+const planningConfig:any = {
+  categories:{title:"Categories",rows:"categories",fields:[["name","Category name","text"]]},
+  relationships:{title:"Ecosystem relationships",rows:"relationships",fields:[["fromIdeaId","From idea","idea"],["toIdeaId","To idea","idea"],["relationship","Relationship","text"],["notes","Notes","textarea"]]},
+  "internal-transactions":{title:"Internal group transactions",rows:"internalTransactions",fields:[["transactionDate","Date","date"],["fromEntity","From entity","text"],["toEntity","To entity","text"],["amount","Amount","number"],["transactionType","Type","text"],["notes","Notes","textarea"]]},
+  "property-plans":{title:"Property support phases & requirements",rows:"propertyPlans",fields:[["ideaId","Linked idea","ideaOptional"],["propertyName","Property / plan name","text"],["supportType","Support type","text"],["phase","Phase","text"],["requirements","Requirements","textarea"],["estimatedCost","Estimated cost","number"],["monthlySupport","Monthly support","number"],["notes","Notes","textarea"]]},
+  "linked-records":{title:"Linked planning records",rows:"linkedRecords",fields:[["ideaId","Growth idea","idea"],["recordType","Record type","text"],["recordId","Record ID / reference","text"],["label","Label","text"],["notes","Notes","textarea"]]},
+};
+function PlanningEditors({data,save,archive,remove}:{data:Dashboard;save:(type:string,values:any,id?:string)=>Promise<any>;archive:(type:string,id:string,archived:boolean)=>void;remove:(type:string,id:string)=>void}) {
+  const [type,setType]=useState("relationships");
+  const [values,setValues]=useState<any>({});
+  const [editing,setEditing]=useState<string|null>(null);
+  const cfg=planningConfig[type], rows=(data as any)[cfg.rows]||[];
+  const beginEdit=(row:any)=>{const next:any={};for(const [key] of cfg.fields){const snake=key.replace(/[A-Z]/g,(x:string)=>`_${x.toLowerCase()}`);next[key]=row[snake]??"";}setValues(next);setEditing(row.id)};
+  const submit=async()=>{await save(type,values,editing||undefined);setValues({});setEditing(null)};
+  return <Card><CardHeader><CardTitle>Detailed owner planning</CardTitle></CardHeader><CardContent className="space-y-4">
+    <Tabs value={type} onValueChange={v=>{setType(v);setValues({});setEditing(null)}}><TabsList className="h-auto flex-wrap">{Object.entries(planningConfig).map(([key,c]:any)=><TabsTrigger key={key} value={key}>{c.title}</TabsTrigger>)}</TabsList></Tabs>
+    <div className="rounded-xl border bg-slate-50 p-4"><h3 className="mb-3 font-semibold">{editing?"Edit":"Add"} {cfg.title.toLowerCase()}</h3><div className="grid gap-3 md:grid-cols-2">
+      {cfg.fields.map(([key,label,kind]:string[])=>{
+        if(kind==="idea"||kind==="ideaOptional")return <div key={key}><Label>{label}</Label><Select value={values[key]|| (kind==="ideaOptional"?"none":"")} onValueChange={v=>setValues({...values,[key]:v==="none"?null:v})}><SelectTrigger><SelectValue placeholder="Select an idea"/></SelectTrigger><SelectContent>{kind==="ideaOptional"&&<SelectItem value="none">Not linked</SelectItem>}{data.ideas.filter(x=>!x.archived_at).map(x=><SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}</SelectContent></Select></div>;
+        return <div key={key} className={kind==="textarea"?"md:col-span-2":""}><Label>{label}</Label>{kind==="textarea"?<Textarea value={values[key]||""} onChange={e=>setValues({...values,[key]:e.target.value})}/>:<Input type={kind} min={kind==="number"?0:undefined} value={values[key]??""} onChange={e=>setValues({...values,[key]:kind==="number"?Number(e.target.value):e.target.value})}/>}</div>
+      })}
+    </div><div className="mt-3 flex gap-2"><Button onClick={submit}><Plus className="mr-2 h-4 w-4"/>{editing?"Save changes":"Add record"}</Button>{editing&&<Button variant="outline" onClick={()=>{setEditing(null);setValues({})}}>Cancel</Button>}</div></div>
+    <div className="space-y-2">{rows.map((row:any)=><div key={row.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm ${row.archived_at?"opacity-60":""}`}><div><b>{row.name||row.relationship||row.property_name||row.label||`${row.from_entity||""} → ${row.to_entity||""}`}</b>{row.archived_at&&<Badge className="ml-2" variant="secondary">Archived</Badge>}<div className="text-xs text-slate-500">{row.notes||row.requirements||row.transaction_date}</div></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={()=>beginEdit(row)}><Edit3 className="mr-1 h-3 w-3"/>Edit</Button><Button size="sm" variant="outline" onClick={()=>archive(type,row.id,!row.archived_at)}>{row.archived_at?<RotateCcw className="mr-1 h-3 w-3"/>:<Archive className="mr-1 h-3 w-3"/>}{row.archived_at?"Restore":"Archive"}</Button><Button size="icon" variant="ghost" aria-label="Permanently delete planning record" onClick={()=>{if(window.confirm("Permanently delete this planning record? This cannot be undone."))remove(type,row.id)}}><Trash2 className="h-4 w-4 text-red-600"/></Button></div></div>)}</div>
+  </CardContent></Card>;
+}
+
 export default function GrowthCapital() {
   const { data, isLoading, error } = useQuery<Dashboard>({ queryKey: ["/api/growth-capital/dashboard"] });
   const [idea, setIdea] = useState(emptyIdea);
+  const [ideaDialog, setIdeaDialog] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [payment, setPayment] = useState({ paymentDate: new Date().toISOString().slice(0, 10), amount: 0, paymentType: "Normal", notes: "" });
   const [property, setProperty] = useState({ transactionDate: new Date().toISOString().slice(0, 10), amount: 0, transactionType: "Allocation from Terminators", notes: "" });
   const [extraCash, setExtraCash] = useState(200000);
@@ -41,6 +77,10 @@ export default function GrowthCapital() {
   const createIdea = useMutation({ mutationFn: () => apiRequest("POST", "/api/growth-capital/ideas", idea), onSuccess: () => { setIdea(emptyIdea); refresh(); } });
   const updateIdea = useMutation({ mutationFn: ({ id, values }: any) => apiRequest("PATCH", `/api/growth-capital/ideas/${id}`, values), onSuccess: refresh });
   const deleteIdea = useMutation({ mutationFn: (id: string) => apiRequest("DELETE", `/api/growth-capital/ideas/${id}`), onSuccess: refresh });
+  const archiveIdea = useMutation({ mutationFn: ({id,archived}:{id:string;archived:boolean}) => apiRequest("PATCH", `/api/growth-capital/ideas/${id}/archive`, {archived}), onSuccess: refresh });
+  const savePlanning = useMutation({ mutationFn: ({type,values,id}:{type:string;values:any;id?:string}) => apiRequest(id?"PATCH":"POST", `/api/growth-capital/planning/${type}${id?`/${id}`:""}`, values), onSuccess: refresh });
+  const archivePlanning = useMutation({ mutationFn: ({type,id,archived}:{type:string;id:string;archived:boolean}) => apiRequest("PATCH", `/api/growth-capital/planning/${type}/${id}/archive`, {archived}), onSuccess: refresh });
+  const deletePlanning = useMutation({ mutationFn: ({type,id}:{type:string;id:string}) => apiRequest("DELETE", `/api/growth-capital/planning/${type}/${id}`), onSuccess: refresh });
   const addPayment = useMutation({ mutationFn: () => apiRequest("POST", "/api/growth-capital/jan-payments", payment), onSuccess: refresh });
   const deletePayment = useMutation({ mutationFn: (id: string) => apiRequest("DELETE", `/api/growth-capital/jan-payments/${id}`), onSuccess: refresh });
   const addProperty = useMutation({ mutationFn: () => apiRequest("POST", "/api/growth-capital/property-transactions", property), onSuccess: refresh });
@@ -67,6 +107,34 @@ export default function GrowthCapital() {
       <Icon className="h-5 w-5 text-red-600" />
     </div></CardContent></Card>
   );
+  const openNewIdea = () => { setEditingId(null); setIdea({...emptyIdea}); setIdeaDialog(true); };
+  const openEditIdea = (row:any) => {
+    setEditingId(row.id);
+    setIdea({ name:row.name, description:row.description, category:row.category, stage:row.stage,
+      setupCost:num(row.setup_cost), monthlyRevenue:num(row.monthly_revenue), monthlyExpenses:num(row.monthly_expenses),
+      monthlyCostSaving:num(row.monthly_cost_saving), staffing:row.staffing, propertySpace:row.property_space,
+      startDate:row.start_date||"", notes:row.notes, expectedFreeCash:num(row.expected_free_cash),
+      propertyFundAllocation:num(row.property_fund_allocation), priorityScore:num(row.priority_score) });
+    setIdeaDialog(true);
+  };
+  const saveIdea = async () => {
+    if (!idea.name.trim() || idea.priorityScore < 0 || idea.priorityScore > 35) return;
+    if (editingId) await updateIdea.mutateAsync({id:editingId,values:idea});
+    else await createIdea.mutateAsync();
+    setIdeaDialog(false);
+  };
+  const IdeaForm = () => <div className="grid gap-4 py-2 sm:grid-cols-2">
+    <div><Label>Name *</Label><Input value={idea.name} maxLength={160} onChange={e=>setIdea({...idea,name:e.target.value})}/></div>
+    <div><Label>Category *</Label><Input value={idea.category} list="growth-categories" onChange={e=>setIdea({...idea,category:e.target.value})}/><datalist id="growth-categories">{data.categories.filter(x=>!x.archived_at).map(x=><option key={x.id} value={x.name}/>)}</datalist></div>
+    <div className="sm:col-span-2"><Label>Description</Label><Textarea value={idea.description} maxLength={5000} onChange={e=>setIdea({...idea,description:e.target.value})}/></div>
+    <div><Label>Stage</Label><Select value={idea.stage} onValueChange={stage=>setIdea({...idea,stage})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{["Idea","Research","Testing","Approved","In Development","Operating"].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
+    <div><Label>Priority score (0–35)</Label><Input type="number" min={0} max={35} value={idea.priorityScore} onChange={e=>setIdea({...idea,priorityScore:Number(e.target.value)})}/></div>
+    {[["Setup cost","setupCost"],["Monthly revenue","monthlyRevenue"],["Monthly expenses","monthlyExpenses"],["Monthly cost saving","monthlyCostSaving"],["Expected free cash","expectedFreeCash"],["Property fund allocation","propertyFundAllocation"]].map(([label,key])=><div key={key}><Label>{label}</Label><Input type="number" min={0} value={(idea as any)[key]} onChange={e=>setIdea({...idea,[key]:Number(e.target.value)})}/></div>)}
+    <div><Label>Planned start date</Label><Input type="date" value={idea.startDate} onChange={e=>setIdea({...idea,startDate:e.target.value})}/></div>
+    <div><Label>Staffing assumptions</Label><Textarea value={idea.staffing} onChange={e=>setIdea({...idea,staffing:e.target.value})}/></div>
+    <div className="sm:col-span-2"><Label>Property space / requirements</Label><Textarea value={idea.propertySpace} onChange={e=>setIdea({...idea,propertySpace:e.target.value})}/></div>
+    <div className="sm:col-span-2"><Label>Private owner notes</Label><Textarea value={idea.notes} maxLength={5000} onChange={e=>setIdea({...idea,notes:e.target.value})}/></div>
+  </div>;
 
   return <div className="space-y-6 p-4 md:p-7">
     <div className="rounded-2xl bg-slate-950 p-6 text-white">
@@ -162,33 +230,25 @@ export default function GrowthCapital() {
       </TabsContent>
 
       <TabsContent value="future" className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-2xl font-bold">Future Growth</h2><p className="text-sm text-slate-500">Owner-managed ideas, assumptions and linked planning.</p></div>
+          <Button size="lg" onClick={openNewIdea}><Plus className="mr-2 h-5 w-5"/>Add Growth Idea</Button>
+        </div>
         <div className="grid gap-3 md:grid-cols-4">
           <Score title="Monthly income" value={rand(data.future.projectedMonthlyRevenue)} icon={TrendingUp}/>
           <Score title="Cost saving" value={rand(data.future.projectedMonthlyCostSaving)} icon={CircleDollarSign}/>
           <Score title="Projected profit" value={rand(data.future.projectedMonthlyProfit)} icon={Target}/>
           <Score title="Capital required" value={rand(data.future.capitalRequired)} icon={Landmark}/>
         </div>
-        <Card><CardHeader><CardTitle>Growth pipeline</CardTitle></CardHeader><CardContent className="space-y-3">
-          {data.ideas.map(row => {
+        <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Growth pipeline</CardTitle><Button variant="outline" size="sm" onClick={()=>setShowArchived(!showArchived)}>{showArchived?"Hide archived":"Show archived"}</Button></CardHeader><CardContent className="space-y-3">
+          {data.ideas.filter(row=>showArchived||!row.archived_at).map(row => {
             const profit = num(row.monthly_revenue)-num(row.monthly_expenses)+num(row.monthly_cost_saving);
-            return <div key={row.id} className="rounded-xl border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{row.name}</h3><p className="mt-1 max-w-3xl text-sm text-slate-600">{row.description}</p><div className="mt-2 flex gap-2"><Badge>{row.category}</Badge><Badge variant="outline">{rand(profit)}/month</Badge></div></div><div className="flex items-center gap-2"><Select value={row.stage} onValueChange={stage => updateIdea.mutate({id:row.id,values:{stage}})}><SelectTrigger className="w-40"><SelectValue/></SelectTrigger><SelectContent>{["Idea","Research","Testing","Approved","In Development","Operating"].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select><Button size="icon" variant="ghost" onClick={()=>deleteIdea.mutate(row.id)}><Trash2 className="h-4 w-4"/></Button></div></div>{row.notes && <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">{row.notes}</p>}</div>;
+             return <div key={row.id} className={`rounded-xl border p-4 ${row.archived_at?"bg-slate-50 opacity-70":""}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-semibold">{row.name}</h3>{row.archived_at&&<Badge variant="secondary">Archived</Badge>}</div><p className="mt-1 max-w-3xl text-sm text-slate-600">{row.description}</p><div className="mt-2 flex flex-wrap gap-2"><Badge>{row.category}</Badge><Badge variant="outline">{rand(profit)}/month</Badge><Badge variant="outline">Priority {row.priority_score}/35</Badge></div></div><div className="flex flex-wrap items-center gap-2">{!row.archived_at&&<Select value={row.stage} onValueChange={stage => updateIdea.mutate({id:row.id,values:{stage}})}><SelectTrigger className="w-40"><SelectValue/></SelectTrigger><SelectContent>{["Idea","Research","Testing","Approved","In Development","Operating"].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>}<Button variant="outline" onClick={()=>openEditIdea(row)}><Edit3 className="mr-2 h-4 w-4"/>Edit</Button><Button variant="outline" onClick={()=>archiveIdea.mutate({id:row.id,archived:!row.archived_at})}>{row.archived_at?<RotateCcw className="mr-2 h-4 w-4"/>:<Archive className="mr-2 h-4 w-4"/>}{row.archived_at?"Restore":"Archive"}</Button><Button size="icon" variant="ghost" aria-label={`Delete ${row.name}`} onClick={()=>{if(window.confirm(`Permanently delete “${row.name}”? This cannot be undone.`)) deleteIdea.mutate(row.id)}}><Trash2 className="h-4 w-4 text-red-600"/></Button></div></div>{row.notes && <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">{row.notes}</p>}</div>;
           })}
         </CardContent></Card>
-        <Card><CardHeader><CardTitle>Add growth idea</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-3">
-          <Input placeholder="Idea name" value={idea.name} onChange={e=>setIdea({...idea,name:e.target.value})}/>
-          <Input placeholder="Category" value={idea.category} onChange={e=>setIdea({...idea,category:e.target.value})}/>
-          <Select value={idea.stage} onValueChange={stage=>setIdea({...idea,stage})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{["Idea","Research","Testing","Approved","In Development","Operating"].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
-          <Input className="md:col-span-3" placeholder="Description" value={idea.description} onChange={e=>setIdea({...idea,description:e.target.value})}/>
-          <Input type="number" placeholder="Setup cost" value={idea.setupCost} onChange={e=>setIdea({...idea,setupCost:Number(e.target.value)})}/>
-          <Input type="number" placeholder="Monthly revenue" value={idea.monthlyRevenue} onChange={e=>setIdea({...idea,monthlyRevenue:Number(e.target.value)})}/>
-          <Input type="number" placeholder="Monthly expenses" value={idea.monthlyExpenses} onChange={e=>setIdea({...idea,monthlyExpenses:Number(e.target.value)})}/>
-          <Input type="number" placeholder="Monthly cost saving" value={idea.monthlyCostSaving} onChange={e=>setIdea({...idea,monthlyCostSaving:Number(e.target.value)})}/>
-          <Input type="number" placeholder="Property allocation" value={idea.propertyFundAllocation} onChange={e=>setIdea({...idea,propertyFundAllocation:Number(e.target.value)})}/>
-          <Input type="number" min={0} max={35} placeholder="Priority score" value={idea.priorityScore} onChange={e=>setIdea({...idea,priorityScore:Number(e.target.value)})}/>
-          <Input className="md:col-span-3" placeholder="Notes, staffing and property requirements" value={idea.notes} onChange={e=>setIdea({...idea,notes:e.target.value})}/>
-          <Button className="md:col-span-3" onClick={()=>createIdea.mutate()} disabled={!idea.name || createIdea.isPending}><Plus className="mr-2 h-4 w-4"/>Add growth idea</Button>
-        </CardContent></Card>
+        <PlanningEditors data={data} save={(type,values,id)=>savePlanning.mutateAsync({type,values,id})} archive={(type,id,archived)=>archivePlanning.mutate({type,id,archived})} remove={(type,id)=>deletePlanning.mutate({type,id})}/>
       </TabsContent>
     </Tabs>
+    <Dialog open={ideaDialog} onOpenChange={setIdeaDialog}><DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>{editingId?"Edit Growth Idea":"Add Growth Idea"}</DialogTitle><DialogDescription>Update all owner assumptions, financial projections, priorities and private planning notes.</DialogDescription></DialogHeader><IdeaForm/><DialogFooter><Button variant="outline" onClick={()=>setIdeaDialog(false)}>Cancel</Button><Button onClick={saveIdea} disabled={!idea.name.trim()||idea.priorityScore<0||idea.priorityScore>35||createIdea.isPending||updateIdea.isPending}>{editingId?"Save changes":"Create idea"}</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }

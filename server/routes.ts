@@ -9762,8 +9762,13 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   app.get("/api/growth-capital/dashboard", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!requireGrowthOwner(req, res)) return;
     try {
-      const [ideasResult, accountResult, paymentsResult, propertyResult, settingsResult, invoices, expenses, jobs, contracts, quotes, clients] = await Promise.all([
+      const [ideasResult, categoriesResult, relationshipsResult, internalTransactionsResult, propertyPlansResult, linkedRecordsResult, accountResult, paymentsResult, propertyResult, settingsResult, invoices, expenses, jobs, contracts, quotes, clients] = await Promise.all([
         db.execute(sql`SELECT * FROM growth_ideas ORDER BY created_at`),
+        db.execute(sql`SELECT * FROM growth_categories ORDER BY name`),
+        db.execute(sql`SELECT * FROM growth_ecosystem_relationships ORDER BY created_at DESC`),
+        db.execute(sql`SELECT * FROM growth_internal_transactions ORDER BY transaction_date DESC, created_at DESC`),
+        db.execute(sql`SELECT * FROM growth_property_support_plans ORDER BY created_at DESC`),
+        db.execute(sql`SELECT * FROM growth_linked_records ORDER BY created_at DESC`),
         db.execute(sql`SELECT * FROM jan_capital_account WHERE id = 1`),
         db.execute(sql`SELECT * FROM jan_capital_payments ORDER BY payment_date`),
         db.execute(sql`SELECT * FROM property_fund_transactions ORDER BY transaction_date DESC, created_at DESC`),
@@ -9840,7 +9845,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
           annualPropertyContribution: ideas.reduce((sum, row) => sum + amount(row.property_fund_allocation), 0) * 12,
           clientCount: clients.length,
         },
-        ideas, payments, propertyTransactions, settings,
+        ideas, categories: categoriesResult.rows, relationships: relationshipsResult.rows,
+        internalTransactions: internalTransactionsResult.rows, propertyPlans: propertyPlansResult.rows,
+        linkedRecords: linkedRecordsResult.rows, payments, propertyTransactions, settings,
       });
     } catch (error) {
       console.error("Growth & Capital dashboard failed:", error);
@@ -9890,6 +9897,102 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
     const result = await db.execute(sql`DELETE FROM growth_ideas WHERE id=${req.params.id} RETURNING id`);
     if (!result.rows[0]) return res.status(404).json({ error: "Idea not found" });
     await auditGrowth(req, "delete", "growth_idea", req.params.id);
+    res.status(204).send();
+  });
+
+  app.patch("/api/growth-capital/ideas/:id/archive", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const archived = req.body?.archived !== false;
+    const result = await db.execute(sql`UPDATE growth_ideas SET archived_at=${archived ? new Date() : null},updated_at=now() WHERE id=${req.params.id} RETURNING *`);
+    if (!result.rows[0]) return res.status(404).json({ error: "Idea not found" });
+    await auditGrowth(req, archived ? "archive" : "restore", "growth_idea", req.params.id);
+    res.json(result.rows[0]);
+  });
+
+  const planningType = z.enum(["categories", "relationships", "internal-transactions", "property-plans", "linked-records"]);
+  app.post("/api/growth-capital/planning/:type", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const kind = planningType.safeParse(req.params.type);
+    if (!kind.success) return res.status(404).json({ error: "Unknown planning record type" });
+    let result;
+    if (kind.data === "categories") {
+      const d = z.object({ name: z.string().trim().min(2).max(100) }).parse(req.body);
+      result = await db.execute(sql`INSERT INTO growth_categories (name) VALUES (${d.name}) RETURNING *`);
+    } else if (kind.data === "relationships") {
+      const d = z.object({ fromIdeaId:z.string().min(1),toIdeaId:z.string().min(1),relationship:z.string().trim().min(2).max(200),notes:z.string().max(2000).default("") }).refine(v=>v.fromIdeaId!==v.toIdeaId,{message:"Choose two different ideas"}).parse(req.body);
+      result = await db.execute(sql`INSERT INTO growth_ecosystem_relationships (from_idea_id,to_idea_id,relationship,notes) VALUES (${d.fromIdeaId},${d.toIdeaId},${d.relationship},${d.notes}) RETURNING *`);
+    } else if (kind.data === "internal-transactions") {
+      const d = z.object({ transactionDate:z.string().min(10),fromEntity:z.string().trim().min(2).max(160),toEntity:z.string().trim().min(2).max(160),amount:growthMoney,transactionType:z.string().trim().min(2).max(100),notes:z.string().max(2000).default("") }).parse(req.body);
+      result = await db.execute(sql`INSERT INTO growth_internal_transactions (transaction_date,from_entity,to_entity,amount,transaction_type,notes) VALUES (${d.transactionDate},${d.fromEntity},${d.toEntity},${d.amount},${d.transactionType},${d.notes}) RETURNING *`);
+    } else if (kind.data === "property-plans") {
+      const d = z.object({ ideaId:z.string().nullable().optional(),propertyName:z.string().trim().min(2).max(160),supportType:z.string().trim().min(2).max(100),phase:z.string().trim().min(2).max(100),requirements:z.string().max(4000).default(""),estimatedCost:growthMoney,monthlySupport:growthMoney,notes:z.string().max(2000).default("") }).parse(req.body);
+      result = await db.execute(sql`INSERT INTO growth_property_support_plans (idea_id,property_name,support_type,phase,requirements,estimated_cost,monthly_support,notes) VALUES (${d.ideaId||null},${d.propertyName},${d.supportType},${d.phase},${d.requirements},${d.estimatedCost},${d.monthlySupport},${d.notes}) RETURNING *`);
+    } else {
+      const d = z.object({ ideaId:z.string().min(1),recordType:z.string().trim().min(2).max(100),recordId:z.string().trim().min(1).max(160),label:z.string().trim().min(2).max(200),notes:z.string().max(2000).default("") }).parse(req.body);
+      result = await db.execute(sql`INSERT INTO growth_linked_records (idea_id,record_type,record_id,label,notes) VALUES (${d.ideaId},${d.recordType},${d.recordId},${d.label},${d.notes}) RETURNING *`);
+    }
+    const row = result.rows[0] as any;
+    await auditGrowth(req, "create", kind.data, row.id);
+    res.status(201).json(row);
+  });
+
+  app.patch("/api/growth-capital/planning/:type/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const kind = planningType.safeParse(req.params.type);
+    if (!kind.success) return res.status(404).json({ error: "Unknown planning record type" });
+    let result;
+    if (kind.data === "categories") {
+      const d = z.object({ name:z.string().trim().min(2).max(100) }).parse(req.body);
+      result = await db.execute(sql`UPDATE growth_categories SET name=${d.name},updated_at=now() WHERE id=${req.params.id} RETURNING *`);
+    } else if (kind.data === "relationships") {
+      const d = z.object({ fromIdeaId:z.string().min(1),toIdeaId:z.string().min(1),relationship:z.string().trim().min(2).max(200),notes:z.string().max(2000).default("") }).refine(v=>v.fromIdeaId!==v.toIdeaId,{message:"Choose two different ideas"}).parse(req.body);
+      result = await db.execute(sql`UPDATE growth_ecosystem_relationships SET from_idea_id=${d.fromIdeaId},to_idea_id=${d.toIdeaId},relationship=${d.relationship},notes=${d.notes} WHERE id=${req.params.id} RETURNING *`);
+    } else if (kind.data === "internal-transactions") {
+      const d = z.object({ transactionDate:z.string().min(10),fromEntity:z.string().trim().min(2).max(160),toEntity:z.string().trim().min(2).max(160),amount:growthMoney,transactionType:z.string().trim().min(2).max(100),notes:z.string().max(2000).default("") }).parse(req.body);
+      result = await db.execute(sql`UPDATE growth_internal_transactions SET transaction_date=${d.transactionDate},from_entity=${d.fromEntity},to_entity=${d.toEntity},amount=${d.amount},transaction_type=${d.transactionType},notes=${d.notes} WHERE id=${req.params.id} RETURNING *`);
+    } else if (kind.data === "property-plans") {
+      const d = z.object({ ideaId:z.string().nullable().optional(),propertyName:z.string().trim().min(2).max(160),supportType:z.string().trim().min(2).max(100),phase:z.string().trim().min(2).max(100),requirements:z.string().max(4000).default(""),estimatedCost:growthMoney,monthlySupport:growthMoney,notes:z.string().max(2000).default("") }).parse(req.body);
+      result = await db.execute(sql`UPDATE growth_property_support_plans SET idea_id=${d.ideaId||null},property_name=${d.propertyName},support_type=${d.supportType},phase=${d.phase},requirements=${d.requirements},estimated_cost=${d.estimatedCost},monthly_support=${d.monthlySupport},notes=${d.notes},updated_at=now() WHERE id=${req.params.id} RETURNING *`);
+    } else {
+      const d = z.object({ ideaId:z.string().min(1),recordType:z.string().trim().min(2).max(100),recordId:z.string().trim().min(1).max(160),label:z.string().trim().min(2).max(200),notes:z.string().max(2000).default("") }).parse(req.body);
+      result = await db.execute(sql`UPDATE growth_linked_records SET idea_id=${d.ideaId},record_type=${d.recordType},record_id=${d.recordId},label=${d.label},notes=${d.notes} WHERE id=${req.params.id} RETURNING *`);
+    }
+    if (!result.rows[0]) return res.status(404).json({ error: "Planning record not found" });
+    await auditGrowth(req, "update", kind.data, req.params.id);
+    res.json(result.rows[0]);
+  });
+
+  app.patch("/api/growth-capital/planning/:type/:id/archive", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const kind = planningType.safeParse(req.params.type);
+    if (!kind.success) return res.status(404).json({ error: "Unknown planning record type" });
+    const archivedAt = req.body?.archived === false ? null : new Date();
+    let result;
+    if (kind.data === "categories") result = await db.execute(sql`UPDATE growth_categories SET archived_at=${archivedAt},updated_at=now() WHERE id=${req.params.id} RETURNING *`);
+    else if (kind.data === "relationships") result = await db.execute(sql`UPDATE growth_ecosystem_relationships SET archived_at=${archivedAt} WHERE id=${req.params.id} RETURNING *`);
+    else if (kind.data === "internal-transactions") result = await db.execute(sql`UPDATE growth_internal_transactions SET archived_at=${archivedAt} WHERE id=${req.params.id} RETURNING *`);
+    else if (kind.data === "property-plans") result = await db.execute(sql`UPDATE growth_property_support_plans SET archived_at=${archivedAt},updated_at=now() WHERE id=${req.params.id} RETURNING *`);
+    else result = await db.execute(sql`UPDATE growth_linked_records SET archived_at=${archivedAt} WHERE id=${req.params.id} RETURNING *`);
+    if (!result.rows[0]) return res.status(404).json({ error: "Planning record not found" });
+    await auditGrowth(req, archivedAt ? "archive" : "restore", kind.data, req.params.id);
+    res.json(result.rows[0]);
+  });
+
+  app.delete("/api/growth-capital/planning/:type/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const kind = planningType.safeParse(req.params.type);
+    if (!kind.success) return res.status(404).json({ error: "Unknown planning record type" });
+    let result;
+    if (kind.data === "categories") {
+      result = await db.execute(sql`DELETE FROM growth_categories c WHERE c.id=${req.params.id}
+        AND NOT EXISTS (SELECT 1 FROM growth_ideas i WHERE i.category=c.name) RETURNING c.id`);
+      if (!result.rows[0]) return res.status(409).json({ error: "Category is in use or was not found; archive it instead" });
+    } else if (kind.data === "relationships") result = await db.execute(sql`DELETE FROM growth_ecosystem_relationships WHERE id=${req.params.id} RETURNING id`);
+    else if (kind.data === "internal-transactions") result = await db.execute(sql`DELETE FROM growth_internal_transactions WHERE id=${req.params.id} RETURNING id`);
+    else if (kind.data === "property-plans") result = await db.execute(sql`DELETE FROM growth_property_support_plans WHERE id=${req.params.id} RETURNING id`);
+    else result = await db.execute(sql`DELETE FROM growth_linked_records WHERE id=${req.params.id} RETURNING id`);
+    if (!result.rows[0]) return res.status(404).json({ error: "Planning record not found" });
+    await auditGrowth(req, "delete", kind.data, req.params.id);
     res.status(204).send();
   });
 
