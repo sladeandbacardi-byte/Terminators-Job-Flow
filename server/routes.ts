@@ -74,6 +74,7 @@ import {
   filterOperationalPayload,
   hasOperationalDepartmentScope,
   hasPermission,
+  isCanonicalOwner,
   scopedDepartmentIds,
 } from "@shared/permissionMatrix";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
@@ -9724,6 +9725,234 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const entity = await storage.updateLegalEntity(req.params.id, req.body);
       res.json(entity);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Private owner Growth & Capital ─────────────────────────────────────────
+  const requireGrowthOwner = (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user || !isCanonicalOwner(req.user)) {
+      res.status(403).json({ error: "Growth & Capital is restricted to the owner" });
+      return false;
+    }
+    return true;
+  };
+  const growthMoney = z.coerce.number().finite().min(0).max(1_000_000_000);
+  const growthIdeaInput = z.object({
+    name: z.string().trim().min(2).max(160),
+    description: z.string().max(5000).default(""),
+    category: z.string().trim().min(2).max(80),
+    stage: z.enum(["Idea", "Research", "Testing", "Approved", "In Development", "Operating"]),
+    setupCost: growthMoney.default(0),
+    monthlyRevenue: growthMoney.default(0),
+    monthlyExpenses: growthMoney.default(0),
+    monthlyCostSaving: growthMoney.default(0),
+    staffing: z.string().max(1000).default(""),
+    propertySpace: z.string().max(1000).default(""),
+    startDate: z.string().nullable().optional(),
+    notes: z.string().max(5000).default(""),
+    expectedFreeCash: growthMoney.default(0),
+    propertyFundAllocation: growthMoney.default(0),
+    priorityScore: z.coerce.number().int().min(0).max(35).default(0),
+  });
+  const auditGrowth = async (req: AuthenticatedRequest, action: string, entityType: string, entityId?: string, details = "") => {
+    await db.execute(sql`INSERT INTO growth_capital_audit_log
+      (actor_id, action, entity_type, entity_id, details)
+      VALUES (${req.user!.id}, ${action}, ${entityType}, ${entityId ?? null}, ${details})`);
+  };
+
+  app.get("/api/growth-capital/dashboard", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    try {
+      const [ideasResult, accountResult, paymentsResult, propertyResult, settingsResult, invoices, expenses, jobs, contracts, quotes, clients] = await Promise.all([
+        db.execute(sql`SELECT * FROM growth_ideas ORDER BY created_at`),
+        db.execute(sql`SELECT * FROM jan_capital_account WHERE id = 1`),
+        db.execute(sql`SELECT * FROM jan_capital_payments ORDER BY payment_date`),
+        db.execute(sql`SELECT * FROM property_fund_transactions ORDER BY transaction_date DESC, created_at DESC`),
+        db.execute(sql`SELECT * FROM growth_capital_settings WHERE id = 1`),
+        storage.getInvoices(),
+        storage.getExpenses(),
+        storage.getJobs(),
+        storage.getServiceContracts(),
+        storage.getQuoteSubmissions(),
+        storage.getClients(),
+      ]);
+      const now = new Date();
+      const monthKey = (value: unknown) => {
+        const date = new Date(String(value ?? ""));
+        return Number.isNaN(+date) ? "" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      };
+      const currentMonth = monthKey(now);
+      const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const previousMonth = monthKey(previousMonthDate);
+      const amount = (value: unknown) => Number(value ?? 0) || 0;
+      const invoiceDate = (row: any) => row.issueDate ?? row.createdAt;
+      const expenseDate = (row: any) => row.expenseDate ?? row.date ?? row.createdAt;
+      const currentIncome = invoices.filter((row: any) => monthKey(invoiceDate(row)) === currentMonth && row.status !== "cancelled").reduce((sum: number, row: any) => sum + amount(row.total), 0);
+      const previousIncome = invoices.filter((row: any) => monthKey(invoiceDate(row)) === previousMonth && row.status !== "cancelled").reduce((sum: number, row: any) => sum + amount(row.total), 0);
+      const currentExpenses = expenses.filter((row: any) => monthKey(expenseDate(row)) === currentMonth).reduce((sum: number, row: any) => sum + amount(row.amount), 0);
+      const completedUnbilled = jobs.filter((job: any) => job.status === "completed" && !job.invoiceId && !job.linkedInvoiceId);
+      const completedUnbilledValue = completedUnbilled.reduce((sum: number, job: any) => sum + amount(job.value ?? job.total ?? job.estimatedValue), 0);
+      const overdueInvoices = invoices.filter((row: any) => row.status !== "paid" && row.status !== "cancelled" && row.dueDate && new Date(row.dueDate) < now);
+      const overdueBalance = overdueInvoices.reduce((sum: number, row: any) => sum + Math.max(0, amount(row.total) - amount(row.paidAmount)), 0);
+      const activeClientIds = new Set(contracts.filter((row: any) => row.status === "active").map((row: any) => row.clientId));
+      const overdueActiveClients = new Set(overdueInvoices.filter((row: any) => activeClientIds.has(row.clientId)).map((row: any) => row.clientId));
+      const awaitingQuotes = quotes.filter((row: any) => ["quoted", "sent"].includes(String(row.status).toLowerCase()));
+      const ideas = ideasResult.rows as any[];
+      const account = (accountResult.rows[0] ?? {}) as any;
+      const payments = paymentsResult.rows as any[];
+      const propertyTransactions = propertyResult.rows as any[];
+      const settings = (settingsResult.rows[0] ?? {}) as any;
+      const totalPaid = payments.reduce((sum, row) => sum + amount(row.amount), 0);
+      const original = amount(account.original_amount) || 8_550_000;
+      const janBalance = Math.max(0, original - totalPaid);
+      const planned = amount(account.planned_monthly_payment) || 300_000;
+      const monthsRemaining = planned > 0 ? Math.ceil(janBalance / planned) : null;
+      const payoffDate = monthsRemaining == null ? null : new Date(now.getFullYear(), now.getMonth() + monthsRemaining, 1).toISOString();
+      const propertyBalance = propertyTransactions.reduce((sum, row) => {
+        const signed = ["Withdrawal", "Property expense"].includes(row.transaction_type) ? -amount(row.amount) : amount(row.amount);
+        return sum + signed;
+      }, 0);
+      const activeIdeas = ideas.filter(row => ["Testing", "Approved", "In Development", "Operating"].includes(row.stage));
+      const projectedProfit = ideas.reduce((sum, row) => sum + amount(row.monthly_revenue) - amount(row.monthly_expenses) + amount(row.monthly_cost_saving), 0);
+      res.json({
+        ownerPosition: {
+          currentIncome, previousIncome, currentExpenses,
+          operatingSurplus: currentIncome - currentExpenses,
+          cashMargin: currentIncome > 0 ? ((currentIncome - currentExpenses) / currentIncome) * 100 : null,
+          janBalance, totalPaid, original, paidPercent: original > 0 ? (totalPaid / original) * 100 : 0,
+          plannedMonthlyPayment: planned, monthsRemaining, payoffDate,
+          propertyBalance, cashGrowthTarget: amount(settings.cash_growth_target) || 100000,
+        },
+        recovery: {
+          completedUnbilledCount: completedUnbilled.length,
+          completedUnbilledValue,
+          quotesAwaitingFollowUp: awaitingQuotes.length,
+          quotesAwaitingValue: awaitingQuotes.reduce((sum: number, row: any) => sum + amount(row.total ?? row.estimatedValue), 0),
+          overdueBalance,
+          overdueActiveClients: overdueActiveClients.size,
+          activeContracts: contracts.filter((row: any) => row.status === "active").length,
+        },
+        future: {
+          activeIdeas: activeIdeas.length,
+          projectedMonthlyRevenue: ideas.reduce((sum, row) => sum + amount(row.monthly_revenue), 0),
+          projectedMonthlyCostSaving: ideas.reduce((sum, row) => sum + amount(row.monthly_cost_saving), 0),
+          projectedMonthlyProfit: projectedProfit,
+          capitalRequired: ideas.reduce((sum, row) => sum + amount(row.setup_cost), 0),
+          annualPropertyContribution: ideas.reduce((sum, row) => sum + amount(row.property_fund_allocation), 0) * 12,
+          clientCount: clients.length,
+        },
+        ideas, payments, propertyTransactions, settings,
+      });
+    } catch (error) {
+      console.error("Growth & Capital dashboard failed:", error);
+      res.status(500).json({ error: "Could not load Growth & Capital" });
+    }
+  });
+
+  app.post("/api/growth-capital/ideas", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const parsed = growthIdeaInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const d = parsed.data;
+    const result = await db.execute(sql`INSERT INTO growth_ideas
+      (name,description,category,stage,setup_cost,monthly_revenue,monthly_expenses,monthly_cost_saving,staffing,property_space,start_date,notes,expected_free_cash,property_fund_allocation,priority_score)
+      VALUES (${d.name},${d.description},${d.category},${d.stage},${d.setupCost},${d.monthlyRevenue},${d.monthlyExpenses},${d.monthlyCostSaving},${d.staffing},${d.propertySpace},${d.startDate ?? null},${d.notes},${d.expectedFreeCash},${d.propertyFundAllocation},${d.priorityScore}) RETURNING *`);
+    const row = result.rows[0] as any;
+    await auditGrowth(req, "create", "growth_idea", row.id, d.name);
+    res.status(201).json(row);
+  });
+
+  app.patch("/api/growth-capital/ideas/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const current = await db.execute(sql`SELECT * FROM growth_ideas WHERE id = ${req.params.id}`);
+    if (!current.rows[0]) return res.status(404).json({ error: "Idea not found" });
+    const source = current.rows[0] as any;
+    const parsed = growthIdeaInput.safeParse({
+      name: source.name, description: source.description, category: source.category, stage: source.stage,
+      setupCost: source.setup_cost, monthlyRevenue: source.monthly_revenue, monthlyExpenses: source.monthly_expenses,
+      monthlyCostSaving: source.monthly_cost_saving, staffing: source.staffing, propertySpace: source.property_space,
+      startDate: source.start_date, notes: source.notes, expectedFreeCash: source.expected_free_cash,
+      propertyFundAllocation: source.property_fund_allocation, priorityScore: source.priority_score, ...req.body,
+    });
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const d = parsed.data;
+    const result = await db.execute(sql`UPDATE growth_ideas SET
+      name=${d.name},description=${d.description},category=${d.category},stage=${d.stage},setup_cost=${d.setupCost},
+      monthly_revenue=${d.monthlyRevenue},monthly_expenses=${d.monthlyExpenses},monthly_cost_saving=${d.monthlyCostSaving},
+      staffing=${d.staffing},property_space=${d.propertySpace},start_date=${d.startDate ?? null},notes=${d.notes},
+      expected_free_cash=${d.expectedFreeCash},property_fund_allocation=${d.propertyFundAllocation},
+      priority_score=${d.priorityScore},updated_at=now() WHERE id=${req.params.id} RETURNING *`);
+    await auditGrowth(req, "update", "growth_idea", req.params.id, d.name);
+    res.json(result.rows[0]);
+  });
+
+  app.delete("/api/growth-capital/ideas/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const result = await db.execute(sql`DELETE FROM growth_ideas WHERE id=${req.params.id} RETURNING id`);
+    if (!result.rows[0]) return res.status(404).json({ error: "Idea not found" });
+    await auditGrowth(req, "delete", "growth_idea", req.params.id);
+    res.status(204).send();
+  });
+
+  app.post("/api/growth-capital/jan-payments", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const parsed = z.object({ paymentDate: z.string().min(10), amount: growthMoney, paymentType: z.enum(["Normal", "Extra", "Mixed / Combined"]), notes: z.string().max(2000).default("") }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const d = parsed.data;
+    const result = await db.execute(sql`INSERT INTO jan_capital_payments (payment_date,amount,payment_type,notes) VALUES (${d.paymentDate},${d.amount},${d.paymentType},${d.notes}) RETURNING *`);
+    const row = result.rows[0] as any;
+    await auditGrowth(req, "create", "jan_payment", row.id, `${d.amount}`);
+    res.status(201).json(row);
+  });
+
+  app.delete("/api/growth-capital/jan-payments/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const result = await db.execute(sql`DELETE FROM jan_capital_payments WHERE id=${req.params.id} RETURNING id`);
+    if (!result.rows[0]) return res.status(404).json({ error: "Payment not found" });
+    await auditGrowth(req, "delete", "jan_payment", req.params.id);
+    res.status(204).send();
+  });
+
+  app.post("/api/growth-capital/property-transactions", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const parsed = z.object({ transactionDate: z.string().min(10), amount: growthMoney, transactionType: z.enum(["Allocation from Terminators", "Additional contribution", "Withdrawal", "Property expense", "Other"]), notes: z.string().max(2000).default("") }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const d = parsed.data;
+    const result = await db.execute(sql`INSERT INTO property_fund_transactions (transaction_date,amount,transaction_type,notes) VALUES (${d.transactionDate},${d.amount},${d.transactionType},${d.notes}) RETURNING *`);
+    const row = result.rows[0] as any;
+    await auditGrowth(req, "create", "property_transaction", row.id, `${d.amount}`);
+    res.status(201).json(row);
+  });
+
+  app.delete("/api/growth-capital/property-transactions/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const result = await db.execute(sql`DELETE FROM property_fund_transactions WHERE id=${req.params.id} RETURNING id`);
+    if (!result.rows[0]) return res.status(404).json({ error: "Transaction not found" });
+    await auditGrowth(req, "delete", "property_transaction", req.params.id);
+    res.status(204).send();
+  });
+
+  app.patch("/api/growth-capital/settings", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!requireGrowthOwner(req, res)) return;
+    const parsed = z.object({
+      plannedMonthlyPayment: growthMoney.optional(), cashGrowthTarget: growthMoney.optional(),
+      propertyTarget: growthMoney.optional(), janAllocationPercent: z.coerce.number().min(0).max(100).optional(),
+      propertyAllocationPercent: z.coerce.number().min(0).max(100).optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const d = parsed.data;
+    if (d.plannedMonthlyPayment !== undefined) await db.execute(sql`UPDATE jan_capital_account SET planned_monthly_payment=${d.plannedMonthlyPayment},updated_at=now() WHERE id=1`);
+    const current = await db.execute(sql`SELECT * FROM growth_capital_settings WHERE id=1`);
+    const c = (current.rows[0] ?? {}) as any;
+    const janPercent = d.janAllocationPercent ?? Number(c.jan_allocation_percent ?? 70);
+    const propertyPercent = d.propertyAllocationPercent ?? Number(c.property_allocation_percent ?? 30);
+    if (Math.abs(janPercent + propertyPercent - 100) > 0.01) return res.status(400).json({ error: "Jan and Property allocations must total 100%" });
+    const result = await db.execute(sql`UPDATE growth_capital_settings SET
+      cash_growth_target=${d.cashGrowthTarget ?? Number(c.cash_growth_target ?? 100000)},
+      property_target=${d.propertyTarget ?? Number(c.property_target ?? 0)},
+      jan_allocation_percent=${janPercent},property_allocation_percent=${propertyPercent},updated_at=now()
+      WHERE id=1 RETURNING *`);
+    await auditGrowth(req, "update", "settings", "1");
+    res.json(result.rows[0]);
   });
 
   return httpServer;

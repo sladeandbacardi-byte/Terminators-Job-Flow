@@ -39,6 +39,101 @@ export async function runStartupMigrations(): Promise<void> {
     true,
   );
 
+  await run(
+    "private growth and capital planning tables",
+    `CREATE TABLE IF NOT EXISTS growth_ideas (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text NOT NULL,
+      description text NOT NULL DEFAULT '',
+      category text NOT NULL DEFAULT 'Business',
+      stage text NOT NULL DEFAULT 'Idea',
+      setup_cost numeric(14,2) NOT NULL DEFAULT 0,
+      monthly_revenue numeric(14,2) NOT NULL DEFAULT 0,
+      monthly_expenses numeric(14,2) NOT NULL DEFAULT 0,
+      monthly_cost_saving numeric(14,2) NOT NULL DEFAULT 0,
+      staffing text NOT NULL DEFAULT '',
+      property_space text NOT NULL DEFAULT '',
+      start_date text,
+      notes text NOT NULL DEFAULT '',
+      expected_free_cash numeric(14,2) NOT NULL DEFAULT 0,
+      property_fund_allocation numeric(14,2) NOT NULL DEFAULT 0,
+      priority_score integer NOT NULL DEFAULT 0,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS jan_capital_account (
+      id integer PRIMARY KEY DEFAULT 1,
+      original_amount numeric(14,2) NOT NULL DEFAULT 8550000,
+      extra_payments numeric(14,2) NOT NULL DEFAULT 900000,
+      position_date text NOT NULL DEFAULT '2026-08-25',
+      planned_monthly_payment numeric(14,2) NOT NULL DEFAULT 300000,
+      updated_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS jan_capital_payments (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      payment_date text NOT NULL,
+      amount numeric(14,2) NOT NULL,
+      payment_type text NOT NULL DEFAULT 'Normal',
+      notes text NOT NULL DEFAULT '',
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS jan_capital_payments_date_amount_idx ON jan_capital_payments(payment_date, amount);
+    CREATE TABLE IF NOT EXISTS property_fund_transactions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      transaction_date text NOT NULL,
+      amount numeric(14,2) NOT NULL,
+      transaction_type text NOT NULL,
+      notes text NOT NULL DEFAULT '',
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS growth_capital_settings (
+      id integer PRIMARY KEY DEFAULT 1,
+      cash_growth_target numeric(14,2) NOT NULL DEFAULT 100000,
+      jan_allocation_percent numeric(5,2) NOT NULL DEFAULT 70,
+      property_allocation_percent numeric(5,2) NOT NULL DEFAULT 30,
+      property_target numeric(14,2) NOT NULL DEFAULT 0,
+      updated_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS growth_capital_audit_log (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      actor_id text NOT NULL,
+      action text NOT NULL,
+      entity_type text NOT NULL,
+      entity_id text,
+      details text NOT NULL DEFAULT '',
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    true,
+  );
+  await run(
+    "private growth and capital seed data",
+    `INSERT INTO jan_capital_account (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+     INSERT INTO growth_capital_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+     INSERT INTO jan_capital_payments (payment_date, amount, payment_type, notes) VALUES
+       ('2025-02-25',150000,'Normal','Historical payment'),('2025-03-25',150000,'Normal','Historical payment'),
+       ('2025-04-25',150000,'Normal','Historical payment'),('2025-05-25',150000,'Normal','Historical payment'),
+       ('2025-06-25',150000,'Normal','Historical payment'),('2025-07-25',150000,'Normal','Historical payment'),
+       ('2025-08-25',150000,'Normal','Historical payment'),('2025-09-25',150000,'Normal','Historical payment'),
+       ('2025-10-25',150000,'Normal','Historical payment'),('2025-11-25',150000,'Normal','Historical payment'),
+       ('2025-12-25',150000,'Normal','Historical payment'),('2026-01-25',150000,'Normal','Historical payment'),
+       ('2026-02-25',150000,'Normal','Historical payment'),('2026-03-25',300000,'Normal','Historical payment'),
+       ('2026-04-25',0,'Normal','Historical payment'),('2026-05-25',450000,'Normal','Historical payment'),
+       ('2026-06-25',300000,'Normal','Historical payment'),('2026-07-25',300000,'Normal','Historical payment'),
+       ('2026-08-25',150000,'Normal','Historical payment')
+     ON CONFLICT (payment_date, amount) DO NOTHING;
+     INSERT INTO growth_ideas (id, name, description, category, stage, notes) VALUES
+       ('growth-integrated-property','Integrated Group Property','Acquire or develop an integrated property that supports the operating group and builds long-term owner capital.','Property','Research','Link property decisions to sustainable operating cash, not turnover.'),
+       ('growth-coffee-shop','Coffee Shop','Evaluate a group-supported coffee shop with realistic foot traffic, staffing, margin and property requirements.','New Business','Idea','Keep internal transfers visible so losses are never concealed.'),
+       ('growth-vehicle-wash','Vehicle Wash','Evaluate an internal and external vehicle wash that can reduce fleet cleaning costs and create third-party income.','Cost Saving','Testing','Separate genuine cost saving from internal revenue.'),
+       ('growth-lea-nail-bar','Lea Nail Bar','Plan a viable nail bar opportunity for Lea, including the private objective of sustainable income that can support her Jimny.','Family Venture','Idea','Private owner objective: build sustainable Lea income toward the Jimny goal.'),
+       ('growth-ist-accounting','IST Accounting Growth','Grow IST accounting services through recurring clients, efficient delivery and cross-group support.','Existing Business','Approved','Measure external revenue separately from internal group billings.'),
+       ('growth-integrated-services','Integrated Business Services','Build shared business services that improve group efficiency and can earn external recurring revenue.','Shared Services','Research','Prioritise services with repeatable delivery and measurable free cash.')
+     ON CONFLICT (id) DO NOTHING`,
+    true,
+  );
+
   // ── quote_submissions columns ──────────────────────────────────────────────
   await run(
     "quote_submissions.site_visit_done",

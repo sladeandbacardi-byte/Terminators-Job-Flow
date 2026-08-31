@@ -54,8 +54,8 @@ const profiles: readonly StaffAccessProfile[] = [
   { workerId: "worker-5", name: "Sheryl-Lyn Lee", jobTitle: "Existing Clients Sales & Admin", team: "Marketing & Sales", departmentIds: ["div-5"], permissions: ["dashboard", "clients:view", "clients:manage", "sales", "calendar", "time:self"] },
   { workerId: "worker-6", name: "Anzel Marais", jobTitle: "Sales Representative", team: "Marketing & Sales", departmentIds: ["div-5"], permissions: ["dashboard", "clients:view", "clients:manage", "sales", "calendar", "time:self"] },
 
-  { workerId: "mobile-tech-01", name: "Re-Althon", jobTitle: "Sanitary Bin Service A Team Supervisor", team: "Sanitary Bin Service A Team", departmentIds: ["div-2"], permissions: [...FIELD_SELF, "teams"], ownWorkOnly: true },
-  { workerId: "mobile-tech-04", name: "Jackie Roelfse", jobTitle: "Sanitary Bin Service B Team Supervisor", team: "Sanitary Bin Service B Team", departmentIds: ["div-2"], permissions: [...FIELD_SELF, "teams"], ownWorkOnly: true },
+  { workerId: "mobile-tech-01", name: "Re-Althon", jobTitle: "Supervisor", team: "Sanitary Bin Service A Team", departmentIds: ["div-2"], permissions: [...FIELD_SELF, "teams"], ownWorkOnly: true },
+  { workerId: "mobile-tech-04", name: "Jackie Roelfse", jobTitle: "Supervisor", team: "Sanitary Bin Service B Team", departmentIds: ["div-2"], permissions: [...FIELD_SELF, "teams"], ownWorkOnly: true },
   { workerId: "mobile-tech-06", name: "Zain Abdol", jobTitle: "Washroom Services Supervisor", team: "Washroom Services", departmentIds: ["div-3"], permissions: [...FIELD_SELF, "teams"], ownWorkOnly: true },
   { workerId: "mobile-tech-10", name: "Zuki Sandi", jobTitle: "Ablution Deep Cleaning Supervisor", team: "Ablution Deep Cleaning", departmentIds: ["div-4"], permissions: [...FIELD_SELF, "teams"], ownWorkOnly: true },
   { workerId: "mobile-tech-09", name: "Reece Ebrahim", jobTitle: "Pest Control Operator", team: "Pest Control Team", departmentIds: ["div-1"], permissions: FIELD_SELF, ownWorkOnly: true },

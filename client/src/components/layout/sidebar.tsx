@@ -107,6 +107,7 @@ const ALL_SECTIONS: NavSection[] = [
     roles: ["admin", "accounts"],
     items: [
       { name: "Finance Dashboard", href: "/finance-dashboard", icon: LayoutDashboard, roles: ["admin", "accounts"] },
+      { name: "Growth & Capital", href: "/growth-capital", icon: TrendingUp, roles: ["admin"] },
       {
         type: "group",
         key: "finance-income",

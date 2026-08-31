@@ -12,7 +12,7 @@ import { JobFlowBrandLockup } from "@/components/terminators-logo";
 import { DEMO_PROFILES } from "@/lib/demoProfiles";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { getOfficeOrganogramBranch, OFFICE_ORGANOGRAM_BRANCHES } from "@shared/officeOrganogram";
-import { MOBILE_STAFF_ROSTER, MOBILE_STAFF_TEAMS } from "@shared/organogram";
+import { MOBILE_STAFF_ROSTER, MOBILE_STAFF_TEAM_GROUPS } from "@shared/organogram";
 
 type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
 
@@ -272,9 +272,9 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     );
   };
 
-  const mobileStaffGroups = MOBILE_STAFF_TEAMS.map(team => ({
-    team,
-    people: directory.staff.filter(person => person.department === team),
+  const mobileStaffGroups = MOBILE_STAFF_TEAM_GROUPS.map(group => ({
+    team: group.department,
+    people: directory.staff.filter(person => (group.teams as readonly string[]).includes(person.department)),
   })).filter(group => group.people.length > 0);
 
   return (

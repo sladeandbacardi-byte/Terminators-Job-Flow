@@ -18,9 +18,11 @@ test("staff login retains the narrow max-width branch", () => {
   assert.match(source, /step === "staff-list"\s*\?\s*mobileStaffGroups\.map/);
 });
 
-test("both selector cards expose complete identity metadata and staff roster uses team headings", () => {
+test("both selector cards expose complete identity metadata and staff roster uses grouped department headings", () => {
   assert.match(source, /aria-label=\{`\$\{user\.name\}, \$\{user\.role\}, \$\{user\.department\}`\}/);
-  assert.match(source, /MOBILE_STAFF_TEAMS\.map/);
+  assert.match(source, /MOBILE_STAFF_TEAM_GROUPS\.map/);
+  assert.match(source, /group\.department/);
+  assert.match(source, /group\.teams/);
   assert.match(source, /group\.team/);
   assert.match(source, /className="break-words font-semibold text-gray-900"/);
   assert.match(source, /className="mt-0\.5 break-words text-sm text-gray-600"/);

@@ -19,11 +19,17 @@ export const MOBILE_STAFF_ROSTER = [
 ] as const;
 
 export const MOBILE_STAFF_TEAMS = [
-  "Sanitary Bin Service A Team",
-  "Sanitary Bin Service B Team",
+  "Sanitary Bin",
   "Washroom Services",
   "Ablution Deep Cleaning",
   "Pest Control Team",
+] as const;
+
+export const MOBILE_STAFF_TEAM_GROUPS = [
+  { department: "Sanitary Bin", teams: ["Sanitary Bin Service A Team", "Sanitary Bin Service B Team"] },
+  { department: "Washroom Services", teams: ["Washroom Services"] },
+  { department: "Ablution Deep Cleaning", teams: ["Ablution Deep Cleaning"] },
+  { department: "Pest Control Team", teams: ["Pest Control Team"] },
 ] as const;
 
 export function getCanonicalWorkerName(workerId: string): string | undefined {

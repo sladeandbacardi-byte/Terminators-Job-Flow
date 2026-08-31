@@ -77,6 +77,7 @@ const Opportunities       = lazy(() => import("@/pages/opportunities"));
 const FieldDiaries        = lazy(() => import("@/pages/field-diaries"));
 const TreatmentReports    = lazy(() => import("@/pages/treatment-reports"));
 const TreatmentReportPrint = lazy(() => import("@/pages/treatment-report-print"));
+const GrowthCapital        = lazy(() => import("@/pages/growth-capital"));
 
 function PageLoader() {
   return (
@@ -227,6 +228,7 @@ function AuthenticatedApp() {
 
                 {/* ── Finance ──────────────────────────────────────────── */}
                 <Route path="/finance-dashboard">{() => <ProtectedRoute component={FinanceDashboard} roles={["admin","accounts"]} />}</Route>
+                <Route path="/growth-capital">{() => <ProtectedRoute component={GrowthCapital} roles={["admin"]} />}</Route>
                 <Route path="/invoices">{() => <ProtectedRoute component={Invoices} roles={["admin","accounts","manager"]} />}</Route>
                 <Route path="/receipts">{() => <ProtectedRoute component={Invoices} roles={["admin","accounts","manager"]} />}</Route>
                 <Route path="/expenses">{() => <ProtectedRoute component={Expenses} roles={["admin","accounts"]} />}</Route>
