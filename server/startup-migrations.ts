@@ -1070,5 +1070,84 @@ export async function runStartupMigrations(): Promise<void> {
      ON CONFLICT (name) DO NOTHING`
   );
 
+  await run(
+    "client contact and site profile tables",
+    `CREATE TABLE IF NOT EXISTS client_contacts (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+       client_id varchar NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+       first_name text NOT NULL,
+       last_name text,
+       job_title text,
+       email text,
+       phone text,
+       mobile text,
+       preferred_contact text DEFAULT 'Email',
+       is_primary boolean NOT NULL DEFAULT false,
+       is_billing boolean NOT NULL DEFAULT false,
+       is_site boolean NOT NULL DEFAULT false,
+       notes text,
+       created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE INDEX IF NOT EXISTS client_contacts_client_id_idx ON client_contacts(client_id);
+     CREATE TABLE IF NOT EXISTS client_sites (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+       client_id varchar NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+       site_name text NOT NULL,
+       street_number text,
+       street_name text,
+       suburb text,
+       city text,
+       province text,
+       postal_code text,
+       gps_link text,
+       google_maps_link text,
+       is_primary boolean NOT NULL DEFAULT false,
+       contact_name text,
+       contact_phone text,
+       contact_email text,
+       notes text,
+       is_active boolean NOT NULL DEFAULT true,
+       created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE INDEX IF NOT EXISTS client_sites_client_id_idx ON client_sites(client_id);`,
+    true,
+  );
+
+  await run(
+    "canonical mobile supervisor teams",
+    `INSERT INTO teams (id, name, department_id, supervisor_id, is_active, notes)
+     VALUES
+       ('mobile-team-sanitary-a', 'Sanitary Bin Service A Team', 'div-2', 'mobile-tech-01', true, 'Canonical mobile access scope'),
+       ('mobile-team-sanitary-b', 'Sanitary Bin Service B Team', 'div-2', 'mobile-tech-04', true, 'Canonical mobile access scope'),
+       ('mobile-team-washroom', 'Washroom Services', 'div-3', 'mobile-tech-06', true, 'Canonical mobile access scope'),
+       ('mobile-team-ablution', 'Ablution Deep Cleaning', 'div-4', 'mobile-tech-10', true, 'Canonical mobile access scope')
+     ON CONFLICT (id) DO NOTHING;
+     DO $$
+     BEGIN
+       IF EXISTS (
+         SELECT 1 FROM teams
+         WHERE (id = 'mobile-team-sanitary-a' AND (name <> 'Sanitary Bin Service A Team' OR department_id <> 'div-2' OR supervisor_id <> 'mobile-tech-01'))
+            OR (id = 'mobile-team-sanitary-b' AND (name <> 'Sanitary Bin Service B Team' OR department_id <> 'div-2' OR supervisor_id <> 'mobile-tech-04'))
+            OR (id = 'mobile-team-washroom' AND (name <> 'Washroom Services' OR department_id <> 'div-3' OR supervisor_id <> 'mobile-tech-06'))
+            OR (id = 'mobile-team-ablution' AND (name <> 'Ablution Deep Cleaning' OR department_id <> 'div-4' OR supervisor_id <> 'mobile-tech-10'))
+       ) THEN
+         RAISE EXCEPTION 'Canonical mobile team ID collision; refusing to overwrite production data';
+       END IF;
+     END $$;
+     INSERT INTO team_members (id, team_id, worker_id)
+     SELECT gen_random_uuid(), seed.team_id, seed.worker_id
+     FROM (VALUES
+       ('mobile-team-sanitary-a', 'mobile-tech-01'),
+       ('mobile-team-sanitary-b', 'mobile-tech-04'),
+       ('mobile-team-washroom', 'mobile-tech-06'),
+       ('mobile-team-ablution', 'mobile-tech-10')
+     ) AS seed(team_id, worker_id)
+     WHERE NOT EXISTS (
+       SELECT 1 FROM team_members existing
+       WHERE existing.team_id = seed.team_id AND existing.worker_id = seed.worker_id
+     );`,
+    true,
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

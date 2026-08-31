@@ -147,6 +147,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     windowMs: 15 * 60 * 1000,
     maxRequests: 30,
   });
+  const mobileLoginRateLimiter = createMemoryRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 5,
+  });
+  const mobileLoginIpRateLimiter = createMemoryRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 20,
+  });
   const inventoryImportUserRateLimiter = createMemoryRateLimiter({
     windowMs: 15 * 60 * 1000,
     maxRequests: 10,
@@ -195,6 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "GET /api/mobile/dashboard",
       "GET /api/mobile/field-diaries",
       "GET /api/mobile/my-day",
+      "GET /api/mobile/search",
       "POST /api/mobile/field-diaries",
       "GET /api/mobile/fleet/assignment",
       "GET /api/mobile/fleet/vehicles",
@@ -995,12 +1004,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = z.object({
         workerId: z.string().trim().min(1),
+        pin: z.string().regex(/^\d{4}$/, "Enter your 4-digit PIN"),
       }).safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: parsed.error.issues[0]?.message || "Worker is required" });
       }
 
       const { workerId } = parsed.data;
+      const ipDecision = mobileLoginIpRateLimiter(`ip:${requestClientKey(req)}`);
+      const decision = ipDecision.allowed
+        ? mobileLoginRateLimiter(`${requestClientKey(req)}:${workerId}`)
+        : ipDecision;
+      if (!decision.allowed) return sendRateLimitResponse(res, decision.retryAfterSeconds);
       if (!MOBILE_STAFF_ROSTER.some(entry => entry.id === workerId)) {
         return res.status(401).json({ message: "Invalid worker" });
       }
@@ -1015,6 +1030,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(worker.role ?? "").trim().toLowerCase() !== "technician"
       ) {
         return res.status(401).json({ message: "Invalid worker" });
+      }
+      if (!await AuthService.verifyMobileWorkerPin(worker, parsed.data.pin)) {
+        return res.status(401).json({ message: "Invalid worker or PIN" });
       }
 
       const token = AuthService.generateMobileWorkerToken(worker.id);
@@ -1372,6 +1390,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Mobile dashboard error:", error);
       res.status(500).json({ message: "Failed to load mobile dashboard" });
     }
+  });
+
+  app.get("/api/mobile/search", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const q = String(req.query.q ?? "").trim().toLowerCase();
+    if (q.length < 2) return res.json({ results: [] });
+    const jobs = await storage.getMobileJobsForWorker(req.mobileWorker!.id);
+    const results = jobs.filter(job =>
+      [job.jobNumber, job.title, job.client?.name, job.client?.tradingName]
+        .some(value => String(value ?? "").toLowerCase().includes(q))
+    ).slice(0, 10).map(job => ({
+      type: "job",
+      id: job.id,
+      title: job.jobNumber,
+      subtitle: `${job.client.name} — ${job.title}`,
+      url: `/mobile/jobs/${job.id}`,
+    }));
+    res.json({ results });
   });
 
   app.get("/api/mobile/work-orders/:workerId", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
@@ -3689,6 +3724,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  app.patch("/api/workers/:id/mobile-pin", requireAuth, async (req: AuthenticatedRequest, res) => {
+    if (!req.user || !isCanonicalOwner(req.user)) {
+      return res.status(403).json({ error: "Only Julien can reset mobile credentials" });
+    }
+    const parsed = z.object({ pin: z.string().regex(/^\d{4}$/) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "A 4-digit PIN is required" });
+    if (!MOBILE_STAFF_ROSTER.some(entry => entry.id === req.params.id)) {
+      return res.status(404).json({ error: "Mobile worker not found" });
+    }
+    const worker = await storage.getWorker(req.params.id);
+    if (!worker || worker.mobileAccessEnabled !== true) {
+      return res.status(404).json({ error: "Mobile worker not found" });
+    }
+    await storage.updateWorker(worker.id, { pin: await AuthService.hashPassword(parsed.data.pin) });
+    await AuthService.logActivity({
+      userId: req.user.id,
+      action: "mobile_pin_reset",
+      resource: "workers",
+      resourceId: worker.id,
+      details: JSON.stringify({ credentialType: "mobile_pin" }),
+      ipAddress: req.ip || req.connection.remoteAddress || null,
+      userAgent: req.headers["user-agent"] || null,
+    });
+    res.json({ success: true });
+  });
+
   // Clients
   app.get("/api/clients", async (req, res) => {
     const clients = await storage.getClients();
@@ -3772,6 +3833,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients/:clientId/contacts", async (req, res) => {
     try {
+      if (!await storage.getClient(req.params.clientId)) {
+        return res.status(404).json({ error: "Client not found" });
+      }
       const { insertClientContactSchema } = await import("@shared/schema");
       const data = insertClientContactSchema.parse({ ...req.body, clientId: req.params.clientId });
       const created = await storage.createClientContact(data);
@@ -3783,8 +3847,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/client-contacts/:id", async (req, res) => {
     try {
+      const existing = await storage.getClientContact(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contact not found" });
+      if (req.body?.clientId && req.body.clientId !== existing.clientId) {
+        return res.status(400).json({ error: "A contact cannot be moved to another client" });
+      }
       const { insertClientContactSchema } = await import("@shared/schema");
-      const data = insertClientContactSchema.partial().parse(req.body);
+      const data = insertClientContactSchema.omit({ clientId: true }).partial().parse(req.body);
       const updated = await storage.updateClientContact(req.params.id, data);
       res.json(updated);
     } catch (error) {
@@ -3806,6 +3875,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients/:clientId/sites", async (req, res) => {
     try {
+      if (!await storage.getClient(req.params.clientId)) {
+        return res.status(404).json({ error: "Client not found" });
+      }
       const { insertClientSiteSchema } = await import("@shared/schema");
       const data = insertClientSiteSchema.parse({ ...req.body, clientId: req.params.clientId });
       const created = await storage.createClientSite(data);
@@ -3817,8 +3889,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/client-sites/:id", async (req, res) => {
     try {
+      const existing = await storage.getClientSite(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Site not found" });
+      if (req.body?.clientId && req.body.clientId !== existing.clientId) {
+        return res.status(400).json({ error: "A site cannot be moved to another client" });
+      }
       const { insertClientSiteSchema } = await import("@shared/schema");
-      const data = insertClientSiteSchema.partial().parse(req.body);
+      const data = insertClientSiteSchema.omit({ clientId: true }).partial().parse(req.body);
       const updated = await storage.updateClientSite(req.params.id, data);
       res.json(updated);
     } catch (error) {
@@ -3869,8 +3946,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Nested PATCH/DELETE for contacts under /api/clients/:clientId/contacts/:id ──
   app.patch("/api/clients/:clientId/contacts/:id", async (req, res) => {
     try {
+      const existing = await storage.getClientContact(req.params.id);
+      if (!existing || existing.clientId !== req.params.clientId) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      if (req.body?.clientId && req.body.clientId !== req.params.clientId) {
+        return res.status(400).json({ error: "A contact cannot be moved to another client" });
+      }
       const { insertClientContactSchema } = await import("@shared/schema");
-      const data = insertClientContactSchema.partial().parse(req.body);
+      const data = insertClientContactSchema.omit({ clientId: true }).partial().parse(req.body);
       const updated = await storage.updateClientContact(req.params.id, data);
       res.json(updated);
     } catch (error) {
@@ -3878,6 +3962,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   app.delete("/api/clients/:clientId/contacts/:id", async (req, res) => {
+    const existing = await storage.getClientContact(req.params.id);
+    if (!existing || existing.clientId !== req.params.clientId) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
     const deleted = await storage.deleteClientContact(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Contact not found" });
     res.status(204).send();
@@ -3886,8 +3974,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Nested PATCH/DELETE for sites under /api/clients/:clientId/sites/:id ──────
   app.patch("/api/clients/:clientId/sites/:id", async (req, res) => {
     try {
+      const existing = await storage.getClientSite(req.params.id);
+      if (!existing || existing.clientId !== req.params.clientId) {
+        return res.status(404).json({ error: "Site not found" });
+      }
+      if (req.body?.clientId && req.body.clientId !== req.params.clientId) {
+        return res.status(400).json({ error: "A site cannot be moved to another client" });
+      }
       const { insertClientSiteSchema } = await import("@shared/schema");
-      const data = insertClientSiteSchema.partial().parse(req.body);
+      const data = insertClientSiteSchema.omit({ clientId: true }).partial().parse(req.body);
       const updated = await storage.updateClientSite(req.params.id, data);
       res.json(updated);
     } catch (error) {
@@ -3895,6 +3990,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   app.delete("/api/clients/:clientId/sites/:id", async (req, res) => {
+    const existing = await storage.getClientSite(req.params.id);
+    if (!existing || existing.clientId !== req.params.clientId) {
+      return res.status(404).json({ error: "Site not found" });
+    }
     const deleted = await storage.deleteClientSite(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Site not found" });
     res.status(204).send();

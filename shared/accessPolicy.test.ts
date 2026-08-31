@@ -10,6 +10,7 @@ import {
   filterOperationalPayload,
   getStaffAccessProfile,
   hasPermission,
+  mobileSupervisorTeamName,
 } from "./permissionMatrix";
 
 const identity = (workerId: string) => ({
@@ -130,10 +131,18 @@ test("manager API collections are filtered to assigned departments and workers",
 });
 
 test("only the four named supervisors may expand mobile work to their team", () => {
-  for (const workerId of ["mobile-tech-01", "mobile-tech-04", "mobile-tech-06", "mobile-tech-10"]) {
+  const exactTeams = new Map([
+    ["mobile-tech-01", "Sanitary Bin Service A Team"],
+    ["mobile-tech-04", "Sanitary Bin Service B Team"],
+    ["mobile-tech-06", "Washroom Services"],
+    ["mobile-tech-10", "Ablution Deep Cleaning"],
+  ]);
+  for (const [workerId, teamName] of exactTeams) {
     assert.equal(canExpandMobileTeamJobs(workerId), true, workerId);
+    assert.equal(mobileSupervisorTeamName(workerId), teamName, workerId);
   }
   for (const workerId of ["mobile-tech-09", "mobile-tech-03", "mobile-tech-07", "mobile-tech-08", "mobile-tech-02"]) {
     assert.equal(canExpandMobileTeamJobs(workerId), false, workerId);
+    assert.equal(mobileSupervisorTeamName(workerId), null, workerId);
   }
 });

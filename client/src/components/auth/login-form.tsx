@@ -97,7 +97,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const loginMutation = useMutation({
     mutationFn: async (
       credentials:
-        | { mode: "mobile"; workerId: string }
+        | { mode: "mobile"; workerId: string; pin: string }
         | { mode: "admin"; username: string; password: string }
         | { mode: "office"; workerId: string },
     ) => {
@@ -114,7 +114,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             credentials.mode === "mobile"
-              ? { workerId: credentials.workerId }
+              ? { workerId: credentials.workerId, pin: credentials.pin }
               : credentials.mode === "office"
                 ? { workerId: credentials.workerId }
               : { username: credentials.username, password: credentials.password },
@@ -156,7 +156,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const selectTechnician = (technician: Technician) => {
     resetCredentials();
     setSelectedTechnician(technician);
-    loginMutation.mutate({ mode: "mobile", workerId: technician.id });
+    setStep("staff-credentials");
   };
 
   const selectAdmin = (administrator: Administrator) => {
@@ -352,7 +352,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
               className="space-y-5"
               onSubmit={event => {
                 event.preventDefault();
-                loginMutation.mutate({ mode: "mobile", workerId: selectedTechnician.id });
+                loginMutation.mutate({ mode: "mobile", workerId: selectedTechnician.id, pin });
               }}
             >
               <div className="flex items-start gap-3">
@@ -361,7 +361,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 </Button>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Welcome, {selectedTechnician.name}</h1>
-                   <p className="mt-1 text-sm text-gray-600">PIN login has been disabled for mobile staff.</p>
+                   <p className="mt-1 text-sm text-gray-600">Enter your 4-digit mobile PIN.</p>
                 </div>
               </div>
 
@@ -374,9 +374,18 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                   <AlertDescription>{loginError}</AlertDescription>
                 </Alert>
               )}
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Confirm your selected profile to continue.
-              </div>
+               <Input
+                 type="password"
+                 inputMode="numeric"
+                 autoComplete="current-password"
+                 maxLength={4}
+                 pattern="[0-9]{4}"
+                 value={pin}
+                 onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                 placeholder="4-digit PIN"
+                 aria-label="Mobile PIN"
+                 required
+               />
               <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending}>
                 {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><Smartphone className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
               </Button>

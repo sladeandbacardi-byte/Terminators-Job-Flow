@@ -77,6 +77,17 @@ const internalWorkerAliases: Record<string, string> = {
   "worker-15": "mobile-tech-01",
 };
 
+const mobileWorkerAliases = Object.fromEntries(
+  Object.entries(internalWorkerAliases).map(([internalId, mobileId]) => [mobileId, internalId]),
+);
+
+const supervisorTeamIds: Record<string, string> = {
+  "mobile-tech-01": "mobile-team-sanitary-a",
+  "mobile-tech-04": "mobile-team-sanitary-b",
+  "mobile-tech-06": "mobile-team-washroom",
+  "mobile-tech-10": "mobile-team-ablution",
+};
+
 export const NAMED_STAFF_ACCESS_PROFILES = profiles;
 
 export function accessWorkerId(identity: AccessIdentity): string {
@@ -122,6 +133,25 @@ export function canManageWorker(identity: AccessIdentity, targetWorkerId: string
 export function canExpandMobileTeamJobs(workerId: string): boolean {
   const profile = getStaffAccessProfile({ id: workerId });
   return profile?.ownWorkOnly === true && profile.permissions.includes("teams");
+}
+
+export function mobileSupervisorTeamName(workerId: string): string | null {
+  const profile = getStaffAccessProfile({ id: workerId });
+  return profile?.ownWorkOnly === true && profile.permissions.includes("teams")
+    ? profile.team
+    : null;
+}
+
+export function mobileSupervisorTeamId(workerId: string): string | null {
+  return canExpandMobileTeamJobs(workerId) ? supervisorTeamIds[accessWorkerId({ id: workerId })] ?? null : null;
+}
+
+export function equivalentWorkerIds(workerId: string): string[] {
+  const canonicalId = accessWorkerId({ id: workerId });
+  return Array.from(new Set([
+    canonicalId,
+    mobileWorkerAliases[canonicalId],
+  ].filter((value): value is string => Boolean(value))));
 }
 
 const recordDepartment = (value: Record<string, unknown>): string | undefined =>

@@ -1,6 +1,11 @@
 import { db } from "./db";
 import { getCanonicalWorkerName } from "@shared/organogram";
-import { canExpandMobileTeamJobs } from "@shared/permissionMatrix";
+import {
+  canExpandMobileTeamJobs,
+  equivalentWorkerIds,
+  getStaffAccessProfile,
+  mobileSupervisorTeamId,
+} from "@shared/permissionMatrix";
 import {
   eq, and, gte, lte, lt, desc, asc, sql, or, ilike, isNull, isNotNull, ne, inArray,
 } from "drizzle-orm";
@@ -838,11 +843,20 @@ export class DbStorage implements IStorage {
   }
 
   async getMobileJobsForWorker(workerId: string): Promise<(Job & { client: Client })[]> {
-    const memberIds = new Set<string>([workerId]);
+    const profile = getStaffAccessProfile({ id: workerId });
+    const memberIds = new Set<string>(equivalentWorkerIds(workerId));
     if (canExpandMobileTeamJobs(workerId)) {
+      const allowedTeamId = mobileSupervisorTeamId(workerId);
+      const allowedDepartments = new Set(getStaffAccessProfile({ id: workerId })?.departmentIds ?? []);
       const technicianTeams = await this.getTeamsForWorker(workerId);
-      for (const team of technicianTeams) {
-        for (const member of await this.getTeamMembers(team.id)) memberIds.add(member.workerId);
+      for (const team of technicianTeams.filter(team =>
+        team.id === allowedTeamId &&
+        equivalentWorkerIds(workerId).includes(team.supervisorId) &&
+        allowedDepartments.has(team.departmentId)
+      )) {
+        for (const member of await this.getTeamMembers(team.id)) {
+          for (const id of equivalentWorkerIds(member.workerId)) memberIds.add(id);
+        }
       }
     }
     const rows = await db.select({ job: jobs, client: clients })
@@ -850,7 +864,10 @@ export class DbStorage implements IStorage {
       .leftJoin(clients, eq(jobs.clientId, clients.id))
       .where(inArray(jobs.workerId, Array.from(memberIds)))
       .orderBy(desc(jobs.scheduledDate));
-    return rows.filter(row => row.client).map(row => ({ ...row.job, client: row.client! }));
+    const allowedDepartments = new Set(profile?.departmentIds ?? []);
+    return rows
+      .filter(row => row.client && allowedDepartments.has(row.job.departmentId))
+      .map(row => ({ ...row.job, client: row.client! }));
   }
 
   async getJobsByDepartment(departmentId: string): Promise<Job[]> {
