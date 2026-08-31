@@ -191,6 +191,41 @@ export async function runStartupMigrations(): Promise<void> {
       ON CONFLICT (name) DO NOTHING`,
     true,
   );
+  await run(
+    "future growth full editing schema",
+    `ALTER TABLE growth_ideas ADD COLUMN IF NOT EXISTS archived_at timestamp;
+     CREATE TABLE IF NOT EXISTS growth_categories (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL UNIQUE,
+       archived_at timestamp, created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS growth_ecosystem_relationships (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), from_idea_id varchar NOT NULL REFERENCES growth_ideas(id) ON DELETE CASCADE,
+       to_idea_id varchar NOT NULL REFERENCES growth_ideas(id) ON DELETE CASCADE, relationship text NOT NULL,
+       notes text NOT NULL DEFAULT '', archived_at timestamp, created_at timestamp NOT NULL DEFAULT now(),
+       CONSTRAINT growth_ecosystem_no_self_link CHECK (from_idea_id <> to_idea_id)
+     );
+     CREATE TABLE IF NOT EXISTS growth_internal_transactions (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), transaction_date text NOT NULL, from_entity text NOT NULL,
+       to_entity text NOT NULL, amount numeric(14,2) NOT NULL DEFAULT 0, transaction_type text NOT NULL DEFAULT 'Allocation',
+       notes text NOT NULL DEFAULT '', archived_at timestamp, created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS growth_property_support_plans (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), idea_id varchar REFERENCES growth_ideas(id) ON DELETE SET NULL,
+       property_name text NOT NULL, support_type text NOT NULL DEFAULT 'Space', phase text NOT NULL DEFAULT 'Research',
+       requirements text NOT NULL DEFAULT '', estimated_cost numeric(14,2) NOT NULL DEFAULT 0,
+       monthly_support numeric(14,2) NOT NULL DEFAULT 0, notes text NOT NULL DEFAULT '', archived_at timestamp,
+       created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS growth_linked_records (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), idea_id varchar NOT NULL REFERENCES growth_ideas(id) ON DELETE CASCADE,
+       record_type text NOT NULL, record_id text NOT NULL, label text NOT NULL, notes text NOT NULL DEFAULT '',
+       archived_at timestamp, created_at timestamp NOT NULL DEFAULT now(), UNIQUE (idea_id, record_type, record_id)
+     );
+     INSERT INTO growth_categories (name) VALUES
+       ('Property'),('New Business'),('Cost Saving'),('Family Venture'),('Existing Business'),('Shared Services')
+     ON CONFLICT (name) DO NOTHING`,
+    true,
+  );
 
   // ── quote_submissions columns ──────────────────────────────────────────────
   await run(
