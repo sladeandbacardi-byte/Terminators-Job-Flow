@@ -6,6 +6,7 @@ import {
   getStaffAccessProfile,
   mobileSupervisorTeamId,
 } from "@shared/permissionMatrix";
+import { calculateFleetOdometerLogs } from "./fleet-odometer-calculation";
 import {
   eq, and, gte, lte, lt, desc, asc, sql, or, ilike, isNull, isNotNull, ne, inArray,
 } from "drizzle-orm";
@@ -1595,7 +1596,7 @@ export class DbStorage implements IStorage {
   async getFleetDashboardData(workerId?: string): Promise<any> {
     const allVehicles = await db.select().from(vehicles);
     const allAssignments = await db.select().from(vehicleAssignments);
-    const allKmLogs = await db.select().from(kmLogs);
+    const allKmLogs = calculateFleetOdometerLogs(await db.select().from(kmLogs));
     const allFuelFillups = await db.select().from(fuelFillups);
     const allInspections = await db.select().from(vehicleInspections);
     const myAssignment = workerId ? allAssignments.find(a => a.workerId === workerId && a.isActive) : null;

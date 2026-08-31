@@ -1,3 +1,4 @@
+import { calculateFleetOdometerLogs } from "./fleet-odometer-calculation";
 import { MailService } from '@sendgrid/mail';
 import type { PurchaseOrder, Supplier, PurchaseOrderItem, InventoryItem } from "@shared/schema";
 import {
@@ -220,16 +221,20 @@ export async function generateWeeklyFleetSummaryEmail(storage: any): Promise<Ema
   const weekEnd = new Date(now);
   weekEnd.setHours(23, 59, 59, 999);
 
-  const [vehicles, workers, assignments, kmLogs, fuelFillups, inspections, issues, serviceRecords] = await Promise.all([
+  const [vehicles, workers, assignments, allKmLogs, fuelFillups, inspections, issues, serviceRecords] = await Promise.all([
     storage.getVehicles(),
     storage.getWorkers(),
     storage.getVehicleAssignments(),
-    storage.getKmLogsByDateRange(weekStart, weekEnd),
+    storage.getKmLogs(),
     storage.getFuelFillupsByDateRange(weekStart, weekEnd),
     storage.getVehicleInspections(),
     storage.getVehicleIssues(),
     storage.getServiceRecords(),
   ]);
+  const kmLogs = calculateFleetOdometerLogs(allKmLogs).filter(
+    (log: any) => new Date(log.logDate) >= weekStart && new Date(log.logDate) <= weekEnd,
+  );
+  const flaggedKmLogs = kmLogs.filter((log: any) => log.odometerCalculation.status === "flagged");
 
   const weekInspections = inspections.filter((i: any) => new Date(i.inspectionDate) >= weekStart);
   const weekServiceRecords = serviceRecords.filter((r: any) => new Date(r.serviceDate) >= weekStart);
@@ -318,6 +323,7 @@ export async function generateWeeklyFleetSummaryEmail(storage: any): Promise<Ema
           <div style="font-size:14px;font-weight:700;color:${color};">${value}</div>
         </div>`).join("")}
     </div>
+    ${flaggedKmLogs.length ? `<div style="margin:16px 24px;padding:12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:8px;font-size:12px;"><strong>${flaggedKmLogs.length} odometer record(s) require review.</strong> Missing, duplicate, invalid, or rollback readings were excluded rather than reported as kilometres.</div>` : ""}
 
     <div style="padding:24px 32px;space-y:24px;">
 
@@ -392,6 +398,7 @@ export async function generateWeeklyFleetSummaryEmail(storage: any): Promise<Ema
   const text = `WEEKLY FLEET SUMMARY — ${dateRange}
 
 KM LOGS: Total ${totalKm} km (Business: ${businessKm} km, Private: ${privateKm} km)
+ODOMETER RECORDS FLAGGED: ${flaggedKmLogs.length}
 FUEL: ${totalLitres.toFixed(1)} L — ${fmt(totalFuelCost)}
 INSPECTIONS: ${weekInspections.length} completed, ${failedInsp.length} failed, ${passedInsp.length} passed
 OPEN ISSUES: ${openIssues.length}

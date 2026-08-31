@@ -212,9 +212,9 @@ export default function FleetKmLog() {
                       <tr key={l.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-600">{format(new Date(l.logDate), "dd MMM yyyy")}</td>
                         <td className="px-4 py-3">{vehicleName(l.vehicleId)}</td>
-                        <td className="px-4 py-3 text-right font-medium">{l.totalKm} km</td>
-                        <td className="px-4 py-3 text-right text-green-600">{l.businessKm} km</td>
-                        <td className="px-4 py-3 text-right text-gray-500">{l.privateKm} km</td>
+                        <td className="px-4 py-3 text-right font-medium">{l.totalKm == null ? <span className="text-amber-700">Review</span> : `${l.totalKm} km`}</td>
+                        <td className="px-4 py-3 text-right text-green-600">{l.businessKm == null ? <span className="text-amber-700">Review</span> : `${l.businessKm} km`}</td>
+                        <td className="px-4 py-3 text-right text-gray-500" title={l.odometerCalculation?.previousPmDate ? `Prior PM: ${new Date(l.odometerCalculation.previousPmDate).toLocaleString("en-ZA")}` : l.odometerCalculation?.flags?.join(", ")}>{l.privateKm == null ? <span className="text-amber-700">Review</span> : `${l.privateKm} km`}</td>
                       </tr>
                     ))}
                     {(myLogs as any[]).length === 0 && (

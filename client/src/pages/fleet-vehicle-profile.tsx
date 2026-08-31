@@ -824,8 +824,8 @@ export default function FleetVehicleProfile() {
                               <td className="px-4 py-3 text-right text-gray-500">{l.startOdometer?.toLocaleString()}</td>
                               <td className="px-4 py-3 text-right text-gray-500">{l.endOdometer?.toLocaleString()}</td>
                               <td className="px-4 py-3 text-right font-semibold">{l.totalKm?.toLocaleString()} km</td>
-                              <td className="px-4 py-3 text-right text-green-600">{l.businessKm} km</td>
-                              <td className="px-4 py-3 text-right text-gray-400">{l.privateKm} km</td>
+                              <td className="px-4 py-3 text-right text-green-600">{l.businessKm == null ? <span className="text-amber-700">Review</span> : `${l.businessKm} km`}</td>
+                              <td className="px-4 py-3 text-right text-gray-400" title={l.odometerCalculation?.previousPmDate ? `Prior PM: ${new Date(l.odometerCalculation.previousPmDate).toLocaleString("en-ZA")}` : l.odometerCalculation?.flags?.join(", ")}>{l.privateKm == null ? <span className="text-amber-700">Review</span> : `${l.privateKm} km`}</td>
                             </tr>
                           ))}
                         </tbody>

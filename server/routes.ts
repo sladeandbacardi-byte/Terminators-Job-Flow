@@ -82,6 +82,7 @@ import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFI
 import { createMemoryRateLimiter } from "./request-limits";
 import { createPasswordlessOfficeLoginHandler, createPasswordLoginHandler } from "./office-auth-http";
 import { enforceOfficeApiAccess } from "./office-access-middleware";
+import { calculateFleetOdometerLogs } from "./fleet-odometer-calculation";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -1910,13 +1911,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isInteger(startOdometer) || !Number.isInteger(endOdometer) || endOdometer < startOdometer) {
         return res.status(400).json({ message: "Enter valid start and end odometer readings" });
       }
-      const data = insertKmLogSchema.parse({
+      const candidate = {
+        id: `pending-${randomUUID()}`,
         vehicleId, workerId: req.mobileWorker!.id, logDate: new Date(),
         startOdometer, endOdometer, totalKm: endOdometer - startOdometer,
-        businessKm: Number(req.body.businessKm ?? 0), privateKm: Number(req.body.privateKm ?? 0),
+        businessKm: 0, privateKm: 0,
         notes: req.body.notes || null,
+        createdAt: new Date(),
+      };
+      const calculated = calculateFleetOdometerLogs([...(await storage.getKmLogs()), candidate]).at(-1)!;
+      const data = insertKmLogSchema.parse({
+        ...candidate,
+        totalKm: calculated.totalKm ?? 0,
+        businessKm: calculated.businessKm ?? 0,
+        privateKm: calculated.privateKm ?? 0,
       });
-      res.status(201).json(await storage.createKmLog(data));
+      const created = await storage.createKmLog(data);
+      res.status(201).json(calculateFleetOdometerLogs(await storage.getKmLogs()).find(log => log.id === created.id));
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to log kilometres" });
     }
@@ -7238,9 +7249,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fleet/km-logs", async (req, res) => {
     try {
       const { workerId, vehicleId } = req.query;
-      if (workerId) return res.json(await storage.getKmLogsByWorker(workerId as string));
-      if (vehicleId) return res.json(await storage.getKmLogsByVehicle(vehicleId as string));
-      res.json(await storage.getKmLogs());
+      const calculated = calculateFleetOdometerLogs(await storage.getKmLogs());
+      if (workerId) return res.json(calculated.filter(log => log.workerId === workerId));
+      if (vehicleId) return res.json(calculated.filter(log => log.vehicleId === vehicleId));
+      res.json(calculated);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -7250,9 +7262,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         logDate: req.body.logDate ? new Date(req.body.logDate) : new Date(),
       };
-      const data = insertKmLogSchema.parse(body);
-      const log = await storage.createKmLog(data);
-      res.status(201).json(log);
+      const candidate = insertKmLogSchema.parse(body);
+      const calculated = calculateFleetOdometerLogs([
+        ...(await storage.getKmLogs()),
+        { id: `pending-${randomUUID()}`, createdAt: new Date(), ...candidate },
+      ]).at(-1)!;
+      const log = await storage.createKmLog({
+        ...candidate,
+        totalKm: calculated.totalKm ?? 0,
+        businessKm: calculated.businessKm ?? 0,
+        privateKm: calculated.privateKm ?? 0,
+      });
+      res.status(201).json(calculateFleetOdometerLogs(await storage.getKmLogs()).find(item => item.id === log.id));
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
