@@ -9762,23 +9762,31 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   app.get("/api/growth-capital/dashboard", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!requireGrowthOwner(req, res)) return;
     try {
+      const safeRows = async (label: string, operation: Promise<any>) => {
+        try { return (await operation).rows ?? []; }
+        catch (error) { console.error(`[Growth & Capital] ${label} unavailable:`, error); return []; }
+      };
+      const safeList = async (label: string, operation: Promise<any[]>) => {
+        try { return await operation; }
+        catch (error) { console.error(`[Growth & Capital] ${label} unavailable:`, error); return []; }
+      };
       const [ideasResult, categoriesResult, relationshipsResult, internalTransactionsResult, propertyPlansResult, linkedRecordsResult, accountResult, paymentsResult, propertyResult, settingsResult, invoices, expenses, jobs, contracts, quotes, clients] = await Promise.all([
-        db.execute(sql`SELECT * FROM growth_ideas ORDER BY created_at`),
-        db.execute(sql`SELECT * FROM growth_categories ORDER BY name`),
-        db.execute(sql`SELECT * FROM growth_ecosystem_relationships ORDER BY created_at DESC`),
-        db.execute(sql`SELECT * FROM growth_internal_transactions ORDER BY transaction_date DESC, created_at DESC`),
-        db.execute(sql`SELECT * FROM growth_property_support_plans ORDER BY created_at DESC`),
-        db.execute(sql`SELECT * FROM growth_linked_records ORDER BY created_at DESC`),
-        db.execute(sql`SELECT * FROM jan_capital_account WHERE id = 1`),
-        db.execute(sql`SELECT * FROM jan_capital_payments ORDER BY payment_date`),
-        db.execute(sql`SELECT * FROM property_fund_transactions ORDER BY transaction_date DESC, created_at DESC`),
-        db.execute(sql`SELECT * FROM growth_capital_settings WHERE id = 1`),
-        storage.getInvoices(),
-        storage.getExpenses(),
-        storage.getJobs(),
-        storage.getServiceContracts(),
-        storage.getQuoteSubmissions(),
-        storage.getClients(),
+        safeRows("ideas", db.execute(sql`SELECT * FROM growth_ideas ORDER BY created_at`)),
+        safeRows("categories", db.execute(sql`SELECT * FROM growth_categories ORDER BY name`)),
+        safeRows("relationships", db.execute(sql`SELECT * FROM growth_ecosystem_relationships ORDER BY created_at DESC`)),
+        safeRows("internal transactions", db.execute(sql`SELECT * FROM growth_internal_transactions ORDER BY transaction_date DESC, created_at DESC`)),
+        safeRows("property plans", db.execute(sql`SELECT * FROM growth_property_support_plans ORDER BY created_at DESC`)),
+        safeRows("linked records", db.execute(sql`SELECT * FROM growth_linked_records ORDER BY created_at DESC`)),
+        safeRows("Jan account", db.execute(sql`SELECT * FROM jan_capital_account WHERE id = 1`)),
+        safeRows("Jan payments", db.execute(sql`SELECT * FROM jan_capital_payments ORDER BY payment_date`)),
+        safeRows("property transactions", db.execute(sql`SELECT * FROM property_fund_transactions ORDER BY transaction_date DESC, created_at DESC`)),
+        safeRows("settings", db.execute(sql`SELECT * FROM growth_capital_settings WHERE id = 1`)),
+        safeList("invoices", storage.getInvoices()),
+        safeList("expenses", storage.getExpenses()),
+        safeList("jobs", storage.getJobs()),
+        safeList("service contracts", storage.getServiceContracts()),
+        safeList("quotes", storage.getQuoteSubmissions()),
+        safeList("clients", storage.getClients()),
       ]);
       const now = new Date();
       const monthKey = (value: unknown) => {
@@ -9801,11 +9809,11 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       const activeClientIds = new Set(contracts.filter((row: any) => row.status === "active").map((row: any) => row.clientId));
       const overdueActiveClients = new Set(overdueInvoices.filter((row: any) => activeClientIds.has(row.clientId)).map((row: any) => row.clientId));
       const awaitingQuotes = quotes.filter((row: any) => ["quoted", "sent"].includes(String(row.status).toLowerCase()));
-      const ideas = ideasResult.rows as any[];
-      const account = (accountResult.rows[0] ?? {}) as any;
-      const payments = paymentsResult.rows as any[];
-      const propertyTransactions = propertyResult.rows as any[];
-      const settings = (settingsResult.rows[0] ?? {}) as any;
+      const ideas = ideasResult as any[];
+      const account = (accountResult[0] ?? {}) as any;
+      const payments = paymentsResult as any[];
+      const propertyTransactions = propertyResult as any[];
+      const settings = (settingsResult[0] ?? {}) as any;
       const totalPaid = payments.reduce((sum, row) => sum + amount(row.amount), 0);
       const original = amount(account.original_amount) || 8_550_000;
       const janBalance = Math.max(0, original - totalPaid);
@@ -9845,9 +9853,9 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
           annualPropertyContribution: ideas.reduce((sum, row) => sum + amount(row.property_fund_allocation), 0) * 12,
           clientCount: clients.length,
         },
-        ideas, categories: categoriesResult.rows, relationships: relationshipsResult.rows,
-        internalTransactions: internalTransactionsResult.rows, propertyPlans: propertyPlansResult.rows,
-        linkedRecords: linkedRecordsResult.rows, payments, propertyTransactions, settings,
+        ideas, categories: categoriesResult, relationships: relationshipsResult,
+        internalTransactions: internalTransactionsResult, propertyPlans: propertyPlansResult,
+        linkedRecords: linkedRecordsResult, payments, propertyTransactions, settings,
       });
     } catch (error) {
       console.error("Growth & Capital dashboard failed:", error);
