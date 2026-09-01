@@ -1203,12 +1203,13 @@ export async function runStartupMigrations(): Promise<void> {
   await run(
     "remove fuel station data",
     `BEGIN;
+     SET LOCAL check_function_bodies = off;
      CREATE OR REPLACE FUNCTION pg_temp.scrub_fuel_station_keys(value jsonb)
      RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
        SELECT CASE jsonb_typeof(value)
          WHEN 'object' THEN COALESCE((
            SELECT jsonb_object_agg(key, pg_temp.scrub_fuel_station_keys(item))
-           FROM jsonb_each(value)
+           FROM jsonb_each(value) AS object_item(key, item)
            WHERE lower(key) NOT IN ('station', 'station_name', 'fuel_station', 'fuelstation')
          ), '{}'::jsonb)
          WHEN 'array' THEN COALESCE((
