@@ -1005,7 +1005,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = z.object({
         workerId: z.string().trim().min(1),
-        pin: z.string().regex(/^\d{4}$/, "Enter your 4-digit PIN"),
       }).safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: parsed.error.issues[0]?.message || "Worker is required" });
@@ -1032,10 +1031,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         return res.status(401).json({ message: "Invalid worker" });
       }
-      if (!await AuthService.verifyMobileWorkerPin(worker, parsed.data.pin)) {
-        return res.status(401).json({ message: "Invalid worker or PIN" });
-      }
-
       const token = AuthService.generateMobileWorkerToken(worker.id);
       const rosterEntry = MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id);
 
@@ -3736,29 +3731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/workers/:id/mobile-pin", requireAuth, async (req: AuthenticatedRequest, res) => {
-    if (!req.user || !isCanonicalOwner(req.user)) {
-      return res.status(403).json({ error: "Only Julien can reset mobile credentials" });
-    }
-    const parsed = z.object({ pin: z.string().regex(/^\d{4}$/) }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "A 4-digit PIN is required" });
-    if (!MOBILE_STAFF_ROSTER.some(entry => entry.id === req.params.id)) {
-      return res.status(404).json({ error: "Mobile worker not found" });
-    }
-    const worker = await storage.getWorker(req.params.id);
-    if (!worker || worker.mobileAccessEnabled !== true) {
-      return res.status(404).json({ error: "Mobile worker not found" });
-    }
-    await storage.updateWorker(worker.id, { pin: await AuthService.hashPassword(parsed.data.pin) });
-    await AuthService.logActivity({
-      userId: req.user.id,
-      action: "mobile_pin_reset",
-      resource: "workers",
-      resourceId: worker.id,
-      details: JSON.stringify({ credentialType: "mobile_pin" }),
-      ipAddress: req.ip || req.connection.remoteAddress || null,
-      userAgent: req.headers["user-agent"] || null,
-    });
-    res.json({ success: true });
+    res.status(410).json({ error: "Staff PIN credentials have been removed" });
   });
 
   // Clients

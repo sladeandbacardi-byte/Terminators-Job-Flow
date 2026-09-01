@@ -3,6 +3,7 @@ import test from "node:test";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("./login-form.tsx", import.meta.url), "utf8");
+const mobileSource = fs.readFileSync(new URL("../mobile/mobile-login.tsx", import.meta.url), "utf8");
 
 test("office selector expands only its own state at desktop breakpoints", () => {
   assert.match(source, /max-w-md md:max-w-4xl xl:max-w-6xl/);
@@ -27,4 +28,11 @@ test("both selector cards expose complete identity metadata and staff roster use
   assert.match(source, /className="break-words font-semibold text-gray-900"/);
   assert.match(source, /className="mt-0\.5 break-words text-sm text-gray-600"/);
   assert.doesNotMatch(source, /<p className=.*truncate.*>\{user\.(name|role)\}/);
+});
+
+test("staff profile login never asks for or sends a PIN", () => {
+  assert.doesNotMatch(source, /\bpin\b|Mobile PIN|4-digit PIN/i);
+  assert.doesNotMatch(mobileSource, /\bpin\b|Mobile PIN|4-digit PIN/i);
+  assert.match(source, /loginMutation\.mutate\(\{ mode: "mobile", workerId: technician\.id \}\)/);
+  assert.match(mobileSource, /JSON\.stringify\(\{ workerId: profile\.id \}\)/);
 });

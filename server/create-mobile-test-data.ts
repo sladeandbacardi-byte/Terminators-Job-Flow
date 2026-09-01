@@ -31,7 +31,7 @@ export async function createMobileTestData() {
       departmentId: divisionId,
       role: "Field Technician",
       employeeId: "EMP001",
-      pin: "1234", // Simple PIN for demo
+      pin: null,
       isActive: true
     });
 

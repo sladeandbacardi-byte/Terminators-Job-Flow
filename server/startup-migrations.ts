@@ -1149,5 +1149,20 @@ export async function runStartupMigrations(): Promise<void> {
     true,
   );
 
+  await run(
+    "Julien-only stored credentials",
+    `UPDATE workers
+       SET pin = NULL
+     WHERE pin IS NOT NULL;
+     UPDATE admin_users
+       SET password_hash = '', is_active = false, updated_at = now()
+     WHERE id <> 'worker-1'
+       AND (password_hash <> '' OR is_active = true);
+     UPDATE users
+       SET password = ''
+     WHERE password <> '';`,
+    true,
+  );
+
   console.log("[migrations] Startup migrations complete.");
 }

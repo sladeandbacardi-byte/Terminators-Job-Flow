@@ -256,14 +256,14 @@ export class DbStorage implements IStorage {
 
   async ensureMobileTechnicians(): Promise<void> {
     const technicianRows = [
-      { id: "mobile-tech-01", name: "Re-Althon", email: "mobile.realthon@terminators.co.za", employeeId: "MT-001", pin: "$2b$12$1OFA70tI7BqBlRIQaProT.aKmJTJzFPuJETb2Cml75h2hxxpyq0q." },
-      { id: "mobile-tech-02", name: "Leon", email: "mobile.leon@terminators.co.za", employeeId: "MT-002", pin: "$2b$12$wnQJbkTzwJonlfVzb/aSAuzOAML/Grpg.DW2yODvrYz8jQ4jNBM3q" },
-      { id: "mobile-tech-03", name: "Garth", email: "mobile.garth@terminators.co.za", employeeId: "MT-003", pin: "$2b$12$0ZnfJTlA1M5to9JDFq/ovO5W9993GsdqDN9mO3yAafqnLXeyPgE8m" },
-      { id: "mobile-tech-04", name: "Jackie", email: "mobile.jackie@terminators.co.za", employeeId: "MT-004", pin: "$2b$12$qOmXf99GMgwHnrpuhm4.kez2lipdbe95QuaeOoK/0DH/LsEOcVwCW" },
-      { id: "mobile-tech-06", name: "Zain", email: "mobile.zain@terminators.co.za", employeeId: "MT-006", pin: "$2b$12$2rRU67ArfS57wCRynAH0b.QIM2IH3StpB4mOx426D6Qs5iUGOQYx6" },
-      { id: "mobile-tech-07", name: "Mike", email: "mobile.mike@terminators.co.za", employeeId: "MT-007", pin: "$2b$12$NsFt8roiFgggruppux.pU.47RBM.2wcqgcwccGy1euAEv7ur3moMm" },
-      { id: "mobile-tech-08", name: "X", email: "mobile.x@terminators.co.za", employeeId: "MT-008", pin: "$2b$12$/jWWeI5FnoOXHxfF4eFFU.ltklj6INnBjU15cZEH76K10DmKR/s/S" },
-      { id: "mobile-tech-09", name: "Reece", email: "mobile.reece@terminators.co.za", employeeId: "MT-009", pin: "$2b$12$LsXLFAybBFD2sUNd8k1bPOGnTe8kGVkAd.i6nzigR2iEn06r4N3d2" },
+      { id: "mobile-tech-01", name: "Re-Althon", email: "mobile.realthon@terminators.co.za", employeeId: "MT-001", pin: null },
+      { id: "mobile-tech-02", name: "Leon", email: "mobile.leon@terminators.co.za", employeeId: "MT-002", pin: null },
+      { id: "mobile-tech-03", name: "Garth", email: "mobile.garth@terminators.co.za", employeeId: "MT-003", pin: null },
+      { id: "mobile-tech-04", name: "Jackie", email: "mobile.jackie@terminators.co.za", employeeId: "MT-004", pin: null },
+      { id: "mobile-tech-06", name: "Zain", email: "mobile.zain@terminators.co.za", employeeId: "MT-006", pin: null },
+      { id: "mobile-tech-07", name: "Mike", email: "mobile.mike@terminators.co.za", employeeId: "MT-007", pin: null },
+      { id: "mobile-tech-08", name: "X", email: "mobile.x@terminators.co.za", employeeId: "MT-008", pin: null },
+      { id: "mobile-tech-09", name: "Reece", email: "mobile.reece@terminators.co.za", employeeId: "MT-009", pin: null },
       { id: "mobile-tech-10", name: "Zuki Sandi", email: "mobile.zuki@terminators.co.za", employeeId: "MT-010", pin: null },
     ];
 

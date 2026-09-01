@@ -14,7 +14,7 @@ import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { getOfficeOrganogramBranch, OFFICE_ORGANOGRAM_BRANCHES } from "@shared/officeOrganogram";
 import { MOBILE_STAFF_ROSTER, MOBILE_STAFF_TEAM_GROUPS } from "@shared/organogram";
 
-type LoginStep = "choose-type" | "staff-list" | "staff-credentials" | "admin-list" | "admin-credentials";
+type LoginStep = "choose-type" | "staff-list" | "admin-list" | "admin-credentials";
 
 interface Technician {
   id: string;
@@ -73,7 +73,6 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const [selectedTechnician, setSelectedTechnician] = useState<Technician | null>(null);
   const [selectedAdmin, setSelectedAdmin] = useState<Administrator | null>(null);
   const [password, setPassword] = useState("");
-  const [pin, setPin] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
 
@@ -97,7 +96,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const loginMutation = useMutation({
     mutationFn: async (
       credentials:
-        | { mode: "mobile"; workerId: string; pin: string }
+        | { mode: "mobile"; workerId: string }
         | { mode: "admin"; username: string; password: string }
         | { mode: "office"; workerId: string },
     ) => {
@@ -114,7 +113,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             credentials.mode === "mobile"
-              ? { workerId: credentials.workerId, pin: credentials.pin }
+              ? { workerId: credentials.workerId }
               : credentials.mode === "office"
                 ? { workerId: credentials.workerId }
               : { username: credentials.username, password: credentials.password },
@@ -148,7 +147,6 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
 
   const resetCredentials = () => {
     setPassword("");
-    setPin("");
     setShowPassword(false);
     setLoginError("");
   };
@@ -156,7 +154,7 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const selectTechnician = (technician: Technician) => {
     resetCredentials();
     setSelectedTechnician(technician);
-    setStep("staff-credentials");
+    loginMutation.mutate({ mode: "mobile", workerId: technician.id });
   };
 
   const selectAdmin = (administrator: Administrator) => {
@@ -173,7 +171,6 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
   const goBack = () => {
     resetCredentials();
     if (step === "staff-list" || step === "admin-list") setStep("choose-type");
-    if (step === "staff-credentials") setStep("staff-list");
     if (step === "admin-credentials") setStep("admin-list");
   };
 
@@ -345,54 +342,6 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
                 </div>
               )}
             </div>
-          )}
-
-          {step === "staff-credentials" && selectedTechnician && (
-            <form
-              className="space-y-5"
-              onSubmit={event => {
-                event.preventDefault();
-                loginMutation.mutate({ mode: "mobile", workerId: selectedTechnician.id, pin });
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <Button type="button" variant="ghost" size="icon" onClick={goBack} aria-label="Back to staff list">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Welcome, {selectedTechnician.name}</h1>
-                   <p className="mt-1 text-sm text-gray-600">Enter your 4-digit mobile PIN.</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-red-50 p-4 text-sm">
-                <p className="font-medium text-red-900">{selectedTechnician.role} · {selectedTechnician.department}</p>
-              </div>
-              {loginError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{loginError}</AlertDescription>
-                </Alert>
-              )}
-               <Input
-                 type="password"
-                 inputMode="numeric"
-                 autoComplete="current-password"
-                 maxLength={4}
-                 pattern="[0-9]{4}"
-                 value={pin}
-                 onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-                 placeholder="4-digit PIN"
-                 aria-label="Mobile PIN"
-                 required
-               />
-              <Button type="submit" className="h-12 w-full bg-red-600 text-base hover:bg-red-700" disabled={loginMutation.isPending}>
-                {loginMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : <><Smartphone className="mr-2 h-4 w-4" /> Open Technician Dashboard</>}
-              </Button>
-              <Button type="button" variant="link" className="w-full" onClick={() => { resetCredentials(); setStep("staff-list"); }}>
-                Switch user
-              </Button>
-            </form>
           )}
 
           {step === "admin-credentials" && selectedAdmin && selectedAdmin.authMethod === "password" && (

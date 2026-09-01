@@ -86,14 +86,6 @@ export class AuthService {
     return jwt.sign({ workerId, tokenType: "mobile_worker_v2" }, JWT_SECRET, { expiresIn: "12h" });
   }
 
-  static async verifyMobileWorkerPin(
-    worker: Awaited<ReturnType<typeof storage.getWorker>>,
-    pin: string,
-  ): Promise<boolean> {
-    if (!worker?.pin || !/^\d{4}$/.test(pin)) return false;
-    return worker.pin.startsWith("$2") ? bcrypt.compare(pin, worker.pin) : false;
-  }
-
   static async authenticatePasswordlessOfficeWorker(
     workerId: string,
   ): Promise<{ user: AuthenticatedUser; token: string } | null> {
