@@ -22,6 +22,10 @@ import { format, addMonths, differenceInDays } from "date-fns";
 const SERVICE_KM_INTERVAL   = 10_000;  // km
 const SERVICE_MONTH_INTERVAL = 6;      // months
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   active:      { label: "Active",        color: "text-green-700",  bg: "bg-green-100",  dot: "bg-green-500"  },
@@ -248,21 +252,21 @@ export default function FleetPage() {
     queryKey: ["/api/fleet/km-logs", isAdmin ? undefined : user?.id],
     queryFn: async () => {
       const url = isAdmin ? "/api/fleet/km-logs" : `/api/fleet/km-logs?workerId=${user?.id}`;
-      return (await fetch(url, { credentials: "include" })).json();
+      return asArray(await (await fetch(url, { credentials: "include" })).json());
     },
   });
   const { data: fuelFillups = [] }  = useQuery<any[]>({
     queryKey: ["/api/fleet/fuel-fillups", isAdmin ? undefined : user?.id],
     queryFn: async () => {
       const url = isAdmin ? "/api/fleet/fuel-fillups" : `/api/fleet/fuel-fillups?workerId=${user?.id}`;
-      return (await fetch(url, { credentials: "include" })).json();
+      return asArray(await (await fetch(url, { credentials: "include" })).json());
     },
   });
   const { data: inspections = [] }  = useQuery<any[]>({
     queryKey: ["/api/fleet/inspections", isAdmin ? undefined : user?.id],
     queryFn: async () => {
       const url = isAdmin ? "/api/fleet/inspections" : `/api/fleet/inspections?workerId=${user?.id}`;
-      return (await fetch(url, { credentials: "include" })).json();
+      return asArray(await (await fetch(url, { credentials: "include" })).json());
     },
   });
   const { data: issues = [] }       = useQuery<any[]>({
