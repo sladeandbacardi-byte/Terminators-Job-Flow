@@ -1529,6 +1529,11 @@ export class DbStorage implements IStorage {
     const [row] = await db.insert(kmLogs).values({ id: randomUUID(), ...data, createdAt: new Date() }).returning();
     return row;
   }
+  async updateKmLog(id: string, data: Partial<InsertKmLog>): Promise<KmLog> {
+    const [row] = await db.update(kmLogs).set(data).where(eq(kmLogs.id, id)).returning();
+    if (!row) throw new Error("KM log not found");
+    return row;
+  }
 
   async deleteKmLog(id: string): Promise<boolean> {
     const r = await db.delete(kmLogs).where(eq(kmLogs.id, id));

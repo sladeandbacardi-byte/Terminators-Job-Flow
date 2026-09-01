@@ -26,8 +26,8 @@ export const workers = pgTable("workers", {
   role: text("role"),
   userType: text("user_type").notNull().default("Staff"),
   mobileAccessEnabled: boolean("mobile_access_enabled").notNull().default(false),
-  employeeId: text("employee_id").unique(), // For mobile login
-  pin: text("pin"), // 4-digit PIN for mobile login (hashed)
+  employeeId: text("employee_id").unique(), // HR identifier; not a login credential
+  pin: text("pin"), // Legacy column retained for historical records; authentication never uses it
   isActive: boolean("is_active").notNull().default(true),
   // HR Profile fields
   idNumber: text("id_number"),
@@ -1165,12 +1165,13 @@ export const fuelFillups = pgTable("fuel_fillups", {
   vehicleId: varchar("vehicle_id").notNull(),
   workerId: varchar("worker_id").notNull(),
   fillDate: timestamp("fill_date").notNull(),
-  odometer: integer("odometer"),
+  odometer: integer("odometer").notNull(),
   litres: decimal("litres", { precision: 8, scale: 2 }).notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
-  fuelStation: text("fuel_station"),
-  receiptPhoto: text("receipt_photo"),
+  fuelType: text("fuel_type").notNull(),
+  receiptPhoto: text("receipt_photo").notNull(),
   notes: text("notes"),
+  submissionKey: text("submission_key"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -1186,6 +1187,7 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   failAlertSent: boolean("fail_alert_sent").notNull().default(false),
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by"),
+  submissionKey: text("submission_key"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -1221,6 +1223,7 @@ export const vehicleIssues = pgTable("vehicle_issues", {
   managerNotes: text("manager_notes"),
   resolvedAt: timestamp("resolved_at"),
   serviceRecordId: varchar("service_record_id"),
+  submissionKey: text("submission_key"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 

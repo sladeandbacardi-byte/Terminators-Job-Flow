@@ -1,10 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { generateWeeklyFleetSummaryEmail, sendEmail } from "./email-service";
+import { generateWeeklyFleetSummaryEmail } from "./email-service";
 import { storage } from "./storage";
 import { runDailyBackupEmail } from "./email-backup";
 import { runStartupMigrations } from "./startup-migrations";
+import { enqueueFleetEmail, fleetWeeklySummaryEmail, startFleetEmailOutboxWorker } from "./fleet-email-outbox";
 import { ensureSoleSuperAdmin } from "./superadmin-provisioning";
 
 console.log("[startup] Job Flow server starting");
@@ -62,6 +63,7 @@ app.use((req, res, next) => {
   // Run schema migrations before anything else — adds missing columns/tables
   // automatically on every deploy so Railway's production DB stays in sync.
   await runStartupMigrations();
+  startFleetEmailOutboxWorker();
   // DbStorage is constructed during module loading, before migrations run. Provision
   // mobile technicians here so the new worker columns are guaranteed to exist.
   await (storage as any).ensureMobileTechnicians?.();
@@ -101,8 +103,8 @@ app.use((req, res, next) => {
       try {
         const params = await generateWeeklyFleetSummaryEmail(storage);
         if (params) {
-          await sendEmail(params);
-          log("Weekly fleet summary email sent to " + params.to);
+          await enqueueFleetEmail(fleetWeeklySummaryEmail(params));
+          log("Weekly fleet summary queued");
         }
       } catch (e) {
         console.error("Weekly fleet summary failed:", e);

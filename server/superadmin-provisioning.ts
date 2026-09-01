@@ -149,7 +149,7 @@ export async function ensureSoleSuperAdmin(): Promise<void> {
 
     console.log(
       passwordChanged
-        ? `[superadmin] Reconciled ${SOLE_SUPERADMIN.name}'s credential from the configured deployment secret`
+        ? `[superadmin] Reconciled ${SOLE_SUPERADMIN.name}'s administrator access`
         : `[superadmin] Confirmed ${SOLE_SUPERADMIN.name} as the sole active super administrator`,
     );
   });

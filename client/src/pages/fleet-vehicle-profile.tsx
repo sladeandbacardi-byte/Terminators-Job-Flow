@@ -536,7 +536,7 @@ export default function FleetVehicleProfile() {
                       <span className="text-xs text-gray-400">{vWorkshopJobs.length} total</span>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-0">
+                  <CardContent className="overflow-x-auto p-0">
                     {vWorkshopJobs.length === 0 ? (
                       <div className="px-4 py-8 text-center text-gray-400">
                         <Hammer className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -628,6 +628,11 @@ export default function FleetVehicleProfile() {
                                   <span className="text-xs text-gray-400 capitalize bg-gray-50 px-2 py-0.5 rounded-full">{issue.category}</span>
                                 </div>
                                 <p className="text-sm text-gray-800 mt-1.5">{issue.description}</p>
+                                 {issue.photoUrl && (
+                                   <a href={issue.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-semibold text-blue-600 underline">
+                                     View reported fault photo
+                                   </a>
+                                 )}
                                 {issue.managerNotes && (
                                   <p className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 mt-1.5">
                                     Manager: {issue.managerNotes}
@@ -755,19 +760,20 @@ export default function FleetVehicleProfile() {
               {/* FUEL HISTORY */}
               <TabsContent value="fuel" className="mt-4">
                 <Card>
-                  <CardContent className="p-0">
+                  <CardContent className="overflow-x-auto p-0">
                     {vFuel.length === 0 ? (
                       <p className="text-center text-gray-400 py-8">No fuel records for this vehicle</p>
                     ) : (
-                      <table className="w-full text-sm">
+                    <table className="w-full min-w-[820px] text-sm">
                         <thead className="bg-gray-50 border-b">
                           <tr>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Driver</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Station</th>
+                             <th className="text-left px-4 py-3 font-medium text-gray-600">Fuel Type</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Odometer</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Litres</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Cost</th>
+                             <th className="text-left px-4 py-3 font-medium text-gray-600">Slip</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -775,10 +781,11 @@ export default function FleetVehicleProfile() {
                             <tr key={f.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-gray-600">{fmt(f.fillDate)}</td>
                               <td className="px-4 py-3">{workerName(f.workerId)}</td>
-                              <td className="px-4 py-3 text-gray-500">{f.fuelStation || "—"}</td>
+                               <td className="px-4 py-3 text-gray-600">{f.fuelType || "—"}</td>
                               <td className="px-4 py-3 text-right text-gray-500">{f.odometer ? f.odometer.toLocaleString() : "—"}</td>
                               <td className="px-4 py-3 text-right">{parseFloat(f.litres || "0").toFixed(1)} L</td>
                               <td className="px-4 py-3 text-right font-semibold text-amber-700">R {parseFloat(f.cost || "0").toFixed(2)}</td>
+                               <td className="px-4 py-3">{f.receiptPhoto ? <a href={f.receiptPhoto} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-600 underline">View slip</a> : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -789,6 +796,7 @@ export default function FleetVehicleProfile() {
                               {vFuel.reduce((s: number, f: any) => s + parseFloat(f.litres || "0"), 0).toFixed(1)} L
                             </td>
                             <td className="px-4 py-2 text-right text-xs font-semibold text-amber-700">R {totalFuelCost.toFixed(2)}</td>
+                            <td />
                           </tr>
                         </tfoot>
                       </table>

@@ -727,7 +727,7 @@ export default function FleetPage() {
               <TabsContent value="km" className="mt-4">
                 <Card>
                   <CardContent className="p-0">
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[760px] text-sm">
                       <thead className="bg-gray-50 border-b">
                         <tr>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
@@ -765,16 +765,18 @@ export default function FleetPage() {
               {/* ── FUEL ─────────────────────────────────────────────────────── */}
               <TabsContent value="fuel" className="mt-4">
                 <Card>
-                  <CardContent className="p-0">
-                    <table className="w-full text-sm">
+                  <CardContent className="overflow-x-auto p-0">
+                    <table className="w-full min-w-[850px] text-sm">
                       <thead className="bg-gray-50 border-b">
                         <tr>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Driver</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
-                          <th className="text-left px-4 py-3 font-medium text-gray-600">Station</th>
+                           <th className="text-left px-4 py-3 font-medium text-gray-600">Fuel Type</th>
+                           <th className="text-right px-4 py-3 font-medium text-gray-600">Odometer</th>
                           <th className="text-right px-4 py-3 font-medium text-gray-600">Litres</th>
                           <th className="text-right px-4 py-3 font-medium text-gray-600">Cost</th>
+                           <th className="text-left px-4 py-3 font-medium text-gray-600">Slip</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -783,13 +785,15 @@ export default function FleetPage() {
                             <td className="px-4 py-3 text-gray-600">{format(new Date(f.fillDate), "dd MMM yyyy")}</td>
                             <td className="px-4 py-3 font-medium">{workerName(f.workerId)}</td>
                             <td className="px-4 py-3 text-gray-600">{vehicleName(f.vehicleId)}</td>
-                            <td className="px-4 py-3 text-gray-600">{f.fuelStation || "—"}</td>
+                             <td className="px-4 py-3 text-gray-600">{f.fuelType || "—"}</td>
+                             <td className="px-4 py-3 text-right text-gray-600">{f.odometer?.toLocaleString?.() ?? "—"} km</td>
                             <td className="px-4 py-3 text-right">{parseFloat(f.litres || "0").toFixed(1)} L</td>
                             <td className="px-4 py-3 text-right font-medium text-amber-700">R {parseFloat(f.cost || "0").toFixed(2)}</td>
+                             <td className="px-4 py-3">{f.receiptPhoto ? <a href={f.receiptPhoto} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-600 underline">View slip</a> : <span className="text-gray-400">—</span>}</td>
                           </tr>
                         ))}
                         {filteredFuel.length === 0 && (
-                          <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No fuel records found</td></tr>
+                          <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No fuel records found</td></tr>
                         )}
                       </tbody>
                     </table>

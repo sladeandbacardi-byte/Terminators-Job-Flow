@@ -8,8 +8,9 @@ import type { Client, Job, Worker } from "@shared/schema";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "@shared/opportunities";
 import { MobileTreatmentReport } from "./mobile-treatment-report";
 import { MobileShell, type MobileNavItem } from "./mobile-shell";
+import { MobileFleetGuard } from "./mobile-fleet-guard";
 
-type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "fleet" | "km" | "fuel" | "inspection" | "issue" | "opportunities";
+type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "fleet" | "kmMorning" | "kmAfternoon" | "fuel" | "inspection" | "monthlyInspection" | "issue" | "opportunities";
 type MobileJob = Job & { client: Client };
 type Opportunity = {
   id: string; clientName: string; description: string; opportunityType: string; typeLabel: string;
@@ -190,7 +191,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
 
   const screenTitle: Record<Screen, string> = {
     dashboard: "Dashboard", jobs: "My Jobs", diaries: "My Day", calendar: "Calendar", fleet: "Fleet",
-    km: "Log KMs", fuel: "Fuel Fill-up", inspection: "Vehicle Inspection", issue: "Report Issue", opportunities: "Additional Opportunities",
+    kmMorning: "Log Morning KMs", kmAfternoon: "Log Afternoon KMs", fuel: "Fuel Fill-up", inspection: "Vehicle Inspection", monthlyInspection: "Monthly Inspection", issue: "Report Issue", opportunities: "Additional Opportunities",
   };
 
   const mobileNavItems: MobileNavItem[] = [
@@ -260,17 +261,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
         {myDay && <section className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-slate-900 p-4 text-white"><p className="text-xs text-slate-300">Attendance</p><p className="mt-1 font-bold">{Math.floor(myDay.totals.attendanceMinutes / 60)}h {myDay.totals.attendanceMinutes % 60}m</p></div><div className="rounded-xl bg-red-600 p-4 text-white"><p className="text-xs text-red-100">Vehicle KM</p><p className="mt-1 font-bold">{myDay.totals.vehicleDistanceKm.toLocaleString("en-ZA")} km</p></div></section>}
       </div>
     );
-    if (screen === "fleet") return <div className="space-y-4">
-      <section className="rounded-xl bg-slate-900 p-5 text-white"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-300">FleetGuard</p><h2 className="mt-1 text-xl font-bold">Fleet Management</h2><p className="mt-2 text-sm text-slate-300">{vehicleLabel}</p></section>
-      <div className="grid grid-cols-2 gap-3">
-        {[
-          ["km", "Log KMs", Gauge],
-          ["fuel", "Fuel", Fuel],
-          ["inspection", "Daily Check", ClipboardCheck],
-          ["issue", "Report Fault", AlertTriangle],
-        ].map(([target, label, Icon]) => <button key={String(target)} onClick={() => nav(target as Screen)} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-red-200 hover:bg-red-50"><Icon className="h-5 w-5 text-red-600" /><p className="mt-3 font-semibold text-slate-900">{String(label)}</p></button>)}
-      </div>
-    </div>;
+    if (screen === "fleet" || screen === "kmMorning" || screen === "kmAfternoon" || screen === "fuel" || screen === "inspection" || screen === "monthlyInspection" || screen === "issue") return <MobileFleetGuard worker={worker} mode={screen} onNavigate={target => nav(target)} onSaved={load} />;
     if (screen === "opportunities") return (
       <div className="space-y-4">
         <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submitOpportunity(); }}>
@@ -295,18 +286,6 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
         <section><h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">My submissions</h2>{opportunities.length === 0 ? <p className="rounded-xl bg-white p-4 text-sm text-slate-500">You have not submitted an opportunity yet.</p> : <div className="space-y-2">{opportunities.map(item => <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold text-slate-900">{item.typeLabel}</p><p className="text-xs text-slate-500">{item.clientName}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{item.statusLabel}</span></div><p className="mt-2 text-sm text-slate-600 line-clamp-2">{item.description}</p></article>)}</div>}</section>
       </div>
     );
-    if (screen === "km") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/km-logs", form, "Kilometres logged."); }}>
-      {vehicleSelect}{input("startOdometer", "Start odometer", "number", true)}{input("endOdometer", "End odometer", "number", true)}{input("businessKm", "Business KMs", "number")}{input("privateKm", "Private KMs", "number")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log KMs</button>
-    </form>;
-    if (screen === "fuel") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/fuel-fillups", form, "Fuel fill-up logged."); }}>
-      {vehicleSelect}{input("litres", "Litres", "number", true)}{input("cost", "Total cost", "number", true)}{input("odometer", "Odometer (optional)", "number")}{input("fuelStation", "Fuel station")}<textarea placeholder="Notes (optional)" value={form.notes ?? ""} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Log fuel fill-up</button>
-    </form>;
-    if (screen === "inspection") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/inspections", { ...form, items: [] }, "Vehicle inspection submitted."); }}>
-      {vehicleSelect}<select value={form.overallResult ?? "pass"} onChange={event => setForm(current => ({ ...current, overallResult: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="pass">Vehicle passed inspection</option><option value="fail">Vehicle has a fault</option></select><textarea required placeholder="Inspection comments and any faults found" value={form.comments ?? ""} onChange={event => setForm(current => ({ ...current, comments: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Submit inspection</button>
-    </form>;
-    if (screen === "issue") return <form className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => { event.preventDefault(); submit("/api/mobile/fleet/issues", form, "Vehicle issue reported."); }}>
-      {vehicleSelect}<select value={form.category ?? "other"} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="other">Other</option><option value="tyres">Tyres</option><option value="engine">Engine</option><option value="brakes">Brakes</option><option value="electrical">Electrical</option><option value="lights">Lights</option></select><select value={form.urgency ?? "medium"} onChange={event => setForm(current => ({ ...current, urgency: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="not_safe">Not safe to drive</option></select><textarea required placeholder="Describe the issue" value={form.description ?? ""} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-red-600 px-4 py-3 font-semibold text-white">Report issue</button>
-    </form>;
     const metrics = data.metrics;
     return <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">

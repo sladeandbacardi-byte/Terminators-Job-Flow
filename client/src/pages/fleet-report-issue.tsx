@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useSearch } from "wouter";
 import { AlertCircle, ArrowLeft, Truck, User, Camera } from "lucide-react";
 import { format } from "date-fns";
+const newSubmissionKey = () => crypto.randomUUID();
 
 const CATEGORIES = [
   { value: "tyres", label: "Tyres" },
@@ -59,6 +60,7 @@ export default function FleetReportIssue() {
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState("medium");
   const [photoUrl, setPhotoUrl] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(newSubmissionKey);
 
   const { data: vehicles = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
   const { data: assignments = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/assignments"] });
@@ -92,6 +94,7 @@ export default function FleetReportIssue() {
         urgency,
         photoUrl: photoUrl || null,
         status: "open",
+        idempotencyKey,
       });
     },
     onSuccess: () => {
@@ -104,6 +107,7 @@ export default function FleetReportIssue() {
         variant: urgency === "not_safe" ? "destructive" : "default",
       });
       setCategory(""); setDescription(""); setPhotoUrl(""); setUrgency("medium");
+      setIdempotencyKey(newSubmissionKey());
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });

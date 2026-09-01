@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import type { AdminUser, Worker } from "@shared/schema";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
-import { OFFICE_ORGANOGRAM_WORKER_IDS } from "@shared/organogram";
+import { MOBILE_STAFF_ROSTER, OFFICE_ORGANOGRAM_WORKER_IDS } from "@shared/organogram";
 
 const normalize = (value: string | null | undefined) =>
   String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -14,6 +14,21 @@ export type OfficeDirectoryEntry = {
   department: string;
   authMethod: "password" | "passwordless";
 };
+
+/**
+ * Password authentication is reserved for the canonical Julien account.  The
+ * name check keeps a stale or accidentally reused `worker-1` record from
+ * becoming a password login, while the configured username preserves the
+ * non-destructive legacy-account migration supported by provisioning.
+ */
+export function isSolePasswordAdministrator(
+  admin: Pick<AdminUser, "id" | "username" | "firstName" | "lastName" | "isActive">,
+  configuredUsername = process.env.ADMIN_USERNAME?.trim() || SOLE_SUPERADMIN.username,
+): boolean {
+  if (!admin.isActive) return false;
+  if (normalize(`${admin.firstName} ${admin.lastName}`) !== normalize(SOLE_SUPERADMIN.name)) return false;
+  return admin.id === SOLE_SUPERADMIN.workerId || normalize(admin.username) === normalize(configuredUsername);
+}
 
 export function selectCanonicalSuperAdminTarget(
   admins: AdminUser[],
@@ -45,6 +60,18 @@ export function isPasswordlessOfficeWorker(
     normalize(worker.role) !== "administrator" &&
     worker.mobileAccessEnabled !== true &&
     worker.isActive
+  );
+}
+
+/** The mobile profile picker is an explicit roster, not a role-based directory. */
+export function isPasswordlessMobileWorker(
+  worker: Pick<Worker, "id" | "role" | "isActive" | "mobileAccessEnabled">,
+): boolean {
+  return (
+    (MOBILE_STAFF_ROSTER as readonly { id: string }[]).some(entry => entry.id === worker.id) &&
+    worker.isActive &&
+    worker.mobileAccessEnabled === true &&
+    normalize(worker.role) === "technician"
   );
 }
 

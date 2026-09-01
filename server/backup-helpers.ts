@@ -261,12 +261,12 @@ export async function generateExcelBackupBuffer(): Promise<{
   ]);
 
   addSheet("Fuel Fill-ups", [
-    ["Date", "Vehicle", "Driver", "Station", "Litres", "Total Cost (ZAR)", "Odometer (km)", "Full Tank"],
+    ["Date", "Vehicle", "Driver", "Fuel Type", "Litres", "Total Cost (ZAR)", "Odometer (km)", "Full Tank"],
     ...fuelFillups.map((f: any) => [
       dateStr(f.fillupDate ?? f.date),
       vehicleMap.get(f.vehicleId) ?? f.vehicleId,
       workerMap.get(f.workerId) ?? (f.workerId ?? ""),
-      f.station ?? f.fuelStation ?? "",
+      f.fuelType ?? "",
       f.litres ?? f.liters ?? f.quantity ?? "",
       zar(f.totalCost ?? f.cost ?? f.amount),
       f.odometer ?? f.odometerReading ?? "",

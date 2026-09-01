@@ -69,7 +69,7 @@ export async function createMobileTestData() {
     });
 
     console.log("Mobile test data created successfully:");
-    console.log(`Worker: ${worker.name} (Employee ID: ${worker.employeeId}, PIN: ${worker.pin})`);
+    console.log(`Worker: ${worker.name} (Employee ID: ${worker.employeeId})`);
     console.log(`Client: ${client.name}`);
     console.log(`Jobs created: ${job1.title}, ${job2.title}`);
     

@@ -64,7 +64,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { getDashboardRole } from "@shared/dashboardRole";
 import { hasUnrestrictedAccess } from "@shared/accessPolicy";
-import { buildOfficeLoginDirectory } from "./office-account-policy";
+import { buildOfficeLoginDirectory, isPasswordlessMobileWorker } from "./office-account-policy";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { MOBILE_STAFF_ROSTER } from "@shared/organogram";
 import {
@@ -83,6 +83,8 @@ import { createMemoryRateLimiter } from "./request-limits";
 import { createPasswordlessOfficeLoginHandler, createPasswordLoginHandler } from "./office-auth-http";
 import { enforceOfficeApiAccess } from "./office-access-middleware";
 import { calculateFleetOdometerLogs } from "./fleet-odometer-calculation";
+import { enqueueFleetEmail, fleetWeeklySummaryEmail } from "./fleet-email-outbox";
+import { fleetSubmissionKey, submitFuelFillup, submitVehicleInspection, submitVehicleIssue } from "./fleet-submissions";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -1024,11 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid worker" });
       }
 
-      if (
-        !worker.isActive ||
-        worker.mobileAccessEnabled !== true ||
-        String(worker.role ?? "").trim().toLowerCase() !== "technician"
-      ) {
+      if (!isPasswordlessMobileWorker(worker)) {
         return res.status(401).json({ message: "Invalid worker" });
       }
       const token = AuthService.generateMobileWorkerToken(worker.id);
@@ -1058,12 +1056,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const getMobileVehicle = async (workerId: string, requestedVehicleId?: string) => {
-    if (requestedVehicleId) {
-      const vehicle = await storage.getVehicle(requestedVehicleId);
-      return vehicle?.isActive ? vehicle.id : null;
-    }
     const assignment = await storage.getActiveAssignmentForWorker(workerId);
-    return assignment?.vehicleId ?? null;
+    // Mobile FleetGuard is deliberately limited to the technician's current
+    // assignment. Never accept another active vehicle from a submitted id.
+    if (!assignment || (requestedVehicleId && requestedVehicleId !== assignment.vehicleId)) return null;
+    const vehicle = await storage.getVehicle(assignment.vehicleId);
+    return vehicle?.isActive ? vehicle.id : null;
   };
 
   // ── Additional opportunities: technician mobile workflow ──────────────────
@@ -1881,15 +1879,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/mobile/fleet/vehicles", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
-      const [activeVehicles, assignment] = await Promise.all([
-        storage.getActiveVehicles(),
-        storage.getActiveAssignmentForWorker(req.mobileWorker!.id),
-      ]);
-      const items = await Promise.all(activeVehicles.map(async vehicle => ({
+      const assignment = await storage.getActiveAssignmentForWorker(req.mobileWorker!.id);
+      const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : null;
+      const items = vehicle?.isActive ? [{
         ...vehicle,
         latestOdometer: (await latestVehicleOdometer(vehicle.id))?.endOdometer ?? null,
-        isAssigned: assignment?.vehicleId === vehicle.id,
-      })));
+        isAssigned: true,
+      }] : [];
       res.json({ vehicles: items, assignedVehicleId: assignment?.vehicleId || null });
     } catch (error) {
       console.error("Could not load mobile Fleet vehicles:", error);
@@ -1897,48 +1893,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/mobile/fleet/overview", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    try {
+      const workerId = req.mobileWorker!.id;
+      const vehicleId = await getMobileVehicle(workerId);
+      if (!vehicleId) return res.json({ vehicle: null, kmLogs: [], fuelFillups: [], inspections: [], issues: [] });
+      const requestedDate = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : new Date().toISOString().slice(0, 10);
+      const sameDay = (value: Date) => value.toISOString().slice(0, 10) === requestedDate;
+      const [vehicle, kmLogs, fuelFillups, inspections, issues] = await Promise.all([
+        storage.getVehicle(vehicleId),
+        storage.getKmLogsByWorker(workerId),
+        storage.getFuelFillupsByWorker(workerId),
+        storage.getVehicleInspectionsByWorker(workerId),
+        storage.getVehicleIssuesByWorker(workerId),
+      ]);
+      res.json({
+        vehicle: vehicle ?? null,
+        date: requestedDate,
+        kmLogs: kmLogs.filter(item => item.vehicleId === vehicleId).map(item => ({ ...item, isSelectedDay: sameDay(item.logDate) })),
+        fuelFillups: fuelFillups.filter(item => item.vehicleId === vehicleId).map(fuelFillupResponse),
+        inspections: inspections.filter(item => item.vehicleId === vehicleId),
+        issues: issues.filter(item => item.vehicleId === vehicleId),
+      });
+    } catch (error) {
+      console.error("Could not load mobile FleetGuard overview:", error);
+      res.status(500).json({ message: "Could not load FleetGuard. Please try again." });
+    }
+  });
+
   app.post("/api/mobile/fleet/km-logs", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
       const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
       if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to log kilometres" });
-      const startOdometer = Number(req.body.startOdometer);
-      const endOdometer = Number(req.body.endOdometer);
-      if (!Number.isInteger(startOdometer) || !Number.isInteger(endOdometer) || endOdometer < startOdometer) {
-        return res.status(400).json({ message: "Enter valid start and end odometer readings" });
+      const logType = req.body.logType === "AM" || req.body.logType === "PM" ? req.body.logType : null;
+      const odometer = Number(req.body.odometer);
+      if (!logType || !Number.isInteger(odometer) || odometer < 0 || odometer > 10_000_000) {
+        return res.status(400).json({ message: "Enter a valid odometer reading and choose Morning or Afternoon." });
       }
+      const day = typeof req.body.logDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.logDate)
+        ? req.body.logDate : new Date().toISOString().slice(0, 10);
+      const workerId = req.mobileWorker!.id;
+      const existing = (await storage.getKmLogsByWorker(workerId)).find(log =>
+        log.vehicleId === vehicleId && log.logDate.toISOString().slice(0, 10) === day,
+      );
+      const existingSnapshots = (() => {
+        try { return Array.isArray(JSON.parse(existing?.notes || "{}").snapshots) ? JSON.parse(existing!.notes!).snapshots : []; }
+        catch { return []; }
+      })();
+      if (existingSnapshots.some((snapshot: any) => snapshot?.type === logType)) {
+        return res.status(409).json({ message: `${logType === "AM" ? "Morning" : "Afternoon"} kilometres have already been logged for this day.` });
+      }
+      const snapshots = [...existingSnapshots, { type: logType, odometer, timestamp: `${day}T${logType === "AM" ? "06:00:00" : "16:00:00"}.000Z` }];
       const candidate = {
-        id: `pending-${randomUUID()}`,
-        vehicleId, workerId: req.mobileWorker!.id, logDate: new Date(),
-        startOdometer, endOdometer, totalKm: endOdometer - startOdometer,
-        businessKm: 0, privateKm: 0,
-        notes: req.body.notes || null,
-        createdAt: new Date(),
+        id: existing?.id ?? `pending-${randomUUID()}`, vehicleId, workerId, logDate: new Date(`${day}T12:00:00.000Z`),
+        startOdometer: snapshots.find((item: any) => item.type === "AM")?.odometer ?? odometer,
+        endOdometer: snapshots.find((item: any) => item.type === "PM")?.odometer ?? odometer,
+        totalKm: 0, businessKm: 0, privateKm: 0, notes: JSON.stringify({ snapshots }), createdAt: existing?.createdAt ?? new Date(),
       };
-      const calculated = calculateFleetOdometerLogs([...(await storage.getKmLogs()), candidate]).at(-1)!;
-      const data = insertKmLogSchema.parse({
-        ...candidate,
-        totalKm: calculated.totalKm ?? 0,
-        businessKm: calculated.businessKm ?? 0,
-        privateKm: calculated.privateKm ?? 0,
-      });
-      const created = await storage.createKmLog(data);
+      const all = [...(await storage.getKmLogs()).filter(log => log.id !== existing?.id), candidate];
+      const calculated = calculateFleetOdometerLogs(all).find(log => log.id === candidate.id)!;
+      const data = insertKmLogSchema.parse({ ...candidate, totalKm: calculated.totalKm ?? 0, businessKm: calculated.businessKm ?? 0, privateKm: calculated.privateKm ?? 0 });
+      const created = existing ? await storage.updateKmLog(existing.id, data) : await storage.createKmLog(data);
       res.status(201).json(calculateFleetOdometerLogs(await storage.getKmLogs()).find(log => log.id === created.id));
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to log kilometres" });
     }
   });
 
+  const fuelFillupInput = (body: Record<string, unknown>, vehicleId: string, workerId: string) => {
+    if (["fuelstation", "fuel_station", "station", "station_name"].some(key =>
+      Object.keys(body).some(inputKey => inputKey.toLowerCase() === key),
+    )) throw new Error("Fuel station details are no longer accepted.");
+    const date = typeof body.date === "string" ? body.date : "";
+    const time = typeof body.time === "string" ? body.time : "";
+    if (!vehicleId || !workerId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      throw new Error("Fuel fill-up date and time are required.");
+    }
+    const fillDate = new Date(`${date}T${time}:00`);
+    const odometer = Number(body.odometer);
+    const litres = Number(body.litres);
+    const cost = Number(body.cost);
+    const fuelType = typeof body.fuelType === "string" ? body.fuelType.trim() : "";
+    const receiptPhoto = typeof body.receiptPhoto === "string" ? body.receiptPhoto : "";
+    const receipt = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/.exec(receiptPhoto);
+    if (Number.isNaN(fillDate.getTime()) || !Number.isInteger(odometer) || odometer < 0 || odometer > 10_000_000
+      || !Number.isFinite(litres) || litres <= 0 || !Number.isFinite(cost) || cost <= 0 || !fuelType
+      || !receipt || receiptPhoto.length > 2_700_000) {
+      throw new Error("Vehicle, worker, date, time, odometer, litres, Rand amount, fuel type, and a valid fuel slip photo are required.");
+    }
+    return insertFuelFillupSchema.parse({
+      vehicleId, workerId, fillDate, odometer, litres: String(litres), cost: String(cost),
+      fuelType, receiptPhoto, notes: typeof body.notes === "string" ? body.notes : null,
+    });
+  };
+
+  const fuelFillupResponse = (fillup: any) => ({
+    ...fillup,
+    pricePerLitre: Number(fillup.cost) / Number(fillup.litres),
+  });
+
   app.post("/api/mobile/fleet/fuel-fillups", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
       const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
       if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to log fuel" });
-      const data = insertFuelFillupSchema.parse({
-        vehicleId, workerId: req.mobileWorker!.id, fillDate: new Date(),
-        odometer: req.body.odometer ? Number(req.body.odometer) : null,
-        litres: String(req.body.litres), cost: String(req.body.cost),
-        fuelStation: req.body.fuelStation || null, notes: req.body.notes || null,
-      });
-      res.status(201).json(await storage.createFuelFillup(data));
+      const data = fuelFillupInput(req.body, vehicleId, req.mobileWorker!.id);
+      const result = await submitFuelFillup(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      res.status(result.created ? 201 : 200).json(fuelFillupResponse(result.record));
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to log fuel fill-up" });
     }
@@ -1948,12 +2010,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
       if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required for an inspection" });
+      const inspectionDate = typeof req.body.inspectionDate === "string" ? new Date(req.body.inspectionDate) : new Date();
+      if (Number.isNaN(inspectionDate.getTime())) {
+        return res.status(400).json({ message: "Enter a valid inspection date and time." });
+      }
+      const items = Array.isArray(req.body.items) ? req.body.items : [];
       const data = insertVehicleInspectionSchema.parse({
-        vehicleId, workerId: req.mobileWorker!.id, inspectionDate: new Date(),
+        vehicleId, workerId: req.mobileWorker!.id, inspectionDate,
         overallResult: req.body.overallResult === "fail" ? "fail" : "pass",
-        itemsJson: JSON.stringify(req.body.items ?? []), comments: req.body.comments || null,
+        itemsJson: JSON.stringify(items), comments: typeof req.body.comments === "string" ? req.body.comments : null,
       });
-      res.status(201).json(await storage.createVehicleInspection(data));
+      const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      res.status(result.created ? 201 : 200).json(result.record);
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to submit vehicle inspection" });
     }
@@ -1963,12 +2031,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
       if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to report an issue" });
+      const reportedAt = typeof req.body.reportedAt === "string" ? new Date(req.body.reportedAt) : new Date();
+      const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl : null;
+      if (!req.body.description || typeof req.body.description !== "string" || req.body.description.trim().length < 3) {
+        return res.status(400).json({ message: "Describe the vehicle fault before submitting it." });
+      }
+      if (Number.isNaN(reportedAt.getTime())) {
+        return res.status(400).json({ message: "Enter a valid fault date and time." });
+      }
+      if (photoUrl && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=\s]+$/.test(photoUrl) || photoUrl.length > 2_700_000)) {
+        return res.status(400).json({ message: "Use a JPG, PNG, or WebP fault photo smaller than 2 MB." });
+      }
       const data = insertVehicleIssueSchema.parse({
-        vehicleId, workerId: req.mobileWorker!.id, reportedAt: new Date(),
-        category: req.body.category || "other", description: req.body.description,
-        urgency: req.body.urgency || "medium", status: "open",
+        vehicleId, workerId: req.mobileWorker!.id, reportedAt,
+        category: req.body.category || "other", description: req.body.description.trim(),
+        urgency: req.body.urgency || "medium", photoUrl, status: "open",
       });
-      res.status(201).json(await storage.createVehicleIssue(data));
+      const result = await submitVehicleIssue(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      res.status(result.created ? 201 : 200).json(result.record);
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to report vehicle issue" });
     }
@@ -1999,9 +2079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const staff = allWorkers
         .filter(worker =>
           canonicalMobileIds.has(worker.id as typeof MOBILE_STAFF_ROSTER[number]["id"]) &&
-          worker.isActive &&
-          worker.mobileAccessEnabled === true &&
-           String(worker.role ?? "").trim().toLowerCase() === "technician",
+          isPasswordlessMobileWorker(worker),
         )
         .map(worker => ({
           ...MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id),
@@ -3692,8 +3770,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/workers", requireAuth, async (req: AuthenticatedRequest, res) => {
     if (!isOvertimeApprover(req)) return res.status(403).json({ error: "Only administrators and managers can create staff profiles" });
     try {
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "pin")) {
+        return res.status(400).json({ error: "Staff PIN credentials have been removed" });
+      }
       const worker = insertWorkerSchema.parse(req.body);
-      if (worker.pin) worker.pin = await AuthService.hashPassword(worker.pin);
       const created = await storage.createWorker(worker);
       const { pin: _pin, ...safeWorker } = created;
       res.status(201).json(safeWorker);
@@ -3708,8 +3788,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existing = await storage.getWorker(req.params.id);
       if (!existing) return res.status(404).json({ error: "Worker not found" });
       if (rejectOutsideDepartment(req, res, existing.departmentId)) return;
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "pin")) {
+        return res.status(400).json({ error: "Staff PIN credentials have been removed" });
+      }
       const updateData = insertWorkerSchema.partial().parse(req.body);
-      if (updateData.pin) updateData.pin = await AuthService.hashPassword(updateData.pin);
       const updated = await storage.updateWorker(req.params.id, updateData);
       const { pin: _pin, ...safeWorker } = updated;
       res.json(safeWorker);
@@ -6972,12 +7054,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ── 12. Fuel Fill-ups ────────────────────────────────────────────────────
       addSheet("Fuel Fill-ups", [
-        ["Date", "Vehicle", "Driver", "Station", "Litres", "Total Cost (ZAR)", "Odometer (km)", "Full Tank"],
+        ["Date", "Vehicle", "Driver", "Fuel Type", "Litres", "Total Cost (ZAR)", "Odometer (km)", "Full Tank"],
         ...fuelFillups.map((f: any) => [
           dateStr(f.fillupDate ?? f.date),
           vehicleMap.get(f.vehicleId) ?? f.vehicleId,
           workerMap.get(f.workerId) ?? (f.workerId ?? ""),
-          f.station ?? f.fuelStation ?? "",
+          f.fuelType ?? "",
           f.litres ?? f.liters ?? f.quantity ?? "",
           zar(f.totalCost ?? f.cost ?? f.amount),
           f.odometer ?? f.odometerReading ?? "",
@@ -7259,21 +7341,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fleet/fuel-fillups", async (req, res) => {
     try {
       const { workerId, vehicleId } = req.query;
-      if (workerId) return res.json(await storage.getFuelFillupsByWorker(workerId as string));
-      if (vehicleId) return res.json(await storage.getFuelFillupsByVehicle(vehicleId as string));
-      res.json(await storage.getFuelFillups());
+      if (workerId) return res.json((await storage.getFuelFillupsByWorker(workerId as string)).map(fuelFillupResponse));
+      if (vehicleId) return res.json((await storage.getFuelFillupsByVehicle(vehicleId as string)).map(fuelFillupResponse));
+      res.json((await storage.getFuelFillups()).map(fuelFillupResponse));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.post("/api/fleet/fuel-fillups", async (req, res) => {
     try {
-      const body = {
-        ...req.body,
-        fillDate: req.body.fillDate ? new Date(req.body.fillDate) : new Date(),
-      };
-      const data = insertFuelFillupSchema.parse(body);
-      const fillup = await storage.createFuelFillup(data);
-      res.status(201).json(fillup);
+      const data = fuelFillupInput(req.body, String(req.body.vehicleId ?? ""), String(req.body.workerId ?? ""));
+      const result = await submitFuelFillup(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      res.status(result.created ? 201 : 200).json(fuelFillupResponse(result.record));
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
@@ -7300,34 +7378,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inspectionDate: req.body.inspectionDate ? new Date(req.body.inspectionDate) : new Date(),
       };
       const data = insertVehicleInspectionSchema.parse(body);
-      const inspection = await storage.createVehicleInspection(data);
-
-      // Send fail alert email if any items failed
-      if (inspection.overallResult === "fail") {
-        try {
-          const items = inspection.itemsJson ? JSON.parse(inspection.itemsJson) : [];
-          const failedItems = items.filter((i: any) => i.result === "fail");
-          const failList = failedItems.map((i: any) => `• ${i.name}${i.comments ? ": " + i.comments : ""}`).join("\n");
-          await sendEmail({
-            to: "admin@terminators.co.za",
-            subject: `⚠️ FLEET FAIL ALERT — Vehicle ${inspection.vehicleId} — ${new Date().toLocaleDateString("en-ZA")}`,
-            html: `<h2 style="color:#dc2626">Vehicle Inspection — FAIL</h2>
-<p><strong>Vehicle ID:</strong> ${inspection.vehicleId}</p>
-<p><strong>Driver:</strong> ${inspection.workerId}</p>
-<p><strong>Date:</strong> ${new Date(inspection.inspectionDate).toLocaleString("en-ZA")}</p>
-<h3>Failed Items:</h3>
-<ul>${failedItems.map((i: any) => `<li><strong>${i.name}</strong>${i.comments ? ": " + i.comments : ""}</li>`).join("")}</ul>
-${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p>` : ""}
-<p style="color:#6b7280;font-size:12px">Sent automatically by The Terminators Fleet System</p>`,
-            text: `VEHICLE INSPECTION — FAIL\n\nVehicle: ${inspection.vehicleId}\nDriver: ${inspection.workerId}\nDate: ${new Date(inspection.inspectionDate).toLocaleString("en-ZA")}\n\nFailed items:\n${failList}\n\n${inspection.comments ? "Comments: " + inspection.comments : ""}`,
-          });
-          await storage.updateVehicleInspection(inspection.id, { failAlertSent: true } as any);
-        } catch (emailErr) {
-          console.error("Failed to send inspection fail alert:", emailErr);
-        }
-      }
-
-      res.status(201).json(inspection);
+      const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      res.status(result.created ? 201 : 200).json(result.record);
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
@@ -7391,8 +7443,8 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
       if (body.reportedAt) body.reportedAt = new Date(body.reportedAt);
       const parsed = insertVehicleIssueSchema.safeParse(body);
       if (!parsed.success) return res.status(400).json({ error: parsed.error.errors });
-      const issue = await storage.createVehicleIssue(parsed.data);
-      res.status(201).json(issue);
+      const result = await submitVehicleIssue(parsed.data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      res.status(result.created ? 201 : 200).json(result.record);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
@@ -7510,11 +7562,11 @@ ${inspection.comments ? `<p><strong>Comments:</strong> ${inspection.comments}</p
   // ── FLEET — WEEKLY SUMMARY EMAIL ────────────────────────────────────────────
   app.post("/api/fleet/send-weekly-summary", async (_req, res) => {
     try {
-      const { generateWeeklyFleetSummaryEmail, sendEmail } = await import("./email-service");
+      const { generateWeeklyFleetSummaryEmail } = await import("./email-service");
       const params = await generateWeeklyFleetSummaryEmail(storage);
       if (!params) return res.status(500).json({ error: "Could not generate summary" });
-      await sendEmail(params);
-      res.json({ success: true, message: `Weekly fleet summary sent to ${params.to}` });
+      const queued = await enqueueFleetEmail(fleetWeeklySummaryEmail(params));
+      res.json({ success: true, message: queued ? "Weekly fleet summary queued" : "Weekly fleet summary was already queued for this week" });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 

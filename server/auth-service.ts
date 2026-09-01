@@ -6,7 +6,11 @@ import { adminUsers, userSessions, officeWorkerSessions, activityLogs } from '@s
 import { eq, and, gt, sql } from 'drizzle-orm';
 import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/schema';
 import { storage } from './storage';
-import { isPasswordlessOfficeWorker } from "./office-account-policy";
+import {
+  isPasswordlessMobileWorker,
+  isPasswordlessOfficeWorker,
+  isSolePasswordAdministrator,
+} from "./office-account-policy";
 
 const configuredSecret = process.env.JWT_SECRET?.trim() || process.env.SESSION_SECRET?.trim();
 if (!configuredSecret) {
@@ -166,6 +170,9 @@ export class AuthService {
       if (!user) {
         return null;
       }
+      if (!isSolePasswordAdministrator(user)) {
+        return null;
+      }
 
       const isValidPassword = await this.verifyPassword(password, user.passwordHash);
       if (!isValidPassword) {
@@ -209,7 +216,7 @@ export class AuthService {
           eq(adminUsers.isActive, true)
         ));
       
-      return user ? await this.enrichAdminUser(user) : null;
+      return user && isSolePasswordAdministrator(user) ? await this.enrichAdminUser(user) : null;
     } catch (error) {
       console.error('Get user error:', error);
       return null;
@@ -336,12 +343,7 @@ export const requireMobileTechnician = async (req: MobileAuthenticatedRequest, r
     }
 
     const worker = await storage.getWorker(claims.workerId);
-    if (
-      !worker ||
-      worker.isActive === false ||
-      worker.mobileAccessEnabled !== true ||
-      String(worker.role ?? "").trim().toLowerCase() !== "technician"
-    ) {
+    if (!worker || !isPasswordlessMobileWorker(worker)) {
       return res.status(403).json({ message: "Mobile technician access required" });
     }
 

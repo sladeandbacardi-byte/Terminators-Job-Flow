@@ -26,6 +26,38 @@ export async function runStartupMigrations(): Promise<void> {
   };
 
   await run(
+    "fleet email outbox",
+    `CREATE TABLE IF NOT EXISTS fleet_email_outbox (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_key text NOT NULL UNIQUE,
+      kind text NOT NULL,
+      recipients text[] NOT NULL,
+      subject text NOT NULL,
+      text_body text NOT NULL,
+      html_body text NOT NULL,
+      attempts integer NOT NULL DEFAULT 0,
+      next_attempt_at timestamp NOT NULL DEFAULT now(),
+      locked_at timestamp,
+      sent_at timestamp,
+      last_error text,
+      created_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS fleet_email_outbox_ready_idx
+      ON fleet_email_outbox (next_attempt_at, created_at) WHERE sent_at IS NULL;`,
+    true,
+  );
+  await run(
+    "fleet submission idempotency",
+    `ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS submission_key text;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS submission_key text;
+     ALTER TABLE vehicle_issues ADD COLUMN IF NOT EXISTS submission_key text;
+     CREATE UNIQUE INDEX IF NOT EXISTS fuel_fillups_submission_key_idx ON fuel_fillups (submission_key) WHERE submission_key IS NOT NULL;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_inspections_submission_key_idx ON vehicle_inspections (submission_key) WHERE submission_key IS NOT NULL;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_issues_submission_key_idx ON vehicle_issues (submission_key) WHERE submission_key IS NOT NULL;`,
+    true,
+  );
+
+  await run(
     "office_worker_sessions",
     `CREATE TABLE IF NOT EXISTS office_worker_sessions (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1161,6 +1193,173 @@ export async function runStartupMigrations(): Promise<void> {
      UPDATE users
        SET password = ''
      WHERE password <> '';`,
+    true,
+  );
+
+  // ── Fuel-station removal ──────────────────────────────────────────────────
+  // Runs as one guarded transaction at startup.  The temporary recursive
+  // function removes only exact fuel-station field names, case-insensitively;
+  // it does not touch unrelated values such as pest-control bait-station data.
+  await run(
+    "remove fuel station data",
+    `BEGIN;
+     CREATE OR REPLACE FUNCTION pg_temp.scrub_fuel_station_keys(value jsonb)
+     RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
+       SELECT CASE jsonb_typeof(value)
+         WHEN 'object' THEN COALESCE((
+           SELECT jsonb_object_agg(key, pg_temp.scrub_fuel_station_keys(item))
+           FROM jsonb_each(value)
+           WHERE lower(key) NOT IN ('station', 'station_name', 'fuel_station', 'fuelstation')
+         ), '{}'::jsonb)
+         WHEN 'array' THEN COALESCE((
+           SELECT jsonb_agg(pg_temp.scrub_fuel_station_keys(item))
+           FROM jsonb_array_elements(value) AS element(item)
+         ), '[]'::jsonb)
+         ELSE value
+       END;
+     $$;
+     DO $$
+     DECLARE target record;
+     BEGIN
+       FOR target IN SELECT * FROM (VALUES
+         ('fleetguard_source_records', 'payload_json'),
+         ('fleetguard_record_mappings', 'metadata_json'),
+         ('fleetguard_conflicts', 'details_json'),
+         ('fleetguard_import_runs', 'counts_json')
+       ) AS scrub_targets(table_name, column_name)
+       LOOP
+         IF to_regclass(target.table_name) IS NOT NULL THEN
+           EXECUTE format(
+             'UPDATE %I SET %I = pg_temp.scrub_fuel_station_keys(%I)
+              WHERE %I IS NOT NULL
+                AND %I IS DISTINCT FROM pg_temp.scrub_fuel_station_keys(%I)',
+             target.table_name, target.column_name, target.column_name,
+             target.column_name, target.column_name, target.column_name
+           );
+         END IF;
+       END LOOP;
+     END $$;
+     ALTER TABLE IF EXISTS fuel_fillups
+        ADD COLUMN IF NOT EXISTS fuel_type text;
+      ALTER TABLE IF EXISTS fuel_fillups
+        ALTER COLUMN fuel_type DROP DEFAULT;
+     ALTER TABLE IF EXISTS fuel_fillups DROP COLUMN IF EXISTS fuel_station;
+     COMMIT;`,
+    true,
+  );
+
+  // Historical reconciliation builds could materialise the prohibited KTD 136
+  // EC vehicle.  This is deliberately target-only and is guarded for partial /
+  // older schemas.  Mapping rows remain as exclusion audit evidence, but every
+  // payload-bearing JSON field is removed rather than retaining KTD data.
+  await run(
+    "remove historical KTD136EC FleetGuard materialisation",
+    `DO $$
+     DECLARE ktd_vehicle_ids text[];
+     BEGIN
+       IF to_regclass('vehicles') IS NULL THEN RETURN; END IF;
+       SELECT array_agg(id) INTO ktd_vehicle_ids
+       FROM vehicles
+       WHERE regexp_replace(upper(COALESCE(registration, '')), '[^A-Z0-9]', '', 'g') = 'KTD136EC';
+       IF COALESCE(array_length(ktd_vehicle_ids, 1), 0) = 0 THEN RETURN; END IF;
+
+       -- Native records are identified through their real vehicle relationship,
+       -- never through source payload text.
+       IF to_regclass('fuel_fillups') IS NOT NULL THEN
+         DELETE FROM fuel_fillups WHERE vehicle_id = ANY(ktd_vehicle_ids);
+       END IF;
+       IF to_regclass('km_logs') IS NOT NULL THEN
+         DELETE FROM km_logs WHERE vehicle_id = ANY(ktd_vehicle_ids);
+       END IF;
+       IF to_regclass('vehicle_inspections') IS NOT NULL THEN
+         DELETE FROM vehicle_inspections WHERE vehicle_id = ANY(ktd_vehicle_ids);
+       END IF;
+       IF to_regclass('service_records') IS NOT NULL THEN
+         DELETE FROM service_records WHERE vehicle_id = ANY(ktd_vehicle_ids);
+       END IF;
+
+       IF to_regclass('fleetguard_record_mappings') IS NOT NULL THEN
+         IF to_regclass('fleetguard_source_records') IS NOT NULL THEN
+           -- Follow the preserved source relationship before its payload is
+           -- erased, so dependent mapping evidence is retained as excluded too.
+           WITH forbidden_source_vehicles AS (
+             SELECT source_id
+             FROM fleetguard_record_mappings
+             WHERE source_system = 'fleetguard' AND entity_type = 'vehicles'
+               AND target_table = 'vehicles' AND target_id = ANY(ktd_vehicle_ids)
+           )
+           UPDATE fleetguard_record_mappings mapping
+              SET status = 'excluded', target_table = NULL, target_id = NULL,
+                  match_method = 'forbidden-vehicle-policy',
+                  metadata_json = jsonb_build_object('cleanup', 'forbidden KTD136EC policy')
+             FROM fleetguard_source_records source_record
+            WHERE mapping.source_system = 'fleetguard'
+              AND source_record.source_system = 'fleetguard'
+              AND mapping.entity_type = source_record.entity_type
+              AND mapping.source_id = source_record.source_id
+              AND COALESCE(
+                    source_record.payload_json ->> 'vehicle_id',
+                    source_record.payload_json ->> 'vehicleId'
+                  ) IN (SELECT source_id FROM forbidden_source_vehicles);
+         END IF;
+         UPDATE fleetguard_record_mappings
+            SET status = 'excluded', target_table = NULL, target_id = NULL,
+                match_method = 'forbidden-vehicle-policy',
+                metadata_json = jsonb_build_object('cleanup', 'forbidden KTD136EC policy')
+          WHERE source_system = 'fleetguard'
+            AND target_table = 'vehicles'
+            AND target_id = ANY(ktd_vehicle_ids);
+       END IF;
+       DELETE FROM vehicles WHERE id = ANY(ktd_vehicle_ids);
+     END $$;
+     DO $$
+     DECLARE target record;
+     BEGIN
+       -- Clear every raw/conflict payload attached to mappings excluded above,
+       -- including children which only held the source vehicle ID.
+       IF to_regclass('fleetguard_source_records') IS NOT NULL
+          AND to_regclass('fleetguard_record_mappings') IS NOT NULL THEN
+         UPDATE fleetguard_source_records source_record
+            SET payload_json = '{}'::jsonb
+           WHERE source_system = 'fleetguard'
+             AND EXISTS (
+               SELECT 1 FROM fleetguard_record_mappings mapping
+               WHERE mapping.source_system = 'fleetguard'
+                 AND mapping.entity_type = source_record.entity_type
+                 AND mapping.source_id = source_record.source_id
+                 AND mapping.status = 'excluded'
+                 AND mapping.match_method = 'forbidden-vehicle-policy'
+             );
+         IF to_regclass('fleetguard_conflicts') IS NOT NULL THEN
+           UPDATE fleetguard_conflicts conflict
+              SET details_json = '{}'::jsonb
+             WHERE source_system = 'fleetguard'
+               AND EXISTS (
+                 SELECT 1 FROM fleetguard_record_mappings mapping
+                 WHERE mapping.source_system = 'fleetguard'
+                   AND mapping.entity_type = conflict.entity_type
+                   AND mapping.source_id = conflict.source_id
+                   AND mapping.status = 'excluded'
+                   AND mapping.match_method = 'forbidden-vehicle-policy'
+               );
+         END IF;
+       END IF;
+       FOR target IN SELECT * FROM (VALUES
+         ('fleetguard_source_records', 'payload_json'),
+         ('fleetguard_conflicts', 'details_json'),
+         ('fleetguard_record_mappings', 'metadata_json')
+       ) AS targets(table_name, column_name)
+       LOOP
+         IF to_regclass(target.table_name) IS NOT NULL THEN
+           EXECUTE format(
+             'UPDATE %I SET %I = ''{}''::jsonb
+               WHERE %I IS NOT NULL
+                 AND regexp_replace(upper(%I::text), ''[^A-Z0-9]'', '''', ''g'') LIKE ''%%KTD136EC%%''',
+             target.table_name, target.column_name, target.column_name, target.column_name
+           );
+         END IF;
+       END LOOP;
+     END $$;`,
     true,
   );
 

@@ -31,6 +31,7 @@ interface EmailParams {
   text?: string;
   html?: string;
   attachments?: EmailAttachment[];
+  headers?: Record<string, string>;
 }
 
 // Values supplied by users may be included in trusted HTML email templates.
@@ -61,6 +62,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       subject: params.subject,
       text: params.text || '',
       html,
+      ...(params.headers ? { headers: params.headers } : {}),
     };
     if (attachments && attachments.length > 0) {
       message.attachments = attachments.map(a => ({

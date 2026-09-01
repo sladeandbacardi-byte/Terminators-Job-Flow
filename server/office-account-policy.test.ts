@@ -5,9 +5,11 @@ import type { AdminUser, Worker } from "@shared/schema";
 import {
   buildOfficeLoginDirectory,
   isEligibleOfficeWorker,
+  isPasswordlessMobileWorker,
   isPasswordlessOfficeWorker,
   passwordHashNeedsReconciliation,
   normalizeDeploymentSecret,
+  isSolePasswordAdministrator,
   selectCanonicalSuperAdminTarget,
 } from "./office-account-policy";
 
@@ -53,6 +55,14 @@ test("startup reconciliation never repurposes an unrelated account that owns the
   );
 });
 
+test("only Julien's canonical administrator record is eligible for password authentication", () => {
+  assert.equal(isSolePasswordAdministrator(admin("worker-1", "Julien Botha", "admin")), true);
+  assert.equal(isSolePasswordAdministrator(admin("legacy-julien", "Julien Botha", "admin")), true);
+  assert.equal(isSolePasswordAdministrator(admin("worker-1", "Another Person", "admin")), false);
+  assert.equal(isSolePasswordAdministrator(admin("worker-2", "Juli Holtshausen", "juli")), false);
+  assert.equal(isSolePasswordAdministrator({ ...admin("worker-1", "Julien Botha", "admin"), isActive: false }), false);
+});
+
 test("office selector gives canonical non-Julien workers passwordless access without inventing credentials", () => {
   const workers = [
     worker("worker-1", "Julien Botha", "Operations Manager"),
@@ -95,6 +105,31 @@ test("passwordless office eligibility rejects Julien, inactive, mobile, generic 
   assert.equal(isPasswordlessOfficeWorker(worker("tech", "Field Tech", "Technician")), false);
 });
 
+test("each of the nine named field profiles is eligible only for passwordless mobile selection", () => {
+  const mobileProfiles = [
+    ["mobile-tech-01", "Re-Althon"], ["mobile-tech-04", "Jackie Roelfse"],
+    ["mobile-tech-06", "Zain Abdol"], ["mobile-tech-10", "Zuki Sandi"],
+    ["mobile-tech-09", "Reece Ebrahim"], ["mobile-tech-03", "Garth du Preez"],
+    ["mobile-tech-07", "Michael Meyer"], ["mobile-tech-08", "Xolani Ndzotoyi"],
+    ["mobile-tech-02", "Leon Coltman"],
+  ] as const;
+
+  for (const [id, name] of mobileProfiles) {
+    const profile = worker(id, name, "Technician");
+    assert.equal(isPasswordlessMobileWorker({ ...profile, mobileAccessEnabled: true }), true, name);
+    assert.equal(isPasswordlessOfficeWorker({ ...profile, mobileAccessEnabled: true }), false, name);
+  }
+});
+
+test("mobile profile selection rejects every office profile and disabled or non-technician workers", () => {
+  assert.equal(isPasswordlessMobileWorker({ ...worker("mobile-tech-01", "Re-Althon", "Technician"), mobileAccessEnabled: false }), false);
+  assert.equal(isPasswordlessMobileWorker({ ...worker("mobile-tech-01", "Re-Althon", "Supervisor"), mobileAccessEnabled: true }), false);
+  assert.equal(isPasswordlessMobileWorker({ ...worker("mobile-tech-01", "Re-Althon", "Technician"), mobileAccessEnabled: true, isActive: false }), false);
+  for (const id of ["worker-1", "worker-2", "worker-3", "worker-4", "worker-5", "worker-6"]) {
+    assert.equal(isPasswordlessMobileWorker({ ...worker(id, "Office User", "Technician"), mobileAccessEnabled: true }), false, id);
+  }
+});
+
 test("desktop office directory contains each of the six canonical admin organogram people exactly once", () => {
   const names = [
     "Julien Botha", "Juli Holtshausen", "Mariette Koekemoer",
@@ -110,6 +145,11 @@ test("desktop office directory contains each of the six canonical admin organogr
   assert.equal(new Set(directory.map(entry => entry.name)).size, 6);
   assert.equal(directory.find(entry => entry.name === "Julien Botha")?.authMethod, "password");
   assert.equal(directory.filter(entry => entry.authMethod === "passwordless").length, 5);
+  for (const name of names) {
+    const entry = directory.find(candidate => candidate.name === name);
+    assert.ok(entry, `${name} must have an office selection`);
+    assert.equal(entry.authMethod, name === "Julien Botha" ? "password" : "passwordless", name);
+  }
 });
 
 test("office role eligibility does not make generic technicians office accounts", () => {

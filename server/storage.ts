@@ -279,6 +279,7 @@ export interface IStorage {
   getKmLogsByVehicle(vehicleId: string): Promise<KmLog[]>;
   getKmLogsByDateRange(start: Date, end: Date): Promise<KmLog[]>;
   createKmLog(log: InsertKmLog): Promise<KmLog>;
+  updateKmLog(id: string, log: Partial<InsertKmLog>): Promise<KmLog>;
   deleteKmLog(id: string): Promise<boolean>;
 
   // Fleet — Fuel Fill-ups
@@ -4044,17 +4045,17 @@ export class MemStorage implements IStorage {
     kmLogsData.forEach(l => this.kmLogs.set(l.id, l));
 
     const fuelData: FuelFillup[] = [
-      { id: "fuel-1",  vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(4),  odometer: 285110, litres: "70.40", cost: "1864.60", fuelStation: "Engen Greenacres",      receiptPhoto: null, notes: null,                    createdAt: td(4)  },
-      { id: "fuel-2",  vehicleId: "vehicle-2",  workerId: "worker-14", fillDate: td(5),  odometer: 198310, litres: "52.10", cost: "1380.65", fuelStation: "BP Newton Park",         receiptPhoto: null, notes: null,                    createdAt: td(5)  },
-      { id: "fuel-3",  vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(3),  odometer: 88580,  litres: "48.60", cost: "1287.90", fuelStation: "Shell Walmer",           receiptPhoto: null, notes: null,                    createdAt: td(3)  },
-      { id: "fuel-4",  vehicleId: "vehicle-4",  workerId: "worker-13", fillDate: td(6),  odometer: 322480, litres: "55.30", cost: "1465.45", fuelStation: "Caltex Summerstrand",    receiptPhoto: null, notes: "Tank very low",          createdAt: td(6)  },
-      { id: "fuel-5",  vehicleId: "vehicle-5",  workerId: "worker-6",  fillDate: td(4),  odometer: 141720, litres: "32.80", cost: "869.20",  fuelStation: "Total Lorraine",         receiptPhoto: null, notes: null,                    createdAt: td(4)  },
-      { id: "fuel-6",  vehicleId: "vehicle-6",  workerId: "worker-12", fillDate: td(2),  odometer: 178210, litres: "50.70", cost: "1343.55", fuelStation: "BP Newton Park",         receiptPhoto: null, notes: null,                    createdAt: td(2)  },
-      { id: "fuel-7",  vehicleId: "vehicle-7",  workerId: "worker-10", fillDate: td(5),  odometer: 41960,  litres: "65.20", cost: "1727.80", fuelStation: "Engen Uitenhage Road",   receiptPhoto: null, notes: "Diesel",                createdAt: td(5)  },
-      { id: "fuel-8",  vehicleId: "vehicle-8",  workerId: "worker-11", fillDate: td(7),  odometer: 165380, litres: "49.40", cost: "1309.10", fuelStation: "Shell Walmer",           receiptPhoto: null, notes: null,                    createdAt: td(7)  },
-      { id: "fuel-9",  vehicleId: "vehicle-9",  workerId: "worker-8",  fillDate: td(3),  odometer: 36300,  litres: "46.90", cost: "1242.85", fuelStation: "Caltex Greenacres",      receiptPhoto: null, notes: null,                    createdAt: td(3)  },
-      { id: "fuel-11", vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(18), odometer: 284980, litres: "68.90", cost: "1825.85", fuelStation: "Total Gqeberha CBD",     receiptPhoto: null, notes: null,                    createdAt: td(18) },
-      { id: "fuel-12", vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(16), odometer: 88420,  litres: "47.10", cost: "1248.15", fuelStation: "BP Charlo",             receiptPhoto: null, notes: null,                    createdAt: td(16) },
+      { id: "fuel-1",  vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(4),  odometer: 285110, litres: "70.40", cost: "1864.60", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(4)  },
+      { id: "fuel-2",  vehicleId: "vehicle-2",  workerId: "worker-14", fillDate: td(5),  odometer: 198310, litres: "52.10", cost: "1380.65", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(5)  },
+      { id: "fuel-3",  vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(3),  odometer: 88580,  litres: "48.60", cost: "1287.90", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(3)  },
+      { id: "fuel-4",  vehicleId: "vehicle-4",  workerId: "worker-13", fillDate: td(6),  odometer: 322480, litres: "55.30", cost: "1465.45", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: "Tank very low", createdAt: td(6)  },
+      { id: "fuel-5",  vehicleId: "vehicle-5",  workerId: "worker-6",  fillDate: td(4),  odometer: 141720, litres: "32.80", cost: "869.20", fuelType: "Petrol 95", receiptPhoto: "seed-slip", notes: null, createdAt: td(4)  },
+      { id: "fuel-6",  vehicleId: "vehicle-6",  workerId: "worker-12", fillDate: td(2),  odometer: 178210, litres: "50.70", cost: "1343.55", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(2)  },
+      { id: "fuel-7",  vehicleId: "vehicle-7",  workerId: "worker-10", fillDate: td(5),  odometer: 41960,  litres: "65.20", cost: "1727.80", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: "Diesel", createdAt: td(5)  },
+      { id: "fuel-8",  vehicleId: "vehicle-8",  workerId: "worker-11", fillDate: td(7),  odometer: 165380, litres: "49.40", cost: "1309.10", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(7)  },
+      { id: "fuel-9",  vehicleId: "vehicle-9",  workerId: "worker-8",  fillDate: td(3),  odometer: 36300,  litres: "46.90", cost: "1242.85", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(3)  },
+      { id: "fuel-11", vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(18), odometer: 284980, litres: "68.90", cost: "1825.85", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(18) },
+      { id: "fuel-12", vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(16), odometer: 88420, litres: "47.10", cost: "1248.15", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(16) },
     ];
     fuelData.forEach(f => this.fuelFillups.set(f.id, f));
 
@@ -4224,6 +4225,13 @@ export class MemStorage implements IStorage {
     const newLog: KmLog = { ...log, id, createdAt: new Date() };
     this.kmLogs.set(id, newLog);
     return newLog;
+  }
+  async updateKmLog(id: string, log: Partial<InsertKmLog>): Promise<KmLog> {
+    const existing = this.kmLogs.get(id);
+    if (!existing) throw new Error("KM log not found");
+    const updated = { ...existing, ...log };
+    this.kmLogs.set(id, updated);
+    return updated;
   }
   async deleteKmLog(id: string): Promise<boolean> {
     return this.kmLogs.delete(id);

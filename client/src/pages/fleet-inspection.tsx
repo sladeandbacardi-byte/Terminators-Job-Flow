@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useSearch } from "wouter";
 import { ClipboardCheck, ArrowLeft, CheckCircle, XCircle, AlertTriangle, Truck, User } from "lucide-react";
 import { format } from "date-fns";
+const newSubmissionKey = () => crypto.randomUUID();
 
 const INSPECTION_CHECKLIST = [
   "Tyres (condition & pressure)",
@@ -53,6 +54,7 @@ export default function FleetInspection() {
     Object.fromEntries(INSPECTION_CHECKLIST.map(name => [name, { result: "pass", comments: "" }]))
   );
   const [overallComments, setOverallComments] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(newSubmissionKey);
 
   const { data: vehicles = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
   const { data: assignments = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/assignments"] });
@@ -95,6 +97,7 @@ export default function FleetInspection() {
         overallResult,
         itemsJson: JSON.stringify(itemsArr),
         comments: overallComments || null,
+        idempotencyKey,
       };
       return apiRequest("POST", "/api/fleet/inspections", body);
     },
@@ -107,6 +110,7 @@ export default function FleetInspection() {
         variant: anyFail ? "destructive" : "default" });
       setItems(Object.fromEntries(INSPECTION_CHECKLIST.map(n => [n, { result: "pass", comments: "" }])));
       setOverallComments("");
+      setIdempotencyKey(newSubmissionKey());
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });

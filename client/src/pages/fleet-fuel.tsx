@@ -13,10 +13,16 @@ import { Link, useSearch } from "wouter";
 import { Fuel, ArrowLeft, Truck, User, ShieldOff } from "lucide-react";
 import { format } from "date-fns";
 import { getDashboardRole } from "@/lib/dashboardRole";
+const newSubmissionKey = () => crypto.randomUUID();
 
 export default function FleetFuel() {
   const { user } = useAuth();
-  const role = getDashboardRole({ departmentId: user?.departmentId, role: user?.role });
+  const role = getDashboardRole({
+    id: user?.id,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
+    role: user?.role,
+  });
   const { toast } = useToast();
   const qc = useQueryClient();
   const search = useSearch();
@@ -24,11 +30,14 @@ export default function FleetFuel() {
 
   const [vehicleId, setVehicleId] = useState(preselectedVehicle);
   const [fillDate, setFillDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [fillTime, setFillTime] = useState(format(new Date(), "HH:mm"));
   const [odometer, setOdometer] = useState("");
   const [litres, setLitres] = useState("");
   const [cost, setCost] = useState("");
-  const [fuelStation, setFuelStation] = useState("");
+  const [fuelType, setFuelType] = useState("");
+  const [receiptPhoto, setReceiptPhoto] = useState("");
   const [notes, setNotes] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(newSubmissionKey);
 
   const { data: vehicles = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
   const { data: assignments = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/assignments"] });
@@ -57,25 +66,28 @@ export default function FleetFuel() {
       const body = {
         vehicleId,
         workerId: user?.id,
-        fillDate: new Date(fillDate).toISOString(),
-        odometer: odometer ? parseInt(odometer) : null,
+        date: fillDate,
+        time: fillTime,
+        odometer: parseInt(odometer),
         litres,
         cost,
-        fuelStation: fuelStation || null,
+        fuelType,
+        receiptPhoto,
         notes: notes || null,
+        idempotencyKey,
       };
       return apiRequest("POST", "/api/fleet/fuel-fillups", body);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/fleet/fuel-fillups"] });
       toast({ title: "Fuel Fill-up Saved", description: "Fill-up recorded successfully." });
-      setOdometer(""); setLitres(""); setCost(""); setFuelStation(""); setNotes("");
+      setOdometer(""); setLitres(""); setCost(""); setFuelType(""); setReceiptPhoto(""); setNotes(""); setIdempotencyKey(newSubmissionKey());
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const vehicleName = (id: string) => (vehicles as any[]).find(v => v.id === id)?.name ?? id;
-  const canSubmit = vehicleId && fillDate && litres && cost;
+  const canSubmit = vehicleId && fillDate && fillTime && odometer && litres && cost && fuelType && receiptPhoto;
 
   if (role === "admin") {
     return (
@@ -127,7 +139,7 @@ export default function FleetFuel() {
                   <span className="font-medium">{user?.firstName} {user?.lastName}</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1.5">
                     <Label>Vehicle</Label>
                     <Select value={vehicleId} onValueChange={setVehicleId}>
@@ -150,11 +162,15 @@ export default function FleetFuel() {
                     <Label>Date</Label>
                     <Input type="date" value={fillDate} onChange={e => setFillDate(e.target.value)} />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label>Time</Label>
+                    <Input type="time" value={fillTime} onChange={e => setFillTime(e.target.value)} />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Odometer Reading (km) <span className="text-gray-400 font-normal">(optional)</span></Label>
-                  <Input type="number" placeholder="e.g. 85520" value={odometer} onChange={e => setOdometer(e.target.value)} />
+                  <Label>Current Odometer Reading (km)</Label>
+                  <Input required type="number" min="0" placeholder="e.g. 85520" value={odometer} onChange={e => setOdometer(e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -176,8 +192,32 @@ export default function FleetFuel() {
                 )}
 
                 <div className="space-y-1.5">
-                  <Label>Fuel Station <span className="text-gray-400 font-normal">(optional)</span></Label>
-                  <Input placeholder="e.g. Engen Sandton" value={fuelStation} onChange={e => setFuelStation(e.target.value)} />
+                  <Label>Fuel Type</Label>
+                  <Select value={fuelType} onValueChange={setFuelType}>
+                    <SelectTrigger><SelectValue placeholder="Select fuel type..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Petrol 93">Petrol 93</SelectItem>
+                      <SelectItem value="Petrol 95">Petrol 95</SelectItem>
+                      <SelectItem value="Diesel 10 ppm">Diesel 10 ppm</SelectItem>
+                      <SelectItem value="Diesel 50 ppm">Diesel 50 ppm</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Fuel Slip Photo</Label>
+                  <Input required type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2_000_000) {
+                      toast({ title: "Invalid slip photo", description: "Use a JPG, PNG, or WebP image smaller than 2 MB.", variant: "destructive" });
+                      event.target.value = "";
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => setReceiptPhoto(String(reader.result));
+                    reader.readAsDataURL(file);
+                  }} />
+                  {receiptPhoto && <p className="text-sm text-emerald-700">Slip photo attached</p>}
                 </div>
 
                 <div className="space-y-1.5">
@@ -203,7 +243,7 @@ export default function FleetFuel() {
                     <tr>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">Station</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600">Fuel Type</th>
                       <th className="text-right px-4 py-3 font-medium text-gray-600">Litres</th>
                       <th className="text-right px-4 py-3 font-medium text-gray-600">Cost</th>
                     </tr>
@@ -213,7 +253,7 @@ export default function FleetFuel() {
                       <tr key={f.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-600">{format(new Date(f.fillDate), "dd MMM yyyy")}</td>
                         <td className="px-4 py-3">{vehicleName(f.vehicleId)}</td>
-                        <td className="px-4 py-3 text-gray-500">{f.fuelStation || "—"}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.fuelType || "—"}</td>
                         <td className="px-4 py-3 text-right">{parseFloat(f.litres || "0").toFixed(1)} L</td>
                         <td className="px-4 py-3 text-right font-medium text-amber-700">R {parseFloat(f.cost || "0").toFixed(2)}</td>
                       </tr>
