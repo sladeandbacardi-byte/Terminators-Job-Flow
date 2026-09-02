@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   FORBIDDEN_REGISTRATION,
+  FLEETGUARD_DRIVER_WORKER_IDS,
   buildReconciliationPlan,
   fleetGuardNativeId,
   fleetGuardKmDailyTargetId,
@@ -10,6 +11,7 @@ import {
   normalizeName,
   normalizeRegistration,
   sanitizeFuelLog,
+  sourceLookbackStart,
   sourceIdForRow,
   stripFuelStationData,
 } from "./fleetguard-reconciliation";
@@ -55,6 +57,12 @@ test("missing vehicle registration is quarantined", () => {
 test("driver name normalization is deterministic", () => {
   assert.equal(normalizeName("Re-Althon"), "re althon");
   assert.equal(normalizeName("  Re  Althon "), "re althon");
+});
+
+test("verified FleetGuard driver IDs map to canonical mobile and office identities", () => {
+  assert.equal(FLEETGUARD_DRIVER_WORKER_IDS["270155d9-6531-4ca5-8922-8c7f4c9978d4"], "mobile-tech-04");
+  assert.equal(FLEETGUARD_DRIVER_WORKER_IDS["dba78f86-b0d4-4cb2-97f0-6899e57468fe"], "mobile-tech-01");
+  assert.equal(FLEETGUARD_DRIVER_WORKER_IDS["d3cd5014-75f2-4e57-929d-a5d9c1d6b3b0"], "worker-1");
 });
 
 test("ID-less settings rows receive a deterministic source fingerprint", () => {
@@ -122,6 +130,14 @@ test("fuel station keys are recursively stripped, including JSON notes and metad
   });
 });
 
+test("source scrubber preserves PostgreSQL dates and binary evidence", () => {
+  const date = new Date("2026-09-02T08:30:00.123Z");
+  const image = Buffer.from("image");
+  const cleaned = stripFuelStationData({ date, image, station_name: "remove" });
+  assert.equal(cleaned.date, date);
+  assert.equal(cleaned.image, image);
+});
+
 test("import planning and fingerprints cannot retain fuel station data", () => {
   const source = {
     vehicles: [{ id: "missing-registration", station: "Do not retain", nested: { Station_Name: "Do not retain" } }],
@@ -180,4 +196,28 @@ test("fuel fingerprints use the strict sanitized payload", () => {
     notes: "untrusted OCR transcript",
   };
   assert.equal(nativeSourceFingerprint(sanitizeFuelLog(contaminated)), nativeSourceFingerprint(sanitizeFuelLog(nativeFields)));
+});
+
+test("fuel source slip-image aliases become the canonical photo fields without OCR data", () => {
+  assert.deepEqual(sanitizeFuelLog({
+    id: "fuel-alias",
+    slip_image_data: "base64-payload",
+    slip_image_mime_type: "image/jpeg",
+    slip_image_name: "slip.jpg",
+    ocr_raw_text: "must not cross",
+    station_name: "must not cross",
+  }), {
+    id: "fuel-alias",
+    slip_data: "base64-payload",
+    slip_mime: "image/jpeg",
+    slip_name: "slip.jpg",
+  });
+});
+
+test("incremental event reads overlap the previous watermark for late changes", () => {
+  assert.equal(
+    sourceLookbackStart(new Date("2026-09-02T12:00:00.000Z"))?.toISOString(),
+    "2026-08-26T12:00:00.000Z",
+  );
+  assert.equal(sourceLookbackStart(null), null);
 });
