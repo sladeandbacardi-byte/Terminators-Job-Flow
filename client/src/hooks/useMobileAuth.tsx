@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { Worker } from '@shared/schema';
+import { clearAllAuth, readMobileSession, validateMobileSession } from '@/lib/mobile-auth';
 
 interface MobileAuthContextType {
   worker: Worker | null;
@@ -29,52 +30,39 @@ export function MobileAuthProvider({ children }: MobileAuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedWorkerId = localStorage.getItem('mobile_worker_id');
-    const storedToken = localStorage.getItem('mobile_session_token');
-    const storedWorkerData = localStorage.getItem('mobile_worker_data');
-
-    if (storedWorkerId && storedToken && storedWorkerData) {
+    let active = true;
+    const hydrate = async () => {
       try {
-        const workerData = JSON.parse(storedWorkerData);
-        setWorker(workerData);
-      } catch (error) {
-        console.error('Error parsing stored worker data:', error);
-        // Clear invalid data
-        localStorage.removeItem('mobile_worker_id');
-        localStorage.removeItem('mobile_session_token');
-        localStorage.removeItem('mobile_worker_data');
-        localStorage.removeItem('mobile_user_role');
-        localStorage.removeItem('mobile_user_type');
+        const session = readMobileSession();
+        if (session && await validateMobileSession(session) && active) setWorker(session.worker as Worker);
+      } finally {
+        if (active) setIsLoading(false);
       }
-    }
-    
-    setIsLoading(false);
+    };
+    void hydrate();
+    return () => { active = false; };
   }, []);
 
   const login = (workerData: Worker) => {
     setWorker(workerData);
-    localStorage.setItem('mobile_worker_id', workerData.id);
-    localStorage.setItem('mobile_worker_data', JSON.stringify(workerData));
-    localStorage.setItem('mobile_user_role', workerData.role || 'Technician');
-    localStorage.setItem('mobile_user_type', 'staff');
   };
 
   const logout = () => {
+    const session = readMobileSession();
     setWorker(null);
-    // Mobile has its own token, but signing out must reset both auth
-    // namespaces so the next screen is always the main login selector.
-    localStorage.removeItem('mobile_worker_id');
-    localStorage.removeItem('mobile_session_token');
-    localStorage.removeItem('mobile_worker_data');
-    localStorage.removeItem('mobile_user_role');
-    localStorage.removeItem('mobile_user_type');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('auth_user_role');
-    localStorage.removeItem('auth_user_type');
-    localStorage.removeItem('demo_mode');
-    localStorage.removeItem('selected_login_mode');
-    window.location.replace('/');
+    void (async () => {
+      try {
+        if (session) {
+          await fetch("/api/auth/mobile-logout", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session.token}` },
+          });
+        }
+      } finally {
+        clearAllAuth();
+        window.location.replace('/');
+      }
+    })();
   };
 
   const value: MobileAuthContextType = {

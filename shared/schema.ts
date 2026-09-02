@@ -807,6 +807,14 @@ export const officeWorkerSessions = pgTable("office_worker_sessions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const mobileWorkerSessions = pgTable("mobile_worker_sessions", {
+  id: varchar("id").primaryKey(),
+  workerId: varchar("worker_id").notNull().references(() => workers.id),
+  sessionToken: varchar("session_token").unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas for new tables
 export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
   id: true,

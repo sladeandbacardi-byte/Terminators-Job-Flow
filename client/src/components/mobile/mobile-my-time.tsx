@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileShell, type MobileNavItem } from "./mobile-shell";
+import { clearAllAuth, mobileFetch, readMobileSession } from "@/lib/mobile-auth";
 
 type TimeEntry = {
   id: string;
@@ -57,7 +58,6 @@ type FleetVehicle = {
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("mobile_session_token") ?? ""}`,
 });
 const today = () => new Date().toISOString().slice(0, 10);
 const reasons = [
@@ -104,20 +104,17 @@ export default function MobileMyTime() {
   const [confirmHighDistance, setConfirmHighDistance] = useState(false);
 
   const worker = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("mobile_worker_data") || "{\"name\":\"Technician\",\"role\":\"Technician\"}") as { name: string; role?: string };
-    } catch {
-      return { name: "Technician", role: "Technician" };
-    }
+    const session = readMobileSession();
+    return session?.worker as { name: string; role?: string } | undefined;
   }, []);
 
   const load = async () => {
     setLoading(true);
     try {
       const [timeResponse, attendanceResponse, vehicleResponse] = await Promise.all([
-        fetch("/api/mobile/time", { headers: authHeaders() }),
-        fetch("/api/mobile/attendance/today", { headers: authHeaders() }),
-        fetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
+        mobileFetch("/api/mobile/time", { headers: authHeaders() }),
+        mobileFetch("/api/mobile/attendance/today", { headers: authHeaders() }),
+        mobileFetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
       ]);
       const [data, attendanceData, vehicleData] = await Promise.all([
         timeResponse.json().catch(() => ({})),
@@ -166,7 +163,7 @@ export default function MobileMyTime() {
     setError("");
     setMessage("");
     try {
-      const response = await fetch(`/api/mobile/attendance/${action}`, {
+      const response = await mobileFetch(`/api/mobile/attendance/${action}`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -247,7 +244,7 @@ export default function MobileMyTime() {
       const body = mode === "timeoff"
         ? { workDate: form.workDate, startTime: form.startTime, finishTime: form.finishTime, reason: form.reason, otherReason: form.otherReason || null, notes: form.notes }
         : { workDate: form.workDate, startTime: form.startTime, finishTime: form.finishTime, customerName: form.customerName, notes: form.notes };
-      const response = await fetch(path, { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
+      const response = await mobileFetch(path, { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(response.status === 401
@@ -266,7 +263,7 @@ export default function MobileMyTime() {
   };
 
   const logout = () => {
-    ["mobile_worker_id", "mobile_session_token", "mobile_worker_data", "mobile_user_role", "mobile_user_type", "auth_token", "auth_user", "auth_user_role", "auth_user_type", "demo_mode", "selected_login_mode"].forEach(key => localStorage.removeItem(key));
+    clearAllAuth();
     window.location.replace("/");
   };
   const statusClass = (status: TimeEntry["status"]) =>
@@ -282,8 +279,8 @@ export default function MobileMyTime() {
     <MobileShell
       title="My Time"
       subtitle="Attendance, overtime and authorised Time Off"
-      workerName={worker.name}
-      workerRole={worker.role}
+      workerName={worker?.name ?? ""}
+      workerRole={worker?.role}
       activeItem="my-time"
       items={mobileNavItems}
       onLogout={logout}

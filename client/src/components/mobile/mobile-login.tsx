@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Smartphone, UserRound } from "lucide-react";
 import type { Worker } from "@shared/schema";
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
+import { storeMobileSession } from "@/lib/mobile-auth";
 
 type StaffProfile = { id: string; name: string; role: string; department: string };
 
@@ -36,21 +37,17 @@ export function MobileLogin({ onSuccess }: MobileLoginProps) {
     try {
       const response = await fetch("/api/auth/mobile-login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("mobile_session_token")
+            ? { Authorization: `Bearer ${localStorage.getItem("mobile_session_token")}` }
+            : {}),
+        },
         body: JSON.stringify({ workerId: profile.id }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || "Unable to sign in");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_user");
-      localStorage.removeItem("auth_user_role");
-      localStorage.removeItem("auth_user_type");
-      localStorage.removeItem("demo_mode");
-      localStorage.setItem("mobile_worker_id", data.worker.id);
-      localStorage.setItem("mobile_session_token", data.token);
-      localStorage.setItem("mobile_worker_data", JSON.stringify(data.worker));
-      localStorage.setItem("mobile_user_role", data.worker.role || "Technician");
-      localStorage.setItem("mobile_user_type", "staff");
+      storeMobileSession({ workerId: data.worker.id, token: data.token, worker: data.worker });
       onSuccess(data.worker);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");

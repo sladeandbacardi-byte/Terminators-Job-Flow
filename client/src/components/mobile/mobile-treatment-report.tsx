@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Check, ChevronLeft, ClipboardCheck, Eraser, Plus, Save, Send, ShieldAlert } from "lucide-react";
+import { mobileFetch } from "@/lib/mobile-auth";
 
 type Product = { id: string; name: string; formulation: string; registrationNumber?: string | null; defaultUnit: string };
 type Area = { area: string; otherDescription?: string | null };
@@ -40,7 +41,6 @@ const blankForm = (): ReportForm => ({
 
 const headers = () => ({
   "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("mobile_session_token") ?? ""}`,
 });
 
 const AREA_OPTIONS = [
@@ -94,8 +94,8 @@ export function MobileTreatmentReport({
     setLoading(true);
     try {
       const [contextResponse, productResponse] = await Promise.all([
-        fetch(`/api/mobile/treatment-reports/${jobId}`, { headers: headers() }),
-        fetch("/api/mobile/pest-control-products", { headers: headers() }),
+        mobileFetch(`/api/mobile/treatment-reports/${jobId}`, { headers: headers() }),
+        mobileFetch("/api/mobile/pest-control-products", { headers: headers() }),
       ]);
       const context = await contextResponse.json();
       if (!contextResponse.ok) throw new Error(context.message || "Unable to load the treatment report.");
@@ -144,7 +144,7 @@ export function MobileTreatmentReport({
     if (!hydrated.current || job?.status === "completed") return;
     try {
       if (!quiet) setSaving(true);
-      const response = await fetch(`/api/mobile/treatment-reports/${jobId}/draft`, {
+      const response = await mobileFetch(`/api/mobile/treatment-reports/${jobId}/draft`, {
         method: "PATCH", headers: headers(), body: JSON.stringify(form),
       });
       const result = await response.json();
@@ -205,7 +205,7 @@ export function MobileTreatmentReport({
   const complete = async () => {
     setValidationErrors([]); setError(""); setSaving(true);
     try {
-      const response = await fetch(`/api/mobile/treatment-reports/${jobId}/complete`, {
+      const response = await mobileFetch(`/api/mobile/treatment-reports/${jobId}/complete`, {
         method: "POST", headers: headers(), body: JSON.stringify(form),
       });
       const result = await response.json();

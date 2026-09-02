@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { AdminUser } from '@shared/schema';
+import { clearAllAuth } from '@/lib/mobile-auth';
 import type { DemoProfile } from '@/lib/demoProfiles';
 
 interface AuthContextType {
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = (newToken: string, userData: AdminUser) => {
+    clearAllAuth();
     setToken(newToken);
     setUser(userData);
     setIsDemoMode(false);
@@ -67,14 +69,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.setItem('auth_user_role', userData.role || 'User');
     localStorage.setItem('auth_user_type', (userData as AdminUser & { userType?: string }).userType || 'admin');
     localStorage.removeItem('demo_mode');
-    localStorage.removeItem('mobile_worker_id');
-    localStorage.removeItem('mobile_session_token');
-    localStorage.removeItem('mobile_worker_data');
-    localStorage.removeItem('mobile_user_role');
-    localStorage.removeItem('mobile_user_type');
   };
 
   const loginDemo = (profile: DemoProfile) => {
+    clearAllAuth();
     const fakeToken = `demo-token-${profile.key}-${Date.now()}`;
     const fakeUser = profile.user as unknown as AdminUser;
     setToken(fakeToken);
@@ -103,16 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUser(null);
     setIsDemoMode(false);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('auth_user_role');
-    localStorage.removeItem('auth_user_type');
-    localStorage.removeItem('demo_mode');
-    localStorage.removeItem('mobile_worker_id');
-    localStorage.removeItem('mobile_session_token');
-    localStorage.removeItem('mobile_worker_data');
-    localStorage.removeItem('mobile_user_role');
-    localStorage.removeItem('mobile_user_type');
+    clearAllAuth();
   };
 
   const value: AuthContextType = {

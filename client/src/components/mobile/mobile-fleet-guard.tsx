@@ -4,6 +4,7 @@ import {
   Fuel, Gauge, History, ShieldCheck, Truck, Camera, RefreshCw,
 } from "lucide-react";
 import type { Worker } from "@shared/schema";
+import { mobileFetch } from "@/lib/mobile-auth";
 
 type FleetMode = "fleet" | "kmMorning" | "kmAfternoon" | "fuel" | "inspection" | "monthlyInspection" | "issue";
 type Log = { id: string; logDate: string; startOdometer: number; endOdometer: number; totalKm: number; businessKm: number; privateKm: number; notes?: string | null; isSelectedDay?: boolean };
@@ -16,7 +17,7 @@ type Overview = {
 };
 const DAILY_CHECKS = ["Tyres", "Lights", "Fluids", "Mirrors", "Wipers", "Brakes", "Seat belts", "Visible damage"];
 
-const headers = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("mobile_session_token") ?? ""}` });
+const headers = () => ({ "Content-Type": "application/json" });
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
 const localTime = () => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
@@ -35,7 +36,7 @@ export function MobileFleetGuard({ worker, mode, onNavigate, onSaved }: { worker
   const load = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/mobile/fleet/overview?date=${date}`, { headers: headers() });
+      const response = await mobileFetch(`/api/mobile/fleet/overview?date=${date}`, { headers: headers() });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || "Unable to load FleetGuard.");
       setOverview(payload); setError("");
@@ -61,7 +62,7 @@ export function MobileFleetGuard({ worker, mode, onNavigate, onSaved }: { worker
     setError(""); setNotice("");
     try {
       if (!overview?.vehicle) throw new Error("You need an assigned vehicle before you can log FleetGuard activity.");
-      const response = await fetch(path, { method: "POST", headers: headers(), body: JSON.stringify({ ...form, ...extra, vehicleId: overview.vehicle.id, idempotencyKey }) });
+      const response = await mobileFetch(path, { method: "POST", headers: headers(), body: JSON.stringify({ ...form, ...extra, vehicleId: overview.vehicle.id, idempotencyKey }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || "Unable to save this FleetGuard update.");
       setForm({}); setIdempotencyKey(newSubmissionKey()); setNotice(success); await Promise.all([load(), onSaved()]); onNavigate("fleet");

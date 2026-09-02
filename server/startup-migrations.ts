@@ -58,6 +58,20 @@ export async function runStartupMigrations(): Promise<void> {
   );
 
   await run(
+    "mobile_worker_sessions",
+    `CREATE TABLE IF NOT EXISTS mobile_worker_sessions (
+       id varchar PRIMARY KEY,
+       worker_id varchar NOT NULL REFERENCES workers(id),
+       session_token varchar UNIQUE NOT NULL,
+       expires_at timestamp NOT NULL,
+       created_at timestamp DEFAULT now()
+     );
+     CREATE INDEX IF NOT EXISTS mobile_worker_sessions_worker_idx
+       ON mobile_worker_sessions(worker_id, expires_at);`,
+    true,
+  );
+
+  await run(
     "office_worker_sessions",
     `CREATE TABLE IF NOT EXISTS office_worker_sessions (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Clock3, RefreshCw } from "lucide-react";
 import { calculateOvertimeBreakdown, formatOvertimeMinutes } from "@shared/overtime";
+import { mobileFetch } from "@/lib/mobile-auth";
 
 type MobileJob = { id: string; title: string; scheduledDate: string; client?: { name: string } | null };
 type OvertimeEntry = {
@@ -17,7 +18,6 @@ type OvertimeEntry = {
 
 const headers = () => ({
   "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("mobile_session_token") ?? ""}`,
 });
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -40,8 +40,8 @@ export default function MobileOvertime() {
     setLoading(true);
     try {
       const [overtimeResponse, dashboardResponse] = await Promise.all([
-        fetch("/api/mobile/overtime", { headers: headers() }),
-        fetch("/api/mobile/dashboard", { headers: headers() }),
+        mobileFetch("/api/mobile/overtime", { headers: headers() }),
+        mobileFetch("/api/mobile/dashboard", { headers: headers() }),
       ]);
       const overtimeData = await overtimeResponse.json();
       const dashboardData = await dashboardResponse.json();
@@ -78,7 +78,7 @@ export default function MobileOvertime() {
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/mobile/overtime", {
+      const response = await mobileFetch("/api/mobile/overtime", {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ ...form, jobId: form.jobId || null }),

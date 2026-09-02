@@ -1490,7 +1490,7 @@ export class DbStorage implements IStorage {
 
   async getActiveAssignmentForWorker(workerId: string): Promise<VehicleAssignment | undefined> {
     const [row] = await db.select().from(vehicleAssignments)
-      .where(and(eq(vehicleAssignments.workerId, workerId), eq(vehicleAssignments.isActive, true))).limit(1);
+      .where(and(inArray(vehicleAssignments.workerId, equivalentWorkerIds(workerId)), eq(vehicleAssignments.isActive, true))).limit(1);
     return row;
   }
 
@@ -1514,7 +1514,7 @@ export class DbStorage implements IStorage {
   async getKmLogs(): Promise<KmLog[]> { return db.select().from(kmLogs).orderBy(desc(kmLogs.logDate)); }
 
   async getKmLogsByWorker(workerId: string): Promise<KmLog[]> {
-    return db.select().from(kmLogs).where(eq(kmLogs.workerId, workerId)).orderBy(desc(kmLogs.logDate));
+    return db.select().from(kmLogs).where(inArray(kmLogs.workerId, equivalentWorkerIds(workerId))).orderBy(desc(kmLogs.logDate));
   }
 
   async getKmLogsByVehicle(vehicleId: string): Promise<KmLog[]> {
@@ -1545,7 +1545,7 @@ export class DbStorage implements IStorage {
   async getFuelFillups(): Promise<FuelFillup[]> { return db.select().from(fuelFillups).orderBy(desc(fuelFillups.fillDate)); }
 
   async getFuelFillupsByWorker(workerId: string): Promise<FuelFillup[]> {
-    return db.select().from(fuelFillups).where(eq(fuelFillups.workerId, workerId)).orderBy(desc(fuelFillups.fillDate));
+    return db.select().from(fuelFillups).where(inArray(fuelFillups.workerId, equivalentWorkerIds(workerId))).orderBy(desc(fuelFillups.fillDate));
   }
 
   async getFuelFillupsByVehicle(vehicleId: string): Promise<FuelFillup[]> {
@@ -1571,7 +1571,7 @@ export class DbStorage implements IStorage {
   async getVehicleInspections(): Promise<VehicleInspection[]> { return db.select().from(vehicleInspections).orderBy(desc(vehicleInspections.inspectionDate)); }
 
   async getVehicleInspectionsByWorker(workerId: string): Promise<VehicleInspection[]> {
-    return db.select().from(vehicleInspections).where(eq(vehicleInspections.workerId, workerId)).orderBy(desc(vehicleInspections.inspectionDate));
+    return db.select().from(vehicleInspections).where(inArray(vehicleInspections.workerId, equivalentWorkerIds(workerId))).orderBy(desc(vehicleInspections.inspectionDate));
   }
 
   async getVehicleInspectionsByVehicle(vehicleId: string): Promise<VehicleInspection[]> {
@@ -1629,7 +1629,7 @@ export class DbStorage implements IStorage {
   }
 
   async getVehicleIssuesByWorker(workerId: string): Promise<VehicleIssue[]> {
-    return db.select().from(vehicleIssues).where(eq(vehicleIssues.workerId, workerId)).orderBy(desc(vehicleIssues.reportedAt));
+    return db.select().from(vehicleIssues).where(inArray(vehicleIssues.workerId, equivalentWorkerIds(workerId))).orderBy(desc(vehicleIssues.reportedAt));
   }
 
   async getOpenVehicleIssues(): Promise<VehicleIssue[]> {

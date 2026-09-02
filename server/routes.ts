@@ -71,6 +71,7 @@ import {
   canAccessDepartment,
   canAccessUiPath,
   canManageWorker,
+  equivalentWorkerIds,
   filterOperationalPayload,
   hasOperationalDepartmentScope,
   hasPermission,
@@ -94,6 +95,51 @@ import { promisify } from "util";
 import { randomUUID } from "crypto";
 
 const execAsync = promisify(exec);
+
+/**
+ * Routes whose authentication is performed by the mobile technician
+ * middleware rather than the general office authentication gate.
+ */
+export const isMobileProtectedRoute = (method: string, path: string) => {
+  const signature = `${method} ${path}`;
+  if ([
+    "GET /api/mobile/dashboard",
+    "GET /api/mobile/field-diaries",
+    "GET /api/mobile/my-day",
+    "GET /api/mobile/search",
+    "POST /api/mobile/field-diaries",
+    "GET /api/mobile/fleet/assignment",
+    "GET /api/mobile/fleet/vehicles",
+    "GET /api/mobile/fleet/overview",
+    "GET /api/auth/mobile-session",
+    "POST /api/auth/mobile-logout",
+    "POST /api/mobile/fleet/km-logs",
+    "POST /api/mobile/fleet/fuel-fillups",
+    "POST /api/mobile/fleet/inspections",
+    "POST /api/mobile/fleet/issues",
+    "GET /api/mobile/opportunities",
+    "POST /api/mobile/opportunities",
+    "GET /api/mobile/pest-control-products",
+    "GET /api/mobile/overtime",
+    "POST /api/mobile/overtime",
+    "GET /api/mobile/time",
+    "POST /api/mobile/time-off",
+    "GET /api/mobile/attendance/today",
+    "POST /api/mobile/attendance/start",
+    "POST /api/mobile/attendance/end",
+  ].includes(signature)) {
+    return true;
+  }
+  return (
+    (method === "GET" && /^\/api\/mobile\/work-orders\/[^/]+$/.test(path)) ||
+    (method === "PATCH" && /^\/api\/mobile\/jobs\/[^/]+\/status$/.test(path)) ||
+    (method === "GET" && /^\/api\/mobile\/treatment-reports\/[^/]+$/.test(path)) ||
+    (method === "PATCH" && /^\/api\/mobile\/treatment-reports\/[^/]+\/draft$/.test(path)) ||
+    (method === "POST" && /^\/api\/mobile\/treatment-reports\/[^/]+\/complete$/.test(path)) ||
+    (method === "DELETE" && /^\/api\/mobile\/field-diaries\/[^/]+$/.test(path)) ||
+    (method === "DELETE" && /^\/api\/mobile\/fleet\/issues\/[^/]+$/.test(path))
+  );
+};
 
 const ATTENDANCE_TIME_ZONE = "Africa/Johannesburg";
 const attendanceDateParts = (value: Date) => {
@@ -197,44 +243,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (method === "PATCH" && /^\/api\/time-off\/[^/]+$/.test(path)) ||
       (method === "GET" && /^\/api\/overtime\/[^/]+\/audit$/.test(path)) ||
       (method === "GET" && /^\/api\/overtime\/prefill\/[^/]+$/.test(path))
-    );
-  };
-
-  const isMobileProtectedRoute = (method: string, path: string) => {
-    const signature = `${method} ${path}`;
-    if ([
-      "GET /api/mobile/dashboard",
-      "GET /api/mobile/field-diaries",
-      "GET /api/mobile/my-day",
-      "GET /api/mobile/search",
-      "POST /api/mobile/field-diaries",
-      "GET /api/mobile/fleet/assignment",
-      "GET /api/mobile/fleet/vehicles",
-      "POST /api/mobile/fleet/km-logs",
-      "POST /api/mobile/fleet/fuel-fillups",
-      "POST /api/mobile/fleet/inspections",
-      "POST /api/mobile/fleet/issues",
-      "GET /api/mobile/opportunities",
-      "POST /api/mobile/opportunities",
-      "GET /api/mobile/pest-control-products",
-      "GET /api/mobile/overtime",
-      "POST /api/mobile/overtime",
-      "GET /api/mobile/time",
-      "POST /api/mobile/time-off",
-      "GET /api/mobile/attendance/today",
-      "POST /api/mobile/attendance/start",
-      "POST /api/mobile/attendance/end",
-    ].includes(signature)) {
-      return true;
-    }
-    return (
-      (method === "GET" && /^\/api\/mobile\/work-orders\/[^/]+$/.test(path)) ||
-      (method === "PATCH" && /^\/api\/mobile\/jobs\/[^/]+\/status$/.test(path)) ||
-      (method === "GET" && /^\/api\/mobile\/treatment-reports\/[^/]+$/.test(path)) ||
-      (method === "PATCH" && /^\/api\/mobile\/treatment-reports\/[^/]+\/draft$/.test(path)) ||
-      (method === "POST" && /^\/api\/mobile\/treatment-reports\/[^/]+\/complete$/.test(path)) ||
-      (method === "DELETE" && /^\/api\/mobile\/field-diaries\/[^/]+$/.test(path)) ||
-      (method === "DELETE" && /^\/api\/mobile\/fleet\/issues\/[^/]+$/.test(path))
     );
   };
 
@@ -1021,15 +1029,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!MOBILE_STAFF_ROSTER.some(entry => entry.id === workerId)) {
         return res.status(401).json({ message: "Invalid worker" });
       }
-      const worker = await storage.getWorker(workerId);
-      if (!worker) {
-        return res.status(401).json({ message: "Invalid worker" });
-      }
-
-      if (!isPasswordlessMobileWorker(worker)) {
-        return res.status(401).json({ message: "Invalid worker" });
-      }
-      const token = AuthService.generateMobileWorkerToken(worker.id);
+      const existingToken = req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.slice(7)
+        : null;
+      if (existingToken) await AuthService.revokeMobileWorkerSession(existingToken);
+      const authenticated = await AuthService.authenticatePasswordlessMobileWorker(workerId);
+      if (!authenticated) return res.status(401).json({ message: "Invalid worker" });
+      const { worker, token } = authenticated;
       const rosterEntry = MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id);
 
       res.json({
@@ -1048,6 +1054,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Mobile login error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  app.get("/api/auth/mobile-session", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    const worker = req.mobileWorker!;
+    const rosterEntry = MOBILE_STAFF_ROSTER.find(entry => entry.id === worker.id);
+    res.json({
+      worker: {
+        id: worker.id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        departmentId: worker.departmentId,
+        role: rosterEntry?.title || worker.role,
+        department: rosterEntry?.team,
+      },
+    });
+  });
+
+  app.post("/api/auth/mobile-logout", requireMobileTechnician, async (req, res) => {
+    const token = req.headers.authorization!.slice(7);
+    await AuthService.revokeMobileWorkerSession(token);
+    res.status(204).send();
   });
 
   const getMobileJob = async (workerId: string, jobId: string) => {
@@ -2057,7 +2085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/mobile/fleet/issues/:id", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     const issue = await storage.getVehicleIssue(req.params.id);
     if (!issue) return res.status(404).json({ message: "Vehicle issue not found" });
-    if (issue.workerId !== req.mobileWorker!.id) {
+    if (!equivalentWorkerIds(req.mobileWorker!.id).includes(issue.workerId)) {
       return res.status(403).json({ message: "You can only remove your own vehicle issues" });
     }
     await storage.deleteVehicleIssue(issue.id);

@@ -10,6 +10,7 @@ import { getDefaultDashboardRoute, getDashboardRole, type DashboardRole } from "
 import { canAccessUiPath } from "@shared/permissionMatrix";
 import { ShieldOff } from "lucide-react";
 import AppShell from "@/components/layout/app-shell";
+import { readMobileSession } from "@/lib/mobile-auth";
 
 const NotFound            = lazy(() => import("@/pages/not-found"));
 const Dashboard           = lazy(() => import("@/pages/dashboard"));
@@ -148,7 +149,7 @@ function AuthenticatedApp() {
   // A mobile technician can follow a FleetGuard link without being sent
   // through the office profile-picker flow. Keep office-authenticated users
   // on the existing desktop FleetGuard route.
-  if (location === "/fleet" && !isLoading && !isAuthenticated && localStorage.getItem("mobile_session_token")) {
+  if (location === "/fleet" && !isLoading && !isAuthenticated && readMobileSession()) {
     return (
       <Suspense fallback={<PageLoader />}>
         <Mobile />
@@ -158,7 +159,7 @@ function AuthenticatedApp() {
 
   // Mobile technicians use a separate signed token and must be able to follow
   // the shared overtime URL without being sent through the office login flow.
-  if (location === "/my-overtime" && localStorage.getItem("mobile_session_token") && !isAuthenticated) {
+  if (location === "/my-overtime" && readMobileSession() && !isAuthenticated) {
     return (
       <Suspense fallback={<PageLoader />}>
         <MobileOvertime />

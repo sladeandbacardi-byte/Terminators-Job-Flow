@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { formatClientAddress, type Job, type Client, type Worker } from '@shared/schema';
 import { MobileEquipmentChecklist } from './mobile-equipment-checklist';
+import { mobileFetch } from "@/lib/mobile-auth";
 
 type ActiveScreen = 'work-orders' | 'equipment-checklist';
 
@@ -37,10 +38,8 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
 
   const fetchWorkOrders = async () => {
     try {
-      const token = localStorage.getItem('mobile_session_token');
-      const response = await fetch(`/api/mobile/work-orders/${worker.id}`, {
+      const response = await mobileFetch(`/api/mobile/work-orders/${worker.id}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -63,12 +62,10 @@ export function MobileWorkOrders({ worker, onLogout }: MobileWorkOrdersProps) {
 
   const updateJobStatus = async (jobId: string, status: string) => {
     try {
-      const token = localStorage.getItem('mobile_session_token');
-      const response = await fetch(`/api/mobile/jobs/${jobId}/status`, {
+      const response = await mobileFetch(`/api/mobile/jobs/${jobId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ status }),
       });

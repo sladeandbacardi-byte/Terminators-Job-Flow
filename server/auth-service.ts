@@ -2,8 +2,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { adminUsers, userSessions, officeWorkerSessions, activityLogs } from '@shared/schema';
+import { adminUsers, userSessions, officeWorkerSessions, mobileWorkerSessions, activityLogs } from '@shared/schema';
 import { eq, and, gt, sql } from 'drizzle-orm';
+import { randomUUID } from "crypto";
 import type { AdminUser, InsertAdminUser, InsertActivityLog } from '@shared/schema';
 import { storage } from './storage';
 import {
@@ -31,7 +32,8 @@ export type AuthenticatedUser = AdminUser & {
 
 type MobileWorkerSessionClaims = {
   workerId: string;
-  tokenType: "mobile_worker_v2";
+  sessionId: string;
+  tokenType: "mobile_worker_v3";
 };
 type OfficeWorkerSessionClaims = {
   workerId: string;
@@ -86,8 +88,53 @@ export class AuthService {
     return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '24h' });
   }
 
-  static generateMobileWorkerToken(workerId: string): string {
-    return jwt.sign({ workerId, tokenType: "mobile_worker_v2" }, JWT_SECRET, { expiresIn: "12h" });
+  static generateMobileWorkerToken(workerId: string, sessionId = randomUUID()): string {
+    return jwt.sign({ workerId, sessionId, tokenType: "mobile_worker_v3" }, JWT_SECRET, { expiresIn: "12h" });
+  }
+
+  static async authenticatePasswordlessMobileWorker(workerId: string): Promise<{ worker: NonNullable<Awaited<ReturnType<typeof storage.getWorker>>>; token: string } | null> {
+    const worker = await storage.getWorker(workerId);
+    if (!worker || !isPasswordlessMobileWorker(worker)) return null;
+    const sessionId = randomUUID();
+    const token = this.generateMobileWorkerToken(worker.id, sessionId);
+    await db.insert(mobileWorkerSessions).values({
+      id: sessionId,
+      workerId: worker.id,
+      sessionToken: token,
+      expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
+    });
+    return { worker, token };
+  }
+
+  static async validateMobileWorkerSession(token: string) {
+    const claims = this.verifyMobileWorkerToken(token);
+    if (!claims) return null;
+    const [session] = await db.select().from(mobileWorkerSessions).where(and(
+      eq(mobileWorkerSessions.id, claims.sessionId),
+      eq(mobileWorkerSessions.workerId, claims.workerId),
+      eq(mobileWorkerSessions.sessionToken, token),
+      gt(mobileWorkerSessions.expiresAt, new Date()),
+    ));
+    if (!session) return null;
+    const worker = await storage.getWorker(claims.workerId);
+    return worker && isPasswordlessMobileWorker(worker) ? worker : null;
+  }
+
+  static async revokeMobileWorkerSession(token: string): Promise<void> {
+    await db.delete(mobileWorkerSessions).where(eq(mobileWorkerSessions.sessionToken, token));
+  }
+
+  private static verifyMobileWorkerToken(token: string): MobileWorkerSessionClaims | null {
+    try {
+      const claims = jwt.verify(token, JWT_SECRET) as Partial<MobileWorkerSessionClaims>;
+      return claims.tokenType === "mobile_worker_v3"
+        && typeof claims.workerId === "string"
+        && typeof claims.sessionId === "string"
+        ? claims as MobileWorkerSessionClaims
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   static async authenticatePasswordlessOfficeWorker(
@@ -302,6 +349,7 @@ export class AuthService {
         .delete(userSessions)
         .where(sql`expires_at <= ${new Date()}`);
       await db.delete(officeWorkerSessions).where(sql`expires_at <= ${new Date()}`);
+      await db.delete(mobileWorkerSessions).where(sql`expires_at <= ${new Date()}`);
     } catch (error) {
       console.error('Session cleanup error:', error);
     }
@@ -337,15 +385,8 @@ export const requireMobileTechnician = async (req: MobileAuthenticatedRequest, r
     const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (!token) return res.status(401).json({ message: "Mobile session token required" });
 
-    const claims = jwt.verify(token, JWT_SECRET) as MobileWorkerSessionClaims;
-    if (claims.tokenType !== "mobile_worker_v2" || !claims.workerId) {
-      return res.status(401).json({ message: "Invalid mobile session" });
-    }
-
-    const worker = await storage.getWorker(claims.workerId);
-    if (!worker || !isPasswordlessMobileWorker(worker)) {
-      return res.status(403).json({ message: "Mobile technician access required" });
-    }
+    const worker = await AuthService.validateMobileWorkerSession(token);
+    if (!worker) return res.status(401).json({ message: "Invalid or expired mobile session" });
 
     req.mobileWorker = worker;
     next();

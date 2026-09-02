@@ -9,6 +9,7 @@ import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "@shared/opportunitie
 import { MobileTreatmentReport } from "./mobile-treatment-report";
 import { MobileShell, type MobileNavItem } from "./mobile-shell";
 import { MobileFleetGuard } from "./mobile-fleet-guard";
+import { mobileFetch } from "@/lib/mobile-auth";
 
 type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "fleet" | "kmMorning" | "kmAfternoon" | "fuel" | "inspection" | "monthlyInspection" | "issue" | "opportunities";
 type MobileJob = Job & { client: Client };
@@ -53,7 +54,6 @@ type MyDayData = {
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("mobile_session_token") ?? ""}`,
 });
 
 export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker; onLogout: () => void }) {
@@ -79,8 +79,8 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     setLoading(true);
     try {
       const [response, fleetResponse] = await Promise.all([
-        fetch("/api/mobile/dashboard", { headers: authHeaders() }),
-        fetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
+        mobileFetch("/api/mobile/dashboard", { headers: authHeaders() }),
+        mobileFetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
       ]);
       if (!response.ok || !fleetResponse.ok) throw new Error(response.status === 401 || fleetResponse.status === 401 ? "Your mobile session has expired. Please sign in again." : "Unable to load your mobile dashboard.");
       const [dashboardData, fleetData] = await Promise.all([response.json(), fleetResponse.json()]);
@@ -98,12 +98,12 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   useEffect(() => { load(); }, []);
 
   const loadOpportunities = async () => {
-    const response = await fetch("/api/mobile/opportunities", { headers: authHeaders() });
+    const response = await mobileFetch("/api/mobile/opportunities", { headers: authHeaders() });
     if (!response.ok) throw new Error("Unable to load your submitted opportunities.");
     setOpportunities(await response.json());
   };
   const loadMyDay = async (date = myDayDate) => {
-    const response = await fetch(`/api/mobile/my-day?date=${encodeURIComponent(date)}`, { headers: authHeaders() });
+    const response = await mobileFetch(`/api/mobile/my-day?date=${encodeURIComponent(date)}`, { headers: authHeaders() });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "Unable to load My Day.");
     setMyDay(result);
@@ -125,7 +125,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   const submit = async (path: string, body: Record<string, unknown>, success: string) => {
     setNotice("");
     try {
-      const response = await fetch(path, { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
+      const response = await mobileFetch(path, { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Unable to save your update.");
       setNotice(success);
@@ -138,7 +138,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
 
   const updateStatus = async (jobId: string, status: "in_progress" | "completed") => {
     try {
-      const response = await fetch(`/api/mobile/jobs/${jobId}/status`, {
+      const response = await mobileFetch(`/api/mobile/jobs/${jobId}/status`, {
         method: "PATCH", headers: authHeaders(), body: JSON.stringify({ status }),
       });
       const result = await response.json();

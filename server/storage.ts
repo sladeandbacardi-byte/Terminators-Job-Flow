@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getCanonicalWorkerName } from "@shared/organogram";
-import { canExpandMobileTeamJobs } from "@shared/permissionMatrix";
+import { canExpandMobileTeamJobs, equivalentWorkerIds } from "@shared/permissionMatrix";
 import { 
   type User, type InsertUser,
   type Department, type InsertDepartment,
@@ -4188,7 +4188,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.vehicleAssignments.values());
   }
   async getActiveAssignmentForWorker(workerId: string): Promise<VehicleAssignment | undefined> {
-    return Array.from(this.vehicleAssignments.values()).find(a => a.workerId === workerId && a.isActive);
+    const workerIds = new Set(equivalentWorkerIds(workerId));
+    return Array.from(this.vehicleAssignments.values()).find(a => workerIds.has(a.workerId) && a.isActive);
   }
   async getAssignmentsForVehicle(vehicleId: string): Promise<VehicleAssignment[]> {
     return Array.from(this.vehicleAssignments.values()).filter(a => a.vehicleId === vehicleId);
@@ -4212,7 +4213,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.kmLogs.values()).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
   }
   async getKmLogsByWorker(workerId: string): Promise<KmLog[]> {
-    return Array.from(this.kmLogs.values()).filter(l => l.workerId === workerId).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
+    const workerIds = new Set(equivalentWorkerIds(workerId));
+    return Array.from(this.kmLogs.values()).filter(l => workerIds.has(l.workerId)).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
   }
   async getKmLogsByVehicle(vehicleId: string): Promise<KmLog[]> {
     return Array.from(this.kmLogs.values()).filter(l => l.vehicleId === vehicleId).sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
@@ -4242,7 +4244,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.fuelFillups.values()).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
   }
   async getFuelFillupsByWorker(workerId: string): Promise<FuelFillup[]> {
-    return Array.from(this.fuelFillups.values()).filter(f => f.workerId === workerId).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
+    const workerIds = new Set(equivalentWorkerIds(workerId));
+    return Array.from(this.fuelFillups.values()).filter(f => workerIds.has(f.workerId)).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
   }
   async getFuelFillupsByVehicle(vehicleId: string): Promise<FuelFillup[]> {
     return Array.from(this.fuelFillups.values()).filter(f => f.vehicleId === vehicleId).sort((a, b) => b.fillDate.getTime() - a.fillDate.getTime());
@@ -4265,7 +4268,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.vehicleInspections.values()).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
   }
   async getVehicleInspectionsByWorker(workerId: string): Promise<VehicleInspection[]> {
-    return Array.from(this.vehicleInspections.values()).filter(i => i.workerId === workerId).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
+    const workerIds = new Set(equivalentWorkerIds(workerId));
+    return Array.from(this.vehicleInspections.values()).filter(i => workerIds.has(i.workerId)).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
   }
   async getVehicleInspectionsByVehicle(vehicleId: string): Promise<VehicleInspection[]> {
     return Array.from(this.vehicleInspections.values()).filter(i => i.vehicleId === vehicleId).sort((a, b) => b.inspectionDate.getTime() - a.inspectionDate.getTime());
@@ -4325,7 +4329,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.vehicleIssues.values()).filter(i => i.vehicleId === vehicleId).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
   }
   async getVehicleIssuesByWorker(workerId: string): Promise<VehicleIssue[]> {
-    return Array.from(this.vehicleIssues.values()).filter(i => i.workerId === workerId).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+    const workerIds = new Set(equivalentWorkerIds(workerId));
+    return Array.from(this.vehicleIssues.values()).filter(i => workerIds.has(i.workerId)).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
   }
   async getOpenVehicleIssues(): Promise<VehicleIssue[]> {
     return Array.from(this.vehicleIssues.values()).filter(i => !["completed", "not_required"].includes(i.status)).sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());

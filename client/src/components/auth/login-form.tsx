@@ -13,6 +13,7 @@ import { DEMO_PROFILES } from "@/lib/demoProfiles";
 import { SOLE_SUPERADMIN } from "@shared/superadmin";
 import { getOfficeOrganogramBranch, OFFICE_ORGANOGRAM_BRANCHES } from "@shared/officeOrganogram";
 import { MOBILE_STAFF_ROSTER, MOBILE_STAFF_TEAM_GROUPS } from "@shared/organogram";
+import { storeMobileSession } from "@/lib/mobile-auth";
 
 type LoginStep = "choose-type" | "staff-list" | "admin-list" | "admin-credentials";
 
@@ -110,7 +111,12 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
             : "/api/auth/admin-login",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(credentials.mode === "mobile" && localStorage.getItem("mobile_session_token")
+              ? { Authorization: `Bearer ${localStorage.getItem("mobile_session_token")}` }
+              : {}),
+          },
           body: JSON.stringify(
             credentials.mode === "mobile"
               ? { workerId: credentials.workerId }
@@ -127,17 +133,8 @@ export function LoginForm({ onSuccess, onDemoLogin }: LoginFormProps) {
     onSuccess: ({ mode, data }) => {
       setLoginError("");
       if (mode === "mobile") {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_user");
-        localStorage.removeItem("auth_user_role");
-        localStorage.removeItem("auth_user_type");
-        localStorage.removeItem("demo_mode");
-        localStorage.setItem("mobile_worker_id", data.worker.id);
-        localStorage.setItem("mobile_session_token", data.token);
-        localStorage.setItem("mobile_worker_data", JSON.stringify(data.worker));
-        localStorage.setItem("mobile_user_role", data.worker.role || "Technician");
-        localStorage.setItem("mobile_user_type", "staff");
-        navigate("/mobile", { replace: true });
+        storeMobileSession({ workerId: data.worker.id, token: data.token, worker: data.worker });
+        window.location.replace("/mobile");
         return;
       }
       onSuccess(data.token, data.user);
