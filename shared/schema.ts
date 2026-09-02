@@ -1,8 +1,1305 @@
-w()`),
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, timestamp, decimal, integer, boolean, primaryKey } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { OPPORTUNITY_TYPES, OPPORTUNITY_STATUSES, OPPORTUNITY_URGENCIES } from "./opportunities";
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+export const departments = pgTable("departments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  colorCode: text("color_code").notNull(),
+  description: text("description"),
+});
+
+export const workers = pgTable("workers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone").notNull(),
+  departmentId: varchar("department_id").notNull(),
+  role: text("role"),
+  userType: text("user_type").notNull().default("Staff"),
+  mobileAccessEnabled: boolean("mobile_access_enabled").notNull().default(false),
+  employeeId: text("employee_id").unique(), // HR identifier; not a login credential
+  pin: text("pin"), // Legacy column retained for historical records; authentication never uses it
+  isActive: boolean("is_active").notNull().default(true),
+  // HR Profile fields
+  idNumber: text("id_number"),
+  startDate: text("start_date"), // YYYY-MM-DD
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  leaveBalance: integer("leave_balance").default(15), // remaining annual leave days
+  pcoRegistrationNumber: text("pco_registration_number"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const clients = pgTable("clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  tradingName: text("trading_name"),
+  email: text("email"),
+  alternateEmailAddress: text("alternate_email_address"),
+  phone: text("phone"),
+  alternatePhoneNumber: text("alternate_phone_number"),
+  // Legacy single-line address — kept for backwards compatibility.
+  // New structured address fields below should be used going forward.
+  address: text("address"),
+  streetNumber: text("street_number"),
+  streetName: text("street_name"),
+  suburb: text("suburb"),
+  city: text("city"),
+  province: text("province"),
+  postalCode: text("postal_code"),
+  googleMapsLink: text("google_maps_link"),
+  contactPerson: text("contact_person"),
+  businessType: text("business_type"),
+  status: text("status").notNull().default('active'), // active, inactive, suspended
+  departmentId: varchar("department_id"),
+  taxNumber: text("tax_number"), // VAT Number
+  companyRegistrationNumber: text("company_registration_number"),
+  paymentTerms: text("payment_terms"),
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
+  // Billing contact (may differ from main contact)
+  billingName: text("billing_name"),
+  billingEmail: text("billing_email"),
+  billingPhone: text("billing_phone"),
+  notes: text("notes"),
+  sageCustomerCode: text("sage_customer_code"),
+  // ── Rental Contract flags (separate from service contracts) ──
+  hasRentalContract: boolean("has_rental_contract").notNull().default(false),
+  rentalContractStatus: text("rental_contract_status").notNull().default("None"), // Active | Inactive | None
+  rentalContractType: text("rental_contract_type"),
+  rentalNotes: text("rental_notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const inventoryItems = pgTable("inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("Consumable"),
+  sku: text("sku").unique(), // optional — auto-generated if not supplied
+  quantity: integer("quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(10),
+  maxStockLevel: integer("max_stock_level").notNull().default(100),
+  reorderPoint: integer("reorder_point").notNull().default(20),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  description: text("description"),
+  departmentId: varchar("department_id"),
+  location: text("location"),
+  supplier: text("supplier"),
+  lastRestocked: timestamp("last_restocked"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at"),
+  // Enhanced stock management fields
+  itemCode: text("item_code"),
+  category: text("category"),
+  unitOfMeasure: text("unit_of_measure").default("units"),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  preferredSupplierId: varchar("preferred_supplier_id"),
+  activeStatus: boolean("active_status").default(true),
+});
+
+export const rentalContracts = pgTable("rental_contracts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  customerName: text("customer_name"),
+  departmentId: varchar("department_id"),
+  // Legacy single-item field — kept for backward compatibility; new contracts use rentalContractItems
+  inventoryItemId: varchar("inventory_item_id"),
+  // Legacy field — kept for backward compatibility
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
+  // Structured pricing fields
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  quantity: integer("quantity").default(1),
+  billingFrequency: text("billing_frequency").default("monthly"),
+  calculatedTotal: decimal("calculated_total", { precision: 10, scale: 2 }),
+  // Contract dates
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  lastPriceIncreaseDate: timestamp("last_price_increase_date"),
+  nextIncreaseDate: timestamp("next_increase_date"),
+  increasePercentage: text("increase_percentage"),
+  // Legacy column alias
+  lastPriceIncrease: timestamp("last_price_increase"),
+  isActive: boolean("is_active").notNull().default(true),
+  activeStatus: boolean("active_status").notNull().default(true),
+  notes: text("notes"),
+  contractNumber: text("contract_number"),
+  // Scheduling
+  frequency: text("frequency"),
+  weekOfMonth: integer("week_of_month"),
+  dayOfWeek: text("day_of_week"),
+  startTime: text("start_time"),
+  estimatedDuration: integer("estimated_duration"),
+  assignedTeamId: varchar("assigned_team_id"),
+  assignedTeamName: text("assigned_team_name"),
+  assignedTechnicianId: varchar("assigned_technician_id"),
+  assignedTechnicianName: text("assigned_technician_name"),
+  routeSequence: integer("route_sequence"),
+  fixedTime: boolean("fixed_time").default(false),
+  invoiceRule: text("invoice_rule"),
+  address: text("address"),
+  googleMapsLink: text("google_maps_link"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const rentalContractItems = pgTable("rental_contract_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  rentalContractId: varchar("rental_contract_id").notNull(),
+  clientId: varchar("client_id").notNull(),
+  itemName: text("item_name").notNull(),
+  refillRule: text("refill_rule").default("Not Applicable"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const jobs = pgTable("jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  clientId: varchar("client_id").notNull(),
+  workerId: varchar("worker_id"),
+  departmentId: varchar("department_id").notNull(),
+  serviceType: text("service_type").notNull(),
+  status: text("status").notNull().default('scheduled'),
+  scheduledDate: timestamp("scheduled_date").notNull(),
+  scheduledTime: text("scheduled_time"),
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  priority: text("priority").notNull().default('medium'),
+  estimatedDuration: integer("estimated_duration"),
+  actualDuration: integer("actual_duration"),
+  location: text("location"),
+  notes: text("notes"),
+  completionNotes: text("completion_notes"),
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurringPattern: text("recurring_pattern"),
+  parentJobId: varchar("parent_job_id"),
+  diary: text("diary"),
+  howInvoiced: text("how_invoiced"),
+  email: text("email"),
+  areaCode: text("area_code"),
+  salesperson: text("salesperson"),
+  contractNo: text("contract_no"),
+  isContract: boolean("is_contract").notNull().default(false),
+  service: text("service"),
+  insects: text("insects"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  pricePerUnit: decimal("price_per_unit", { precision: 10, scale: 2 }),
+  increaseDate: text("increase_date"),
+  specialInstructions: text("special_instructions"),
+  internalInstructions: text("internal_instructions"),
+  isFixed: boolean("is_fixed").notNull().default(false),
+  orderNo: text("order_no"),
+  recurrenceInterval: integer("recurrence_interval"),
+  recurrencePeriod: text("recurrence_period"),
+  recurrenceDay: text("recurrence_day"),
+  recurrenceCount: integer("recurrence_count"),
+  recurrenceYears: integer("recurrence_years"),
+  completedDate: timestamp("completed_date"),
+  jobNumber: text("job_number"),
+  linkedQuoteId: varchar("linked_quote_id"),
+  invoiceStatus: text("invoice_status").default('not_invoiced'), // not_invoiced | ready_to_invoice | exported | invoiced | do_not_invoice
+  mustBeInvoiced: boolean("must_be_invoiced").default(true),
+  invoiceRef: text("invoice_ref"),
+  financeNotes: text("finance_notes"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }),
+  vatIncluded: boolean("vat_included").default(false),
+  linkedContractId: varchar("linked_contract_id"),
+  siteId: varchar("site_id"),          // optional link to client_sites
+  treatmentType: text("treatment_type"),
+  otherPestType: text("other_pest_type"),
+  serviceCategory: text("service_category"),
+  completionAllUnitsChecked: text("completion_all_units_checked"), // yes | no | na
+  completionExtraFaultFound: boolean("completion_extra_fault_found").default(false),
+  completionCustomerSignature: text("completion_customer_signature"),
+  googleMapsLink: text("google_maps_link"),
+  legalEntityId: varchar("legal_entity_id"),
+  legalEntityName: text("legal_entity_name"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const OVERTIME_WORK_TYPES = ["client_job", "internal", "workshop", "stock_warehouse", "travel", "other"] as const;
+export type OvertimeWorkType = typeof OVERTIME_WORK_TYPES[number];
+export const TIME_ADJUSTMENT_TYPES = ["OVERTIME", "AUTHORISED_TIME_OFF"] as const;
+export type TimeAdjustmentType = typeof TIME_ADJUSTMENT_TYPES[number];
+export const TIME_OFF_REASONS = [
+  "finished_scheduled_work_early", "gap_between_jobs", "management_authorised",
+  "returned_home_before_later_job", "operational_downtime", "other",
+] as const;
+export type TimeOffReason = typeof TIME_OFF_REASONS[number];
+export const TIME_OFF_REASON_LABELS: Record<TimeOffReason, string> = {
+  finished_scheduled_work_early: "Finished scheduled work early",
+  gap_between_jobs: "Gap between jobs",
+  management_authorised: "Management authorised",
+  returned_home_before_later_job: "Returned home before later job",
+  operational_downtime: "Operational downtime",
+  other: "Other",
+};
+
+export const OVERTIME_WORK_TYPE_LABELS: Record<OvertimeWorkType, string> = {
+  client_job:      "Client Job",
+  internal:        "Internal",
+  workshop:        "Workshop",
+  stock_warehouse: "Stock / Warehouse",
+  travel:          "Travel",
+  other:           "Other",
+};
+
+export const overtimeEntries = pgTable("overtime_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entryType: text("entry_type").notNull().default("OVERTIME"), // OVERTIME | AUTHORISED_TIME_OFF
+  employeeId: varchar("employee_id").notNull(),
+  workDate: text("work_date").notNull(), // YYYY-MM-DD
+  customerName: text("customer_name"),
+  clientId: varchar("client_id"),        // nullable — internal overtime has no client
+  jobId: varchar("job_id"),
+  jobNumber: text("job_number"),
+  workType: text("work_type").notNull().default("client_job"), // OvertimeWorkType
+  otherDescription: text("other_description"),
+  timeOffReason: text("time_off_reason"),
+  timeOffOtherReason: text("time_off_other_reason"),
+  conflictOverrideReason: text("conflict_override_reason"),
+  startTime: text("start_time").notNull(), // HH:mm
+  finishTime: text("finish_time").notNull(), // HH:mm
+  beforeHoursMinutes: integer("before_hours_minutes").notNull().default(0),
+  afterHoursMinutes: integer("after_hours_minutes").notNull().default(0),
+  notes: text("notes").notNull(),
+  overtimeMinutes: integer("overtime_minutes").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  approvedById: varchar("approved_by_id"),
+  approvedByName: text("approved_by_name"),
+  approvalTimestamp: timestamp("approval_timestamp"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const overtimeAuditEntries = pgTable("overtime_audit_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  overtimeEntryId: varchar("overtime_entry_id").notNull(),
+  actorId: varchar("actor_id").notNull(),
+  actorName: text("actor_name").notNull(),
+  action: text("action").notNull(), // submitted | edited | approved | rejected | reopened
+  details: text("details"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  clientId: varchar("client_id").notNull(),
+  status: text("status").notNull().default('draft'), // draft, sent, paid, overdue, cancelled
+  issueDate: timestamp("issue_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  paymentDate: timestamp("payment_date"),
+  notes: text("notes"),
+  terms: text("terms"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+  sageInvoiceId: varchar("sage_invoice_id"), // Store Sage invoice ID for integration
+  sageStatus: varchar("sage_status"), // Store Sage invoice status
+  linkedJobId: varchar("linked_job_id"),
+  linkedQuoteId: varchar("linked_quote_id"),
+  linkedContractId: varchar("linked_contract_id"), // link to service or rental contract
+  legalEntityId: varchar("legal_entity_id"),
+  legalEntityName: text("legal_entity_name"),
+});
+
+export const invoiceItems = pgTable("invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(),
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  jobId: varchar("job_id"), // link to job if invoice item is for a job
+  contractId: varchar("contract_id"), // link to contract if invoice item is for rental
+  inventoryItemId: varchar("inventory_item_id"), // link to inventory item
+});
+
+export const jobInventoryItems = pgTable("job_inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull(),
+  inventoryItemId: varchar("inventory_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  isRental: boolean("is_rental").notNull().default(false),
+  rentalStartDate: timestamp("rental_start_date"),
+  rentalEndDate: timestamp("rental_end_date"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  // Stock tracking fields
+  clientId: varchar("client_id"),
+  technicianId: varchar("technician_id"),
+  technicianName: text("technician_name"),
+  contractId: varchar("contract_id"),
+  locationId: varchar("location_id"), // from which stock location was used
+  itemName: text("item_name"), // denormalized for quick display
+  unitOfMeasure: text("unit_of_measure"),
+});
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull(), // info, warning, error, success
+  priority: text("priority").notNull().default('medium'), // low, medium, high, urgent
+  isRead: boolean("is_read").notNull().default(false),
+  userId: varchar("user_id"),
+  relatedEntityType: text("related_entity_type"), // job, contract, worker, inventory, invoice
+  relatedEntityId: varchar("related_entity_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// ── Additional opportunities ────────────────────────────────────────────────
+// A technician-reported customer need that can progress through the existing
+// lead/quote, job, and invoice workflow without duplicating those entities.
+export const opportunities = pgTable("opportunities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  siteId: varchar("site_id"),
+  sourceJobId: varchar("source_job_id"),
+  reportedByWorkerId: varchar("reported_by_worker_id").notNull(),
+  assignedToWorkerId: varchar("assigned_to_worker_id"),
+  opportunityType: text("opportunity_type").notNull(),
+  customType: text("custom_type"),
+  description: text("description").notNull(),
+  urgency: text("urgency").notNull().default("normal"),
+  status: text("status").notNull().default("new"),
+  estimatedValue: decimal("estimated_value", { precision: 12, scale: 2 }),
+  quoteId: varchar("quote_id"),
+  jobId: varchar("job_id"),
+  invoiceId: varchar("invoice_id"),
+  wonAt: timestamp("won_at"),
+  lostReason: text("lost_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const opportunityPhotos = pgTable("opportunity_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  opportunityId: varchar("opportunity_id").notNull().references(() => opportunities.id),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name"),
+  uploadedByWorkerId: varchar("uploaded_by_worker_id").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Admin-set corrections supplement automatically derived service usage. The
+// historical contracts/jobs remain the source of truth whenever no override exists.
+export const serviceWalletOverrides = pgTable("service_wallet_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  serviceType: text("service_type").notNull(),
+  state: text("state").notNull(),
+  updatedByUserId: varchar("updated_by_user_id"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content").notNull(),
+  textContent: text("text_content"),
+  type: text("type").notNull(), // invoice, notification, reminder
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const emailLogs = pgTable("email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject").notNull(),
+  status: text("status").notNull(), // sent, failed, pending
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  templateId: varchar("template_id"),
+  relatedEntityId: varchar("related_entity_id"), // invoice id, job id, etc.
+  relatedEntityType: text("related_entity_type"), // invoice, job, etc.
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const customReports = pgTable("custom_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  reportType: text("report_type").notNull(), // 'sales', 'expenses', 'financial', 'operational', 'custom'
+  template: text("template"), // 'sales_summary', 'expense_breakdown', 'financial_overview', 'department_performance', 'custom'
+  configuration: text("configuration").notNull(), // JSON string with report configuration
+  filters: text("filters"), // JSON string with filter settings (departments, date ranges, etc.)
+  createdBy: varchar("created_by").notNull(),
+  isTemplate: boolean("is_template").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  lastRun: timestamp("last_run"),
+  runCount: integer("run_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+});
+
+export const insertDepartmentSchema = createInsertSchema(departments).omit({
+  id: true,
+});
+
+export const insertWorkerSchema = createInsertSchema(workers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertClientSchema = createInsertSchema(clients).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({
+  id: true,
+  createdAt: true,
+  contractNumber: true,
+});
+
+export const insertRentalContractItemSchema = createInsertSchema(rentalContractItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type RentalContractItem = typeof rentalContractItems.$inferSelect;
+export type InsertRentalContractItem = z.infer<typeof insertRentalContractItemSchema>;
+
+export const contractDeletionHistory = pgTable("contract_deletion_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull(),
+  contractNumber: text("contract_number"),
+  clientName: text("client_name").notNull(),
+  itemName: text("item_name").notNull(),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  reason: text("reason").notNull(),
+  deletedBy: text("deleted_by"),
+  deletedAt: timestamp("deleted_at").notNull().default(sql`now()`),
+  notes: text("notes"),
+});
+
+export const insertJobSchema = createInsertSchema(jobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  jobNumber: true,
+});
+
+export const insertOvertimeEntrySchema = createInsertSchema(overtimeEntries).omit({
+  id: true,
+  overtimeMinutes: true,
+  status: true,
+  approvedById: true,
+  approvedByName: true,
+  approvalTimestamp: true,
+  rejectionReason: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOvertimeAuditEntrySchema = createInsertSchema(overtimeAuditEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
+  id: true,
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmailLogSchema = createInsertSchema(emailLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOpportunitySchema = createInsertSchema(opportunities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  wonAt: true,
+}).extend({
+  opportunityType: z.enum(OPPORTUNITY_TYPES),
+  urgency: z.enum(OPPORTUNITY_URGENCIES).default("normal"),
+  status: z.enum(OPPORTUNITY_STATUSES).default("new"),
+});
+
+export const insertOpportunityPhotoSchema = createInsertSchema(opportunityPhotos).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertServiceWalletOverrideSchema = createInsertSchema(serviceWalletOverrides).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertJobInventoryItemSchema = createInsertSchema(jobInventoryItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCustomReportSchema = createInsertSchema(customReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastRun: true,
+  runCount: true,
+});
+
+// Types
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+export type Department = typeof departments.$inferSelect;
+
+export type InsertWorker = z.infer<typeof insertWorkerSchema>;
+export type Worker = typeof workers.$inferSelect;
+
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Client = typeof clients.$inferSelect;
+
+/**
+ * Render the structured address as a clean multi-line string.
+ * Falls back to the legacy single-line `address` field when the new
+ * structured fields are all blank.
+ *
+ * Format (blank lines are skipped):
+ *   streetNumber streetName
+ *   suburb
+ *   city
+ *   province
+ *   postalCode
+ */
+export function formatClientAddress(
+  client: Pick<Client, "streetNumber" | "streetName" | "suburb" | "city" | "province" | "postalCode" | "address">,
+): string {
+  const streetLine = [client.streetNumber, client.streetName].filter(Boolean).join(" ").trim();
+  const lines = [
+    streetLine,
+    client.suburb ?? "",
+    client.city ?? "",
+    client.province ?? "",
+    client.postalCode ?? "",
+  ]
+    .map((l) => (l ?? "").trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.length > 0) return lines.join("\n");
+  return (client.address ?? "").trim();
+}
+
+export function hasStructuredAddress(
+  client: Pick<Client, "streetNumber" | "streetName" | "suburb" | "city" | "province" | "postalCode">,
+): boolean {
+  return Boolean(
+    client.streetNumber || client.streetName || client.suburb ||
+    client.city || client.province || client.postalCode,
+  );
+}
+
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+
+export type InsertRentalContract = z.infer<typeof insertRentalContractSchema>;
+export type RentalContract = typeof rentalContracts.$inferSelect;
+
+export type InsertOvertimeEntry = z.infer<typeof insertOvertimeEntrySchema>;
+export type OvertimeEntry = typeof overtimeEntries.$inferSelect;
+export type InsertOvertimeAuditEntry = z.infer<typeof insertOvertimeAuditEntrySchema>;
+export type OvertimeAuditEntry = typeof overtimeAuditEntries.$inferSelect;
+
+export type ContractDeletionHistory = typeof contractDeletionHistory.$inferSelect;
+
+export type InsertJob = z.infer<typeof insertJobSchema>;
+export type Job = typeof jobs.$inferSelect;
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
+export type InsertEmailLog = z.infer<typeof insertEmailLogSchema>;
+export type EmailLog = typeof emailLogs.$inferSelect;
+
+export type InsertJobInventoryItem = z.infer<typeof insertJobInventoryItemSchema>;
+export type JobInventoryItem = typeof jobInventoryItems.$inferSelect;
+
+export type InsertCustomReport = z.infer<typeof insertCustomReportSchema>;
+export type CustomReport = typeof customReports.$inferSelect;
+
+// Suppliers table
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  website: text("website"),
+  category: text("category").notNull(), // e.g., "hygiene", "pest_control", "equipment"
+  departmentId: varchar("department_id"), // link to department for department-specific suppliers
+  paymentTerms: text("payment_terms"), // e.g., "30 days", "Net 15"
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
+// Purchase Orders table
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poNumber: text("po_number").notNull().unique(), // PO-2024-001, etc.
+  supplierId: varchar("supplier_id").notNull(),
+  requestedById: varchar("requested_by_id").notNull(), // User who created the PO
+  approvedById: varchar("approved_by_id"), // User who approved the PO
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, sent, received, cancelled
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  requestDate: timestamp("request_date").notNull().default(sql`now()`),
+  approvalDate: timestamp("approval_date"),
+  sentDate: timestamp("sent_date"),
+  expectedDeliveryDate: timestamp("expected_delivery_date"),
+  actualDeliveryDate: timestamp("actual_delivery_date"),
+  notes: text("notes"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Purchase Order Items table
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id").notNull(),
+  inventoryItemId: varchar("inventory_item_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  quantityReceived: integer("quantity_received").default(0),
+  itemName: text("item_name"), // denormalized
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+
+// Admin users for authentication and authorization
+export const adminUsers = pgTable("admin_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: varchar("username").unique().notNull(),
+  email: varchar("email").unique().notNull(),
+  passwordHash: varchar("password_hash").notNull(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  role: varchar("role").notNull().default("admin"), // admin, superadmin
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Activity logs for tracking admin user actions
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // No FK reference: this app has two parallel user types (admin_users and
+  // workers), and this column records the id of whichever one performed the
+  // action, so it can't be constrained to a single table.
+  userId: varchar("user_id").notNull(),
+  clientId: varchar("client_id"),     // optional — allows filtering logs by client
+  action: varchar("action").notNull(), // login, logout, create_invoice, update_client, etc.
+  resource: varchar("resource"), // invoices, clients, workers, etc.
+  resourceId: varchar("resource_id"), // specific record ID
+  details: text("details"), // additional action details as JSON string
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Sessions for managing user login state
+export const userSessions = pgTable("user_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => adminUsers.id),
+  sessionToken: varchar("session_token").unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Passwordless office sessions are deliberately separate from administrator
+// credential sessions and mobile-worker JWTs. The active worker row remains
+// the authoritative identity for the lifetime of every request.
+export const officeWorkerSessions = pgTable("office_worker_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workerId: varchar("worker_id").notNull().references(() => workers.id),
+  sessionToken: varchar("session_token").unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const mobileWorkerSessions = pgTable("mobile_worker_sessions", {
+  id: varchar("id").primaryKey(),
+  workerId: varchar("worker_id").notNull().references(() => workers.id),
+  sessionToken: varchar("session_token").unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas for new tables
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Calendar events for appointment scheduling
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  type: varchar("type").notNull().default("appointment"), // job, appointment, meeting, reminder
+  priority: varchar("priority").notNull().default("medium"), // low, medium, high
+  clientId: varchar("client_id").references(() => clients.id),
+  workerId: varchar("worker_id").references(() => workers.id),
+  departmentId: varchar("department_id").references(() => departments.id),
+  location: text("location"),
+  status: varchar("status").notNull().default("scheduled"), // scheduled, in_progress, completed, cancelled
+  color: varchar("color"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types for new tables
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type UserSession = typeof userSessions.$inferSelect;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+
+// Quote submissions from public website
+export const quoteSubmissions = pgTable("quote_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull(),
+  contactPerson: text("contact_person").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  serviceType: varchar("service_type").notNull(), // pest_control, sanitary_bins, washroom, deep_cleaning
+  description: text("description").notNull(),
+  address: text("address"),
+  preferredContactMethod: varchar("preferred_contact_method").notNull().default("email"), // email, phone, either
+  status: varchar("status").notNull().default("new"), // new, contacted, quoted, converted, declined
+  assignedTo: varchar("assigned_to"), // Worker ID who handles this quote
+  notes: text("notes"), // Internal notes about the quote
+  quoteAmount: text("quote_amount"), // Quoted price sent to client
+  lineItemsJson: text("line_items_json"), // JSON array of line items from the lead form
+  quoteSentAt: timestamp("quote_sent_at"), // When the quote email was sent
+  submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
+  followUpDate: timestamp("follow_up_date"),
+  quoteNumber: text("quote_number"),
+  frequency: text("frequency"), // e.g. "monthly", "weekly", "once_off"
+  specialInstructions: text("special_instructions"),
+  origination: text("origination").notNull().default("other"), // marketing channel — see ORIGINATION_OPTIONS
+  originationOther: text("origination_other"), // free text when origination === "other"
+  // Extended lead/sales pipeline fields
+  tradingName: text("trading_name"),
+  leadType: text("lead_type"),               // Once-off, Contract, Rental, Outright Purchase, Unknown
+  priority: text("priority").default("medium"), // low, medium, high
+  opportunity: boolean("opportunity").notNull().default(false),
+  estimatedValue: text("estimated_value"),
+  expectedCloseDate: text("expected_close_date"), // YYYY-MM-DD
+  probability: integer("probability"),
+  nextAction: text("next_action"),
+  stage: text("stage"),                      // full 16-stage pipeline value
+  quoteType: text("quote_type"),             // Once-off, Contract, Rental, Outright Purchase
+  lostReason: text("lost_reason"),
+  lostReasonOther: text("lost_reason_other"),
+  validUntil: text("valid_until"),           // YYYY-MM-DD
+  monthlyRecurring: text("monthly_recurring"),
+  installationCost: text("installation_cost"),
+  internalNotes: text("internal_notes"),
+  clientId: varchar("client_id").references(() => clients.id),
+  // Site & service detail fields
+  afterHoursRequired: text("after_hours_required"),           // yes / no / unknown
+  existingCompetitorContract: text("existing_competitor_contract"), // yes / no / unknown
+  competitorName: text("competitor_name"),
+  cancellationNoticeRequired: text("cancellation_notice_required"), // yes / no / unknown
+  noticePeriod: text("notice_period"),
+  earliestStartDate: text("earliest_start_date"),             // YYYY-MM-DD
+  clientFlags: text("client_flags"),                          // JSON array: ["bad_payer","high_profile",...]
+  expectedServiceTime: text("expected_service_time"),         // e.g. "Monthly", "Bi-weekly"
+  departmentId: varchar("department_id"),
+  legalEntityId: varchar("legal_entity_id"),
+  legalEntityName: text("legal_entity_name"),
+  siteVisitDone: boolean("site_visit_done").notNull().default(false),
+});
+
+// Marketing channel options for the Origination field on every lead
+export const ORIGINATION_OPTIONS = [
+  { value: "facebook",        label: "Facebook" },
+  { value: "google",          label: "Google" },
+  { value: "vehicles",        label: "Vehicles" },
+  { value: "phone",           label: "Phone / Incoming Call" },
+  { value: "cold_call",       label: "Cold Call" },
+  { value: "referral",        label: "Word of Mouth / Referral" },
+  { value: "website",         label: "Website" },
+  { value: "existing_client", label: "Existing Client" },
+  { value: "walk_in",         label: "Walk-in" },
+  { value: "email",           label: "Email" },
+  { value: "other",           label: "Other" },
+] as const;
+
+export type OriginationValue = typeof ORIGINATION_OPTIONS[number]["value"];
+
+export const ORIGINATION_LABELS: Record<string, string> =
+  Object.fromEntries(ORIGINATION_OPTIONS.map(o => [o.value, o.label]));
+
+// ── Lead pipeline stages ────────────────────────────────────────────────────
+
+export const LEAD_STAGES = [
+  { value: "new",                    label: "New Lead",                          color: "bg-blue-100 text-blue-700" },
+  { value: "contacted",              label: "Contacted",                         color: "bg-indigo-100 text-indigo-700" },
+  { value: "appointment_scheduled",  label: "Appointment Scheduled",             color: "bg-purple-100 text-purple-700" },
+  { value: "site_assessment_done",   label: "Site Assessment Done",              color: "bg-violet-100 text-violet-700" },
+  { value: "quote_needed",           label: "Quote Needed",                      color: "bg-amber-100 text-amber-700" },
+  { value: "quote_sent",             label: "Quote Sent",                        color: "bg-yellow-100 text-yellow-700" },
+  { value: "follow_up_due",          label: "Follow-up Due",                     color: "bg-orange-100 text-orange-700" },
+  { value: "accepted",               label: "Accepted",                          color: "bg-green-100 text-green-700" },
+  { value: "declined",               label: "Declined / Lost",                   color: "bg-red-100 text-red-700" },
+  { value: "contract_pending",       label: "Contract Pending",                  color: "bg-teal-100 text-teal-700" },
+  { value: "converted_contract",     label: "Converted to Contract",             color: "bg-emerald-100 text-emerald-700" },
+  { value: "converted_job",          label: "Converted to Once-off Job",         color: "bg-cyan-100 text-cyan-700" },
+  { value: "installation_scheduled", label: "Installation / Service Scheduled",  color: "bg-sky-100 text-sky-700" },
+  { value: "invoiced",               label: "Invoiced",                          color: "bg-lime-100 text-lime-700" },
+  { value: "after_sales_followup",   label: "After-sales Follow-up Due",         color: "bg-pink-100 text-pink-700" },
+  { value: "complete",               label: "Complete",                          color: "bg-gray-100 text-gray-600" },
+] as const;
+export type LeadStage = typeof LEAD_STAGES[number]["value"];
+export const LEAD_STAGE_LABELS: Record<string, string> = Object.fromEntries(LEAD_STAGES.map(s => [s.value, s.label]));
+
+// ── Simplified lead pipeline (Lead -> Quote -> Job -> Invoice redesign) ─────
+// This is the ONLY set of statuses the Leads board renders as columns.
+// Everything that used to be a separate "hidden" pipeline stage (site visits,
+// contracts, registration, scheduling, invoicing, after-sales) now lives as
+// an activity/record on the lead, quote, Accepted Work item, job or invoice
+// instead of a board stage — so a lead can never disappear from the board.
+export const LEAD_STATUSES = [
+  { value: "new",                 label: "New",                color: "bg-blue-100 text-blue-700" },
+  { value: "contacted",           label: "Contacted",           color: "bg-indigo-100 text-indigo-700" },
+  { value: "appointment_booked",  label: "Appointment Booked",  color: "bg-purple-100 text-purple-700" },
+  { value: "quote_required",      label: "Quote Required",      color: "bg-amber-100 text-amber-700" },
+  { value: "quoted",              label: "Quoted",               color: "bg-yellow-100 text-yellow-700" },
+  { value: "lost",                label: "Lost",                color: "bg-red-100 text-red-700" },
+  { value: "converted",           label: "Converted",           color: "bg-green-100 text-green-700" },
+] as const;
+export type LeadStatus = typeof LEAD_STATUSES[number]["value"];
+export const LEAD_STATUS_LABELS: Record<string, string> = Object.fromEntries(LEAD_STATUSES.map(s => [s.value, s.label]));
+
+// Fallback bucket for any status value that doesn't map cleanly — a lead must
+// NEVER be hidden just because its status is unrecognised.
+export const NEEDS_REVIEW_STATUS = "needs_review" as const;
+
+// Maps every legacy/hidden LEAD_STAGES value (and any stray `stage` value) to
+// one of the 7 canonical LEAD_STATUSES above. Pure function — safe to call at
+// read time (normalizing old DB rows on the fly) or as a one-time migration.
+export function normalizeLeadStatus(status?: string | null, stage?: string | null): LeadStatus | "needs_review" {
+  const canonical = new Set(LEAD_STATUSES.map(s => s.value));
+  const raw = (status || "").trim();
+  if (canonical.has(raw as LeadStatus)) return raw as LeadStatus;
+
+  const LEGACY_MAP: Record<string, LeadStatus> = {
+    appointment_scheduled: "appointment_booked",
+    appointment_set:       "appointment_booked",
+    site_assessment_done:  "quote_required",
+    assessment_done:       "quote_required",
+    site_done:             "quote_required",
+    quote_needed:          "quote_required",
+    quote_sent:            "quoted",
+    follow_up_due:         "quoted",
+    declined:              "lost",
+    accepted:              "converted",
+    won:                   "converted",
+    contract_pending:      "converted",
+    client_registration_pending: "converted",
+    installation_scheduled: "converted",
+    invoiced:              "converted",
+    after_sales_followup:  "converted",
+    after_sales_follow_up_due: "converted",
+    complete:              "converted",
+    converted_contract:    "converted",
+    converted_job:         "converted",
+  };
+  if (LEGACY_MAP[raw]) return LEGACY_MAP[raw];
+
+  // Fall back to the legacy `stage` column if `status` itself was unusable.
+  const rawStage = (stage || "").trim();
+  if (canonical.has(rawStage as LeadStatus)) return rawStage as LeadStatus;
+  if (LEGACY_MAP[rawStage]) return LEGACY_MAP[rawStage];
+
+  return NEEDS_REVIEW_STATUS;
+}
+
+export const QUOTE_STATUSES = [
+  "Draft","Sent","Follow-up Due","Followed Up","Accepted","Declined",
+  "Expired","Contract Pending","Converted to Contract","Converted to Job",
+] as const;
+
+export const LOST_REASONS = [
+  { value: "price_too_high",  label: "Price too high" },
+  { value: "competitor",      label: "Client chose competitor" },
+  { value: "no_response",     label: "No response" },
+  { value: "not_ready",       label: "Not ready yet" },
+  { value: "wrong_service",   label: "Wrong service" },
+  { value: "bad_timing",      label: "Bad timing" },
+  { value: "duplicate",       label: "Duplicate lead" },
+  { value: "other",           label: "Other" },
+] as const;
+
+export const insertQuoteSubmissionSchema = createInsertSchema(quoteSubmissions).omit({
+  id: true,
+  submittedAt: true,
+  quoteNumber: true,
+}).extend({
+  origination: z.enum([
+    "facebook","google","vehicles","phone","cold_call","referral",
+    "website","existing_client","walk_in","email","other",
+  ], { required_error: "Origination is required" }),
+  originationOther: z.string().optional().nullable(),
+  // email and phone are NOT NULL in DB but are optional when staff create a lead internally
+  email: z.string().optional().default(""),
+  phone: z.string().optional().default(""),
+  // companyName and contactPerson: make the Zod message friendly
+  companyName: z.string().min(1, "Company / client name is required"),
+  contactPerson: z.string().optional().default(""),
+});
+
+export type InsertQuoteSubmission = z.infer<typeof insertQuoteSubmissionSchema>;
+export type QuoteSubmission = typeof quoteSubmissions.$inferSelect;
+
+// ── Lead activity timeline ──────────────────────────────────────────────────
+// A simple append-only log of what happened on a lead (status changes,
+// appointments booked, site visits completed, quotes created, etc). Rendered
+// on the lead card as its history; never used to drive board visibility.
+export const leadActivities = pgTable("lead_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => quoteSubmissions.id),
+  type: text("type").notNull(),          // status_change, appointment_booked, site_visit_done, quote_created, note, etc.
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertLeadActivitySchema = createInsertSchema(leadActivities).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertLeadActivity = z.infer<typeof insertLeadActivitySchema>;
+export type LeadActivity = typeof leadActivities.$inferSelect;
+
+// ─── PRICING LIBRARY ────────────────────────────────────────────────────────
+
+export const pricingLibrary = pgTable("pricing_library", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),  // sanitary_bins, washroom, pest_control, deep_cleaning, installation, dustmats, other
+  serviceType: text("service_type"),
+  unit: text("unit"),                    // per month, per visit, each, per sqm, etc.
+  unitPrice: text("unit_price").notNull(),
+  departmentId: varchar("department_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  cost: text("cost"),
+  itemCode: text("item_code"),
+  vatStatus: text("vat_status").default("inclusive"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertPricingLibrarySchema = createInsertSchema(pricingLibrary).omit({ id: true, createdAt: true });
+export type InsertPricingLibraryItem = z.infer<typeof insertPricingLibrarySchema>;
+export type PricingLibraryItem = typeof pricingLibrary.$inferSelect;
+
+// ─── SALES FOLLOW-UPS ───────────────────────────────────────────────────────
+
+export const salesFollowUps = pgTable("sales_follow_ups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id"),
+  type: text("type"),                   // first_followup, second_followup, manual, after_sales
+  method: text("method"),               // Phone call, Email, WhatsApp, Client visit, Other
+  dueDate: text("due_date"),            // YYYY-MM-DD
+  completedAt: text("completed_at"),
+  status: text("status").notNull().default("pending"),  // pending, completed, rescheduled
+  result: text("result"),               // accepted, declined, reschedule, no_answer
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertSalesFollowUpSchema = createInsertSchema(salesFollowUps).omit({ id: true, createdAt: true });
+export type InsertSalesFollowUp = z.infer<typeof insertSalesFollowUpSchema>;
+export type SalesFollowUp = typeof salesFollowUps.$inferSelect;
+
+// ─── FLEET MODULE ──────────────────────────────────────────────────────────
+
+export const vehicles = pgTable("vehicles", {
+  id: varchar("id").primaryKey(),
+  name: text("name").notNull(),
+  registration: text("registration").notNull(),
+  make: text("make"),
+  model: text("model"),
+  year: text("year"),
+  departmentId: varchar("department_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  vehicleStatus: text("vehicle_status").notNull().default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const vehicleAssignments = pgTable("vehicle_assignments", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  assignedAt: timestamp("assigned_at").notNull().default(sql`now()`),
+  unassignedAt: timestamp("unassigned_at"),
+  sourceSystem: varchar("source_system"),
+  sourceAssignmentId: varchar("source_assignment_id"),
+});
+
+export const kmLogs = pgTable("km_logs", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  logDate: timestamp("log_date").notNull(),
+  startOdometer: integer("start_odometer").notNull(),
+  endOdometer: integer("end_odometer").notNull(),
+  totalKm: integer("total_km").notNull(),
+  businessKm: integer("business_km").notNull().default(0),
+  privateKm: integer("private_km").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const fuelFillups = pgTable("fuel_fillups", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  fillDate: timestamp("fill_date").notNull(),
+  odometer: integer("odometer").notNull(),
+  litres: decimal("litres", { precision: 8, scale: 2 }).notNull(),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  fuelType: text("fuel_type").notNull(),
+  receiptPhoto: text("receipt_photo").notNull(),
+  notes: text("notes"),
+  submissionKey: text("submission_key"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const vehicleInspections = pgTable("vehicle_inspections", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  inspectionDate: timestamp("inspection_date").notNull(),
+  overallResult: text("overall_result").notNull().default("pass"),
+  itemsJson: text("items_json"),
+  comments: text("comments"),
+  photoUrl: text("photo_url"),
+  failAlertSent: boolean("fail_alert_sent").notNull().default(false),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by"),
+  submissionKey: text("submission_key"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
+export const insertVehicleAssignmentSchema = createInsertSchema(vehicleAssignments).omit({ id: true, assignedAt: true });
+export const insertKmLogSchema = createInsertSchema(kmLogs).omit({ id: true, createdAt: true });
+export const insertFuelFillupSchema = createInsertSchema(fuelFillups).omit({ id: true, createdAt: true });
+export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections).omit({ id: true, createdAt: true, failAlertSent: true });
+
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
+export type InsertVehicleAssignment = z.infer<typeof insertVehicleAssignmentSchema>;
+export type VehicleAssignment = typeof vehicleAssignments.$inferSelect;
+export type InsertKmLog = z.infer<typeof insertKmLogSchema>;
+export type KmLog = typeof kmLogs.$inferSelect;
+export type InsertFuelFillup = z.infer<typeof insertFuelFillupSchema>;
+export type FuelFillup = typeof fuelFillups.$inferSelect;
+export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
+export type VehicleInspection = typeof vehicleInspections.$inferSelect;
+
+// ─── FLEET MAINTENANCE ──────────────────────────────────────────────────────
+
+export const vehicleIssues = pgTable("vehicle_issues", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  workerId: varchar("worker_id").notNull(),
+  reportedAt: timestamp("reported_at").notNull(),
+  category: text("category").notNull(), // tyres, engine, brakes, electrical, body, lights, fluids, windscreen, other
+  description: text("description").notNull(),
+  urgency: text("urgency").notNull().default("medium"), // low, medium, high, not_safe
+  status: text("status").notNull().default("open"), // open, in_progress, booked, completed, not_required
+  photoUrl: text("photo_url"),
+  managerNotes: text("manager_notes"),
+  resolvedAt: timestamp("resolved_at"),
+  serviceRecordId: varchar("service_record_id"),
+  submissionKey: text("submission_key"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const serviceRecords = pgTable("service_records", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  serviceDate: timestamp("service_date").notNull(),
+  odometer: integer("odometer").notNull(),
+  serviceProvider: text("service_provider").notNull(),
+  workDone: text("work_done").notNull(),
+  issuesFixed: text("issues_fixed"),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  invoiceNumber: text("invoice_number"),
+  invoiceUrl: text("invoice_url"),
+  notes: text("notes"),
+  nextServiceDate: timestamp("next_service_date"),
+  nextServiceOdometer: integer("next_service_odometer"),
+  createdByWorkerId: varchar("created_by_worker_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const workshopJobs = pgTable("workshop_jobs", {
+  id: varchar("id").primaryKey(),
+  vehicleId: varchar("vehicle_id").notNull(),
+  assignedDriverId: varchar("assigned_driver_id"),
+  issueSource: text("issue_source").notNull().default("manual"),
+  sourceInspectionId: varchar("source_inspection_id"),
+  sourceIssueId: varchar("source_issue_id"),
+  description: text("description").notNull(),
+  reportedByWorkerId: varchar("reported_by_worker_id"),
+  scheduledDate: timestamp("scheduled_date"),
+  priority: text("priority").notNull().default("medium"),
+  status: text("status").notNull().default("open"),
+  serviceProvider: text("service_provider"),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertVehicleIssueSchema = createInsertSchema(vehicleIssues).omit({ id: true, createdAt: true });
+export const insertServiceRecordSchema = createInsertSchema(serviceRecords).omit({ id: true, createdAt: true });
+export const insertWorkshopJobSchema = createInsertSchema(workshopJobs).omit({ id: true, createdAt: true });
+
+export type InsertVehicleIssue = z.infer<typeof insertVehicleIssueSchema>;
+export type VehicleIssue = typeof vehicleIssues.$inferSelect;
+export type InsertServiceRecord = z.infer<typeof insertServiceRecordSchema>;
+export type ServiceRecord = typeof serviceRecords.$inferSelect;
+export type InsertWorkshopJob = z.infer<typeof insertWorkshopJobSchema>;
+export type WorkshopJob = typeof workshopJobs.$inferSelect;
+
+// ─── TEAM ATTENDANCE MODULE ──────────────────────────────────────────────────
+
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  departmentId: varchar("department_id").notNull(),
+  supervisorId: varchar("supervisor_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
 export const teamMembers = pgTable("team_members", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey().default(sql.raw("gen_random_uuid()")),
   teamId: varchar("team_id").notNull(),
   workerId: varchar("worker_id").notNull(),
 });
