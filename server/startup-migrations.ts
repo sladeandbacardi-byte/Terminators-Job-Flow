@@ -634,6 +634,11 @@ export async function runStartupMigrations(): Promise<void> {
      WHERE quote_submissions.id = n.id`
   );
 
+  await run(
+    "service_contracts.site_id",
+    `ALTER TABLE service_contracts ADD COLUMN IF NOT EXISTS site_id varchar`,
+  );
+
   // Service contracts
   await run(
     "backfill: service_contracts missing contract_number",
