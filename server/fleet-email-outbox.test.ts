@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FLEET_EMAIL_RECIPIENTS, failedInspectionEmail, fleetFuelEmail, fleetMessageId, fleetWeeklySummaryEmail, retryDelaySeconds } from "./fleet-email-outbox";
+import { DEFAULT_FLEET_EMAIL_RECIPIENTS, failedInspectionEmail, fleetEmailRecipients, fleetFuelEmail, fleetMessageId, fleetWeeklySummaryEmail, retryDelaySeconds } from "./fleet-email-outbox";
 
-test("fleet templates always use the two required recipients", () => {
-  assert.deepEqual(FLEET_EMAIL_RECIPIENTS, ["julien@terminators.co.za", "accounts@terminators.co.za"]);
+test("fleet recipients default safely and accept valid configuration", () => {
+  assert.deepEqual(DEFAULT_FLEET_EMAIL_RECIPIENTS, ["julien@terminators.co.za", "accounts@terminators.co.za"]);
+  assert.deepEqual(fleetEmailRecipients("Julien@example.com, accounts@example.com;Julien@example.com"), ["julien@example.com", "accounts@example.com"]);
+  assert.throws(() => fleetEmailRecipients("not-an-email"), /valid comma-separated/);
 });
 
 test("fuel template excludes station details", () => {

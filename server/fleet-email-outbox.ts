@@ -1,11 +1,19 @@
 import { pool } from "./db";
 import { escapeHtml, sendEmail } from "./email-service";
 
-/** Fleet notifications deliberately have no configurable recipients. */
-export const FLEET_EMAIL_RECIPIENTS = [
+export const DEFAULT_FLEET_EMAIL_RECIPIENTS = [
   "julien@terminators.co.za",
   "accounts@terminators.co.za",
 ] as const;
+
+export function fleetEmailRecipients(value = process.env.FLEET_NOTIFICATION_RECIPIENTS): string[] {
+  if (!value?.trim()) return [...DEFAULT_FLEET_EMAIL_RECIPIENTS];
+  const recipients = Array.from(new Set(value.split(/[;,]/).map(item => item.trim().toLowerCase()).filter(Boolean)));
+  if (!recipients.length || recipients.some(item => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item))) {
+    throw new Error("FLEET_NOTIFICATION_RECIPIENTS must contain valid comma-separated email addresses.");
+  }
+  return recipients;
+}
 
 export type FleetEmailKind = "fuel_fillup" | "inspection_failed" | "fault_reported" | "weekly_summary";
 
@@ -88,7 +96,7 @@ export async function enqueueFleetEmail(email: FleetEmail): Promise<boolean> {
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (event_key) DO NOTHING
      RETURNING id`,
-    [email.eventKey, email.kind, [...FLEET_EMAIL_RECIPIENTS], email.subject, email.text, email.html],
+    [email.eventKey, email.kind, fleetEmailRecipients(), email.subject, email.text, email.html],
   );
   return result.rowCount === 1;
 }

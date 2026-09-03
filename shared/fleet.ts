@@ -1,0 +1,18 @@
+export const FLEET_INSPECTION_CHECKS = [
+  "Tyres",
+  "Lights",
+  "Engine oil",
+  "Coolant",
+  "Windscreen",
+  "Mirrors",
+  "Wipers",
+  "Brakes",
+  "Seat belts",
+  "Fire extinguisher",
+  "First aid kit",
+  "Equipment secured",
+  "Visible damage",
+  "Cleanliness",
+  "Licence disc",
+  "Driver licence",
+] as const;

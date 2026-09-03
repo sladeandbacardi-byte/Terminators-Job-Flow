@@ -79,6 +79,7 @@ import {
   scopedDepartmentIds,
 } from "@shared/permissionMatrix";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
+import { assertNoOdometerRollback, validateFleetInspectionItems } from "./fleet-input-validation";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import { createMemoryRateLimiter } from "./request-limits";
 import { createPasswordlessOfficeLoginHandler, createPasswordLoginHandler } from "./office-auth-http";
@@ -1982,6 +1983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const all = [...(await storage.getKmLogs()).filter(log => log.id !== existing?.id), candidate];
       const calculated = calculateFleetOdometerLogs(all).find(log => log.id === candidate.id)!;
+      assertNoOdometerRollback(calculated.odometerCalculation.flags);
       const data = insertKmLogSchema.parse({ ...candidate, totalKm: calculated.totalKm ?? 0, businessKm: calculated.businessKm ?? 0, privateKm: calculated.privateKm ?? 0 });
       const created = existing ? await storage.updateKmLog(existing.id, data) : await storage.createKmLog(data);
       res.status(201).json(calculateFleetOdometerLogs(await storage.getKmLogs()).find(log => log.id === created.id));
@@ -1994,6 +1996,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (["fuelstation", "fuel_station", "station", "station_name"].some(key =>
       Object.keys(body).some(inputKey => inputKey.toLowerCase() === key),
     )) throw new Error("Fuel station details are no longer accepted.");
+    if (typeof body.notes === "string" && body.notes.trim()) {
+      throw new Error("Fuel notes are not accepted. Record only the approved fuel fields.");
+    }
     const date = typeof body.date === "string" ? body.date : "";
     const time = typeof body.time === "string" ? body.time : "";
     if (!vehicleId || !workerId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
@@ -2013,7 +2018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return insertFuelFillupSchema.parse({
       vehicleId, workerId, fillDate, odometer, litres: String(litres), cost: String(cost),
-      fuelType, receiptPhoto, notes: typeof body.notes === "string" ? body.notes : null,
+      fuelType, receiptPhoto, notes: null,
     });
   };
 
@@ -2042,10 +2047,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (Number.isNaN(inspectionDate.getTime())) {
         return res.status(400).json({ message: "Enter a valid inspection date and time." });
       }
-      const items = Array.isArray(req.body.items) ? req.body.items : [];
+      const items = validateFleetInspectionItems(req.body.items);
+      const overallResult = items.some(item => item.result === "fail") ? "fail" : "pass";
       const data = insertVehicleInspectionSchema.parse({
         vehicleId, workerId: req.mobileWorker!.id, inspectionDate,
-        overallResult: req.body.overallResult === "fail" ? "fail" : "pass",
+        overallResult,
         itemsJson: JSON.stringify(items), comments: typeof req.body.comments === "string" ? req.body.comments : null,
       });
       const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
@@ -7350,6 +7356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(await storage.getKmLogs()),
         { id: `pending-${randomUUID()}`, createdAt: new Date(), ...candidate },
       ]).at(-1)!;
+      assertNoOdometerRollback(calculated.odometerCalculation.flags);
       const log = await storage.createKmLog({
         ...candidate,
         totalKm: calculated.totalKm ?? 0,
@@ -7405,7 +7412,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         inspectionDate: req.body.inspectionDate ? new Date(req.body.inspectionDate) : new Date(),
       };
-      const data = insertVehicleInspectionSchema.parse(body);
+      const items = validateFleetInspectionItems(
+        typeof body.itemsJson === "string" ? JSON.parse(body.itemsJson) : body.items,
+      );
+      const data = insertVehicleInspectionSchema.parse({
+        ...body,
+        itemsJson: JSON.stringify(items),
+        overallResult: items.some(item => item.result === "fail") ? "fail" : "pass",
+      });
       const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
       res.status(result.created ? 201 : 200).json(result.record);
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }

@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fleetSubmissionKey, withFleetSubmissionTransaction } from "./fleet-submissions";
 
-test("fleet submission keys preserve valid client retry IDs and replace invalid values", () => {
+test("fleet submission keys preserve valid client retry IDs and reject invalid values", () => {
   assert.equal(fleetSubmissionKey("mobile:fuel:01JABCDEF1234567"), "mobile:fuel:01JABCDEF1234567");
-  assert.match(fleetSubmissionKey("too short"), /^[0-9a-f-]{36}$/);
+  assert.throws(() => fleetSubmissionKey("too short"), /valid submission key/);
+  assert.throws(() => fleetSubmissionKey(undefined), /valid submission key/);
 });
 
 test("fleet submission transaction commits only after domain and outbox work succeeds", async () => {

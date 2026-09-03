@@ -70,7 +70,10 @@ export async function runStartupMigrations(): Promise<void> {
   await run(
     "FleetGuard active vehicle exclusivity",
     `CREATE UNIQUE INDEX IF NOT EXISTS vehicle_assignments_active_vehicle_unique
-       ON vehicle_assignments(vehicle_id) WHERE is_active;`,
+       ON vehicle_assignments(vehicle_id) WHERE is_active;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_assignments_active_worker_unique
+       ON vehicle_assignments(worker_id) WHERE is_active;`,
+    true,
   );
 
   await run(

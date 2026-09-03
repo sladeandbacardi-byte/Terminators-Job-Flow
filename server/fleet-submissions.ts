@@ -1,7 +1,6 @@
-import { randomUUID } from "crypto";
 import type { FuelFillup, InsertFuelFillup, InsertVehicleInspection, InsertVehicleIssue, VehicleInspection, VehicleIssue } from "@shared/schema";
 import { pool } from "./db";
-import { failedInspectionEmail, fleetFaultEmail, fleetFuelEmail, type FleetEmail } from "./fleet-email-outbox";
+import { failedInspectionEmail, fleetEmailRecipients, fleetFaultEmail, fleetFuelEmail, type FleetEmail } from "./fleet-email-outbox";
 
 type QueryClient = Pick<typeof pool, "query">;
 type SubmissionKind = "fuel" | "inspection" | "issue";
@@ -14,7 +13,9 @@ const issueColumns = `id, vehicle_id AS "vehicleId", worker_id AS "workerId", re
  * its fields: two genuine fill-ups may otherwise look identical.
  */
 export function fleetSubmissionKey(value: unknown): string {
-  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{16,200}$/.test(value.trim())) return randomUUID();
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{16,200}$/.test(value.trim())) {
+    throw new Error("A valid submission key is required. Refresh the form and try again.");
+  }
   return value.trim();
 }
 
@@ -50,7 +51,7 @@ async function submit<T>(
         await client.query(
           `INSERT INTO fleet_email_outbox (event_key, kind, recipients, subject, text_body, html_body)
            VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (event_key) DO NOTHING`,
-          [notification.eventKey, notification.kind, ["julien@terminators.co.za", "accounts@terminators.co.za"], notification.subject, notification.text, notification.html],
+          [notification.eventKey, notification.kind, fleetEmailRecipients(), notification.subject, notification.text, notification.html],
         );
       }
       return { record, created: true };

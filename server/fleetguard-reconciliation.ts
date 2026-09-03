@@ -432,17 +432,27 @@ async function ensureReconciliationTables(target: TargetDatabase): Promise<void>
 }
 
 async function ensureAssignmentExclusivity(target: TargetDatabase): Promise<void> {
-  const duplicates = await target.query(
-    `SELECT vehicle_id, count(*)::int AS active_count
+  const duplicateVehicles = await target.query(
+    `SELECT vehicle_id AS key, count(*)::int AS active_count
        FROM vehicle_assignments WHERE is_active
       GROUP BY vehicle_id HAVING count(*) > 1`,
   );
-  if (duplicates.rowCount) {
-    throw new Error(`Cannot enforce vehicle assignment exclusivity: ${JSON.stringify(duplicates.rows)}`);
+  const duplicateWorkers = await target.query(
+    `SELECT worker_id AS key, count(*)::int AS active_count
+       FROM vehicle_assignments WHERE is_active
+      GROUP BY worker_id HAVING count(*) > 1`,
+  );
+  if (duplicateVehicles.rowCount || duplicateWorkers.rowCount) {
+    throw new Error(`Cannot enforce assignment exclusivity: ${JSON.stringify({
+      vehicles: duplicateVehicles.rows,
+      workers: duplicateWorkers.rows,
+    })}`);
   }
   await target.query(
     `CREATE UNIQUE INDEX IF NOT EXISTS vehicle_assignments_active_vehicle_unique
-       ON vehicle_assignments(vehicle_id) WHERE is_active`,
+       ON vehicle_assignments(vehicle_id) WHERE is_active;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_assignments_active_worker_unique
+       ON vehicle_assignments(worker_id) WHERE is_active`,
   );
 }
 

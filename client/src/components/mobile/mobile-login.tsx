@@ -15,6 +15,7 @@ const FALLBACK_STAFF: StaffProfile[] = [
   ["mobile-tech-03", "Garth du Preez"], ["mobile-tech-04", "Jackie Roelfse"],
   ["mobile-tech-06", "Zain Abdol"], ["mobile-tech-07", "Michael Meyer"],
   ["mobile-tech-08", "Xolani Ndzotoyi"], ["mobile-tech-09", "Reece Ebrahim"],
+  ["mobile-tech-10", "Zuki Sandi"],
 ].map(([id, name]) => ({ id, name, role: "Technician", department: "Field Service" }));
 
 export function MobileLogin({ onSuccess }: MobileLoginProps) {
