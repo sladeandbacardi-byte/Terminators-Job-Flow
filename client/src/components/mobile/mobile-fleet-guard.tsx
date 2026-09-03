@@ -18,6 +18,7 @@ type Overview = {
   inspections: Array<{ id: string; inspectionDate: string; overallResult: string; comments?: string | null }>;
   issues: Array<{ id: string; reportedAt: string; category: string; description: string; urgency: string; status: string }>;
 };
+type SelectableVehicle = { id: string; name: string; registration: string; isAssigned?: boolean; selectedToday?: boolean };
 
 const headers = () => ({ "Content-Type": "application/json" });
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -25,7 +26,7 @@ const localTime = () => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Joh
 const datetimeFor = (date: string, time: string) => `${date}T${time}:00`;
 const newSubmissionKey = () => crypto.randomUUID();
 
-type FleetDetail = { title: string; lines: string[] };
+type FleetDetail = { title: string; lines: string[]; confirm?: { label: string; action: () => void } };
 type MobileKmSnapshot = { type: "AM" | "PM"; odometer: number; timestamp?: string };
 
 function snapshotFromLog(log: Log | undefined, type: "AM" | "PM"): MobileKmSnapshot | undefined {
@@ -54,6 +55,7 @@ function FleetOverview({
   onNavigate,
   setDetail,
   load,
+  onChangeVehicle,
 }: {
   worker: Worker;
   date: string;
@@ -70,6 +72,7 @@ function FleetOverview({
   onNavigate: (mode: FleetMode) => void;
   setDetail: (detail: FleetDetail | null) => void;
   load: () => Promise<void>;
+  onChangeVehicle: () => void;
 }) {
   const statusRow = (log: Log | undefined, label: "Morning" | "Afternoon") => {
     const period = label === "Morning" ? "AM" : "PM";
@@ -106,7 +109,7 @@ function FleetOverview({
           <p className="truncate text-sm font-bold text-slate-900">{worker.name}</p>
           <p className="truncate text-sm text-slate-500">{overview?.vehicle ? `${overview.vehicle.registration} · ${overview.vehicle.name}` : "No vehicle assigned"}</p>
         </div>
-        <button type="button" className="shrink-0 text-sm font-bold text-blue-700 underline underline-offset-2" onClick={() => setDetail({ title: "Assigned vehicle", lines: [overview?.vehicle ? `${overview.vehicle.registration} · ${overview.vehicle.name}` : "No active vehicle is assigned.", "Vehicle changes are managed by your supervisor."] })}>Change</button>
+        <button type="button" className="shrink-0 text-sm font-bold text-blue-700 underline underline-offset-2" onClick={onChangeVehicle}>Change</button>
       </div>
     </header>
     <div className="flex items-center gap-2">
@@ -124,7 +127,7 @@ function FleetOverview({
       <div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => onNavigate("kmMorning")} className="rounded-xl bg-blue-600 px-3 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Log Morning KMs</button><button type="button" onClick={() => onNavigate("kmAfternoon")} className="rounded-xl bg-blue-600 px-3 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Log Afternoon KMs</button></div>
       <div className="space-y-2"><button type="button" onClick={() => onNavigate("inspection")} className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left text-emerald-900"><ClipboardCheck className="h-5 w-5 text-emerald-600" /><span className="flex-1 font-semibold">Daily Vehicle Check</span><ChevronRight className="h-4 w-4 text-emerald-500" /></button><button type="button" onClick={() => onNavigate("monthlyInspection")} className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-900"><CalendarCheck2 className="h-5 w-5 text-slate-600" /><span className="flex-1 font-semibold">Monthly Inspection</span><ChevronRight className="h-4 w-4 text-slate-400" /></button><button type="button" onClick={() => onNavigate("fuel")} className="flex w-full items-center gap-3 rounded-xl bg-orange-500 p-4 text-left text-white shadow-sm hover:bg-orange-600"><Fuel className="h-5 w-5" /><span className="flex-1 font-bold">Log Fuel</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={() => onNavigate("issue")} className="flex w-full items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-left text-red-800"><AlertTriangle className="h-5 w-5 text-red-600" /><span className="flex-1 font-semibold">Report Fault</span><ChevronRight className="h-4 w-4 text-red-400" /></button></div>
     </>}
-    {detail && <div role="dialog" aria-modal="true" aria-labelledby="fleet-detail-title" className="fixed inset-0 z-50 flex items-end bg-slate-950/40 p-4 sm:items-center sm:justify-center"><section className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"><h2 id="fleet-detail-title" className="text-lg font-bold">{detail.title}</h2>{detail.lines.map(line => <p key={line} className="mt-3 text-sm text-slate-600">{line}</p>)}<button type="button" onClick={() => setDetail(null)} className="mt-5 w-full rounded-xl bg-slate-900 py-3 font-semibold text-white">Close</button></section></div>}
+    {detail && <div role="dialog" aria-modal="true" aria-labelledby="fleet-detail-title" className="fixed inset-0 z-50 flex items-end bg-slate-950/40 p-4 sm:items-center sm:justify-center"><section className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"><h2 id="fleet-detail-title" className="text-lg font-bold">{detail.title}</h2>{detail.lines.map(line => <p key={line} className="mt-3 text-sm text-slate-600">{line}</p>)}{detail.confirm && <button type="button" onClick={detail.confirm.action} className="mt-5 w-full rounded-xl bg-blue-700 py-3 font-semibold text-white">{detail.confirm.label}</button>}<button type="button" onClick={() => setDetail(null)} className={`${detail.confirm ? "mt-2" : "mt-5"} w-full rounded-xl bg-slate-900 py-3 font-semibold text-white`}>{detail.confirm ? "Cancel" : "Close"}</button></section></div>}
   </div>;
 }
 
@@ -136,7 +139,10 @@ export function MobileFleetGuard({ worker, mode, onNavigate, onSaved }: { worker
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState<Record<string, string>>({});
   const [idempotencyKey, setIdempotencyKey] = useState(newSubmissionKey);
-  const [detail, setDetail] = useState<{ title: string; lines: string[] } | null>(null);
+  const [detail, setDetail] = useState<FleetDetail | null>(null);
+  const [vehiclePicker, setVehiclePicker] = useState(false);
+  const [vehicles, setVehicles] = useState<SelectableVehicle[]>([]);
+  const [changingVehicle, setChangingVehicle] = useState(false);
   const load = async () => {
     setLoading(true);
     try {
@@ -148,6 +154,37 @@ export function MobileFleetGuard({ worker, mode, onNavigate, onSaved }: { worker
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [date]);
+  const openVehiclePicker = async () => {
+    setError(""); setChangingVehicle(true);
+    try {
+      const response = await mobileFetch("/api/mobile/fleet/vehicles", { headers: headers() });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Unable to load vehicles.");
+      setVehicles(payload.vehicles); setVehiclePicker(true);
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to load vehicles."); }
+    finally { setChangingVehicle(false); }
+  };
+  const chooseVehicle = async (vehicleId: string, confirmed = false) => {
+    setChangingVehicle(true); setError("");
+    try {
+      const response = await mobileFetch("/api/mobile/fleet/selection", { method: "POST", headers: headers(), body: JSON.stringify({ vehicleId, confirmed }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Unable to change vehicle.");
+      if (payload.requiresConfirmation) {
+        const target = vehicles.find(vehicle => vehicle.id === vehicleId);
+        setDetail({ title: "Confirm vehicle change", lines: [
+          `${target?.registration || "This vehicle"} was selected today by ${payload.occupiedBy.name}.`,
+          payload.willSwap ? "Confirm to exchange your current vehicles." : "Confirm to transfer this vehicle to you.",
+        ], confirm: { label: "Confirm change", action: () => chooseVehicle(vehicleId, true) } });
+        // The detail dialog deliberately requires an explicit second action.
+        setVehiclePicker(false);
+        return;
+      }
+      setVehiclePicker(false); setDetail(null); setNotice(payload.swapped ? "Vehicles exchanged." : "Current vehicle updated.");
+      await Promise.all([load(), onSaved()]);
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to change vehicle."); }
+    finally { setChangingVehicle(false); }
+  };
   const selectedLogs = useMemo(() => overview?.kmLogs.filter(log => log.isSelectedDay) ?? [], [overview]);
   const snapshotLog = (type: "AM" | "PM") => selectedLogs.find(log => {
     try { return JSON.parse(log.notes || "{}").snapshots?.some((snapshot: { type?: string }) => snapshot.type === type); }
@@ -171,7 +208,7 @@ export function MobileFleetGuard({ worker, mode, onNavigate, onSaved }: { worker
       setForm({}); setIdempotencyKey(newSubmissionKey()); setNotice(success); await Promise.all([load(), onSaved()]); onNavigate("fleet");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to save this FleetGuard update."); }
   };
-  if (mode === "fleet") return <FleetOverview worker={worker} date={date} overview={overview} loading={loading} error={error} notice={notice} morning={morning} afternoon={afternoon} business={business} privateKm={privateKm} detail={detail} goDate={goDate} onNavigate={onNavigate} setDetail={setDetail} load={load} />;
+  if (mode === "fleet") return <><FleetOverview worker={worker} date={date} overview={overview} loading={loading} error={error} notice={notice} morning={morning} afternoon={afternoon} business={business} privateKm={privateKm} detail={detail} goDate={goDate} onNavigate={onNavigate} setDetail={setDetail} load={load} onChangeVehicle={openVehiclePicker} />{vehiclePicker && <div role="dialog" aria-modal="true" aria-label="Change vehicle" className="fixed inset-0 z-50 flex items-end bg-slate-950/40 p-4 sm:items-center sm:justify-center"><section className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"><h2 className="text-lg font-bold">Change vehicle</h2><p className="mt-1 text-sm text-slate-600">Choose your current vehicle for today.</p><div className="mt-4 max-h-72 space-y-2 overflow-y-auto">{vehicles.map(vehicle => <button key={vehicle.id} type="button" disabled={changingVehicle || vehicle.isAssigned} onClick={() => chooseVehicle(vehicle.id)} className="flex w-full items-center justify-between rounded-xl border border-slate-200 p-3 text-left disabled:opacity-50"><span><span className="block font-semibold">{vehicle.registration}</span><span className="text-sm text-slate-500">{vehicle.name}</span></span><span className="text-xs font-bold text-blue-700">{vehicle.isAssigned ? "Current" : vehicle.selectedToday ? "Selected today" : "Select"}</span></button>)}</div><button type="button" onClick={() => setVehiclePicker(false)} className="mt-4 w-full rounded-xl border border-slate-300 py-3 font-semibold">Cancel</button></section></div>}</>;
   const input = (name: string, label: string, required = false) => <label className="block text-sm font-semibold text-slate-700">{label}<input required={required} min="0" type="number" inputMode="decimal" value={form[name] ?? ""} onChange={e => set(name, e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 font-normal outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></label>;
   const choosePhoto = (key: string) => (event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2_000_000) { setError("Use a JPG, PNG, or WebP image smaller than 2 MB."); event.target.value = ""; return; } const reader = new FileReader(); reader.onload = () => set(key, String(reader.result)); reader.readAsDataURL(file); };
   const FormShell = ({ title, children }: { title: string; children: ReactNode }) => <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><button type="button" onClick={() => onNavigate("fleet")} className="flex items-center gap-1 text-sm font-semibold text-slate-600"><ArrowLeft className="h-4 w-4" /> FleetGuard</button><div><h2 className="text-lg font-bold text-slate-900">{title}</h2><p className="text-sm text-slate-500">{overview?.vehicle ? `${overview.vehicle.registration} · ${overview.vehicle.name}` : "No vehicle assigned"}</p></div>{error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}{loading ? <p className="text-sm text-slate-500">Loading vehicle details…</p> : !overview?.vehicle ? <button onClick={load} className="w-full rounded-xl border border-slate-300 py-3 font-semibold text-slate-700">Retry assigned vehicle</button> : children}</section>;

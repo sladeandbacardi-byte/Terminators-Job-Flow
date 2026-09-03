@@ -81,6 +81,7 @@ import {
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { assertNoOdometerRollback, validateFleetInspectionItems } from "./fleet-input-validation";
 import { submitMobileKmSnapshot } from "./mobile-km-submissions";
+import { selectMobileVehicle } from "./mobile-vehicle-selection";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import { createMemoryRateLimiter } from "./request-limits";
 import { createPasswordlessOfficeLoginHandler, createPasswordLoginHandler } from "./office-auth-http";
@@ -112,6 +113,7 @@ export const isMobileProtectedRoute = (method: string, path: string) => {
     "POST /api/mobile/field-diaries",
     "GET /api/mobile/fleet/assignment",
     "GET /api/mobile/fleet/vehicles",
+    "POST /api/mobile/fleet/selection",
     "GET /api/mobile/fleet/overview",
     "GET /api/auth/mobile-session",
     "POST /api/auth/mobile-logout",
@@ -1091,7 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // assignment. Never accept another active vehicle from a submitted id.
     if (!assignment || (requestedVehicleId && requestedVehicleId !== assignment.vehicleId)) return null;
     const vehicle = await storage.getVehicle(assignment.vehicleId);
-    return vehicle?.isActive ? vehicle.id : null;
+    return vehicle?.isActive && vehicle.registration.toUpperCase().replace(/[^A-Z0-9]/g, "") !== "KTD136EC" ? vehicle.id : null;
   };
 
   // ── Additional opportunities: technician mobile workflow ──────────────────
@@ -1904,22 +1906,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/mobile/fleet/assignment", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     const assignment = await storage.getActiveAssignmentForWorker(req.mobileWorker!.id);
     const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : undefined;
-    res.json({ assignment: assignment ?? null, vehicle: vehicle ?? null });
+    const allowed = vehicle?.isActive && vehicle.registration.toUpperCase().replace(/[^A-Z0-9]/g, "") !== "KTD136EC";
+    res.json({ assignment: allowed ? assignment : null, vehicle: allowed ? vehicle : null });
   });
 
   app.get("/api/mobile/fleet/vehicles", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     try {
       const assignment = await storage.getActiveAssignmentForWorker(req.mobileWorker!.id);
-      const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : null;
-      const items = vehicle?.isActive ? [{
+      const listed = await db.execute(sql`
+        SELECT v.*, a.worker_id AS "assignedWorkerId",
+          (a.source_system='jobflow-mobile'
+            AND (a.assigned_at AT TIME ZONE 'Africa/Johannesburg')::date
+              = (now() AT TIME ZONE 'Africa/Johannesburg')::date) AS "selectedToday"
+        FROM vehicles v
+        LEFT JOIN vehicle_assignments a ON a.vehicle_id=v.id AND a.is_active
+        WHERE v.is_active
+          AND regexp_replace(upper(COALESCE(v.registration, '')), '[^A-Z0-9]', '', 'g') <> 'KTD136EC'
+        ORDER BY v.registration`);
+      const items = await Promise.all((listed.rows as any[]).map(async vehicle => ({
         ...vehicle,
         latestOdometer: (await latestVehicleOdometer(vehicle.id))?.endOdometer ?? null,
-        isAssigned: true,
-      }] : [];
+        isAssigned: vehicle.id === assignment?.vehicleId,
+      })));
       res.json({ vehicles: items, assignedVehicleId: assignment?.vehicleId || null });
     } catch (error) {
       console.error("Could not load mobile Fleet vehicles:", error);
       res.status(500).json({ error: "Could not load vehicles. Please try again." });
+    }
+  });
+
+  app.post("/api/mobile/fleet/selection", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
+    if (typeof req.body?.vehicleId !== "string" || !req.body.vehicleId) {
+      return res.status(400).json({ message: "A vehicle is required." });
+    }
+    try {
+      const selection = await selectMobileVehicle({
+        workerId: req.mobileWorker!.id,
+        vehicleId: req.body.vehicleId,
+        confirmed: req.body.confirmed === true,
+      });
+      // A confirmation is an expected decision point, not a conflict/error.
+      res.json(selection);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Could not change vehicle." });
     }
   });
 
