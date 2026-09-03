@@ -237,8 +237,8 @@ export default function FleetFuel() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">My Recent Fill-ups</CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <table className="w-full text-sm">
+              <CardContent className="overflow-x-auto p-0">
+                <table className="min-w-[680px] w-full text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
@@ -253,7 +253,7 @@ export default function FleetFuel() {
                       <tr key={f.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-600">{format(new Date(f.fillDate), "dd MMM yyyy")}</td>
                         <td className="px-4 py-3">{vehicleName(f.vehicleId)}</td>
-                        <td className="px-4 py-3 text-gray-500">{f.fuelType || "—"}</td>
+                        <td className="px-4 py-3 text-gray-500">{f.fuelType || "—"}{f.isLegacyImported && f.slipStatus !== "available" && <span className="ml-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Legacy · Slip unavailable from source</span>}</td>
                         <td className="px-4 py-3 text-right">{parseFloat(f.litres || "0").toFixed(1)} L</td>
                         <td className="px-4 py-3 text-right font-medium text-amber-700">R {parseFloat(f.cost || "0").toFixed(2)}</td>
                       </tr>

@@ -2014,7 +2014,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const fuelFillupResponse = (fillup: any) => ({
     ...fillup,
+    notes: undefined,
     pricePerLitre: Number(fillup.cost) / Number(fillup.litres),
+    isLegacyImported: (() => {
+      try { return JSON.parse(fillup.notes || "{}")?.source === "FleetGuard" || String(fillup.id).startsWith("fg-fuel-"); }
+      catch { return String(fillup.id).startsWith("fg-fuel-"); }
+    })(),
+    slipStatus: fillup.receiptPhoto ? "available" : "unavailable_from_source",
   });
 
   app.post("/api/mobile/fleet/fuel-fillups", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
@@ -2039,10 +2045,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const items = validateFleetInspectionItems(req.body.items);
       const overallResult = items.some(item => item.result === "fail") ? "fail" : "pass";
+      const inspectionType = req.body.inspectionType === "monthly" ? "monthly" : "daily";
       const data = insertVehicleInspectionSchema.parse({
         vehicleId, workerId: req.mobileWorker!.id, inspectionDate,
         overallResult,
-        itemsJson: JSON.stringify(items), comments: typeof req.body.comments === "string" ? req.body.comments : null,
+        itemsJson: JSON.stringify(items.map(item => ({ ...item, type: inspectionType }))),
+        comments: typeof req.body.comments === "string" ? req.body.comments : null,
       });
       const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
       res.status(result.created ? 201 : 200).json(result.record);

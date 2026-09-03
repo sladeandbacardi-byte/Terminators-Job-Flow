@@ -785,7 +785,7 @@ export default function FleetVehicleProfile() {
                               <td className="px-4 py-3 text-right text-gray-500">{f.odometer ? f.odometer.toLocaleString() : "—"}</td>
                               <td className="px-4 py-3 text-right">{parseFloat(f.litres || "0").toFixed(1)} L</td>
                               <td className="px-4 py-3 text-right font-semibold text-amber-700">R {parseFloat(f.cost || "0").toFixed(2)}</td>
-                               <td className="px-4 py-3">{f.receiptPhoto ? <a href={f.receiptPhoto} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-600 underline">View slip</a> : "—"}</td>
+                               <td className="px-4 py-3">{f.receiptPhoto ? <a href={f.receiptPhoto} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-600 underline">View slip</a> : f.isLegacyImported ? <span className="text-xs font-semibold text-amber-700">Slip unavailable from source</span> : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
