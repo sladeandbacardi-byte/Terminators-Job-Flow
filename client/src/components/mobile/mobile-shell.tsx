@@ -23,6 +23,7 @@ interface MobileShellProps {
   headerAction?: ReactNode;
   footer?: ReactNode;
   compact?: boolean;
+  hideHeader?: boolean;
   children: ReactNode;
 }
 
@@ -38,6 +39,7 @@ export function MobileShell({
   headerAction,
   footer,
   compact = false,
+  hideHeader = false,
   children,
 }: MobileShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -50,7 +52,7 @@ export function MobileShell({
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="sticky top-0 z-20 border-b border-gray-100 bg-white shadow-sm">
+      {!hideHeader && <header className="sticky top-0 z-20 border-b border-gray-100 bg-white shadow-sm">
         <div className={`mx-auto flex h-16 w-full items-center justify-between gap-3 px-4 ${compact ? "max-w-md" : "max-w-3xl"}`}>
           <div className="flex min-w-0 items-center gap-2">
             <button
@@ -72,7 +74,7 @@ export function MobileShell({
           </div>
           {headerAction && <div className="shrink-0">{headerAction}</div>}
         </div>
-      </header>
+      </header>}
 
       {menuOpen && (
         <div className="fixed inset-0 z-40">

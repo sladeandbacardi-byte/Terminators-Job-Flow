@@ -12,6 +12,12 @@ export const MOBILE_FLEET_BOTTOM_NAV = [
   { id: "admin", label: "Admin" },
 ] as const;
 
+export const MOBILE_FLEET_OVERVIEW_LAYOUT = {
+  hideGenericShell: true,
+  statusRows: "stacked",
+  showRecentActivity: false,
+} as const;
+
 export function fleetInspectionLabel(type: "daily" | "monthly"): string {
   return type === "monthly" ? "Monthly Inspection" : "Daily Vehicle Check";
 }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   MOBILE_FLEET_ACTIONS,
   MOBILE_FLEET_BOTTOM_NAV,
+  MOBILE_FLEET_OVERVIEW_LAYOUT,
   fleetInspectionLabel,
 } from "./mobile-fleet-contract";
 
@@ -22,6 +23,14 @@ test("Fleet primary actions keep the reference hierarchy and colour roles", () =
 
 test("Fleet footer keeps Log and Admin in the reference order", () => {
   assert.deepEqual(MOBILE_FLEET_BOTTOM_NAV.map(item => item.label), ["Log", "Admin"]);
+});
+
+test("Fleet Log overview hides the generic shell and keeps history off the primary dashboard", () => {
+  assert.deepEqual(MOBILE_FLEET_OVERVIEW_LAYOUT, {
+    hideGenericShell: true,
+    statusRows: "stacked",
+    showRecentActivity: false,
+  });
 });
 
 test("Fleet inspection labels distinguish daily and monthly checks", () => {
