@@ -1299,7 +1299,7 @@ export const teams = pgTable("teams", {
 });
 
 export const teamMembers = pgTable("team_members", {
-  id: varchar("id").primaryKey().default(sql.raw("gen_random_uuid()")),
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teamId: varchar("team_id").notNull(),
   workerId: varchar("worker_id").notNull(),
 });

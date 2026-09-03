@@ -1,4 +1,89 @@
-xpires_at);`,
+import { db } from "./db";
+import { sql } from "drizzle-orm";
+
+/**
+ * Startup migrations — runs automatically before the server starts listening.
+ * Each migration is idempotent (uses IF NOT EXISTS / IF EXISTS guards) so it
+ * is completely safe to run on every deploy, including on an already-up-to-date
+ * database.
+ *
+ * Add new migrations at the bottom as the schema evolves.
+ */
+export async function runStartupMigrations(): Promise<void> {
+  console.log("[migrations] Running startup schema migrations…");
+
+  const run = async (label: string, statement: string, critical = false) => {
+    try {
+      await db.execute(sql.raw(statement));
+      console.log(`[migrations]   ✓ ${label}`);
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[migrations]   ✗ ${label}: ${message}`);
+      if (critical) {
+        throw new Error(`[migrations] Critical migration failed (${label}): ${message}`);
+      }
+    }
+  };
+
+  await run(
+    "fleet email outbox",
+    `CREATE TABLE IF NOT EXISTS fleet_email_outbox (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_key text NOT NULL UNIQUE,
+      kind text NOT NULL,
+      recipients text[] NOT NULL,
+      subject text NOT NULL,
+      text_body text NOT NULL,
+      html_body text NOT NULL,
+      attempts integer NOT NULL DEFAULT 0,
+      next_attempt_at timestamp NOT NULL DEFAULT now(),
+      locked_at timestamp,
+      sent_at timestamp,
+      last_error text,
+      created_at timestamp NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS fleet_email_outbox_ready_idx
+      ON fleet_email_outbox (next_attempt_at, created_at) WHERE sent_at IS NULL;`,
+    true,
+  );
+  await run(
+    "fleet submission idempotency",
+    `ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS submission_key text;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS submission_key text;
+     ALTER TABLE vehicle_issues ADD COLUMN IF NOT EXISTS submission_key text;
+     CREATE UNIQUE INDEX IF NOT EXISTS fuel_fillups_submission_key_idx ON fuel_fillups (submission_key) WHERE submission_key IS NOT NULL;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_inspections_submission_key_idx ON vehicle_inspections (submission_key) WHERE submission_key IS NOT NULL;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_issues_submission_key_idx ON vehicle_issues (submission_key) WHERE submission_key IS NOT NULL;`,
+    true,
+  );
+
+  await run(
+    "FleetGuard assignment provenance and exclusivity",
+    `ALTER TABLE vehicle_assignments ADD COLUMN IF NOT EXISTS unassigned_at timestamp;
+     ALTER TABLE vehicle_assignments ADD COLUMN IF NOT EXISTS source_system varchar;
+     ALTER TABLE vehicle_assignments ADD COLUMN IF NOT EXISTS source_assignment_id varchar;
+     CREATE UNIQUE INDEX IF NOT EXISTS vehicle_assignments_source_unique
+       ON vehicle_assignments(source_system, source_assignment_id)
+       WHERE source_system IS NOT NULL AND source_assignment_id IS NOT NULL;`,
+    true,
+  );
+  await run(
+    "FleetGuard active vehicle exclusivity",
+    `CREATE UNIQUE INDEX IF NOT EXISTS vehicle_assignments_active_vehicle_unique
+       ON vehicle_assignments(vehicle_id) WHERE is_active;`,
+  );
+
+  await run(
+    "mobile_worker_sessions",
+    `CREATE TABLE IF NOT EXISTS mobile_worker_sessions (
+       id varchar PRIMARY KEY,
+       worker_id varchar NOT NULL REFERENCES workers(id),
+       session_token varchar UNIQUE NOT NULL,
+       expires_at timestamp NOT NULL,
+       created_at timestamp DEFAULT now()
+     );
+     CREATE INDEX IF NOT EXISTS mobile_worker_sessions_worker_idx
+       ON mobile_worker_sessions(worker_id, expires_at);`,
     true,
   );
 

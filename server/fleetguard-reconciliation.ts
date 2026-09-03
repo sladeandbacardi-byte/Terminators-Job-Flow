@@ -1,4 +1,95 @@
-", "cost", "amount", "total_cost",
+import pg from "pg";
+import { createHash, randomUUID } from "node:crypto";
+import { equivalentWorkerIds } from "@shared/permissionMatrix";
+
+const { Pool } = pg;
+type TargetDatabase = pg.Pool | pg.PoolClient;
+
+export const FLEETGUARD_SOURCE = "fleetguard";
+export const FORBIDDEN_REGISTRATION = "KTD136EC";
+export const FLEETGUARD_DRIVER_WORKER_IDS: Readonly<Record<string, string>> = {
+  "995eaad5-ee91-4659-99cd-aaaf0afea4ae": "mobile-tech-03",
+  "270155d9-6531-4ca5-8922-8c7f4c9978d4": "mobile-tech-04",
+  "d3cd5014-75f2-4e57-929d-a5d9c1d6b3b0": "worker-1",
+  "54e388bc-0573-4e79-812b-0d100cc4dd21": "mobile-tech-02",
+  "dd10d9c3-7e63-4dce-986c-8f7c82e5551e": "mobile-tech-07",
+  "dba78f86-b0d4-4cb2-97f0-6899e57468fe": "mobile-tech-01",
+  "963cd613-c94a-45ff-89ae-aa8239b7cbee": "mobile-tech-09",
+  "2822ef04-58a6-41aa-874b-45bb3b53c057": "worker-5",
+  "52324c3d-4aa5-45d1-b9bf-8f0377a2f8d5": "mobile-tech-08",
+  "f69cd533-3711-4583-930c-5430360449a1": "mobile-tech-06",
+};
+
+export const FLEETGUARD_TABLES = [
+  "vehicles",
+  "drivers",
+  "km_logs",
+  "daily_checks",
+  "daily_check_items",
+  "fuel_logs",
+  "inspections",
+  "inspection_templates",
+  "monthly_check_items",
+  "maintenance_records",
+  "service_records",
+  "audit_log",
+  "notification_settings",
+  "push_subscriptions",
+] as const;
+
+export type FleetGuardTable = typeof FLEETGUARD_TABLES[number];
+export type ReconciliationAction =
+  | "imported"
+  | "updated"
+  | "unchanged"
+  | "skipped"
+  | "conflicted"
+  | "excluded";
+
+export type ReconciliationCount = Record<ReconciliationAction, number> & {
+  source: number;
+  target: number;
+};
+
+export type ReconciliationConflict = {
+  entityType: string;
+  sourceId: string;
+  reason: string;
+  details: Record<string, unknown>;
+};
+
+export type ReconciliationReport = {
+  runId: string;
+  mode: "dry-run" | "apply";
+  startedAt: string;
+  completedAt?: string;
+  counts: Record<string, ReconciliationCount>;
+  /** Counts of records materialised into JobFlow's native fleet tables. */
+  nativeCounts: Record<string, ReconciliationCount>;
+  conflicts: ReconciliationConflict[];
+  samples: Array<Record<string, unknown>>;
+  timings?: Record<string, { pages: number; milliseconds: number; rows: number }>;
+  assignments?: SourceAssignmentResult[];
+};
+
+export type SourceAssignmentResult = {
+  sourceDriverId: string;
+  sourceDriverName: string | null;
+  sourceVehicleId: string | null;
+  sourceRegistration: string | null;
+  targetWorkerId: string | null;
+  targetVehicleId: string | null;
+  result: "mapped" | "unassigned" | "conflicted";
+  error: string | null;
+};
+
+export type SourceRow = Record<string, unknown> & { id?: string | null };
+
+const STATION_SOURCE_KEYS = new Set(["station", "station_name", "fuel_station", "fuelstation"]);
+const FUEL_LOG_ALLOWED_KEYS = new Set([
+  "id", "created_at", "createdat", "updated_at", "updatedat", "date", "fill_date",
+  "vehicle_id", "vehicleid", "driver_id", "driverid", "worker_id", "workerid",
+  "litres", "liters", "quantity", "amount_rands", "cost", "amount", "total_cost",
   "odometer_km", "odometer", "mileage", "fuel_type", "fueltype",
   "photo_url", "receipt_photo", "receipt_url", "slip_url", "slip_data", "slip_mime",
   "slip_image_data", "slip_image_name", "slip_image_mime_type",
