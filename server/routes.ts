@@ -80,6 +80,7 @@ import {
 } from "@shared/permissionMatrix";
 import { calculateOvertimeMinutes, calculateOvertimeBreakdown, calculateAuthorisedTimeOffMinutes, timeToMinutes } from "@shared/overtime";
 import { assertNoOdometerRollback, validateFleetInspectionItems } from "./fleet-input-validation";
+import { submitMobileKmSnapshot } from "./mobile-km-submissions";
 import { sendAttendanceNotification, sendTimeAdjustmentNotification, TIME_NOTIFICATION_RECIPIENTS } from "./time-notifications";
 import { createMemoryRateLimiter } from "./request-limits";
 import { createPasswordlessOfficeLoginHandler, createPasswordLoginHandler } from "./office-auth-http";
@@ -1964,29 +1965,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const day = typeof req.body.logDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.logDate)
         ? req.body.logDate : new Date().toISOString().slice(0, 10);
       const workerId = req.mobileWorker!.id;
-      const existing = (await storage.getKmLogsByWorker(workerId)).find(log =>
-        log.vehicleId === vehicleId && log.logDate.toISOString().slice(0, 10) === day,
-      );
-      const existingSnapshots = (() => {
-        try { return Array.isArray(JSON.parse(existing?.notes || "{}").snapshots) ? JSON.parse(existing!.notes!).snapshots : []; }
-        catch { return []; }
-      })();
-      if (existingSnapshots.some((snapshot: any) => snapshot?.type === logType)) {
+      const submissionKey = fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key"));
+      const result = await submitMobileKmSnapshot({ vehicleId, workerId, day, logType, odometer, submissionKey });
+      if (result.duplicate) {
         return res.status(409).json({ message: `${logType === "AM" ? "Morning" : "Afternoon"} kilometres have already been logged for this day.` });
       }
-      const snapshots = [...existingSnapshots, { type: logType, odometer, timestamp: `${day}T${logType === "AM" ? "06:00:00" : "16:00:00"}.000Z` }];
-      const candidate = {
-        id: existing?.id ?? `pending-${randomUUID()}`, vehicleId, workerId, logDate: new Date(`${day}T12:00:00.000Z`),
-        startOdometer: snapshots.find((item: any) => item.type === "AM")?.odometer ?? odometer,
-        endOdometer: snapshots.find((item: any) => item.type === "PM")?.odometer ?? odometer,
-        totalKm: 0, businessKm: 0, privateKm: 0, notes: JSON.stringify({ snapshots }), createdAt: existing?.createdAt ?? new Date(),
-      };
-      const all = [...(await storage.getKmLogs()).filter(log => log.id !== existing?.id), candidate];
-      const calculated = calculateFleetOdometerLogs(all).find(log => log.id === candidate.id)!;
-      assertNoOdometerRollback(calculated.odometerCalculation.flags);
-      const data = insertKmLogSchema.parse({ ...candidate, totalKm: calculated.totalKm ?? 0, businessKm: calculated.businessKm ?? 0, privateKm: calculated.privateKm ?? 0 });
-      const created = existing ? await storage.updateKmLog(existing.id, data) : await storage.createKmLog(data);
-      res.status(201).json(calculateFleetOdometerLogs(await storage.getKmLogs()).find(log => log.id === created.id));
+      res.status(result.created ? 201 : 200).json({
+        ...result.record,
+        totalKm: result.calculated.totalKm ?? 0,
+        businessKm: result.calculated.businessKm ?? 0,
+        privateKm: result.calculated.privateKm ?? 0,
+        odometerCalculation: result.calculated,
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to log kilometres" });
     }

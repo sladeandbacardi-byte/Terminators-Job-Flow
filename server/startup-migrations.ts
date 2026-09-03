@@ -56,6 +56,22 @@ export async function runStartupMigrations(): Promise<void> {
      CREATE UNIQUE INDEX IF NOT EXISTS vehicle_issues_submission_key_idx ON vehicle_issues (submission_key) WHERE submission_key IS NOT NULL;`,
     true,
   );
+  await run(
+    "mobile KM submission idempotency",
+    `CREATE TABLE IF NOT EXISTS fleet_km_submission_receipts (
+       submission_key varchar PRIMARY KEY,
+       vehicle_id varchar NOT NULL,
+       worker_id varchar NOT NULL,
+       log_date date NOT NULL,
+       log_type varchar NOT NULL,
+       km_log_id varchar NOT NULL,
+       odometer integer NOT NULL,
+       created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE UNIQUE INDEX IF NOT EXISTS fleet_km_receipts_log_type_unique
+       ON fleet_km_submission_receipts(vehicle_id, worker_id, log_date, log_type);`,
+    true,
+  );
 
   await run(
     "FleetGuard assignment provenance and exclusivity",
