@@ -88,6 +88,7 @@ export type SourceRow = Record<string, unknown> & { id?: string | null };
 const STATION_SOURCE_KEYS = new Set(["station", "station_name", "fuel_station", "fuelstation"]);
 const FUEL_LOG_ALLOWED_KEYS = new Set([
   "id", "created_at", "createdat", "updated_at", "updatedat", "date", "fill_date",
+  "deleted", "is_deleted", "deleted_at", "deletedat", "deleted_by", "deletedby", "delete_reason",
   "vehicle_id", "vehicleid", "driver_id", "driverid", "worker_id", "workerid",
   "litres", "liters", "quantity", "amount_rands", "cost", "amount", "total_cost",
   "odometer_km", "odometer", "mileage", "fuel_type", "fueltype",
@@ -277,6 +278,11 @@ export function buildReconciliationPlan(
         count.excluded++;
         continue;
       }
+      if (sourceIsDeleted(row)) {
+        count.skipped++;
+        if (samples.length < 25) samples.push({ entityType: table, sourceId, action: "skipped", deleted: true });
+        continue;
+      }
       if (table === "vehicles" && !row.registration) {
         count.conflicted++;
         conflicts.push({
@@ -408,6 +414,20 @@ async function ensureReconciliationTables(target: TargetDatabase): Promise<void>
     );
     ALTER TABLE fleetguard_high_water_marks
       ADD COLUMN IF NOT EXISTS source_id varchar;
+    ALTER TABLE fleet_settings_versions ADD COLUMN IF NOT EXISTS source_system varchar;
+    ALTER TABLE fleet_settings_versions ADD COLUMN IF NOT EXISTS source_id varchar;
+    CREATE UNIQUE INDEX IF NOT EXISTS fleet_settings_versions_source_unique
+      ON fleet_settings_versions(source_system, source_id)
+      WHERE source_system IS NOT NULL AND source_id IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS fleet_external_task_refs (
+      id varchar PRIMARY KEY, entity_type text NOT NULL, source_id varchar NOT NULL,
+      external_system text NOT NULL, external_task_id text NOT NULL,
+      payload_json jsonb NOT NULL DEFAULT '{}'::jsonb, deleted_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now(),
+      UNIQUE(entity_type, source_id, external_system, external_task_id)
+    );
+    CREATE INDEX IF NOT EXISTS fleet_external_task_refs_source_idx
+      ON fleet_external_task_refs(entity_type, source_id);
     CREATE TABLE IF NOT EXISTS fleetguard_import_checkpoints (
       source_system varchar NOT NULL,
       entity_type varchar NOT NULL,
@@ -558,6 +578,54 @@ function asTimestamp(value: unknown): Date | null {
 
 function entityCreatedAt(row: SourceRow): Date | null {
   return asTimestamp(row.created_at ?? row.createdAt);
+}
+
+function sourceDeletedAt(row: SourceRow): Date | null {
+  if (row.deleted === true || row.is_deleted === true || row.deleted_at || row.deletedAt) {
+    return asTimestamp(row.deleted_at ?? row.deletedAt ?? row.updated_at ?? row.updatedAt ?? row.created_at);
+  }
+  return null;
+}
+
+function sourceIsDeleted(row: SourceRow): boolean {
+  return sourceDeletedAt(row) !== null;
+}
+
+/** Extract only stable Microsoft task references; never create a task from one. */
+export function microsoftTaskReferences(row: SourceRow): string[] {
+  const refs = new Set<string>();
+  const visit = (value: unknown, key = ""): void => {
+    if (Array.isArray(value)) return value.forEach(item => visit(item, key));
+    if (!value || typeof value !== "object") return;
+    for (const [childKey, child] of Object.entries(value as Record<string, unknown>)) {
+      const normalized = childKey.toLowerCase();
+      if (typeof child === "string"
+        && /(?:microsoft|ms|planner|todo).*(?:task|id)|(?:task).*(?:microsoft|planner|todo|ms)/.test(normalized)
+        && child.trim()) refs.add(child.trim());
+      else visit(child, normalized);
+    }
+  };
+  visit(row);
+  return Array.from(refs).sort();
+}
+
+async function persistMicrosoftTaskReferences(
+  target: TargetDatabase, entityType: FleetGuardTable, row: SourceRow,
+): Promise<void> {
+  const sourceId = sourceIdForRow(entityType, row);
+  const deletedAt = sourceDeletedAt(row);
+  for (const taskId of microsoftTaskReferences(row)) {
+    await target.query(
+      `INSERT INTO fleet_external_task_refs
+        (id,entity_type,source_id,external_system,external_task_id,payload_json,deleted_at,created_at)
+       VALUES ($1,$2,$3,'microsoft',$4,$5::jsonb,$6,$7)
+       ON CONFLICT (entity_type,source_id,external_system,external_task_id) DO UPDATE SET
+         payload_json=EXCLUDED.payload_json, deleted_at=EXCLUDED.deleted_at`,
+      [fleetGuardNativeId("external-task", `${entityType}:${sourceId}:${taskId}`), entityType, sourceId, taskId,
+        JSON.stringify({ sourceSystem: FLEETGUARD_SOURCE, sourceId, historical: true }),
+        deletedAt, entityCreatedAt(row) ?? deletedAt ?? new Date()],
+    );
+  }
 }
 
 const nativeCount = (counts: Record<string, ReconciliationCount>, table: string) =>
@@ -859,7 +927,7 @@ async function persistSourceRow(
       sourceIdForRow(entityType, row),
       JSON.stringify(row),
       createdAt,
-      row.deleted === true,
+       sourceIsDeleted(row),
     ],
   );
   await target.query(
@@ -955,9 +1023,35 @@ async function materializeNativeRow(
   const sourceId = sourceIdForRow(entityType, row);
   const count = nativeCount(nativeCounts, entityType);
   count.source++;
+  // Tombstones are preserved verbatim in fleetguard_source_records, but must
+  // never be re-materialised or trigger downstream notification/task work.
+  if (sourceIsDeleted(row)) {
+    const mapping = await target.query(
+      `SELECT target_table,target_id FROM fleetguard_record_mappings
+       WHERE source_system=$1 AND entity_type=$2 AND source_id=$3`,
+      [FLEETGUARD_SOURCE, entityType, sourceId],
+    );
+    const mapped = mapping.rows[0];
+    const tombstoneAt = sourceDeletedAt(row) ?? entityCreatedAt(row) ?? new Date();
+    if (mapped?.target_id && ["vehicles", "km_logs", "fuel_fillups", "vehicle_inspections"].includes(mapped.target_table)) {
+      await target.query(
+        `UPDATE ${mapped.target_table}
+            SET deleted_at=COALESCE(deleted_at,$2), delete_reason='FleetGuard source tombstone'
+          WHERE id=$1`,
+        [mapped.target_id, tombstoneAt],
+      );
+    } else if (mapped?.target_id && mapped.target_table === "fleet_inspection_templates") {
+      await target.query(`UPDATE fleet_inspection_templates SET archived_at=COALESCE(archived_at,$2) WHERE id=$1`, [mapped.target_id, tombstoneAt]);
+    } else if (mapped?.target_id && mapped.target_table === "fleet_inspection_template_items") {
+      await target.query(`UPDATE fleet_inspection_template_items SET archived_at=COALESCE(archived_at,$2) WHERE id=$1`, [mapped.target_id, tombstoneAt]);
+    }
+    count.skipped++;
+    return;
+  }
   const nativeEntityTypes: FleetGuardTable[] = [
     "vehicles", "drivers", "km_logs", "fuel_logs", "daily_checks", "inspections",
-    "maintenance_records", "service_records",
+    "maintenance_records", "service_records", "inspection_templates",
+    "daily_check_items", "monthly_check_items", "notification_settings", "audit_log",
   ];
   if (!nativeEntityTypes.includes(entityType)) {
     // No JobFlow-native equivalent exists for templates and child payloads.
@@ -972,6 +1066,84 @@ async function materializeNativeRow(
       runId, sourceEventId: sourceId, sourceCreatedAt: createdAt?.toISOString() ?? null, nativeFingerprint: fingerprint,
     });
   };
+  if (entityType === "inspection_templates") {
+    const name = textValue(row, "name", "title", "template_name", "description");
+    if (!name) return quarantineNativeRow(target, runId, entityType, row, nativeCounts, "MISSING_TEMPLATE_NAME");
+    const id = fleetGuardNativeId("inspection-template", sourceId);
+    await mapSuccess("fleet_inspection_templates", id, "deterministic-fg-template-id");
+    await target.query(
+      `INSERT INTO fleet_inspection_templates (id,name,version,archived_at,created_by,created_at)
+       VALUES ($1,$2,$3,NULL,'fleetguard-import',$4)
+       ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, version=EXCLUDED.version, archived_at=NULL`,
+      [id, name, integerValue(row, "version") ?? 1, createdAt ?? new Date()],
+    );
+    return;
+  }
+  if (entityType === "daily_check_items" || entityType === "monthly_check_items") {
+    const templateSourceId = sourceReference(
+      row, "inspection_template_id", "template_id", "monthly_template_id", "check_template_id",
+    );
+    const label = textValue(row, "label", "name", "item_name", "description", "question");
+    const templateId = templateSourceId
+      ? await mappedTargetId(target, "inspection_templates", templateSourceId)
+      : null;
+    if (!templateId || !label) {
+      return quarantineNativeRow(target, runId, entityType, row, nativeCounts,
+        !templateId ? "UNMAPPED_INSPECTION_TEMPLATE" : "MISSING_TEMPLATE_ITEM_LABEL");
+    }
+    const id = fleetGuardNativeId("inspection-template-item", sourceId);
+    await mapSuccess("fleet_inspection_template_items", id, "deterministic-fg-template-item-id");
+    await target.query(
+      `INSERT INTO fleet_inspection_template_items (id,template_id,label,position,archived_at,created_at)
+       VALUES ($1,$2,$3,$4,NULL,$5)
+       ON CONFLICT (id) DO UPDATE SET template_id=EXCLUDED.template_id,label=EXCLUDED.label,
+         position=EXCLUDED.position,archived_at=NULL`,
+      [id, templateId, label, integerValue(row, "position", "sort_order", "order", "sequence") ?? 0,
+        createdAt ?? new Date()],
+    );
+    return;
+  }
+  if (entityType === "notification_settings") {
+    const id = fleetGuardNativeId("settings-version", sourceId);
+    // Advisory locking keeps a new source setting from racing for the next
+    // human-readable version; it never invokes the notification subsystem.
+    await target.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, ["fleetguard-settings-version"]);
+    const existing = await target.query(
+      `SELECT version FROM fleet_settings_versions WHERE source_system=$1 AND source_id=$2`,
+      [FLEETGUARD_SOURCE, sourceId],
+    );
+    const version = existing.rows[0]?.version ?? Number((await target.query(
+      `SELECT COALESCE(MAX(version),0)+1 AS version FROM fleet_settings_versions`,
+    )).rows[0]?.version);
+    await mapSuccess("fleet_settings_versions", id, "versioned-source-settings");
+    await target.query(
+      `INSERT INTO fleet_settings_versions (id,version,settings_json,created_by,source_system,source_id,created_at)
+       VALUES ($1,$2,$3::jsonb,'fleetguard-import',$4,$5,$6)
+       ON CONFLICT (source_system,source_id) WHERE source_system IS NOT NULL AND source_id IS NOT NULL
+       DO UPDATE SET settings_json=EXCLUDED.settings_json`,
+      [id, version, JSON.stringify(stripFuelStationData(row)), FLEETGUARD_SOURCE, sourceId, createdAt ?? new Date()],
+    );
+    return;
+  }
+  if (entityType === "audit_log") {
+    const id = fleetGuardNativeId("audit", sourceId);
+    await mapSuccess("fleet_audit_entries", id, "deterministic-fg-audit-id");
+    await target.query(
+      `INSERT INTO fleet_audit_entries (id,entity_type,entity_id,action,actor_id,reason,before_json,after_json,created_at)
+       VALUES ($1,$2,$3,$4,'fleetguard-import',$5,$6::jsonb,$7::jsonb,$8)
+       ON CONFLICT (id) DO UPDATE SET entity_type=EXCLUDED.entity_type,entity_id=EXCLUDED.entity_id,
+         action=EXCLUDED.action,reason=EXCLUDED.reason,before_json=EXCLUDED.before_json,after_json=EXCLUDED.after_json`,
+      [id, textValue(row, "entity_type", "table_name", "resource") ?? "fleetguard",
+        textValue(row, "entity_id", "record_id", "target_id") ?? sourceId,
+        textValue(row, "action", "event", "operation") ?? "imported",
+        textValue(row, "reason", "message", "description") ?? "FleetGuard historical audit import",
+        JSON.stringify(stripFuelStationData(row.before ?? row.old_values ?? {})),
+        JSON.stringify({ sourceEventId: sourceId, source: FLEETGUARD_SOURCE,
+          values: stripFuelStationData(row.after ?? row.new_values ?? row.details ?? {}) }),
+        createdAt ?? asTimestamp(row.timestamp) ?? new Date()],
+    );
+    return;
+  }
   if (entityType === "drivers") {
     const worker = uniquelyMatchingWorker(row, workers);
     if (!worker) return quarantineNativeRow(target, runId, entityType, row, nativeCounts, "AMBIGUOUS_OR_MISSING_WORKER_MATCH");
@@ -1298,6 +1470,8 @@ export async function runFleetGuardReconciliation(
                 ? "excluded"
                 : conflicted
                   ? "conflicted"
+                  : sourceIsDeleted(row)
+                    ? "skipped"
                   : mappings.has(mappingKey) ? "unchanged" : "imported";
               count.source++;
               count[action]++;
@@ -1305,12 +1479,13 @@ export async function runFleetGuardReconciliation(
                 await persistExclusion(targetClient, runId, table, sourceId);
               } else {
                 await persistSourceRow(targetClient, runId, table, row, action);
-                if (!conflicted && table !== "km_logs") {
+                await persistMicrosoftTaskReferences(targetClient, table, row);
+                if (!conflicted && (table !== "km_logs" || sourceIsDeleted(row))) {
                   await materializeNativeRow(targetClient, runId, table, row, workers, report.nativeCounts);
                 }
               }
               mappings.add(mappingKey);
-              if (table === "km_logs" && !excluded) kmRows.push(row);
+              if (table === "km_logs" && !excluded && !sourceIsDeleted(row)) kmRows.push(row);
               if (report.samples.length < 25) report.samples.push({ entityType: table, sourceId, action });
             }
             tableRows += rows.length;
@@ -1356,7 +1531,25 @@ export async function runFleetGuardReconciliation(
             targetClient.release();
           }
         } else {
-          count.source += rows.length;
+          for (const row of rows) {
+            const sourceId = sourceIdForRow(table, row);
+            const excluded = table === "vehicles"
+              ? normalizeRegistration(row.registration) === FORBIDDEN_REGISTRATION
+              : Object.entries(row).some(([key, value]) =>
+                (key.endsWith("_id") || key.endsWith("Id")) && typeof value === "string" && forbiddenIds.has(value));
+            if (excluded) forbiddenIds.add(sourceId);
+            const conflicted = table === "vehicles" && !textValue(row, "registration", "registration_number");
+            const mappingKey = `${table}:${sourceId}`;
+            const action: ReconciliationAction = excluded ? "excluded" : conflicted ? "conflicted"
+              : sourceIsDeleted(row) ? "skipped" : mappings.has(mappingKey) ? "unchanged" : "imported";
+            count.source++;
+            count[action]++;
+            if (conflicted) report.conflicts.push({
+              entityType: table, sourceId, reason: "MISSING_REGISTRATION",
+              details: { row: stripFuelStationData(row) },
+            });
+            if (report.samples.length < 25) report.samples.push({ entityType: table, sourceId, action });
+          }
           tableRows += rows.length;
         }
         console.error(JSON.stringify({

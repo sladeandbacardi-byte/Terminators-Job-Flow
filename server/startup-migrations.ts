@@ -1306,26 +1306,55 @@ export async function runStartupMigrations(): Promise<void> {
     "remove historical KTD136EC FleetGuard materialisation",
     `DO $$
      DECLARE ktd_vehicle_ids text[];
+     DECLARE ktd_assignment_ids text[];
      BEGIN
        IF to_regclass('vehicles') IS NULL THEN RETURN; END IF;
-       SELECT array_agg(id) INTO ktd_vehicle_ids
-       FROM vehicles
-       WHERE regexp_replace(upper(COALESCE(registration, '')), '[^A-Z0-9]', '', 'g') = 'KTD136EC';
+       -- Registration alone is never deletion provenance.  Only a vehicle
+       -- explicitly mapped from FleetGuard may be removed; an unmatched native
+       -- JobFlow KTD row is left intact (and remains hidden by Fleet policy).
+       IF to_regclass('fleetguard_record_mappings') IS NULL THEN RETURN; END IF;
+       SELECT array_agg(v.id) INTO ktd_vehicle_ids
+       FROM vehicles v JOIN fleetguard_record_mappings m
+         ON m.source_system='fleetguard' AND m.entity_type='vehicles'
+        AND m.target_table='vehicles' AND m.target_id=v.id
+       WHERE regexp_replace(upper(COALESCE(v.registration, '')), '[^A-Z0-9]', '', 'g') = 'KTD136EC';
        IF COALESCE(array_length(ktd_vehicle_ids, 1), 0) = 0 THEN RETURN; END IF;
 
-       -- Native records are identified through their real vehicle relationship,
-       -- never through source payload text.
+       -- Likewise, delete only child rows with explicit FleetGuard mappings.
+       IF to_regclass('vehicle_assignments') IS NOT NULL THEN
+         SELECT array_agg(a.id) INTO ktd_assignment_ids
+         FROM vehicle_assignments a
+         WHERE a.vehicle_id = ANY(ktd_vehicle_ids)
+           AND EXISTS (
+             SELECT 1 FROM fleetguard_record_mappings m
+             WHERE m.source_system='fleetguard'
+               AND m.target_table='vehicle_assignments' AND m.target_id=a.id
+           );
+         IF COALESCE(array_length(ktd_assignment_ids, 1), 0) > 0 THEN
+           UPDATE fleetguard_record_mappings
+              SET status='excluded',target_table=NULL,target_id=NULL,
+                  match_method='forbidden-vehicle-policy',
+                  metadata_json=metadata_json || '{"cleanup":"forbidden KTD136EC assignment"}'::jsonb
+            WHERE source_system='fleetguard' AND target_table='vehicle_assignments'
+              AND target_id = ANY(ktd_assignment_ids);
+           DELETE FROM vehicle_assignments WHERE id = ANY(ktd_assignment_ids);
+         END IF;
+       END IF;
        IF to_regclass('fuel_fillups') IS NOT NULL THEN
-         DELETE FROM fuel_fillups WHERE vehicle_id = ANY(ktd_vehicle_ids);
+         DELETE FROM fuel_fillups r WHERE vehicle_id = ANY(ktd_vehicle_ids)
+           AND EXISTS (SELECT 1 FROM fleetguard_record_mappings m WHERE m.source_system='fleetguard' AND m.target_table='fuel_fillups' AND m.target_id=r.id);
        END IF;
        IF to_regclass('km_logs') IS NOT NULL THEN
-         DELETE FROM km_logs WHERE vehicle_id = ANY(ktd_vehicle_ids);
+         DELETE FROM km_logs r WHERE vehicle_id = ANY(ktd_vehicle_ids)
+           AND EXISTS (SELECT 1 FROM fleetguard_record_mappings m WHERE m.source_system='fleetguard' AND m.target_table='km_logs' AND m.target_id=r.id);
        END IF;
        IF to_regclass('vehicle_inspections') IS NOT NULL THEN
-         DELETE FROM vehicle_inspections WHERE vehicle_id = ANY(ktd_vehicle_ids);
+         DELETE FROM vehicle_inspections r WHERE vehicle_id = ANY(ktd_vehicle_ids)
+           AND EXISTS (SELECT 1 FROM fleetguard_record_mappings m WHERE m.source_system='fleetguard' AND m.target_table='vehicle_inspections' AND m.target_id=r.id);
        END IF;
        IF to_regclass('service_records') IS NOT NULL THEN
-         DELETE FROM service_records WHERE vehicle_id = ANY(ktd_vehicle_ids);
+         DELETE FROM service_records r WHERE vehicle_id = ANY(ktd_vehicle_ids)
+           AND EXISTS (SELECT 1 FROM fleetguard_record_mappings m WHERE m.source_system='fleetguard' AND m.target_table='service_records' AND m.target_id=r.id);
        END IF;
 
        IF to_regclass('fleetguard_record_mappings') IS NOT NULL THEN
@@ -1412,6 +1441,78 @@ export async function runStartupMigrations(): Promise<void> {
      END $$;`,
     true,
   );
+
+  await run(
+    "native Fleet audit, evidence and configuration foundation",
+    `ALTER TABLE km_logs ADD COLUMN IF NOT EXISTS deleted_at timestamp;
+     ALTER TABLE km_logs ADD COLUMN IF NOT EXISTS deleted_by varchar;
+     ALTER TABLE km_logs ADD COLUMN IF NOT EXISTS delete_reason text;
+     ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS deleted_at timestamp;
+     ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS deleted_by varchar;
+     ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS delete_reason text;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS deleted_at timestamp;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS deleted_by varchar;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS delete_reason text;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS template_snapshot_json jsonb;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS evidence_json jsonb NOT NULL DEFAULT '[]'::jsonb;
+     ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS deleted_at timestamp;
+     ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS deleted_by varchar;
+     ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS delete_reason text;
+     ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS updated_at timestamp;
+     ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+     ALTER TABLE km_logs ADD COLUMN IF NOT EXISTS updated_at timestamp;
+     ALTER TABLE km_logs ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+     ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS updated_at timestamp;
+     ALTER TABLE fuel_fillups ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS updated_at timestamp;
+     ALTER TABLE vehicle_inspections ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+     CREATE TABLE IF NOT EXISTS fleet_audit_entries (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), entity_type text NOT NULL,
+       entity_id varchar NOT NULL, action text NOT NULL, actor_id varchar NOT NULL,
+       reason text NOT NULL, before_json jsonb, after_json jsonb,
+       created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE INDEX IF NOT EXISTS fleet_audit_entity_idx ON fleet_audit_entries(entity_type, entity_id, created_at DESC);
+     CREATE TABLE IF NOT EXISTS fleet_settings_versions (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), version integer NOT NULL UNIQUE,
+       settings_json jsonb NOT NULL, created_by varchar NOT NULL, created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS fleet_inspection_templates (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL,
+       version integer NOT NULL DEFAULT 1, archived_at timestamp, created_by varchar NOT NULL,
+       created_at timestamp NOT NULL DEFAULT now()
+     );
+     CREATE TABLE IF NOT EXISTS fleet_inspection_template_items (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), template_id varchar NOT NULL REFERENCES fleet_inspection_templates(id),
+       label text NOT NULL, position integer NOT NULL, archived_at timestamp,
+       created_at timestamp NOT NULL DEFAULT now(), UNIQUE(template_id, position)
+     );
+     CREATE TABLE IF NOT EXISTS fleet_weekly_summary_attachments (
+       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), event_key text NOT NULL UNIQUE,
+       file_name text NOT NULL, mime_type text NOT NULL, content bytea NOT NULL,
+       created_at timestamp NOT NULL DEFAULT now()
+     );`,
+    true,
+  );
+  await run(
+    "FleetGuard reconciliation parity structures",
+    `ALTER TABLE fleet_settings_versions ADD COLUMN IF NOT EXISTS source_system varchar;
+     ALTER TABLE fleet_settings_versions ADD COLUMN IF NOT EXISTS source_id varchar;
+     CREATE UNIQUE INDEX IF NOT EXISTS fleet_settings_versions_source_unique
+       ON fleet_settings_versions(source_system, source_id)
+       WHERE source_system IS NOT NULL AND source_id IS NOT NULL;
+     CREATE TABLE IF NOT EXISTS fleet_external_task_refs (
+       id varchar PRIMARY KEY, entity_type text NOT NULL, source_id varchar NOT NULL,
+       external_system text NOT NULL, external_task_id text NOT NULL,
+       payload_json jsonb NOT NULL DEFAULT '{}'::jsonb, deleted_at timestamp,
+       created_at timestamp NOT NULL DEFAULT now(),
+       UNIQUE(entity_type, source_id, external_system, external_task_id)
+     );
+     CREATE INDEX IF NOT EXISTS fleet_external_task_refs_source_idx
+       ON fleet_external_task_refs(entity_type, source_id);`,
+    true,
+  );
+  await run("Fleet weekly summary attachment reference", `ALTER TABLE fleet_email_outbox ADD COLUMN IF NOT EXISTS attachment_id varchar;`, true);
 
   console.log("[migrations] Startup migrations complete.");
 }

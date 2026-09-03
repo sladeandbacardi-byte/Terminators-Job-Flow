@@ -68,6 +68,13 @@ export async function selectMobileVehicle(
     const mine = activeRows.rows.find((row: any) => row.worker_id === input.workerId);
     const occupant = activeRows.rows.find((row: any) => row.vehicle_id === input.vehicleId && row.worker_id !== input.workerId);
     if (mine?.vehicle_id === input.vehicleId) {
+      if (mine.selected_today !== true) {
+        await client.query(
+          `UPDATE vehicle_assignments SET assigned_at=now(),source_system=$2,
+             notes=$3,unassigned_at=NULL WHERE id=$1`,
+          [mine.id, JOBFLOW_MOBILE_SOURCE, JSON.stringify({ source: "JobFlowMobile", action: "select" })],
+        );
+      }
       return { requiresConfirmation: false, assignment: { id: mine.id, vehicleId: input.vehicleId, workerId: input.workerId }, swapped: false };
     }
 

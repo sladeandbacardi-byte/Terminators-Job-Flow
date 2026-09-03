@@ -3976,7 +3976,7 @@ export class MemStorage implements IStorage {
     //   vehicle-9  KDM688EC  2023 VW Caddy            Reece      (worker-8,  div-1 Pest Control)
     //   vehicle-10 (TBA)     2026 BYD Dolphin Surf     Julien     (worker-1,  div-6 Management) — ELECTRIC
 
-    const vehiclesData: Vehicle[] = [
+    const vehiclesData = [
       { id: "vehicle-1",  name: "Mercedes Vito (Re-Althon)",  registration: "DPN524EC", make: "Mercedes-Benz", model: "Vito",    year: "2006", departmentId: "div-3", isActive: true, vehicleStatus: "unsafe",      notes: "Failed inspection — brake light and oil issue outstanding.", createdAt: new Date("2020-01-01") },
       { id: "vehicle-2",  name: "VW Caddy (Jackie)",          registration: "HDF872EC", make: "Volkswagen",   model: "Caddy",   year: "2013", departmentId: "div-2", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2020-01-01") },
       { id: "vehicle-3",  name: "VW Caddy (Garth)",           registration: "JPC031EC", make: "Volkswagen",   model: "Caddy",   year: "2020", departmentId: "div-1", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2020-06-01") },
@@ -3988,9 +3988,9 @@ export class MemStorage implements IStorage {
       { id: "vehicle-9",  name: "VW Caddy (Reece)",           registration: "KDM688EC", make: "Volkswagen",   model: "Caddy",   year: "2023", departmentId: "div-1", isActive: true, vehicleStatus: "active",      notes: null, createdAt: new Date("2023-06-01") },
       { id: "vehicle-10", name: "BYD Dolphin Surf (Julien)",  registration: "KTZ909EC", make: "BYD",          model: "Dolphin Surf", year: "2026", departmentId: "div-6", isActive: true, vehicleStatus: "spare",       notes: "Electric vehicle.", createdAt: new Date("2026-01-01") },
     ];
-    vehiclesData.forEach(v => this.vehicles.set(v.id, v));
+    vehiclesData.forEach(v => this.vehicles.set(v.id, v as Vehicle));
 
-    const assignmentsData: VehicleAssignment[] = [
+    const assignmentsData = [
       { id: "assign-1",  vehicleId: "vehicle-1",  workerId: "worker-16", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
       { id: "assign-2",  vehicleId: "vehicle-2",  workerId: "worker-14", isActive: true, notes: null, assignedAt: new Date("2020-01-01") },
       { id: "assign-3",  vehicleId: "vehicle-3",  workerId: "worker-9",  isActive: true, notes: null, assignedAt: new Date("2020-06-01") },
@@ -4002,7 +4002,7 @@ export class MemStorage implements IStorage {
       { id: "assign-9",  vehicleId: "vehicle-9",  workerId: "worker-8",  isActive: true, notes: null, assignedAt: new Date("2023-06-01") },
       { id: "assign-10", vehicleId: "vehicle-10", workerId: "worker-1",  isActive: true, notes: null, assignedAt: new Date("2026-01-01") },
     ];
-    assignmentsData.forEach(a => this.vehicleAssignments.set(a.id, a));
+    assignmentsData.forEach(a => this.vehicleAssignments.set(a.id, a as VehicleAssignment));
 
     // Estimated current odometers (realistic for each vehicle's age & usage)
     // DPN524EC 2006 Vito     ~285,200 km
@@ -4016,7 +4016,7 @@ export class MemStorage implements IStorage {
     // KDM688EC 2023 Caddy    ~36,400 km
     // (TBA)    2026 Surf      ~8,200 km
 
-    const kmLogsData: KmLog[] = [
+    const kmLogsData = [
       // Re-Althon — Vito
       { id: "km-1",  vehicleId: "vehicle-1",  workerId: "worker-16", logDate: td(1),  startOdometer: 285110, endOdometer: 285200, totalKm: 90,  businessKm: 90,  privateKm: 0,  notes: "Washroom servicing — Newton Park route", createdAt: td(1) },
       { id: "km-2",  vehicleId: "vehicle-1",  workerId: "worker-16", logDate: td(6),  startOdometer: 284980, endOdometer: 285110, totalKm: 130, businessKm: 120, privateKm: 10, notes: "Walmer & Summerstrand route", createdAt: td(6) },
@@ -4042,9 +4042,9 @@ export class MemStorage implements IStorage {
       // Sales 2 — Celerio (Sales)
       { id: "km-14", vehicleId: "vehicle-5",  workerId: "worker-6",  logDate: td(3),  startOdometer: 141720, endOdometer: 141800, totalKm: 80,  businessKm: 75,  privateKm: 5,  notes: "Sales visits — new client prospects", createdAt: td(3) },
     ];
-    kmLogsData.forEach(l => this.kmLogs.set(l.id, l));
+    kmLogsData.forEach(l => this.kmLogs.set(l.id, l as KmLog));
 
-    const fuelData: FuelFillup[] = [
+    const fuelData = [
       { id: "fuel-1",  vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(4),  odometer: 285110, litres: "70.40", cost: "1864.60", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(4)  },
       { id: "fuel-2",  vehicleId: "vehicle-2",  workerId: "worker-14", fillDate: td(5),  odometer: 198310, litres: "52.10", cost: "1380.65", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(5)  },
       { id: "fuel-3",  vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(3),  odometer: 88580,  litres: "48.60", cost: "1287.90", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(3)  },
@@ -4057,7 +4057,7 @@ export class MemStorage implements IStorage {
       { id: "fuel-11", vehicleId: "vehicle-1",  workerId: "worker-16", fillDate: td(18), odometer: 284980, litres: "68.90", cost: "1825.85", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(18) },
       { id: "fuel-12", vehicleId: "vehicle-3",  workerId: "worker-9",  fillDate: td(16), odometer: 88420, litres: "47.10", cost: "1248.15", fuelType: "Diesel 50 ppm", receiptPhoto: "seed-slip", notes: null, createdAt: td(16) },
     ];
-    fuelData.forEach(f => this.fuelFillups.set(f.id, f));
+    fuelData.forEach(f => this.fuelFillups.set(f.id, f as FuelFillup));
 
     const passItems = JSON.stringify([
       { name: "Tyres (condition & pressure)", result: "pass" },
@@ -4114,7 +4114,7 @@ export class MemStorage implements IStorage {
       { name: "Driver's licence in possession", result: "pass" },
     ]);
 
-    const inspectionsData: VehicleInspection[] = [
+    const inspectionsData = [
       { id: "insp-1",  vehicleId: "vehicle-10", workerId: "worker-1",  inspectionDate: td(2),  overallResult: "pass", itemsJson: passItems,      comments: "New vehicle — all checks passed.", photoUrl: null, failAlertSent: false, createdAt: td(2)  },
       { id: "insp-2",  vehicleId: "vehicle-1",  workerId: "worker-16", inspectionDate: td(1),  overallResult: "fail", itemsJson: failItemsVito,   comments: "Brake light and oil issue reported. Needs attention.", photoUrl: null, failAlertSent: true,  createdAt: td(1)  },
       { id: "insp-3",  vehicleId: "vehicle-2",  workerId: "worker-14", inspectionDate: td(1),  overallResult: "pass", itemsJson: passItems,      comments: null, photoUrl: null, failAlertSent: false, createdAt: td(1)  },
@@ -4126,9 +4126,9 @@ export class MemStorage implements IStorage {
       { id: "insp-9",  vehicleId: "vehicle-8",  workerId: "worker-11", inspectionDate: td(2),  overallResult: "pass", itemsJson: passItems,      comments: "Vehicle in good condition.", photoUrl: null, failAlertSent: false, createdAt: td(2)  },
       { id: "insp-10", vehicleId: "vehicle-9",  workerId: "worker-8",  inspectionDate: td(1),  overallResult: "pass", itemsJson: passItems,      comments: null, photoUrl: null, failAlertSent: false, createdAt: td(1)  },
     ];
-    inspectionsData.forEach(i => this.vehicleInspections.set(i.id, i));
+    inspectionsData.forEach(i => this.vehicleInspections.set(i.id, i as VehicleInspection));
 
-    const issuesData: VehicleIssue[] = [
+    const issuesData = [
       { id: "issue-1", vehicleId: "vehicle-1",  workerId: "worker-16", reportedAt: td(1),  category: "electrical", description: "Right rear brake light not working. Bulb may need replacing.", urgency: "high",    status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(1)  },
       { id: "issue-2", vehicleId: "vehicle-1",  workerId: "worker-16", reportedAt: td(1),  category: "engine",     description: "Engine oil level low. Topped up temporarily but burns oil — needs workshop check.", urgency: "medium",  status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(1)  },
       { id: "issue-3", vehicleId: "vehicle-4",  workerId: "worker-13", reportedAt: td(2),  category: "tyres",      description: "Front left tyre showing wear on inner edge. High mileage vehicle — requires inspection.", urgency: "medium",  status: "open",        photoUrl: null, managerNotes: "Monitor tyre — book at PE Tyres if wear increases.", resolvedAt: null, serviceRecordId: null, createdAt: td(2)  },
@@ -4136,7 +4136,7 @@ export class MemStorage implements IStorage {
       { id: "issue-5", vehicleId: "vehicle-8",  workerId: "worker-11", reportedAt: td(21), category: "engine",     description: "Clutch slipping slightly on hills. Getting worse over past two weeks.", urgency: "medium",  status: "in_progress", photoUrl: null, managerNotes: "Booked at Gqeberha Auto for Thursday. Driver to be careful on hills.", resolvedAt: null, serviceRecordId: null, createdAt: td(21) },
       { id: "issue-6", vehicleId: "vehicle-10", workerId: "worker-1",  reportedAt: td(5),  category: "other",      description: "Passenger window rattles at highway speed. Seal may need adjustment.", urgency: "low",     status: "open",        photoUrl: null, managerNotes: null, resolvedAt: null, serviceRecordId: null, createdAt: td(5)  },
     ];
-    issuesData.forEach(i => this.vehicleIssues.set(i.id, i));
+    issuesData.forEach(i => this.vehicleIssues.set(i.id, i as VehicleIssue));
 
     const serviceData: ServiceRecord[] = [
       { id: "sr-1", vehicleId: "vehicle-1",  serviceDate: td(120), odometer: 284200, serviceProvider: "Mercedes-Benz Eastern Cape", workDone: "Major service — oil change, all filters replaced, gearbox fluid, brake fluid flush. Wiper blades replaced. Tyre rotation.", issuesFixed: null, cost: "9800.00", invoiceNumber: "MBEC-2026-0112", invoiceUrl: null, notes: "High mileage vehicle — recommend checking engine mounts at next service.", nextServiceDate: tdf(60), nextServiceOdometer: 295000, createdByWorkerId: "worker-1", createdAt: td(120) },
@@ -4168,7 +4168,7 @@ export class MemStorage implements IStorage {
   }
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const id = randomUUID();
-    const newVehicle: Vehicle = { ...vehicle, id, createdAt: new Date() };
+    const newVehicle = { ...vehicle, id, createdAt: new Date() } as Vehicle;
     this.vehicles.set(id, newVehicle);
     return newVehicle;
   }
@@ -4196,7 +4196,7 @@ export class MemStorage implements IStorage {
   }
   async createVehicleAssignment(a: InsertVehicleAssignment): Promise<VehicleAssignment> {
     const id = randomUUID();
-    const newA: VehicleAssignment = { ...a, id, assignedAt: new Date() };
+    const newA = { ...a, id, assignedAt: new Date() } as VehicleAssignment;
     this.vehicleAssignments.set(id, newA);
     return newA;
   }
@@ -4224,7 +4224,7 @@ export class MemStorage implements IStorage {
   }
   async createKmLog(log: InsertKmLog): Promise<KmLog> {
     const id = randomUUID();
-    const newLog: KmLog = { ...log, id, createdAt: new Date() };
+    const newLog = { ...log, id, createdAt: new Date() } as KmLog;
     this.kmLogs.set(id, newLog);
     return newLog;
   }
@@ -4255,7 +4255,7 @@ export class MemStorage implements IStorage {
   }
   async createFuelFillup(f: InsertFuelFillup): Promise<FuelFillup> {
     const id = randomUUID();
-    const newFillup: FuelFillup = { ...f, id, createdAt: new Date() };
+    const newFillup = { ...f, id, createdAt: new Date() } as FuelFillup;
     this.fuelFillups.set(id, newFillup);
     return newFillup;
   }
@@ -4281,7 +4281,7 @@ export class MemStorage implements IStorage {
   }
   async createVehicleInspection(i: InsertVehicleInspection): Promise<VehicleInspection> {
     const id = randomUUID();
-    const newInspection: VehicleInspection = { ...i, id, failAlertSent: false, createdAt: new Date() };
+    const newInspection = { ...i, id, failAlertSent: false, createdAt: new Date() } as VehicleInspection;
     this.vehicleInspections.set(id, newInspection);
     return newInspection;
   }
@@ -4340,7 +4340,7 @@ export class MemStorage implements IStorage {
   }
   async createVehicleIssue(issue: InsertVehicleIssue): Promise<VehicleIssue> {
     const id = randomUUID();
-    const newIssue: VehicleIssue = { ...issue, id, photoUrl: issue.photoUrl ?? null, managerNotes: issue.managerNotes ?? null, resolvedAt: issue.resolvedAt ?? null, serviceRecordId: issue.serviceRecordId ?? null, createdAt: new Date() };
+    const newIssue = { ...issue, id, photoUrl: issue.photoUrl ?? null, managerNotes: issue.managerNotes ?? null, resolvedAt: issue.resolvedAt ?? null, serviceRecordId: issue.serviceRecordId ?? null, createdAt: new Date() } as VehicleIssue;
     this.vehicleIssues.set(id, newIssue);
     return newIssue;
   }
@@ -4401,7 +4401,7 @@ export class MemStorage implements IStorage {
   }
   async createWorkshopJob(job: InsertWorkshopJob): Promise<WorkshopJob> {
     const id = randomUUID();
-    const newJob: WorkshopJob = {
+    const newJob = {
       ...job, id,
       assignedDriverId: job.assignedDriverId ?? null,
       sourceInspectionId: job.sourceInspectionId ?? null,
@@ -4413,7 +4413,7 @@ export class MemStorage implements IStorage {
       notes: job.notes ?? null,
       completedAt: job.completedAt ?? null,
       createdAt: new Date(),
-    };
+    } as WorkshopJob;
     this.workshopJobs.set(id, newJob);
     return newJob;
   }
@@ -4442,7 +4442,7 @@ export class MemStorage implements IStorage {
     }
 
     // Unsafe vehicles
-    for (const v of this.vehicles.values()) {
+    for (const v of Array.from(this.vehicles.values())) {
       if (v.vehicleStatus === "unsafe") {
         notifications.push({ id: `unsafe-${v.id}`, type: "vehicle_unsafe", severity: "critical", title: "Vehicle Marked Unsafe", message: `${v.name} is marked as unsafe`, vehicleId: v.id, createdAt: v.createdAt });
       }
@@ -4457,7 +4457,7 @@ export class MemStorage implements IStorage {
 
     // Service overdue
     const allSvc = Array.from(this.serviceRecords.values());
-    for (const v of this.vehicles.values()) {
+    for (const v of Array.from(this.vehicles.values())) {
       const svc = allSvc.filter(r => r.vehicleId === v.id).sort((a, b) => b.serviceDate.getTime() - a.serviceDate.getTime())[0];
       if (svc?.nextServiceDate && new Date(svc.nextServiceDate) < now) {
         notifications.push({ id: `svc-due-${v.id}`, type: "service_overdue", severity: "medium", title: "Service Overdue", message: `${v.name} service was due ${Math.abs(Math.round((now.getTime() - new Date(svc.nextServiceDate).getTime()) / 86400000))} days ago`, vehicleId: v.id, createdAt: svc.nextServiceDate });

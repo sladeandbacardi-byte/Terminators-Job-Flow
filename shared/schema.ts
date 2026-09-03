@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, boolean, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, boolean, jsonb, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_STATUSES, OPPORTUNITY_URGENCIES } from "./opportunities";
@@ -1142,6 +1142,11 @@ export const vehicles = pgTable("vehicles", {
   isActive: boolean("is_active").notNull().default(true),
   vehicleStatus: text("vehicle_status").notNull().default("active"),
   notes: text("notes"),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deleteReason: text("delete_reason"),
+  updatedAt: timestamp("updated_at"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -1168,6 +1173,11 @@ export const kmLogs = pgTable("km_logs", {
   businessKm: integer("business_km").notNull().default(0),
   privateKm: integer("private_km").notNull().default(0),
   notes: text("notes"),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deleteReason: text("delete_reason"),
+  updatedAt: timestamp("updated_at"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -1183,6 +1193,11 @@ export const fuelFillups = pgTable("fuel_fillups", {
   receiptPhoto: text("receipt_photo").notNull(),
   notes: text("notes"),
   submissionKey: text("submission_key"),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deleteReason: text("delete_reason"),
+  updatedAt: timestamp("updated_at"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -1199,25 +1214,92 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by"),
   submissionKey: text("submission_key"),
+  templateSnapshotJson: jsonb("template_snapshot_json"),
+  evidenceJson: jsonb("evidence_json").notNull().default(sql`'[]'::jsonb`),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deleteReason: text("delete_reason"),
+  updatedAt: timestamp("updated_at"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
-export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
+// Fleet records are deliberately append/audit friendly.  The columns below are
+// installed on the older operational tables by startup migrations; these tables
+// hold configuration and immutable evidence which did not previously exist.
+export const fleetAuditEntries = pgTable("fleet_audit_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  action: text("action").notNull(),
+  actorId: varchar("actor_id").notNull(),
+  reason: text("reason").notNull(),
+  beforeJson: jsonb("before_json"),
+  afterJson: jsonb("after_json"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const fleetSettingsVersions = pgTable("fleet_settings_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  version: integer("version").notNull(),
+  settingsJson: jsonb("settings_json").notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const fleetInspectionTemplates = pgTable("fleet_inspection_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  version: integer("version").notNull().default(1),
+  archivedAt: timestamp("archived_at"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const fleetInspectionTemplateItems = pgTable("fleet_inspection_template_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull(),
+  label: text("label").notNull(),
+  position: integer("position").notNull(),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// References to work which remains in an external task system are evidence,
+// not JobFlow tasks. Reconciliation records them here so historical imports
+// cannot accidentally schedule or notify somebody.
+export const fleetExternalTaskRefs = pgTable("fleet_external_task_refs", {
+  id: varchar("id").primaryKey(),
+  entityType: text("entity_type").notNull(),
+  sourceId: varchar("source_id").notNull(),
+  externalSystem: text("external_system").notNull(),
+  externalTaskId: text("external_task_id").notNull(),
+  payloadJson: jsonb("payload_json").notNull().default(sql`'{}'::jsonb`),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true, deletedAt: true, deletedBy: true, deleteReason: true, updatedAt: true, version: true });
 export const insertVehicleAssignmentSchema = createInsertSchema(vehicleAssignments).omit({ id: true, assignedAt: true });
-export const insertKmLogSchema = createInsertSchema(kmLogs).omit({ id: true, createdAt: true });
-export const insertFuelFillupSchema = createInsertSchema(fuelFillups).omit({ id: true, createdAt: true });
-export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections).omit({ id: true, createdAt: true, failAlertSent: true });
+export const insertKmLogSchema = createInsertSchema(kmLogs).omit({ id: true, createdAt: true, deletedAt: true, deletedBy: true, deleteReason: true, updatedAt: true, version: true });
+export const insertFuelFillupSchema = createInsertSchema(fuelFillups).omit({ id: true, createdAt: true, deletedAt: true, deletedBy: true, deleteReason: true, updatedAt: true, version: true });
+export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections).omit({ id: true, createdAt: true, failAlertSent: true, deletedAt: true, deletedBy: true, deleteReason: true, updatedAt: true, version: true, templateSnapshotJson: true, evidenceJson: true });
 
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
-export type Vehicle = typeof vehicles.$inferSelect;
+type FleetLifecycleOptional = {
+  deletedAt?: Date | null; deletedBy?: string | null; deleteReason?: string | null;
+  updatedAt?: Date | null; version?: number;
+};
+export type Vehicle = Omit<typeof vehicles.$inferSelect, keyof FleetLifecycleOptional> & FleetLifecycleOptional;
 export type InsertVehicleAssignment = z.infer<typeof insertVehicleAssignmentSchema>;
 export type VehicleAssignment = typeof vehicleAssignments.$inferSelect;
 export type InsertKmLog = z.infer<typeof insertKmLogSchema>;
-export type KmLog = typeof kmLogs.$inferSelect;
+export type KmLog = Omit<typeof kmLogs.$inferSelect, keyof FleetLifecycleOptional> & FleetLifecycleOptional;
 export type InsertFuelFillup = z.infer<typeof insertFuelFillupSchema>;
-export type FuelFillup = typeof fuelFillups.$inferSelect;
+export type FuelFillup = Omit<typeof fuelFillups.$inferSelect, keyof FleetLifecycleOptional> & FleetLifecycleOptional;
 export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
-export type VehicleInspection = typeof vehicleInspections.$inferSelect;
+export type VehicleInspection = Omit<typeof vehicleInspections.$inferSelect, keyof FleetLifecycleOptional | "templateSnapshotJson" | "evidenceJson">
+  & FleetLifecycleOptional & { templateSnapshotJson?: unknown; evidenceJson?: unknown };
 
 // ─── FLEET MAINTENANCE ──────────────────────────────────────────────────────
 

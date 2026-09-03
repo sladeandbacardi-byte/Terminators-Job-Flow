@@ -29,3 +29,5 @@
 - [Organogram unrestricted access](organogram-unrestricted-access.md) — only canonical Julien, explicit Admin/Supervisor roles, and PCO roles get every module; generic Manager/Technician stay restricted.
 - [Spreadsheet export integrity](spreadsheet-export-integrity.md) — inventory every client and server CSV writer; neutralize formula-like strings after leading whitespace while preserving numeric values.
 - [FleetGuard assignment history](fleetguard-assignment-history.md) — source exposes only current driver links; never treat session_started_at as assignment history. Preserve JobFlow pair-change history instead.
+- [Fleet KM same-day history](fleet-km-same-day-history.md) — legacy FleetGuard AM/PM readings can be separate rows on one worker/vehicle/day; never add a simple unique-day constraint.
+- [Fleet daily vehicle use](fleet-daily-vehicle-use.md) — current mobile vehicle choice is a Johannesburg-day session; swaps end assignments but never move vehicle-linked history.

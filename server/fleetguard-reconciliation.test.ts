@@ -8,6 +8,7 @@ import {
   fleetGuardKmDailyTargetId,
   groupFleetGuardKmEvents,
   nativeSourceFingerprint,
+  microsoftTaskReferences,
   normalizeName,
   normalizeRegistration,
   sanitizeFuelLog,
@@ -220,4 +221,34 @@ test("incremental event reads overlap the previous watermark for late changes", 
     "2026-08-26T12:00:00.000Z",
   );
   assert.equal(sourceLookbackStart(null), null);
+});
+
+test("KTD exclusion reaches grandchildren regardless of which foreign-key name is used", () => {
+  const plan = buildReconciliationPlan({
+    vehicles: [{ id: "ktd", registration: "KTD-136-EC" }],
+    inspections: [{ id: "inspection", vehicleId: "ktd" }],
+    daily_check_items: [{ id: "item", inspection_id: "inspection" }],
+    monthly_check_items: [{ id: "monthly", parent_id: "item" }],
+  });
+  assert.equal(plan.counts.inspections.excluded, 1);
+  assert.equal(plan.counts.daily_check_items.excluded, 1);
+  assert.equal(plan.counts.monthly_check_items.excluded, 1);
+});
+
+test("tombstones plan as skipped rather than a new import and retain source identity", () => {
+  const source = { audit_log: [{ id: "audit-deleted", deleted: true, deleted_at: "2026-09-01T10:00:00Z" }] };
+  const first = buildReconciliationPlan(source);
+  const rerun = buildReconciliationPlan(source, new Set(["audit_log:audit-deleted"]));
+  assert.equal(first.counts.audit_log.skipped, 1);
+  assert.equal(first.counts.audit_log.imported, 0);
+  assert.equal(rerun.counts.audit_log.skipped, 1);
+  assert.equal(sourceIdForRow("audit_log", source.audit_log[0]), "audit-deleted");
+});
+
+test("only explicit Microsoft task references are retained as references", () => {
+  const refs = microsoftTaskReferences({
+    microsoft_task_id: "planner-task-1",
+    nested: { msPlannerTaskId: "planner-task-2", unrelated_task_id: "do-not-copy" },
+  });
+  assert.deepEqual(refs, ["planner-task-1", "planner-task-2"]);
 });

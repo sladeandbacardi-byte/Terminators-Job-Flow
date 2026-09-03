@@ -54,7 +54,7 @@ import {
    treatmentReportPhotos,
    treatmentReportAudits,
    treatmentReportFollowUps,
-   insertPestControlProductSchema,
+  insertPestControlProductSchema, fleetAuditEntries,
 } from "@shared/schema";
 import { z } from "zod";
 import { escapeHtml, sendEmail, generatePurchaseOrderEmail, generateApprovalNotificationEmail } from "./email-service";
@@ -89,6 +89,13 @@ import { enforceOfficeApiAccess } from "./office-access-middleware";
 import { calculateFleetOdometerLogs } from "./fleet-odometer-calculation";
 import { enqueueFleetEmail, fleetWeeklySummaryEmail } from "./fleet-email-outbox";
 import { fleetSubmissionKey, submitFuelFillup, submitVehicleInspection, submitVehicleIssue } from "./fleet-submissions";
+import { correctFleetRecord, setFleetRecordDeleted } from "./fleet-admin";
+import { allowanceFeedback, allowanceForDate, calculateFleetAchievements, calculateFuelConsumption, monthlyCheckStatus } from "./fleet-domain";
+import { fleetActivityWorkbook } from "./fleet-activity-export";
+import { fleetActivityRows, readFleetActivity } from "./fleet-activity";
+import { getMobileFleetSelectionStatus } from "./mobile-fleet-selection-status";
+import { canReadFleetRecord, isKtdVehicle } from "./fleet-scope";
+import { archiveInspectionTemplate, createFleetSettings, createInspectionTemplate, listFleetSettings, listInspectionTemplates, mobileInspectionConfiguration, prepareInspectionSubmission, snapshotInspectionTemplate, updateInspectionTemplateItem, writeInspectionSnapshot } from "./fleet-configuration";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
   OPPORTUNITY_TYPE_LABELS, OPPORTUNITY_STATUS_LABELS,
@@ -653,6 +660,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     next();
   };
+  const requireFleetManager = (req: AuthenticatedRequest, res: any, next: any) => {
+    if (req.user?.authenticationMethod === "profile_picker"
+      || !req.user || !["admin", "manager"].includes(getDashboardRole(req.user))) {
+      return res.status(403).json({ error: "Fleet manager access required" });
+    }
+    next();
+  };
 
   const overtimeActorName = (req: AuthenticatedRequest) =>
     req.user?.username || [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || "Unknown user";
@@ -1088,12 +1102,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const getMobileVehicle = async (workerId: string, requestedVehicleId?: string) => {
-    const assignment = await storage.getActiveAssignmentForWorker(workerId);
+    const assignment = await getMobileFleetSelectionStatus(workerId);
     // Mobile FleetGuard is deliberately limited to the technician's current
     // assignment. Never accept another active vehicle from a submitted id.
-    if (!assignment || (requestedVehicleId && requestedVehicleId !== assignment.vehicleId)) return null;
-    const vehicle = await storage.getVehicle(assignment.vehicleId);
-    return vehicle?.isActive && vehicle.registration.toUpperCase().replace(/[^A-Z0-9]/g, "") !== "KTD136EC" ? vehicle.id : null;
+    if (!assignment?.selectedToday || (requestedVehicleId && requestedVehicleId !== assignment.vehicleId)) return null;
+    return assignment.vehicleId;
   };
 
   // ── Additional opportunities: technician mobile workflow ──────────────────
@@ -1905,9 +1918,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/mobile/fleet/assignment", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
     const assignment = await storage.getActiveAssignmentForWorker(req.mobileWorker!.id);
+    const selection = await getMobileFleetSelectionStatus(req.mobileWorker!.id);
     const vehicle = assignment ? await storage.getVehicle(assignment.vehicleId) : undefined;
     const allowed = vehicle?.isActive && vehicle.registration.toUpperCase().replace(/[^A-Z0-9]/g, "") !== "KTD136EC";
-    res.json({ assignment: allowed ? assignment : null, vehicle: allowed ? vehicle : null });
+    res.json({ assignment: allowed ? assignment : null, vehicle: allowed ? vehicle : null, selectedToday: selection?.selectedToday === true });
   });
 
   app.get("/api/mobile/fleet/vehicles", requireMobileTechnician, async (req: MobileAuthenticatedRequest, res) => {
@@ -1928,7 +1942,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latestOdometer: (await latestVehicleOdometer(vehicle.id))?.endOdometer ?? null,
         isAssigned: vehicle.id === assignment?.vehicleId,
       })));
-      res.json({ vehicles: items, assignedVehicleId: assignment?.vehicleId || null });
+      const selection = await getMobileFleetSelectionStatus(req.mobileWorker!.id);
+      res.json({ vehicles: items, assignedVehicleId: assignment?.vehicleId || null, selectedToday: selection?.selectedToday === true });
     } catch (error) {
       console.error("Could not load mobile Fleet vehicles:", error);
       res.status(500).json({ error: "Could not load vehicles. Please try again." });
@@ -1956,7 +1971,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const workerId = req.mobileWorker!.id;
       const vehicleId = await getMobileVehicle(workerId);
-      if (!vehicleId) return res.json({ vehicle: null, kmLogs: [], fuelFillups: [], inspections: [], issues: [] });
+      const inspectionConfiguration = await mobileInspectionConfiguration();
+      if (!vehicleId) return res.json({ vehicle: null, selectedToday: false, todayVehicleConfirmed: false, ...inspectionConfiguration, kmLogs: [], fuelFillups: [], inspections: [], issues: [] });
       const requestedDate = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
         ? req.query.date
         : new Date().toISOString().slice(0, 10);
@@ -1969,12 +1985,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getVehicleIssuesByWorker(workerId),
       ]);
       res.json({
-        vehicle: vehicle ?? null,
+        vehicle: vehicle ? { ...vehicle, selectedToday: true } : null,
+        selectedToday: true,
+        todayVehicleConfirmed: true,
+        ...inspectionConfiguration,
         date: requestedDate,
         kmLogs: kmLogs.filter(item => item.vehicleId === vehicleId).map(item => ({ ...item, isSelectedDay: sameDay(item.logDate) })),
         fuelFillups: fuelFillups.filter(item => item.vehicleId === vehicleId).map(fuelFillupResponse),
         inspections: inspections.filter(item => item.vehicleId === vehicleId),
         issues: issues.filter(item => item.vehicleId === vehicleId),
+        allowance: { amount: allowanceForDate(`${requestedDate}T12:00:00Z`), feedback: allowanceFeedback(`${requestedDate}T12:00:00Z`) },
+        monthlyCheck: monthlyCheckStatus(`${requestedDate}T12:00:00Z`, inspections.map(item => ({
+          vehicleId: item.vehicleId, workerId: item.workerId, date: item.inspectionDate, deletedAt: item.deletedAt,
+        })), { vehicleId, workerId }),
+        achievements: calculateFleetAchievements({
+          inspections: inspections.filter(item => item.vehicleId === vehicleId),
+          kmLogs: kmLogs.filter(item => item.vehicleId === vehicleId),
+          consumption: calculateFuelConsumption(fuelFillups.filter(item => item.vehicleId === vehicleId).map(item => ({
+            id: item.id, vehicleId: item.vehicleId, workerId: item.workerId, date: item.fillDate, odometer: item.odometer, litres: item.litres, deletedAt: item.deletedAt,
+          }))),
+        }),
       });
     } catch (error) {
       console.error("Could not load mobile FleetGuard overview:", error);
@@ -2072,9 +2102,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (Number.isNaN(inspectionDate.getTime())) {
         return res.status(400).json({ message: "Enter a valid inspection date and time." });
       }
-      const items = validateFleetInspectionItems(req.body.items);
-      const overallResult = items.some(item => item.result === "fail") ? "fail" : "pass";
       const inspectionType = req.body.inspectionType === "monthly" ? "monthly" : "daily";
+      const templateId = typeof req.body.templateId === "string"
+        ? req.body.templateId
+        : `canonical-${inspectionType}-v1`;
+      const prepared = await prepareInspectionSubmission(templateId, req.body.items);
+      const items = prepared.items;
+      const overallResult = items.some(item => item.result === "fail") ? "fail" : "pass";
       const data = insertVehicleInspectionSchema.parse({
         vehicleId, workerId: req.mobileWorker!.id, inspectionDate,
         overallResult,
@@ -2082,6 +2116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         comments: typeof req.body.comments === "string" ? req.body.comments : null,
       });
       const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
+      if (result.created) {
+        await writeInspectionSnapshot(result.record.id, prepared.snapshot);
+      }
       res.status(result.created ? 201 : 200).json(result.record);
     } catch (error: any) {
       res.status(400).json({ message: error.message ?? "Unable to submit vehicle inspection" });
@@ -7302,17 +7339,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── FLEET ROUTES ─────────────────────────────────────────────────────────
 
-  app.get("/api/fleet/vehicles", async (req, res) => {
+  // Last-line, record-level Fleet policy. Individual handlers retain their
+  // existing response contracts, while this gate prevents IDOR/KTD access even
+  // when a legacy raw handler forgets to add its own filter.
+  app.use("/api/fleet", requireAuth, async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const vehicles = await storage.getVehicles();
+      const byId = new Map(vehicles.map(vehicle => [vehicle.id, vehicle]));
+      const vehicleOwners = new Map((await storage.getVehicleAssignments()).filter(item => item.isActive).map(item => [item.vehicleId, item.workerId]));
+      const allowed = (row: any) => {
+        if (row?.registration && isKtdVehicle(row)) return false;
+        const scoped = row?.registration
+          ? { ...row, vehicleId: row.id, workerId: row.workerId ?? vehicleOwners.get(row.id) }
+          : row;
+        return canReadFleetRecord(req.user ?? {}, scoped ?? {}, byId);
+      };
+      if (req.method !== "GET") {
+        let target: any = null;
+        const segments = req.path.split("/").filter(Boolean);
+        const id = segments[1];
+        if (id && req.path.startsWith("/vehicles/")) target = await storage.getVehicle(id);
+        else if (id && req.path.startsWith("/issues/")) target = await storage.getVehicleIssue(id);
+        else if (id && req.path.startsWith("/service-records/")) target = await storage.getServiceRecord(id);
+        else if (id && req.path.startsWith("/workshop-jobs/")) target = await storage.getWorkshopJob(id);
+        else if (id && req.path.startsWith("/km-logs/")) target = (await storage.getKmLogs()).find(row => row.id === id);
+        else if (id && req.path.startsWith("/fuel-fillups/")) target = (await storage.getFuelFillups()).find(row => row.id === id);
+        else if (id && req.path.startsWith("/inspections/")) target = (await storage.getVehicleInspections()).find(row => row.id === id);
+        else if (id && req.path.startsWith("/assignments/")) target = (await storage.getVehicleAssignments()).find(row => row.id === id);
+        else if (req.body?.registration) target = req.body;
+        else if (req.body?.vehicleId) target = { vehicleId: req.body.vehicleId, workerId: req.body.workerId };
+        if (target && !allowed(target)) return res.status(403).json({ error: "Fleet record is outside your access scope" });
+      }
+      const json = res.json.bind(res);
+      res.json = ((payload: any) => {
+        const filter = (value: any): any => {
+          if (Array.isArray(value)) return value.filter(item => !item || typeof item !== "object" || allowed(item)).map(filter);
+          if (!value || typeof value !== "object") return value;
+          if ((value.vehicleId || value.registration) && !allowed(value)) return null;
+          return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, filter(item)]));
+        };
+        return json(filter(payload));
+      }) as any;
+      next();
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/fleet/vehicles", requireAuth, async (req, res) => {
     try { res.json(await storage.getVehicles()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get("/api/fleet/vehicles/:id", async (req, res) => {
+  app.get("/api/fleet/vehicles/:id", requireAuth, async (req, res) => {
     const v = await storage.getVehicle(req.params.id);
     if (!v) return res.status(404).json({ error: "Vehicle not found" });
     res.json(v);
   });
 
-  app.post("/api/fleet/vehicles", async (req, res) => {
+  app.post("/api/fleet/vehicles", requireAuth, requireFleetManager, async (req, res) => {
     try {
       const data = insertVehicleSchema.parse(req.body);
       const vehicle = await storage.createVehicle(data);
@@ -7320,7 +7402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
-  app.patch("/api/fleet/vehicles/:id", async (req, res) => {
+  app.patch("/api/fleet/vehicles/:id", requireAuth, requireFleetManager, async (req, res) => {
     try {
       const data = insertVehicleSchema.partial().parse(req.body);
       const vehicle = await storage.updateVehicle(req.params.id, data);
@@ -7328,13 +7410,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
-  app.delete("/api/fleet/vehicles/:id", async (req, res) => {
+  app.delete("/api/fleet/vehicles/:id", requireAuth, requireFleetManager, async (req, res) => {
     const ok = await storage.deleteVehicle(req.params.id);
     if (!ok) return res.status(404).json({ error: "Vehicle not found" });
     res.status(204).send();
   });
 
-  app.get("/api/fleet/assignments", async (req, res) => {
+  app.get("/api/fleet/assignments", requireAuth, async (req, res) => {
     try {
       const { workerId, vehicleId } = req.query;
       if (workerId) {
@@ -7346,7 +7428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/fleet/assignments", async (req, res) => {
+  app.post("/api/fleet/assignments", requireAuth, requireFleetManager, async (req, res) => {
     try {
       const data = insertVehicleAssignmentSchema.parse(req.body);
       const a = await storage.createVehicleAssignment(data);
@@ -7354,7 +7436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
-  app.patch("/api/fleet/assignments/:id", async (req, res) => {
+  app.patch("/api/fleet/assignments/:id", requireAuth, requireFleetManager, async (req, res) => {
     try {
       const data = insertVehicleAssignmentSchema.partial().parse(req.body);
       const a = await storage.updateVehicleAssignment(req.params.id, data);
@@ -7362,7 +7444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
-  app.get("/api/fleet/km-logs", async (req, res) => {
+  app.get("/api/fleet/km-logs", requireAuth, async (req, res) => {
     try {
       const { workerId, vehicleId } = req.query;
       const calculated = calculateFleetOdometerLogs(await storage.getKmLogs());
@@ -7372,17 +7454,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/fleet/km-logs", async (req, res) => {
+  app.post("/api/fleet/km-logs", requireAuth, async (req, res) => {
     try {
       const body = {
         ...req.body,
         logDate: req.body.logDate ? new Date(req.body.logDate) : new Date(),
       };
       const candidate = insertKmLogSchema.parse(body);
-      const calculated = calculateFleetOdometerLogs([
+      const calculated = calculateFleetOdometerLogs(([
         ...(await storage.getKmLogs()),
         { id: `pending-${randomUUID()}`, createdAt: new Date(), ...candidate },
-      ]).at(-1)!;
+      ] as any)).at(-1)!;
       assertNoOdometerRollback(calculated.odometerCalculation.flags);
       const log = await storage.createKmLog({
         ...candidate,
@@ -7394,13 +7476,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
-  app.delete("/api/fleet/km-logs/:id", async (req, res) => {
+  app.delete("/api/fleet/km-logs/:id", requireAuth, requireFleetManager, async (req, res) => {
     const ok = await storage.deleteKmLog(req.params.id);
     if (!ok) return res.status(404).json({ error: "KM log not found" });
     res.status(204).send();
   });
 
-  app.get("/api/fleet/fuel-fillups", async (req, res) => {
+  app.get("/api/fleet/fuel-fillups", requireAuth, async (req, res) => {
     try {
       const { workerId, vehicleId } = req.query;
       if (workerId) return res.json((await storage.getFuelFillupsByWorker(workerId as string)).map(fuelFillupResponse));
@@ -7409,7 +7491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/fleet/fuel-fillups", async (req, res) => {
+  app.post("/api/fleet/fuel-fillups", requireAuth, async (req, res) => {
     try {
       const data = fuelFillupInput(req.body, String(req.body.vehicleId ?? ""), String(req.body.workerId ?? ""));
       const result = await submitFuelFillup(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
@@ -7417,13 +7499,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
-  app.delete("/api/fleet/fuel-fillups/:id", async (req, res) => {
+  app.delete("/api/fleet/fuel-fillups/:id", requireAuth, requireFleetManager, async (req, res) => {
     const ok = await storage.deleteFuelFillup(req.params.id);
     if (!ok) return res.status(404).json({ error: "Fuel fillup not found" });
     res.status(204).send();
   });
 
-  app.get("/api/fleet/inspections", async (req, res) => {
+  app.get("/api/fleet/inspections", requireAuth, async (req, res) => {
     try {
       const { workerId, vehicleId, result } = req.query;
       if (workerId) return res.json(await storage.getVehicleInspectionsByWorker(workerId as string));
@@ -7433,7 +7515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/fleet/inspections", async (req, res) => {
+  app.post("/api/fleet/inspections", requireAuth, async (req, res) => {
     try {
       const body = {
         ...req.body,
@@ -7452,7 +7534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message, details: String(e) }); }
   });
 
-  app.patch("/api/fleet/inspections/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/fleet/inspections/:id", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
     try {
       const body: any = { ...req.body };
       if (body.reviewedAt) body.reviewedAt = new Date(body.reviewedAt);
@@ -7461,13 +7543,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
-  app.delete("/api/fleet/inspections/:id", async (req, res) => {
+  app.delete("/api/fleet/inspections/:id", requireAuth, requireFleetManager, async (req, res) => {
     const ok = await storage.deleteVehicleInspection(req.params.id);
     if (!ok) return res.status(404).json({ error: "Inspection not found" });
     res.status(204).send();
   });
 
-  app.get("/api/fleet/dashboard", async (req, res) => {
+  app.get("/api/fleet/dashboard", requireAuth, async (req, res) => {
     try {
       const { workerId } = req.query;
       const data = await storage.getFleetDashboardData(workerId as string | undefined);
@@ -7475,8 +7557,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // A single canonical read model for the dashboard and its history tabs.
+  // Filters compose (rather than the legacy endpoints' worker-or-vehicle
+  // branching) so managers can investigate a driver, a vehicle and a period.
+  app.get("/api/fleet/activity", requireAuth, async (req, res) => {
+    try {
+      const { workerId, vehicleId, from, to, tab = "all" } = req.query as Record<string, string>;
+      const includeDeleted = req.query.includeDeleted === "true"
+        && ["admin", "manager"].includes(getDashboardRole((req as AuthenticatedRequest).user ?? {}));
+      const audits = await db.select().from(fleetAuditEntries).orderBy(desc(fleetAuditEntries.createdAt)).limit(500);
+      const activity = await readFleetActivity(storage, (req as AuthenticatedRequest).user ?? {}, {
+        workerId, vehicleId, from, to, includeDeleted,
+      }, audits);
+      // `tab` remains informational for current callers; this endpoint is a
+      // consolidated read and therefore always returns every category.
+      res.json({ ...activity, tab, fuelFillups: activity.fuelFillups.map(fuelFillupResponse) });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.get("/api/fleet/activity.xlsx", requireAuth, requireFleetManager, async (req, res) => {
+    try {
+      const { workerId, vehicleId, from, to } = req.query as Record<string, string>;
+      const includeDeleted = req.query.includeDeleted === "true"
+        && ["admin", "manager"].includes(getDashboardRole((req as AuthenticatedRequest).user ?? {}));
+      const audits = await db.select().from(fleetAuditEntries).orderBy(desc(fleetAuditEntries.createdAt)).limit(500);
+      const activity = await readFleetActivity(storage, (req as AuthenticatedRequest).user ?? {}, {
+        workerId, vehicleId, from, to, includeDeleted,
+      }, audits);
+      const content = fleetActivityWorkbook(fleetActivityRows(activity));
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="fleet-activity.xlsx"');
+      res.send(content);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  const fleetPatchToColumns = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`), item,
+  ]));
+  app.patch("/api/fleet/:kind(km-logs|fuel-fillups|inspections)/:id/correction", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json(await correctFleetRecord(req.params.kind as "km-logs" | "fuel-fillups" | "inspections", req.params.id,
+        fleetPatchToColumns(req.body.patch ?? req.body), req.user!.id, req.body.reason));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post("/api/fleet/:kind(km-logs|fuel-fillups|inspections)/:id/:action(soft-delete|restore)", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json(await setFleetRecordDeleted(req.params.kind as "km-logs" | "fuel-fillups" | "inspections", req.params.id,
+        req.params.action === "soft-delete", req.user!.id, req.body.reason));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.get("/api/fleet/settings", requireAuth, requireFleetManager, async (_req, res) => {
+    try { res.json(await listFleetSettings()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/fleet/settings", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
+    try { res.status(201).json(await createFleetSettings(req.body.settings ?? req.body, req.user!.id)); }
+    catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.get("/api/fleet/inspection-templates", requireAuth, requireFleetManager, async (req, res) => {
+    try { res.json(await listInspectionTemplates(req.query.includeArchived === "true")); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/fleet/inspection-templates", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
+    try { res.status(201).json(await createInspectionTemplate(String(req.body.name ?? ""), req.body.items, req.user!.id)); }
+    catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post("/api/fleet/inspection-templates/:id/:action(archive|restore)", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
+    try { res.json(await archiveInspectionTemplate(req.params.id, req.user!.id, req.params.action === "archive")); }
+    catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.patch("/api/fleet/inspection-templates/:templateId/items/:itemId", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
+    try { res.json(await updateInspectionTemplateItem(req.params.templateId, req.params.itemId, req.body, req.user!.id)); }
+    catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.get("/api/fleet/audit", requireAuth, requireFleetManager, async (req, res) => {
+    try {
+      const values: unknown[] = []; const where: string[] = [];
+      if (typeof req.query.entityType === "string") { values.push(req.query.entityType); where.push(`entity_type=$${values.length}`); }
+      if (typeof req.query.entityId === "string") { values.push(req.query.entityId); where.push(`entity_id=$${values.length}`); }
+      const result = await (await import("./db")).pool.query(`SELECT * FROM fleet_audit_entries ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY created_at DESC LIMIT 500`, values);
+      res.json(result.rows);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── FLEET MAINTENANCE — ISSUES ──────────────────────────────────────────────
-  app.get("/api/fleet/issues", async (req, res) => {
+  app.get("/api/fleet/issues", requireAuth, async (req, res) => {
     try {
       const { vehicleId, workerId, status, urgency } = req.query as Record<string, string>;
       let issues = await storage.getVehicleIssues();
@@ -7488,17 +7652,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/issues/open", async (_req, res) => {
+  app.get("/api/fleet/issues/open", requireAuth, async (_req, res) => {
     try { res.json(await storage.getOpenVehicleIssues()); }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/issues/not-safe", async (_req, res) => {
+  app.get("/api/fleet/issues/not-safe", requireAuth, async (_req, res) => {
     try { res.json(await storage.getNotSafeVehicleIssues()); }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/issues/:id", async (req, res) => {
+  app.get("/api/fleet/issues/:id", requireAuth, async (req, res) => {
     try {
       const issue = await storage.getVehicleIssue(req.params.id);
       if (!issue) return res.status(404).json({ error: "Issue not found" });
@@ -7517,14 +7681,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.patch("/api/fleet/issues/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/fleet/issues/:id", requireAuth, requireFleetManager, async (req: AuthenticatedRequest, res) => {
     try {
       const issue = await storage.updateVehicleIssue(req.params.id, req.body);
       res.json(issue);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.delete("/api/fleet/issues/:id", requireAuth, async (_req, res) => {
+  app.delete("/api/fleet/issues/:id", requireAuth, requireFleetManager, async (_req, res) => {
     try {
       await storage.deleteVehicleIssue((_req as any).params.id);
       res.json({ success: true });
@@ -7532,7 +7696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── FLEET MAINTENANCE — SERVICE RECORDS ─────────────────────────────────────
-  app.get("/api/fleet/service-records", async (req, res) => {
+  app.get("/api/fleet/service-records", requireAuth, async (req, res) => {
     try {
       const { vehicleId } = req.query as Record<string, string>;
       if (vehicleId) return res.json(await storage.getServiceRecordsByVehicle(vehicleId));
@@ -7540,7 +7704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/service-records/:id", async (req, res) => {
+  app.get("/api/fleet/service-records/:id", requireAuth, async (req, res) => {
     try {
       const rec = await storage.getServiceRecord(req.params.id);
       if (!rec) return res.status(404).json({ error: "Service record not found" });
@@ -7583,7 +7747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── FLEET — WORKSHOP JOBS ───────────────────────────────────────────────────
-  app.get("/api/fleet/workshop-jobs", async (req, res) => {
+  app.get("/api/fleet/workshop-jobs", requireAuth, async (req, res) => {
     try {
       const { vehicleId } = req.query as Record<string, string>;
       if (vehicleId) return res.json(await storage.getWorkshopJobsByVehicle(vehicleId));
@@ -7591,7 +7755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.get("/api/fleet/workshop-jobs/:id", async (req, res) => {
+  app.get("/api/fleet/workshop-jobs/:id", requireAuth, async (req, res) => {
     try {
       const job = await storage.getWorkshopJob(req.params.id);
       if (!job) return res.status(404).json({ error: "Workshop job not found" });
@@ -7629,18 +7793,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── FLEET — WEEKLY SUMMARY EMAIL ────────────────────────────────────────────
-  app.post("/api/fleet/send-weekly-summary", async (_req, res) => {
+  app.post("/api/fleet/send-weekly-summary", requireAuth, requireFleetManager, async (_req: AuthenticatedRequest, res) => {
     try {
       const { generateWeeklyFleetSummaryEmail } = await import("./email-service");
       const params = await generateWeeklyFleetSummaryEmail(storage);
       if (!params) return res.status(500).json({ error: "Could not generate summary" });
-      const queued = await enqueueFleetEmail(fleetWeeklySummaryEmail(params));
+      const to = new Date().toISOString().slice(0, 10);
+      const fromDate = new Date(); fromDate.setUTCDate(fromDate.getUTCDate() - 7);
+      const audits = await db.select().from(fleetAuditEntries).orderBy(desc(fleetAuditEntries.createdAt)).limit(500);
+      const activity = await readFleetActivity(storage, _req.user ?? {}, { from: fromDate.toISOString().slice(0, 10), to }, audits);
+      const email = fleetWeeklySummaryEmail(params);
+      email.attachment = {
+        filename: "fleet-activity.xlsx",
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content: fleetActivityWorkbook(fleetActivityRows(activity)),
+      };
+      const queued = await enqueueFleetEmail(email);
       res.json({ success: true, message: queued ? "Weekly fleet summary queued" : "Weekly fleet summary was already queued for this week" });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
   // ── FLEET — NOTIFICATIONS ───────────────────────────────────────────────────
-  app.get("/api/fleet/notifications", async (_req, res) => {
+  app.get("/api/fleet/notifications", requireAuth, async (_req, res) => {
     try { res.json(await storage.getFleetNotifications()); }
     catch (err: any) { res.status(500).json({ error: err.message }); }
   });

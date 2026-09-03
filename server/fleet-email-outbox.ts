@@ -23,6 +23,7 @@ export type FleetEmail = {
   subject: string;
   text: string;
   html: string;
+  attachment?: { filename: string; mimeType: string; content: Buffer };
 };
 
 const fromAddress = () =>
@@ -91,14 +92,26 @@ export function fleetWeeklySummaryEmail(summary: { subject: string; text?: strin
 
 /** The unique event key makes concurrent or repeated route calls a single durable enqueue. */
 export async function enqueueFleetEmail(email: FleetEmail): Promise<boolean> {
-  const result = await pool.query(
-    `INSERT INTO fleet_email_outbox (event_key, kind, recipients, subject, text_body, html_body)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (event_key) DO NOTHING
-     RETURNING id`,
-    [email.eventKey, email.kind, fleetEmailRecipients(), email.subject, email.text, email.html],
-  );
-  return result.rowCount === 1;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    let attachmentId: string | null = null;
+    if (email.attachment) {
+      const attachment = await client.query(
+        `INSERT INTO fleet_weekly_summary_attachments(event_key,file_name,mime_type,content)
+         VALUES($1,$2,$3,$4) ON CONFLICT(event_key) DO UPDATE SET file_name=EXCLUDED.file_name
+         RETURNING id`, [email.eventKey, email.attachment.filename, email.attachment.mimeType, email.attachment.content],
+      );
+      attachmentId = attachment.rows[0].id;
+    }
+    const result = await client.query(
+      `INSERT INTO fleet_email_outbox (event_key, kind, recipients, subject, text_body, html_body, attachment_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (event_key) DO NOTHING RETURNING id`,
+      [email.eventKey, email.kind, fleetEmailRecipients(), email.subject, email.text, email.html, attachmentId],
+    );
+    await client.query("COMMIT");
+    return result.rowCount === 1;
+  } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
 }
 
 export const retryDelaySeconds = (attempt: number) => Math.min(6 * 60 * 60, 60 * 2 ** Math.max(0, attempt - 1));
@@ -122,12 +135,13 @@ export async function processFleetEmailOutbox(limit = 10): Promise<number> {
      )
      UPDATE fleet_email_outbox o SET locked_at = now(), attempts = o.attempts + 1
      FROM candidates WHERE o.id = candidates.id
-      RETURNING o.id, o.event_key, o.recipients, o.subject, o.text_body, o.html_body, o.attempts`,
+       RETURNING o.id, o.event_key, o.recipients, o.subject, o.text_body, o.html_body, o.attachment_id, o.attempts`,
     [limit],
   );
   for (const row of claimed.rows) {
     try {
-      await sendEmail({ to: row.recipients.join(", "), from: fromAddress(), subject: row.subject, text: row.text_body, html: row.html_body, headers: { "Message-ID": fleetMessageId(row.event_key ?? row.id) } });
+      const attachment = row.attachment_id ? (await pool.query(`SELECT file_name,mime_type,content FROM fleet_weekly_summary_attachments WHERE id=$1`, [row.attachment_id])).rows[0] : null;
+      await sendEmail({ to: row.recipients.join(", "), from: fromAddress(), subject: row.subject, text: row.text_body, html: row.html_body, headers: { "Message-ID": fleetMessageId(row.event_key ?? row.id) }, attachments: attachment ? [{ filename: attachment.file_name, type: attachment.mime_type, content: Buffer.from(attachment.content).toString("base64") }] : undefined });
       await pool.query(`UPDATE fleet_email_outbox SET sent_at = now(), locked_at = NULL, last_error = NULL WHERE id = $1`, [row.id]);
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 1000) : "Fleet email delivery failed";
