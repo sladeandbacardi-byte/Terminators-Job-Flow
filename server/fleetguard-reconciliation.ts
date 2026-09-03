@@ -1091,15 +1091,19 @@ async function materializeNativeRow(
       return quarantineNativeRow(target, runId, entityType, row, nativeCounts,
         !templateId ? "UNMAPPED_INSPECTION_TEMPLATE" : "MISSING_TEMPLATE_ITEM_LABEL");
     }
-    const id = fleetGuardNativeId("inspection-template-item", sourceId);
+    const position = integerValue(row, "position", "sort_order", "order", "sequence") ?? 0;
+    const existingItem = await target.query(
+      `SELECT id FROM fleet_inspection_template_items WHERE template_id=$1 AND position=$2 LIMIT 1`,
+      [templateId, position],
+    );
+    const id = existingItem.rows[0]?.id ?? fleetGuardNativeId("inspection-template-item", sourceId);
     await mapSuccess("fleet_inspection_template_items", id, "deterministic-fg-template-item-id");
     await target.query(
       `INSERT INTO fleet_inspection_template_items (id,template_id,label,position,archived_at,created_at)
        VALUES ($1,$2,$3,$4,NULL,$5)
        ON CONFLICT (id) DO UPDATE SET template_id=EXCLUDED.template_id,label=EXCLUDED.label,
          position=EXCLUDED.position,archived_at=NULL`,
-      [id, templateId, label, integerValue(row, "position", "sort_order", "order", "sequence") ?? 0,
-        createdAt ?? new Date()],
+      [id, templateId, label, position, createdAt ?? new Date()],
     );
     return;
   }
