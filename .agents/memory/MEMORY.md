@@ -31,3 +31,4 @@
 - [FleetGuard assignment history](fleetguard-assignment-history.md) — source exposes only current driver links; never treat session_started_at as assignment history. Preserve JobFlow pair-change history instead.
 - [Fleet KM same-day history](fleet-km-same-day-history.md) — legacy FleetGuard AM/PM readings can be separate rows on one worker/vehicle/day; never add a simple unique-day constraint.
 - [Fleet daily vehicle use](fleet-daily-vehicle-use.md) — current mobile vehicle choice is a Johannesburg-day session; swaps end assignments but never move vehicle-linked history.
+- [Fleet migration reconciliation state](fleet-migration-reconciliation-state.md) — reuse template items by template+position; verify total mappings, not per-run delta counts or stale conflict status alone.
