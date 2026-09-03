@@ -85,6 +85,53 @@
   }
 }
 
+/* FleetGuard uses a compact, light staff surface while the rest of the
+   mobile app keeps its shared JobFlow styling. */
+.fleet-guard-screen > section:first-of-type {
+  background: white;
+  color: hsl(222.2 47.4% 11.2%);
+  border: 1px solid hsl(214.3 31.8% 91.4%);
+}
+
+.fleet-guard-screen > section:first-of-type .border-white\/10 {
+  border-color: hsl(214.3 31.8% 91.4%);
+}
+
+.fleet-guard-screen > section:first-of-type .bg-white\/10 {
+  background: hsl(210 40% 96%);
+}
+
+.fleet-guard-screen > section:first-of-type .text-white {
+  color: hsl(222.2 47.4% 11.2%);
+}
+
+.fleet-guard-screen > section:first-of-type .text-slate-400 {
+  color: hsl(215.4 16.3% 46.9%);
+}
+
+.fleet-guard-screen > section:first-of-type .text-orange-400,
+.fleet-guard-screen > section:first-of-type .text-orange-300 {
+  color: hsl(221.2 83.2% 53.3%);
+}
+
+.fleet-guard-screen > .grid.grid-cols-2 > button {
+  background: hsl(221.2 83.2% 53.3%);
+  border-color: hsl(221.2 83.2% 53.3%);
+  color: white;
+}
+
+.fleet-guard-screen > .space-y-2 > button:nth-child(1) {
+  background: hsl(138 76% 97%);
+  border-color: hsl(141 79% 85%);
+  color: hsl(142 72% 29%);
+}
+
+.fleet-guard-screen > .space-y-2 > button:nth-child(2) {
+  background: hsl(210 40% 96%);
+  border-color: hsl(214.3 31.8% 91.4%);
+  color: hsl(222.2 47.4% 11.2%);
+}
+
 @layer components {
   .pest-control-gradient {
     background: linear-gradient(135deg, var(--pest-control-50) 0%, var(--pest-control-100) 100%);

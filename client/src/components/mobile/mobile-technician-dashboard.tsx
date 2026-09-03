@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays, ClipboardPenLine,
+  Bell, CalendarDays, ClipboardPenLine,
   LayoutDashboard, ListChecks, RefreshCw, Truck, Lightbulb, Camera, Clock3,
   Fuel, ClipboardCheck, AlertTriangle, Gauge,
 } from "lucide-react";
@@ -9,6 +9,7 @@ import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "@shared/opportunitie
 import { MobileTreatmentReport } from "./mobile-treatment-report";
 import { MobileShell, type MobileNavItem } from "./mobile-shell";
 import { MobileFleetGuard } from "./mobile-fleet-guard";
+import { MOBILE_FLEET_BOTTOM_NAV } from "./mobile-fleet-contract";
 import { mobileFetch } from "@/lib/mobile-auth";
 
 type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "fleet" | "kmMorning" | "kmAfternoon" | "fuel" | "inspection" | "monthlyInspection" | "issue" | "opportunities";
@@ -204,6 +205,7 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     { id: "fleet", label: "Fleet", icon: Truck, onSelect: () => nav("fleet") },
   ];
   const openFleetGuard = () => nav("fleet");
+  const isFleetScreen = ["fleet", "kmMorning", "kmAfternoon", "fuel", "inspection", "monthlyInspection", "issue"].includes(screen);
   const vehicleSelect = (
     <select required value={form.vehicleId ?? ""} onChange={event => setForm(current => ({ ...current, vehicleId: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
       <option value="">Select vehicle</option>
@@ -304,8 +306,10 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     workerRole={worker.role}
     items={mobileNavItems}
     activeItem={treatmentJobId ? "jobs" : screen}
+    compact={isFleetScreen}
     onLogout={onLogout}
-    headerAction={<button aria-label="Refresh dashboard" onClick={load} className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"><RefreshCw className="h-4 w-4" /></button>}
+    headerAction={isFleetScreen ? <button aria-label="View Fleet notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"><Bell className="h-4 w-4" /></button> : <button aria-label="Refresh dashboard" onClick={load} className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"><RefreshCw className="h-4 w-4" /></button>}
+    footer={screen === "fleet" ? <nav aria-label="Fleet navigation" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur"><div className="mx-auto grid max-w-3xl grid-cols-2"><button type="button" onClick={() => nav("fleet")} className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-semibold text-blue-700"><Truck className="h-4 w-4" />{MOBILE_FLEET_BOTTOM_NAV[0].label}</button><button type="button" disabled className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-semibold text-slate-400 disabled:cursor-not-allowed"><LayoutDashboard className="h-4 w-4" />{MOBILE_FLEET_BOTTOM_NAV[1].label}</button></div></nav> : undefined}
   >
     {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}

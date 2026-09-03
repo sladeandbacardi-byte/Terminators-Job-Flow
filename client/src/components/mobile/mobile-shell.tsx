@@ -21,6 +21,8 @@ interface MobileShellProps {
   onLogout: () => void;
   onBack?: () => void;
   headerAction?: ReactNode;
+  footer?: ReactNode;
+  compact?: boolean;
   children: ReactNode;
 }
 
@@ -34,6 +36,8 @@ export function MobileShell({
   onLogout,
   onBack,
   headerAction,
+  footer,
+  compact = false,
   children,
 }: MobileShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -47,7 +51,7 @@ export function MobileShell({
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
       <header className="sticky top-0 z-20 border-b border-gray-100 bg-white shadow-sm">
-        <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-between gap-3 px-4">
+        <div className={`mx-auto flex h-16 w-full items-center justify-between gap-3 px-4 ${compact ? "max-w-md" : "max-w-3xl"}`}>
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
@@ -133,7 +137,8 @@ export function MobileShell({
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-3xl px-4 py-5 pb-10 sm:px-6">{children}</div>
+      <div className={`mx-auto w-full px-4 py-5 pb-10 sm:px-6 ${compact ? "max-w-md" : "max-w-3xl"}`}>{children}</div>
+      {footer}
     </main>
   );
 }
