@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
@@ -54,6 +54,7 @@ export default function FleetInspection() {
     Object.fromEntries(INSPECTION_CHECKLIST.map(name => [name, { result: "pass", comments: "" }]))
   );
   const [overallComments, setOverallComments] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(newSubmissionKey);
 
   const { data: vehicles = [] } = useQuery<any[]>({ queryKey: ["/api/fleet/vehicles"] });
@@ -97,6 +98,7 @@ export default function FleetInspection() {
         overallResult,
         itemsJson: JSON.stringify(itemsArr),
         comments: overallComments || null,
+        photoUrl,
         idempotencyKey,
       };
       return apiRequest("POST", "/api/fleet/inspections", body);
@@ -110,6 +112,7 @@ export default function FleetInspection() {
         variant: anyFail ? "destructive" : "default" });
       setItems(Object.fromEntries(INSPECTION_CHECKLIST.map(n => [n, { result: "pass", comments: "" }])));
       setOverallComments("");
+      setPhotoUrl("");
       setIdempotencyKey(newSubmissionKey());
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -117,6 +120,18 @@ export default function FleetInspection() {
 
   const passCount = Object.values(items).filter(i => i.result === "pass").length;
   const failCount = Object.values(items).filter(i => i.result === "fail").length;
+  const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2_000_000) {
+      toast({ title: "Invalid photo", description: "Use a JPG, PNG, or WebP image smaller than 2 MB.", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPhotoUrl(String(reader.result));
+    reader.readAsDataURL(file);
+  };
 
   return (
         <div className="p-4 sm:p-6">
@@ -238,13 +253,18 @@ export default function FleetInspection() {
                   <Textarea value={overallComments} onChange={e => setOverallComments(e.target.value)}
                     placeholder="Any additional notes about the vehicle condition..." rows={3} />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Vehicle-check photo (required)</Label>
+                  <Input required type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={choosePhoto} />
+                  {photoUrl && <img src={photoUrl} alt="Daily vehicle-check preview" className="max-h-48 w-full rounded-lg border object-contain" />}
+                </div>
                 {anyFail && (
                   <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     A fail alert email will be sent to admin immediately upon submission.
                   </div>
                 )}
-                <Button onClick={() => submitMutation.mutate()} disabled={!vehicleId || submitMutation.isPending}
+                <Button onClick={() => submitMutation.mutate()} disabled={!vehicleId || !photoUrl || submitMutation.isPending}
                   className={`w-full text-white ${anyFail ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}>
                   {submitMutation.isPending ? "Submitting..." : anyFail ? "Submit (Will Alert Admin)" : "Submit Inspection"}
                 </Button>
@@ -264,6 +284,7 @@ export default function FleetInspection() {
                       <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">Result</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">Failed Items</th>
+                       <th className="text-left px-4 py-3 font-medium text-gray-600">Photo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -281,11 +302,12 @@ export default function FleetInspection() {
                             }
                           </td>
                           <td className="px-4 py-3 text-xs text-red-600">{fails.length > 0 ? fails.map((i: any) => i.name).join(", ") : "—"}</td>
+                           <td className="px-4 py-3">{ins.photoUrl ? <a href={ins.photoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-600 underline">View photo</a> : "—"}</td>
                         </tr>
                       );
                     })}
                     {(myInspections as any[]).length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No inspections yet</td></tr>
+                       <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No inspections yet</td></tr>
                     )}
                   </tbody>
                 </table>

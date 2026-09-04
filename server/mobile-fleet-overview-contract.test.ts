@@ -28,3 +28,18 @@ test("all mobile Fleet creates resolve the today-confirmed vehicle", () => {
   assert.match(configuration, /templateId: template\.id/);
   assert.match(configuration, /\/\^canonical-\(daily\|monthly\)-v1\$\/\.test\(templateId\)/);
 });
+
+test("daily photo create and read routes retain authentication and server-derived template enforcement", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+  const mobileStart = routes.indexOf('app.post("/api/mobile/fleet/inspections"');
+  const mobileHandler = routes.slice(mobileStart, routes.indexOf('app.post("/api/mobile/fleet/issues"', mobileStart));
+  assert.match(mobileHandler, /requireMobileTechnician/);
+  assert.match(mobileHandler, /prepared\.inspectionType !== requestedInspectionType/);
+  assert.match(mobileHandler, /required: inspectionType === "daily"/);
+  const officeStart = routes.indexOf('app.get("/api/fleet/inspections"');
+  const officeHandlers = routes.slice(officeStart, routes.indexOf('app.patch("/api/fleet/inspections', officeStart));
+  assert.match(officeHandlers, /requireAuth/);
+  assert.match(officeHandlers, /required: true, label: "Daily vehicle-check photo"/);
+  assert.match(routes, /app\.use\("\/api\/fleet", requireAuth/);
+  assert.match(routes, /canReadFleetRecord/);
+});

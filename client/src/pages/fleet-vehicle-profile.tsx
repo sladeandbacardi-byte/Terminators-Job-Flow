@@ -686,6 +686,7 @@ export default function FleetVehicleProfile() {
                                     </div>
                                   )}
                                   {ins.comments && <p className="text-xs text-gray-500 mt-1">{ins.comments}</p>}
+                                   {ins.photoUrl && <a href={ins.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-semibold text-blue-600 underline">View inspection photo</a>}
                                 </div>
                                 <p className="text-xs text-gray-400 shrink-0">{fmtFull(ins.inspectionDate)}</p>
                               </div>

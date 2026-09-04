@@ -34,3 +34,12 @@ test("canonical fallback DTO IDs are server-recognized and validate canonical la
     configuration.dailyInspectionTemplateId, configuration.dailyInspectionItems, submitted,
   ).length, FLEET_INSPECTION_CHECKS.length);
 });
+
+test("mobile inspection type is derived from the server template rather than trusted client input", async () => {
+  const daily = await import("./fleet-configuration").then(module =>
+    module.prepareInspectionSubmission("canonical-daily-v1", FLEET_INSPECTION_CHECKS.map(name => ({ name, result: "pass" }))));
+  const monthly = await import("./fleet-configuration").then(module =>
+    module.prepareInspectionSubmission("canonical-monthly-v1", FLEET_INSPECTION_CHECKS.map(name => ({ name, result: "pass" }))));
+  assert.equal(daily.inspectionType, "daily");
+  assert.equal(monthly.inspectionType, "monthly");
+});

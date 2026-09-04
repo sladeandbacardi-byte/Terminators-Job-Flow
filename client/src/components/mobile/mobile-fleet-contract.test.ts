@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   MOBILE_FLEET_ACTIONS,
   MOBILE_FLEET_BOTTOM_NAV,
@@ -94,4 +95,13 @@ test("real overview checklist fields support a custom template and an explicit c
       { id: "canonical-monthly:1", name: "Brakes", result: "pass", comments: undefined, type: "monthly" },
     ],
   });
+});
+
+test("daily check UI contract requires supported photo evidence without changing monthly or fuel controls", () => {
+  const source = readFileSync(new URL("./mobile-fleet-guard.tsx", import.meta.url), "utf8");
+  assert.match(source, /Vehicle-check photo \(required\)/);
+  assert.match(source, /accept="image\/jpeg,image\/png,image\/webp"/);
+  assert.match(source, /disabled=\{!completed \|\| \(!monthly && !form\.photoUrl\)\}/);
+  assert.match(source, /Fuel slip \(required\)/);
+  assert.match(source, /monthly && !form\.photoUrl/);
 });

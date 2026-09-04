@@ -87,13 +87,15 @@ export async function prepareInspectionSubmission(templateId: string, submitted:
     template = { ...found, items: found.items } as InspectionTemplate;
   }
   const items = validateInspectionItemsForTemplate(templateId, template.items, submitted);
+  const inspectionType: "daily" | "monthly" =
+    template.id === "canonical-monthly-v1" || template.name.toLowerCase().includes("month") ? "monthly" : "daily";
   const snapshot = {
     id: template.id, templateId: template.id, name: template.name, version: template.version,
     source: template.id.startsWith("canonical-") ? "canonical-fallback" : "database",
     items: template.items.slice().sort((a, b) => a.position - b.position)
       .map(item => ({ id: item.id, label: item.label, position: item.position, templateId: template.id })),
   };
-  return { items, snapshot };
+  return { items, snapshot, inspectionType };
 }
 
 export async function writeInspectionSnapshot(inspectionId: string, snapshot: unknown) {

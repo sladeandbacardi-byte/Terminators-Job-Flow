@@ -95,6 +95,7 @@ import { fleetActivityWorkbook } from "./fleet-activity-export";
 import { fleetActivityRows, readFleetActivity } from "./fleet-activity";
 import { getMobileFleetSelectionStatus } from "./mobile-fleet-selection-status";
 import { canReadFleetRecord, isKtdVehicle } from "./fleet-scope";
+import { fleetPhotoEvidence } from "./fleet-photo-evidence";
 import { archiveInspectionTemplate, createFleetSettings, createInspectionTemplate, listFleetSettings, listInspectionTemplates, mobileInspectionConfiguration, prepareInspectionSubmission, snapshotInspectionTemplate, updateInspectionTemplateItem, writeInspectionSnapshot } from "./fleet-configuration";
 import {
   OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, OPPORTUNITY_URGENCIES,
@@ -2058,11 +2059,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const litres = Number(body.litres);
     const cost = Number(body.cost);
     const fuelType = typeof body.fuelType === "string" ? body.fuelType.trim() : "";
-    const receiptPhoto = typeof body.receiptPhoto === "string" ? body.receiptPhoto : "";
-    const receipt = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/.exec(receiptPhoto);
+    const receiptPhoto = fleetPhotoEvidence(body.receiptPhoto, { required: true, label: "Fuel slip photo" });
     if (Number.isNaN(fillDate.getTime()) || !Number.isInteger(odometer) || odometer < 0 || odometer > 10_000_000
       || !Number.isFinite(litres) || litres <= 0 || !Number.isFinite(cost) || cost <= 0 || !fuelType
-      || !receipt || receiptPhoto.length > 2_700_000) {
+      || !receiptPhoto) {
       throw new Error("Vehicle, worker, date, time, odometer, litres, Rand amount, fuel type, and a valid fuel slip photo are required.");
     }
     return insertFuelFillupSchema.parse({
@@ -2102,11 +2102,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (Number.isNaN(inspectionDate.getTime())) {
         return res.status(400).json({ message: "Enter a valid inspection date and time." });
       }
-      const inspectionType = req.body.inspectionType === "monthly" ? "monthly" : "daily";
+      const requestedInspectionType = req.body.inspectionType === "monthly" ? "monthly" : "daily";
       const templateId = typeof req.body.templateId === "string"
         ? req.body.templateId
-        : `canonical-${inspectionType}-v1`;
+        : `canonical-${requestedInspectionType}-v1`;
       const prepared = await prepareInspectionSubmission(templateId, req.body.items);
+      if (prepared.inspectionType !== requestedInspectionType) {
+        throw new Error("Inspection type must match the selected active template.");
+      }
+      const inspectionType = prepared.inspectionType;
+      const photoUrl = fleetPhotoEvidence(req.body.photoUrl, {
+        required: inspectionType === "daily",
+        label: inspectionType === "daily" ? "Daily vehicle-check photo" : "Monthly inspection photo",
+      });
       const items = prepared.items;
       const overallResult = items.some(item => item.result === "fail") ? "fail" : "pass";
       const data = insertVehicleInspectionSchema.parse({
@@ -2114,6 +2122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         overallResult,
         itemsJson: JSON.stringify(items.map(item => ({ ...item, type: inspectionType }))),
         comments: typeof req.body.comments === "string" ? req.body.comments : null,
+        photoUrl,
       });
       const result = await submitVehicleInspection(data, fleetSubmissionKey(req.body.idempotencyKey ?? req.header("Idempotency-Key")));
       if (result.created) {
@@ -2130,15 +2139,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vehicleId = await getMobileVehicle(req.mobileWorker!.id, req.body.vehicleId);
       if (!vehicleId) return res.status(400).json({ message: "An assigned vehicle is required to report an issue" });
       const reportedAt = typeof req.body.reportedAt === "string" ? new Date(req.body.reportedAt) : new Date();
-      const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl : null;
+      const photoUrl = fleetPhotoEvidence(req.body.photoUrl, { required: false, label: "Fault photo" });
       if (!req.body.description || typeof req.body.description !== "string" || req.body.description.trim().length < 3) {
         return res.status(400).json({ message: "Describe the vehicle fault before submitting it." });
       }
       if (Number.isNaN(reportedAt.getTime())) {
         return res.status(400).json({ message: "Enter a valid fault date and time." });
-      }
-      if (photoUrl && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=\s]+$/.test(photoUrl) || photoUrl.length > 2_700_000)) {
-        return res.status(400).json({ message: "Use a JPG, PNG, or WebP fault photo smaller than 2 MB." });
       }
       const data = insertVehicleIssueSchema.parse({
         vehicleId, workerId: req.mobileWorker!.id, reportedAt,
@@ -7526,6 +7532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       const data = insertVehicleInspectionSchema.parse({
         ...body,
+        photoUrl: fleetPhotoEvidence(body.photoUrl, { required: true, label: "Daily vehicle-check photo" }),
         itemsJson: JSON.stringify(items),
         overallResult: items.some(item => item.result === "fail") ? "fail" : "pass",
       });
