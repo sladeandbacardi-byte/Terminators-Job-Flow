@@ -11,6 +11,8 @@ import { MobileShell, type MobileNavItem } from "./mobile-shell";
 import { MobileFleetGuard } from "./mobile-fleet-guard";
 import { MOBILE_FLEET_BOTTOM_NAV, MOBILE_FLEET_OVERVIEW_LAYOUT } from "./mobile-fleet-contract";
 import { mobileFetch } from "@/lib/mobile-auth";
+import { getStaffAccessProfile } from "@shared/permissionMatrix";
+import { allowedMobileNavigation, canAccessMobileScreen } from "./mobile-navigation-contract";
 
 type Screen = "dashboard" | "jobs" | "diaries" | "calendar" | "fleet" | "kmMorning" | "kmAfternoon" | "fuel" | "inspection" | "monthlyInspection" | "issue" | "opportunities";
 type MobileJob = Job & { client: Client };
@@ -58,9 +60,12 @@ const authHeaders = () => ({
 });
 
 export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker; onLogout: () => void }) {
+  const accessProfile = getStaffAccessProfile({ id: worker.id });
+  const mobilePermissions = accessProfile?.permissions ?? [];
   const [screen, setScreen] = useState<Screen>(() => {
     const requested = new URLSearchParams(window.location.search).get("screen");
-    return requested === "fleet" || window.location.pathname === "/fleet" ? "fleet" : "dashboard";
+    return (requested === "fleet" || window.location.pathname === "/fleet")
+      && canAccessMobileScreen("fleet", mobilePermissions) ? "fleet" : "dashboard";
   });
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
@@ -79,12 +84,13 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   const load = async () => {
     setLoading(true);
     try {
-      const [response, fleetResponse] = await Promise.all([
-        mobileFetch("/api/mobile/dashboard", { headers: authHeaders() }),
-        mobileFetch("/api/mobile/fleet/vehicles", { headers: authHeaders() }),
-      ]);
-      if (!response.ok || !fleetResponse.ok) throw new Error(response.status === 401 || fleetResponse.status === 401 ? "Your mobile session has expired. Please sign in again." : "Unable to load your mobile dashboard.");
-      const [dashboardData, fleetData] = await Promise.all([response.json(), fleetResponse.json()]);
+      const response = await mobileFetch("/api/mobile/dashboard", { headers: authHeaders() });
+      const fleetResponse = mobilePermissions.includes("fleet")
+        ? await mobileFetch("/api/mobile/fleet/vehicles", { headers: authHeaders() })
+        : null;
+      if (!response.ok || (fleetResponse && !fleetResponse.ok)) throw new Error(response.status === 401 || fleetResponse?.status === 401 ? "Your mobile session has expired. Please sign in again." : "Unable to load your mobile dashboard.");
+      const dashboardData = await response.json();
+      const fleetData = fleetResponse ? await fleetResponse.json() : [];
       setData(dashboardData);
       setFleetVehicles(fleetData.vehicles ?? []);
       setForm(current => current.vehicleId ? current : { ...current, vehicleId: fleetData.assignedVehicleId || "" });
@@ -179,6 +185,10 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
   };
 
   const nav = (target: Screen) => {
+    if (!canAccessMobileScreen(target, mobilePermissions)) {
+      setScreen("dashboard");
+      return;
+    }
     setScreen(target);
     setNotice("");
     setError("");
@@ -195,15 +205,23 @@ export function MobileTechnicianDashboard({ worker, onLogout }: { worker: Worker
     kmMorning: "Log Morning KMs", kmAfternoon: "Log Afternoon KMs", fuel: "Fuel Fill-up", inspection: "Vehicle Inspection", monthlyInspection: "Monthly Inspection", issue: "Report Issue", opportunities: "Additional Opportunities",
   };
 
-  const mobileNavItems: MobileNavItem[] = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, onSelect: () => nav("dashboard") },
-    { id: "jobs", label: "My Jobs", icon: ListChecks, onSelect: () => nav("jobs") },
-    { id: "my-time", label: "My Time", icon: Clock3, href: "/my-overtime" },
-    { id: "diaries", label: "My Day", icon: ClipboardPenLine, onSelect: () => nav("diaries") },
-    { id: "calendar", label: "Calendar", icon: CalendarDays, onSelect: () => nav("calendar") },
-    { id: "opportunities", label: "Additional Opportunities", icon: Lightbulb, onSelect: () => nav("opportunities") },
-    { id: "fleet", label: "Fleet", icon: Truck, onSelect: () => nav("fleet") },
-  ];
+  const mobileNavItems: MobileNavItem[] = allowedMobileNavigation(mobilePermissions).map(item => {
+    const icon = item.id === "home" ? LayoutDashboard
+      : item.id === "jobs" ? ListChecks
+      : item.id === "my-time" ? Clock3
+      : item.id === "my-day" ? ClipboardPenLine
+      : item.id === "calendar" ? CalendarDays
+      : item.id === "opportunities" ? Lightbulb
+      : Truck;
+    const target = (item.id === "home" ? "dashboard" : item.id === "my-day" ? "diaries" : item.id) as Screen;
+    return {
+      id: item.id === "home" ? "dashboard" : item.id === "my-day" ? "diaries" : item.id,
+      label: item.label,
+      icon,
+      href: item.href,
+      onSelect: item.href ? undefined : () => nav(target),
+    };
+  });
   const openFleetGuard = () => nav("fleet");
   const isFleetScreen = ["fleet", "kmMorning", "kmAfternoon", "fuel", "inspection", "monthlyInspection", "issue"].includes(screen);
   const vehicleSelect = (

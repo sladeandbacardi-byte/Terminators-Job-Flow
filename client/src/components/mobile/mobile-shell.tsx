@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, ChevronRight, LogOut, Menu, X } from "lucide-react";
 import { JobFlowBrandLockup } from "@/components/terminators-logo";
@@ -43,11 +43,97 @@ export function MobileShell({
   children,
 }: MobileShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerHistoryRef = useRef(false);
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  const closeMenu = (restoreHistory = true) => {
+    if (!menuOpen) return;
+    setMenuOpen(false);
+    const hadDrawerHistory = drawerHistoryRef.current;
+    drawerHistoryRef.current = false;
+    if (restoreHistory && hadDrawerHistory) {
+      window.history.back();
+    }
+  };
+
+  const openMenu = () => {
+    if (menuOpen) return;
+    window.history.pushState({ ...(window.history.state ?? {}), mobileDrawer: true }, "");
+    drawerHistoryRef.current = true;
+    setMenuOpen(true);
+  };
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+    const onPopState = () => {
+      drawerHistoryRef.current = false;
+      setMenuOpen(false);
+      const pendingAction = pendingActionRef.current;
+      pendingActionRef.current = null;
+      pendingAction?.();
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const drawer = document.getElementById("mobile-navigation-drawer");
+      if (!drawer) return;
+      const focusable = Array.from(drawer.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])',
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("popstate", onPopState);
+      document.removeEventListener("keydown", onKeyDown);
+      menuButtonRef.current?.focus();
+    };
+  }, [menuOpen]);
 
   const selectItem = (item: MobileNavItem) => {
-    setMenuOpen(false);
-    if (item.onSelect) item.onSelect();
-    else if (item.href) window.location.href = item.href;
+    const activate = () => {
+      if (item.onSelect) item.onSelect();
+      else if (item.href) window.location.assign(item.href);
+    };
+    if (drawerHistoryRef.current) {
+      pendingActionRef.current = activate;
+      drawerHistoryRef.current = false;
+      window.history.back();
+    } else {
+      setMenuOpen(false);
+      activate();
+    }
+  };
+
+  const signOut = () => {
+    if (drawerHistoryRef.current) {
+      pendingActionRef.current = onLogout;
+      drawerHistoryRef.current = false;
+      window.history.back();
+    } else {
+      setMenuOpen(false);
+      onLogout();
+    }
   };
 
   return (
@@ -58,8 +144,12 @@ export function MobileShell({
             <button
               type="button"
               aria-label={onBack ? "Back" : "Open menu"}
-              onClick={onBack ?? (() => setMenuOpen(true))}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+              aria-controls={onBack ? undefined : "mobile-navigation-drawer"}
+              aria-expanded={onBack ? undefined : menuOpen}
+              onClick={onBack ?? openMenu}
+              ref={menuButtonRef}
+              data-testid={onBack ? undefined : "mobile-menu-toggle"}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
             >
               {onBack ? <ArrowLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -76,26 +166,47 @@ export function MobileShell({
         </div>
       </header>}
 
+      {hideHeader && (
+        <button
+          type="button"
+          aria-label="Open menu"
+          aria-controls="mobile-navigation-drawer"
+          aria-expanded={menuOpen}
+          onClick={openMenu}
+          ref={menuButtonRef}
+          data-testid="mobile-menu-toggle"
+          className="fixed left-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
       {menuOpen && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-40" aria-label="Navigation drawer">
           <button
             type="button"
             aria-label="Close menu"
-            className="absolute inset-0 bg-gray-950/40"
-            onClick={() => setMenuOpen(false)}
+            className="absolute inset-0 bg-gray-950/45"
+            onClick={() => closeMenu()}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-gray-200 bg-white shadow-2xl">
+          <aside
+            id="mobile-navigation-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-navigation-title"
+            className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-gray-200 bg-white shadow-2xl"
+          >
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <div className="min-w-0">
                 <JobFlowBrandLockup size="sm" data-testid="mobile-menu-brand-lockup" />
-                <p className="mt-2 truncate text-sm font-semibold text-gray-900">{workerName}</p>
+                <p id="mobile-navigation-title" className="mt-2 truncate text-sm font-semibold text-gray-900">{workerName}</p>
                 <p className="text-xs text-gray-500">{workerRole || "Technician"}</p>
               </div>
               <button
                 type="button"
                 aria-label="Close menu"
-                onClick={() => setMenuOpen(false)}
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                onClick={() => closeMenu()}
+                ref={closeButtonRef}
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -113,7 +224,7 @@ export function MobileShell({
                       key={item.id}
                       type="button"
                       onClick={() => selectItem(item)}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition-colors ${
+                      className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 ${
                         active ? "bg-red-50 text-red-700" : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                     >
@@ -128,8 +239,8 @@ export function MobileShell({
             <div className="border-t border-gray-100 p-4">
               <button
                 type="button"
-                onClick={onLogout}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+                 onClick={signOut}
+                 className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
